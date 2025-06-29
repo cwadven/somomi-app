@@ -93,62 +93,34 @@ const ProfileScreen = () => {
         )}
       </View>
       
-      {/* 제품 관리 섹션 */}
-      <View style={styles.settingsSection}>
-        <Text style={styles.sectionTitle}>제품 관리</Text>
-        
-        <SettingItem 
-          icon="checkmark-done-circle-outline" 
-          title="소진 처리한 상품 보기" 
-          onPress={() => navigation.navigate('ConsumedProducts')}
-        />
-      </View>
+      {/* 로그인 한 경우에만 제품 관리와 앱 설정 표시 */}
+      {isLoggedIn && user && (
+        <>
+          {/* 제품 관리 섹션 */}
+          <View style={styles.settingsSection}>
+            <Text style={styles.sectionTitle}>제품 관리</Text>
+            
+            <SettingItem 
+              icon="checkmark-done-circle-outline" 
+              title="소진 처리한 상품 보기" 
+              onPress={() => navigation.navigate('ConsumedProducts')}
+            />
+          </View>
+          
+          {/* 설정 섹션 */}
+          <View style={styles.settingsSection}>
+            <Text style={styles.sectionTitle}>앱 설정</Text>
+            
+            <SettingItem 
+              icon="notifications-outline" 
+              title="알림 설정" 
+              onPress={() => Alert.alert('알림', '알림 설정 기능은 아직 구현되지 않았습니다.')}
+            />
+          </View>
+        </>
+      )}
       
-      {/* 설정 섹션 */}
-      <View style={styles.settingsSection}>
-        <Text style={styles.sectionTitle}>앱 설정</Text>
-        
-        <SettingItem 
-          icon="notifications-outline" 
-          title="알림 설정" 
-          onPress={() => Alert.alert('알림', '알림 설정 기능은 아직 구현되지 않았습니다.')}
-        />
-        
-        <SettingItem 
-          icon="color-palette-outline" 
-          title="테마 설정" 
-          onPress={() => Alert.alert('알림', '테마 설정 기능은 아직 구현되지 않았습니다.')}
-        />
-        
-        <SettingItem 
-          icon="language-outline" 
-          title="언어 설정" 
-          onPress={() => Alert.alert('알림', '언어 설정 기능은 아직 구현되지 않았습니다.')}
-        />
-      </View>
-      
-      <View style={styles.settingsSection}>
-        <Text style={styles.sectionTitle}>데이터 관리</Text>
-        
-        <SettingItem 
-          icon="cloud-upload-outline" 
-          title="데이터 백업" 
-          onPress={() => Alert.alert('알림', '데이터 백업 기능은 아직 구현되지 않았습니다.')}
-        />
-        
-        <SettingItem 
-          icon="cloud-download-outline" 
-          title="데이터 복원" 
-          onPress={() => Alert.alert('알림', '데이터 복원 기능은 아직 구현되지 않았습니다.')}
-        />
-        
-        <SettingItem 
-          icon="trash-outline" 
-          title="데이터 초기화" 
-          onPress={() => Alert.alert('알림', '데이터 초기화 기능은 아직 구현되지 않았습니다.')}
-        />
-      </View>
-      
+      {/* 정보 섹션은 항상 표시 */}
       <View style={styles.settingsSection}>
         <Text style={styles.sectionTitle}>정보</Text>
         
