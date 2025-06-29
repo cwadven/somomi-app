@@ -6,7 +6,9 @@ import { Ionicons } from '@expo/vector-icons';
 
 // 스크린 임포트
 import HomeScreen from '../screens/HomeScreen';
-import MyProductsScreen from '../screens/MyProductsScreen';
+import LocationsScreen from '../screens/LocationsScreen';
+import LocationDetailScreen from '../screens/LocationDetailScreen';
+import AddLocationScreen from '../screens/AddLocationScreen';
 import AddProductScreen from '../screens/AddProductScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
@@ -38,14 +40,26 @@ const HomeStack = () => {
   );
 };
 
-// 내 목록 스택 네비게이터
-const MyProductsStack = () => {
+// 영역 스택 네비게이터
+const LocationsStack = () => {
   return (
     <Stack.Navigator>
       <Stack.Screen 
-        name="MyProductsScreen" 
-        component={MyProductsScreen} 
-        options={{ title: '내 목록', headerShown: false }}
+        name="LocationsScreen" 
+        component={LocationsScreen} 
+        options={{ title: '영역 목록', headerShown: false }}
+      />
+      <Stack.Screen 
+        name="LocationDetail" 
+        component={LocationDetailScreen} 
+        options={({ route }) => ({ 
+          title: route.params.locationId === 'all' ? '모든 제품' : '영역 상세' 
+        })}
+      />
+      <Stack.Screen 
+        name="AddLocation" 
+        component={AddLocationScreen} 
+        options={{ title: '영역 추가' }}
       />
       <Stack.Screen 
         name="AddProduct" 
@@ -77,8 +91,8 @@ const AppNavigator = () => {
 
             if (route.name === 'Home') {
               iconName = focused ? 'home' : 'home-outline';
-            } else if (route.name === 'MyProducts') {
-              iconName = focused ? 'list' : 'list-outline';
+            } else if (route.name === 'Locations') {
+              iconName = focused ? 'grid' : 'grid-outline';
             } else if (route.name === 'Profile') {
               iconName = focused ? 'person' : 'person-outline';
             }
@@ -95,9 +109,9 @@ const AppNavigator = () => {
           options={{ headerShown: false, title: '홈' }}
         />
         <Tab.Screen 
-          name="MyProducts" 
-          component={MyProductsStack} 
-          options={{ headerShown: false, title: '내 목록' }}
+          name="Locations" 
+          component={LocationsStack} 
+          options={{ headerShown: false, title: '내 영역' }}
         />
         <Tab.Screen 
           name="Profile" 

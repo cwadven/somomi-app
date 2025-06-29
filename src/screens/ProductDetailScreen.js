@@ -15,12 +15,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { fetchProductById, deleteProductAsync } from '../redux/slices/productsSlice';
 
 // HP 바 컴포넌트
-const HPBar = ({ percentage }) => {
+const HPBar = ({ percentage, type }) => {
   // HP 바 색상 계산
-  const getHPColor = () => {
-    if (percentage > 70) return '#4CAF50'; // 녹색
-    if (percentage > 30) return '#FFC107'; // 노란색
-    return '#F44336'; // 빨간색
+  const getHPColor = (value, type) => {
+    if (type === 'expiry') {
+      // 유통기한용 색상 (파란색 계열)
+      if (value > 70) return '#2196F3'; // 파란색
+      if (value > 30) return '#03A9F4'; // 밝은 파란색
+      return '#F44336'; // 빨간색 (위험)
+    } else {
+      // 소진용 색상 (녹색 계열)
+      if (value > 70) return '#4CAF50'; // 녹색
+      if (value > 30) return '#FFC107'; // 노란색
+      return '#FF9800'; // 주황색
+    }
   };
 
   return (
@@ -28,7 +36,7 @@ const HPBar = ({ percentage }) => {
       <View 
         style={[
           styles.hpBar, 
-          { width: `${percentage}%`, backgroundColor: getHPColor() }
+          { width: `${percentage}%`, backgroundColor: getHPColor(percentage, type) }
         ]} 
       />
     </View>
@@ -80,46 +88,55 @@ const ProductDetailScreen = () => {
     );
   }
   
-  // 남은 수명 계산 (%)
-  const calculateRemainingLife = () => {
-    // remainingPercentage가 있으면 그대로 사용
-    if (currentProduct.remainingPercentage !== undefined) {
-      return currentProduct.remainingPercentage;
-    }
-    
-    if (!currentProduct.expiryDate && !currentProduct.estimatedEndDate) return 100;
+  // 유통기한 남은 수명 계산 (%)
+  const calculateExpiryPercentage = () => {
+    if (!currentProduct.expiryDate) return null;
     
     const today = new Date();
-    let targetDate;
-    
-    if (currentProduct.expiryDate) {
-      targetDate = new Date(currentProduct.expiryDate);
-    } else if (currentProduct.estimatedEndDate) {
-      targetDate = new Date(currentProduct.estimatedEndDate);
-    }
-    
+    const expiryDate = new Date(currentProduct.expiryDate);
     const purchaseDate = new Date(currentProduct.purchaseDate);
-    const totalDays = (targetDate - purchaseDate) / (1000 * 60 * 60 * 24);
-    const remainingDays = (targetDate - today) / (1000 * 60 * 60 * 24);
+    
+    const totalDays = (expiryDate - purchaseDate) / (1000 * 60 * 60 * 24);
+    const remainingDays = (expiryDate - today) / (1000 * 60 * 60 * 24);
     
     const percentage = Math.max(0, Math.min(100, (remainingDays / totalDays) * 100));
     return Math.round(percentage);
   };
   
-  // 남은 일수 계산
-  const calculateRemainingDays = () => {
-    if (!currentProduct.expiryDate && !currentProduct.estimatedEndDate) return null;
+  // 소진 예상일 남은 수명 계산 (%)
+  const calculateConsumptionPercentage = () => {
+    if (!currentProduct.estimatedEndDate) return null;
     
     const today = new Date();
-    let targetDate;
+    const endDate = new Date(currentProduct.estimatedEndDate);
+    const purchaseDate = new Date(currentProduct.purchaseDate);
     
-    if (currentProduct.expiryDate) {
-      targetDate = new Date(currentProduct.expiryDate);
-    } else if (currentProduct.estimatedEndDate) {
-      targetDate = new Date(currentProduct.estimatedEndDate);
-    }
+    const totalDays = (endDate - purchaseDate) / (1000 * 60 * 60 * 24);
+    const remainingDays = (endDate - today) / (1000 * 60 * 60 * 24);
     
-    const remainingDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
+    const percentage = Math.max(0, Math.min(100, (remainingDays / totalDays) * 100));
+    return Math.round(percentage);
+  };
+  
+  // 유통기한 남은 일수 계산
+  const calculateExpiryDays = () => {
+    if (!currentProduct.expiryDate) return null;
+    
+    const today = new Date();
+    const expiryDate = new Date(currentProduct.expiryDate);
+    
+    const remainingDays = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+    return remainingDays;
+  };
+  
+  // 소진 예상일 남은 일수 계산
+  const calculateConsumptionDays = () => {
+    if (!currentProduct.estimatedEndDate) return null;
+    
+    const today = new Date();
+    const endDate = new Date(currentProduct.estimatedEndDate);
+    
+    const remainingDays = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
     return remainingDays;
   };
 
@@ -171,8 +188,10 @@ const ProductDetailScreen = () => {
     Alert.alert('알림', '알림 설정 기능은 아직 구현되지 않았습니다.');
   };
 
-  const hpPercentage = calculateRemainingLife();
-  const remainingDays = calculateRemainingDays();
+  const expiryPercentage = calculateExpiryPercentage();
+  const consumptionPercentage = calculateConsumptionPercentage();
+  const expiryDays = calculateExpiryDays();
+  const consumptionDays = calculateConsumptionDays();
   
   // 정보 항목 컴포넌트
   const InfoItem = ({ label, value, icon }) => {
@@ -202,24 +221,70 @@ const ProductDetailScreen = () => {
             <Text style={styles.brandName}>{currentProduct.brand}</Text>
             <Text style={styles.categoryName}>{currentProduct.category}</Text>
           </View>
-          
+        </View>
+      </View>
+      
+      {/* HP 바 섹션 */}
+      <View style={styles.hpSectionContainer}>
+        {expiryPercentage !== null && (
           <View style={styles.hpSection}>
+            <View style={styles.hpHeader}>
+              <View style={styles.hpTitleContainer}>
+                <Ionicons name="alarm-outline" size={18} color="#2196F3" style={styles.hpIcon} />
+                <Text style={styles.hpTitle}>유통기한</Text>
+              </View>
+              <Text style={styles.hpDate}>
+                {new Date(currentProduct.expiryDate).toLocaleDateString()}
+              </Text>
+            </View>
             <View style={styles.hpLabelContainer}>
               <Text style={styles.hpLabel}>남은 수명</Text>
-              <Text style={styles.hpPercentage}>{hpPercentage}%</Text>
+              <Text style={[styles.hpPercentage, { color: '#2196F3' }]}>
+                {expiryPercentage}%
+              </Text>
             </View>
-            <HPBar percentage={hpPercentage} />
-            {remainingDays !== null && (
+            <HPBar percentage={expiryPercentage} type="expiry" />
+            {expiryDays !== null && (
               <Text style={styles.remainingDays}>
-                {remainingDays > 0 
-                  ? `${remainingDays}일 남음` 
-                  : remainingDays === 0 
+                {expiryDays > 0 
+                  ? `${expiryDays}일 남음` 
+                  : expiryDays === 0 
                     ? '오늘까지' 
-                    : `${Math.abs(remainingDays)}일 지남`}
+                    : `${Math.abs(expiryDays)}일 지남`}
               </Text>
             )}
           </View>
-        </View>
+        )}
+        
+        {consumptionPercentage !== null && (
+          <View style={styles.hpSection}>
+            <View style={styles.hpHeader}>
+              <View style={styles.hpTitleContainer}>
+                <Ionicons name="hourglass-outline" size={18} color="#4CAF50" style={styles.hpIcon} />
+                <Text style={styles.hpTitle}>소진 예상</Text>
+              </View>
+              <Text style={styles.hpDate}>
+                {new Date(currentProduct.estimatedEndDate).toLocaleDateString()}
+              </Text>
+            </View>
+            <View style={styles.hpLabelContainer}>
+              <Text style={styles.hpLabel}>남은 수명</Text>
+              <Text style={[styles.hpPercentage, { color: '#4CAF50' }]}>
+                {consumptionPercentage}%
+              </Text>
+            </View>
+            <HPBar percentage={consumptionPercentage} type="consumption" />
+            {consumptionDays !== null && (
+              <Text style={styles.remainingDays}>
+                {consumptionDays > 0 
+                  ? `${consumptionDays}일 남음` 
+                  : consumptionDays === 0 
+                    ? '오늘까지' 
+                    : `${Math.abs(consumptionDays)}일 지남`}
+              </Text>
+            )}
+          </View>
+        )}
       </View>
       
       {/* 제품 정보 */}
@@ -231,22 +296,6 @@ const ProductDetailScreen = () => {
           value={currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate).toLocaleDateString() : null} 
           icon="calendar-outline" 
         />
-        
-        {currentProduct.expiryDate && (
-          <InfoItem 
-            label="유통기한" 
-            value={new Date(currentProduct.expiryDate).toLocaleDateString()} 
-            icon="alarm-outline" 
-          />
-        )}
-        
-        {currentProduct.estimatedEndDate && (
-          <InfoItem 
-            label="예상 소모 완료일" 
-            value={new Date(currentProduct.estimatedEndDate).toLocaleDateString()} 
-            icon="hourglass-outline" 
-          />
-        )}
         
         <InfoItem 
           label="구매 방법" 
@@ -351,7 +400,6 @@ const styles = StyleSheet.create({
   brandCategoryContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
   },
   brandName: {
     fontSize: 14,
@@ -366,8 +414,38 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
+  hpSectionContainer: {
+    backgroundColor: '#fff',
+    padding: 16,
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#E0E0E0',
+  },
   hpSection: {
-    marginTop: 8,
+    marginBottom: 16,
+  },
+  hpHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  hpTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  hpIcon: {
+    marginRight: 6,
+  },
+  hpTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  hpDate: {
+    fontSize: 14,
+    color: '#666',
   },
   hpLabelContainer: {
     flexDirection: 'row',
@@ -377,13 +455,11 @@ const styles = StyleSheet.create({
   },
   hpLabel: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
+    color: '#666',
   },
   hpPercentage: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#4CAF50',
   },
   hpBarContainer: {
     height: 10,

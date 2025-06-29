@@ -3,12 +3,20 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 // HP 바 컴포넌트
-const HPBar = ({ percentage }) => {
+const HPBar = ({ percentage, type }) => {
   // HP 바 색상 계산
-  const getHPColor = () => {
-    if (percentage > 70) return '#4CAF50'; // 녹색
-    if (percentage > 30) return '#FFC107'; // 노란색
-    return '#F44336'; // 빨간색
+  const getHPColor = (value, type) => {
+    if (type === 'expiry') {
+      // 유통기한용 색상 (파란색 계열)
+      if (value > 70) return '#2196F3'; // 파란색
+      if (value > 30) return '#03A9F4'; // 밝은 파란색
+      return '#F44336'; // 빨간색 (위험)
+    } else {
+      // 소진용 색상 (녹색 계열)
+      if (value > 70) return '#4CAF50'; // 녹색
+      if (value > 30) return '#FFC107'; // 노란색
+      return '#FF9800'; // 주황색
+    }
   };
 
   return (
@@ -16,7 +24,7 @@ const HPBar = ({ percentage }) => {
       <View 
         style={[
           styles.hpBar, 
-          { width: `${percentage}%`, backgroundColor: getHPColor() }
+          { width: `${percentage}%`, backgroundColor: getHPColor(percentage, type) }
         ]} 
       />
     </View>
@@ -24,28 +32,31 @@ const HPBar = ({ percentage }) => {
 };
 
 const ProductCard = ({ product, onPress }) => {
-  // 남은 수명 계산 (%)
-  const calculateRemainingLife = () => {
-    // remainingPercentage가 있으면 그대로 사용
-    if (product.remainingPercentage !== undefined) {
-      return product.remainingPercentage;
-    }
-    
-    // 없으면 계산
-    if (!product.expiryDate && !product.estimatedEndDate) return 100;
+  // 유통기한 남은 수명 계산 (%)
+  const calculateExpiryPercentage = () => {
+    if (!product.expiryDate) return null;
     
     const today = new Date();
-    let targetDate;
-    
-    if (product.expiryDate) {
-      targetDate = new Date(product.expiryDate);
-    } else if (product.estimatedEndDate) {
-      targetDate = new Date(product.estimatedEndDate);
-    }
-    
+    const expiryDate = new Date(product.expiryDate);
     const purchaseDate = new Date(product.purchaseDate);
-    const totalDays = (targetDate - purchaseDate) / (1000 * 60 * 60 * 24);
-    const remainingDays = (targetDate - today) / (1000 * 60 * 60 * 24);
+    
+    const totalDays = (expiryDate - purchaseDate) / (1000 * 60 * 60 * 24);
+    const remainingDays = (expiryDate - today) / (1000 * 60 * 60 * 24);
+    
+    const percentage = Math.max(0, Math.min(100, (remainingDays / totalDays) * 100));
+    return Math.round(percentage);
+  };
+
+  // 소진 예상일 남은 수명 계산 (%)
+  const calculateConsumptionPercentage = () => {
+    if (!product.estimatedEndDate) return null;
+    
+    const today = new Date();
+    const endDate = new Date(product.estimatedEndDate);
+    const purchaseDate = new Date(product.purchaseDate);
+    
+    const totalDays = (endDate - purchaseDate) / (1000 * 60 * 60 * 24);
+    const remainingDays = (endDate - today) / (1000 * 60 * 60 * 24);
     
     const percentage = Math.max(0, Math.min(100, (remainingDays / totalDays) * 100));
     return Math.round(percentage);
@@ -64,7 +75,8 @@ const ProductCard = ({ product, onPress }) => {
     return categoryIcons[product.category] || 'cube-outline';
   };
 
-  const hpPercentage = calculateRemainingLife();
+  const expiryPercentage = calculateExpiryPercentage();
+  const consumptionPercentage = calculateConsumptionPercentage();
 
   return (
     <TouchableOpacity style={styles.container} onPress={onPress}>
@@ -78,7 +90,27 @@ const ProductCard = ({ product, onPress }) => {
             <Text style={styles.brand}>{product.brand}</Text>
             <Text style={styles.category}>{product.category}</Text>
           </View>
-          <HPBar percentage={hpPercentage} />
+          
+          {expiryPercentage !== null && (
+            <View style={styles.hpSection}>
+              <View style={styles.hpLabelContainer}>
+                <Text style={styles.hpLabel}>유통기한</Text>
+                <Text style={styles.hpPercentage}>{expiryPercentage}%</Text>
+              </View>
+              <HPBar percentage={expiryPercentage} type="expiry" />
+            </View>
+          )}
+          
+          {consumptionPercentage !== null && (
+            <View style={styles.hpSection}>
+              <View style={styles.hpLabelContainer}>
+                <Text style={styles.hpLabel}>소진 예상</Text>
+                <Text style={styles.hpPercentage}>{consumptionPercentage}%</Text>
+              </View>
+              <HPBar percentage={consumptionPercentage} type="consumption" />
+            </View>
+          )}
+          
           <View style={styles.dateInfo}>
             <Ionicons name="calendar-outline" size={14} color="#666" />
             <Text style={styles.dateText}>
@@ -147,16 +179,32 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  hpBarContainer: {
-    height: 8,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 4,
+  hpSection: {
     marginBottom: 8,
+  },
+  hpLabelContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  hpLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  hpPercentage: {
+    fontSize: 12,
+    color: '#666',
+  },
+  hpBarContainer: {
+    height: 6,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 3,
     overflow: 'hidden',
   },
   hpBar: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 3,
   },
   dateInfo: {
     flexDirection: 'row',
