@@ -43,6 +43,8 @@ const ProductCard = ({ product, onPress }) => {
     const totalDays = (expiryDate - purchaseDate) / (1000 * 60 * 60 * 24);
     const remainingDays = (expiryDate - today) / (1000 * 60 * 60 * 24);
     
+    // 유통기한이 가까워질수록 HP바가 줄어들도록 변경
+    // 남은 일수의 비율을 직접 사용 (구매일부터 유통기한까지의 총 기간 중 남은 비율)
     const percentage = Math.max(0, Math.min(100, (remainingDays / totalDays) * 100));
     return Math.round(percentage);
   };
@@ -58,6 +60,8 @@ const ProductCard = ({ product, onPress }) => {
     const totalDays = (endDate - purchaseDate) / (1000 * 60 * 60 * 24);
     const remainingDays = (endDate - today) / (1000 * 60 * 60 * 24);
     
+    // 소진예상일이 가까워질수록 HP바가 줄어들도록 변경
+    // 남은 일수의 비율을 직접 사용 (구매일부터 소진예상일까지의 총 기간 중 남은 비율)
     const percentage = Math.max(0, Math.min(100, (remainingDays / totalDays) * 100));
     return Math.round(percentage);
   };
@@ -77,25 +81,69 @@ const ProductCard = ({ product, onPress }) => {
 
   const expiryPercentage = calculateExpiryPercentage();
   const consumptionPercentage = calculateConsumptionPercentage();
+  
+  // HP가 0%인지 확인
+  const isZeroHP = (expiryPercentage === 0 || consumptionPercentage === 0);
 
   return (
     <TouchableOpacity style={styles.container} onPress={onPress}>
-      <View style={styles.card}>
-        <View style={styles.characterImageContainer}>
-          <Ionicons name={getCategoryIcon()} size={40} color="#4CAF50" />
+      <View style={[
+        styles.card,
+        isZeroHP && styles.zeroHPCard
+      ]}>
+        <View style={[
+          styles.characterImageContainer,
+          isZeroHP && styles.zeroHPImageContainer
+        ]}>
+          <Ionicons 
+            name={getCategoryIcon()} 
+            size={40} 
+            color={isZeroHP ? "#888" : "#4CAF50"} 
+          />
+          {isZeroHP && (
+            <View style={styles.warningIconContainer}>
+              <Ionicons name="warning" size={20} color="#FFF" />
+            </View>
+          )}
         </View>
         <View style={styles.infoContainer}>
-          <Text style={styles.productName}>{product.name}</Text>
+          <Text style={[
+            styles.productName,
+            isZeroHP && styles.zeroHPText
+          ]}>
+            {product.name}
+            {isZeroHP && " (소진/만료)"}
+          </Text>
           <View style={styles.brandContainer}>
-            <Text style={styles.brand}>{product.brand}</Text>
-            <Text style={styles.category}>{product.category}</Text>
+            <Text style={[
+              styles.brand,
+              isZeroHP && styles.zeroHPSubText
+            ]}>
+              {product.brand}
+            </Text>
+            <Text style={[
+              styles.category,
+              isZeroHP && styles.zeroHPCategory
+            ]}>
+              {product.category}
+            </Text>
           </View>
           
           {expiryPercentage !== null && (
             <View style={styles.hpSection}>
               <View style={styles.hpLabelContainer}>
-                <Text style={styles.hpLabel}>유통기한</Text>
-                <Text style={styles.hpPercentage}>{expiryPercentage}%</Text>
+                <Text style={[
+                  styles.hpLabel,
+                  isZeroHP && styles.zeroHPSubText
+                ]}>
+                  유통기한
+                </Text>
+                <Text style={[
+                  styles.hpPercentage,
+                  isZeroHP && styles.zeroHPSubText
+                ]}>
+                  {expiryPercentage}%
+                </Text>
               </View>
               <HPBar percentage={expiryPercentage} type="expiry" />
             </View>
@@ -104,16 +152,29 @@ const ProductCard = ({ product, onPress }) => {
           {consumptionPercentage !== null && (
             <View style={styles.hpSection}>
               <View style={styles.hpLabelContainer}>
-                <Text style={styles.hpLabel}>소진 예상</Text>
-                <Text style={styles.hpPercentage}>{consumptionPercentage}%</Text>
+                <Text style={[
+                  styles.hpLabel,
+                  isZeroHP && styles.zeroHPSubText
+                ]}>
+                  소진 예상
+                </Text>
+                <Text style={[
+                  styles.hpPercentage,
+                  isZeroHP && styles.zeroHPSubText
+                ]}>
+                  {consumptionPercentage}%
+                </Text>
               </View>
               <HPBar percentage={consumptionPercentage} type="consumption" />
             </View>
           )}
           
           <View style={styles.dateInfo}>
-            <Ionicons name="calendar-outline" size={14} color="#666" />
-            <Text style={styles.dateText}>
+            <Ionicons name="calendar-outline" size={14} color={isZeroHP ? "#888" : "#666"} />
+            <Text style={[
+              styles.dateText,
+              isZeroHP && styles.zeroHPSubText
+            ]}>
               {product.expiryDate 
                 ? `유통기한: ${new Date(product.expiryDate).toLocaleDateString()}`
                 : product.estimatedEndDate 
@@ -144,6 +205,12 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
   },
+  // HP가 0%인 카드의 스타일
+  zeroHPCard: {
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
   characterImageContainer: {
     width: 70,
     height: 70,
@@ -152,6 +219,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    position: 'relative',
+  },
+  // HP가 0%인 이미지 컨테이너 스타일
+  zeroHPImageContainer: {
+    backgroundColor: '#e0e0e0',
+  },
+  // 경고 아이콘 컨테이너
+  warningIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#F44336',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   infoContainer: {
     flex: 1,
@@ -160,6 +244,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 4,
+  },
+  // HP가 0%인 텍스트 스타일
+  zeroHPText: {
+    color: '#888',
+    textDecorationLine: 'line-through',
+  },
+  // HP가 0%인 서브 텍스트 스타일
+  zeroHPSubText: {
+    color: '#888',
   },
   brandContainer: {
     flexDirection: 'row',
@@ -178,6 +271,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
+  },
+  // HP가 0%인 카테고리 스타일
+  zeroHPCategory: {
+    backgroundColor: '#9E9E9E',
   },
   hpSection: {
     marginBottom: 8,

@@ -10,9 +10,11 @@ import LocationsScreen from '../screens/LocationsScreen';
 import LocationDetailScreen from '../screens/LocationDetailScreen';
 import AddLocationScreen from '../screens/AddLocationScreen';
 import AddProductScreen from '../screens/AddProductScreen';
+import EditProductScreen from '../screens/EditProductScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import CategoryScreen from '../screens/CategoryScreen';
+import ConsumedProductsScreen from '../screens/ConsumedProductsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -30,6 +32,11 @@ const HomeStack = () => {
         name="ProductDetail" 
         component={ProductDetailScreen} 
         options={{ title: '제품 상세' }}
+      />
+      <Stack.Screen 
+        name="EditProduct" 
+        component={EditProductScreen} 
+        options={{ title: '제품 수정' }}
       />
       <Stack.Screen 
         name="Category" 
@@ -67,6 +74,11 @@ const LocationsStack = () => {
         options={{ title: '제품 등록' }}
       />
       <Stack.Screen 
+        name="EditProduct" 
+        component={EditProductScreen} 
+        options={{ title: '제품 수정' }}
+      />
+      <Stack.Screen 
         name="ProductDetail" 
         component={ProductDetailScreen} 
         options={{ title: '제품 상세' }}
@@ -75,6 +87,24 @@ const LocationsStack = () => {
         name="Category" 
         component={CategoryScreen} 
         options={{ title: '카테고리' }}
+      />
+    </Stack.Navigator>
+  );
+};
+
+// 프로필 스택 네비게이터
+const ProfileStack = () => {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen 
+        name="ProfileScreen" 
+        component={ProfileScreen} 
+        options={{ title: '프로필', headerShown: false }}
+      />
+      <Stack.Screen 
+        name="ConsumedProducts" 
+        component={ConsumedProductsScreen} 
+        options={{ title: '소진 처리된 상품' }}
       />
     </Stack.Navigator>
   );
@@ -115,8 +145,8 @@ const AppNavigator = () => {
         />
         <Tab.Screen 
           name="Profile" 
-          component={ProfileScreen} 
-          options={{ title: '프로필' }}
+          component={ProfileStack} 
+          options={{ headerShown: false, title: '프로필' }}
         />
       </Tab.Navigator>
     </NavigationContainer>

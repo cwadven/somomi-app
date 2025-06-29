@@ -9,11 +9,13 @@ import {
   Alert
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { logout } from '../redux/slices/authSlice';
 
 const ProfileScreen = () => {
   const dispatch = useDispatch();
+  const navigation = useNavigation();
   const { user, isLoggedIn } = useSelector(state => state.auth);
   
   // 로그아웃 처리
@@ -89,6 +91,17 @@ const ProfileScreen = () => {
             </TouchableOpacity>
           </View>
         )}
+      </View>
+      
+      {/* 제품 관리 섹션 */}
+      <View style={styles.settingsSection}>
+        <Text style={styles.sectionTitle}>제품 관리</Text>
+        
+        <SettingItem 
+          icon="checkmark-done-circle-outline" 
+          title="소진 처리한 상품 보기" 
+          onPress={() => navigation.navigate('ConsumedProducts')}
+        />
       </View>
       
       {/* 설정 섹션 */}
@@ -281,7 +294,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   footer: {
-    padding: 20,
+    padding: 16,
     alignItems: 'center',
   },
   footerText: {

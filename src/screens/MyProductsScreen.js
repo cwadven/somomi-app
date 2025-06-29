@@ -1,19 +1,21 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { fetchProducts } from '../redux/slices/productsSlice';
 import ProductCard from '../components/ProductCard';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
 const MyProductsScreen = ({ navigation }) => {
   const dispatch = useDispatch();
   const { products, status, error } = useSelector((state) => state.products);
 
-  useEffect(() => {
-    if (status === 'idle') {
+  // 화면이 포커스될 때마다 제품 목록 다시 로드
+  useFocusEffect(
+    useCallback(() => {
       dispatch(fetchProducts());
-    }
-  }, [status, dispatch]);
+    }, [dispatch])
+  );
 
   const renderItem = ({ item }) => (
     <ProductCard 
@@ -28,7 +30,7 @@ const MyProductsScreen = ({ navigation }) => {
         <Text style={styles.title}>내 제품 목록</Text>
       </View>
       
-      {status === 'loading' && (
+      {status === 'loading' && products.length === 0 && (
         <View style={styles.centered}>
           <Text>로딩 중...</Text>
         </View>
@@ -46,7 +48,7 @@ const MyProductsScreen = ({ navigation }) => {
         </View>
       )}
       
-      {status === 'succeeded' && products.length > 0 && (
+      {products.length > 0 && (
         <FlatList
           data={products}
           renderItem={renderItem}

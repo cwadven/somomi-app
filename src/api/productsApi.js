@@ -72,6 +72,9 @@ let sampleProducts = [
   },
 ];
 
+// 소진 처리된 제품 목록
+let consumedProducts = [];
+
 // 샘플 카테고리 데이터
 const sampleCategories = [
   { id: '1', name: '식품', icon: 'fast-food' },
@@ -116,10 +119,15 @@ let sampleLocations = [
 // API 서비스 함수
 // 실제 API 구현 시 이 함수들만 수정하면 됩니다.
 export const fetchProductsApi = () => {
-  return new Promise((resolve) => {
-    // API 호출을 시뮬레이션 (0.5초 지연)
+  return new Promise((resolve, reject) => {
     setTimeout(() => {
-      resolve([...sampleProducts]); // 배열 복사본 반환
+      try {
+        // 소진 처리된 제품 제외
+        const activeProducts = sampleProducts.filter(p => !p.isConsumed);
+        resolve([...activeProducts]); // 배열 복사본 반환
+      } catch (error) {
+        reject(new Error('Failed to fetch products'));
+      }
     }, 500);
   });
 };
@@ -189,6 +197,45 @@ export const deleteProductApi = (id) => {
       } else {
         reject(new Error('Product not found'));
       }
+    }, 500);
+  });
+};
+
+// 소진 처리 API 함수
+export const markProductAsConsumedApi = (id) => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const index = sampleProducts.findIndex(p => p.id === id);
+      if (index !== -1) {
+        // 제품 복사
+        const product = { ...sampleProducts[index] };
+        
+        // 소진 처리 정보 추가
+        product.consumedAt = new Date().toISOString();
+        product.isConsumed = true;
+        
+        // 일반 제품 목록에서 제거
+        sampleProducts = [
+          ...sampleProducts.slice(0, index),
+          ...sampleProducts.slice(index + 1)
+        ];
+        
+        // 소진 처리된 제품 목록에 추가
+        consumedProducts = [...consumedProducts, product];
+        
+        resolve(product);
+      } else {
+        reject(new Error('Product not found'));
+      }
+    }, 500);
+  });
+};
+
+// 소진 처리된 제품 목록 조회 API 함수
+export const fetchConsumedProductsApi = () => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve([...consumedProducts]); // 배열 복사본 반환
     }, 500);
   });
 };
@@ -278,14 +325,26 @@ export const deleteLocationApi = (id) => {
   });
 };
 
+// 위치별 제품 목록 조회 API 함수
 export const fetchProductsByLocationApi = (locationId) => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     setTimeout(() => {
-      if (locationId === 'all') {
-        resolve([...sampleProducts]); // 배열 복사본 반환
-      } else {
-        const filteredProducts = sampleProducts.filter(product => product.locationId === locationId);
-        resolve([...filteredProducts]); // 배열 복사본 반환
+      try {
+        let filteredProducts;
+        
+        if (locationId === 'all') {
+          // 모든 제품 (소진 처리된 제품 제외)
+          filteredProducts = sampleProducts.filter(p => !p.isConsumed);
+        } else {
+          // 특정 위치의 제품 (소진 처리된 제품 제외)
+          filteredProducts = sampleProducts.filter(p => 
+            p.locationId === locationId && !p.isConsumed
+          );
+        }
+        
+        resolve(filteredProducts);
+      } catch (error) {
+        reject(new Error('Failed to fetch products by location'));
       }
     }, 500);
   });

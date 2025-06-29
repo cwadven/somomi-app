@@ -4,8 +4,11 @@ import {
   fetchProductByIdApi, 
   addProductApi, 
   updateProductApi, 
-  deleteProductApi 
+  deleteProductApi,
+  markProductAsConsumedApi,
+  fetchConsumedProductsApi
 } from '../../api/productsApi';
+import { deleteLocation } from './locationsSlice';
 
 // 비동기 액션 생성
 export const fetchProducts = createAsyncThunk(
@@ -68,9 +71,37 @@ export const deleteProductAsync = createAsyncThunk(
   }
 );
 
+// 소진 처리 액션
+export const markProductAsConsumedAsync = createAsyncThunk(
+  'products/markAsConsumed',
+  async (id, { rejectWithValue }) => {
+    try {
+      const response = await markProductAsConsumedApi(id);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// 소진 처리된 제품 조회 액션
+export const fetchConsumedProductsAsync = createAsyncThunk(
+  'products/fetchConsumedProducts',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await fetchConsumedProductsApi();
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 const initialState = {
   products: [],
+  consumedProducts: [], // 소진 처리된 제품 목록
   status: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
+  consumedStatus: 'idle', // 소진 처리된 제품 로딩 상태
   error: null,
   currentProduct: null,
 };
@@ -155,6 +186,52 @@ export const productsSlice = createSlice({
       .addCase(deleteProductAsync.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload;
+      })
+      
+      // 소진 처리 액션 처리
+      .addCase(markProductAsConsumedAsync.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(markProductAsConsumedAsync.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        // 일반 제품 목록에서 제거
+        state.products = state.products.filter(product => product.id !== action.payload.id);
+        // 소진 처리된 제품 목록에 추가
+        state.consumedProducts.push(action.payload);
+        // 현재 제품이 소진 처리된 제품이면 초기화
+        if (state.currentProduct && state.currentProduct.id === action.payload.id) {
+          state.currentProduct = null;
+        }
+      })
+      .addCase(markProductAsConsumedAsync.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
+      })
+      
+      // 소진 처리된 제품 조회 액션 처리
+      .addCase(fetchConsumedProductsAsync.pending, (state) => {
+        state.consumedStatus = 'loading';
+      })
+      .addCase(fetchConsumedProductsAsync.fulfilled, (state, action) => {
+        state.consumedStatus = 'succeeded';
+        state.consumedProducts = action.payload;
+      })
+      .addCase(fetchConsumedProductsAsync.rejected, (state, action) => {
+        state.consumedStatus = 'failed';
+        state.error = action.payload;
+      })
+      
+      // 영역 삭제 시 해당 영역의 제품들도 함께 삭제
+      .addCase(deleteLocation.fulfilled, (state, action) => {
+        const deletedLocationId = action.payload;
+        // 일반 제품 목록에서 해당 영역의 제품 제거
+        state.products = state.products.filter(product => product.locationId !== deletedLocationId);
+        // 소진 처리된 제품 목록에서도 해당 영역의 제품 제거
+        state.consumedProducts = state.consumedProducts.filter(product => product.locationId !== deletedLocationId);
+        // 현재 제품이 해당 영역의 제품이면 초기화
+        if (state.currentProduct && state.currentProduct.locationId === deletedLocationId) {
+          state.currentProduct = null;
+        }
       });
   },
 });

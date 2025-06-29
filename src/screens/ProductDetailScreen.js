@@ -7,12 +7,13 @@ import {
   Image, 
   TouchableOpacity,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  Modal
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchProductById, deleteProductAsync } from '../redux/slices/productsSlice';
+import { fetchProductById, deleteProductAsync, markProductAsConsumedAsync } from '../redux/slices/productsSlice';
 
 // HP 바 컴포넌트
 const HPBar = ({ percentage, type }) => {
@@ -50,6 +51,10 @@ const ProductDetailScreen = () => {
   
   const { productId } = route.params;
   const { currentProduct, status, error } = useSelector(state => state.products);
+  
+  // 소진 처리 성공 모달 상태
+  const [showConsumedModal, setShowConsumedModal] = useState(false);
+  const [consumedProduct, setConsumedProduct] = useState(null);
   
   useEffect(() => {
     dispatch(fetchProductById(productId));
@@ -99,6 +104,8 @@ const ProductDetailScreen = () => {
     const totalDays = (expiryDate - purchaseDate) / (1000 * 60 * 60 * 24);
     const remainingDays = (expiryDate - today) / (1000 * 60 * 60 * 24);
     
+    // 유통기한이 가까워질수록 HP바가 줄어들도록 계산
+    // 남은 일수의 비율을 직접 사용 (구매일부터 유통기한까지의 총 기간 중 남은 비율)
     const percentage = Math.max(0, Math.min(100, (remainingDays / totalDays) * 100));
     return Math.round(percentage);
   };
@@ -114,6 +121,8 @@ const ProductDetailScreen = () => {
     const totalDays = (endDate - purchaseDate) / (1000 * 60 * 60 * 24);
     const remainingDays = (endDate - today) / (1000 * 60 * 60 * 24);
     
+    // 소진예상일이 가까워질수록 HP바가 줄어들도록 계산
+    // 남은 일수의 비율을 직접 사용 (구매일부터 소진예상일까지의 총 기간 중 남은 비율)
     const percentage = Math.max(0, Math.min(100, (remainingDays / totalDays) * 100));
     return Math.round(percentage);
   };
@@ -180,18 +189,59 @@ const ProductDetailScreen = () => {
   
   // 제품 수정 화면으로 이동
   const handleEdit = () => {
-    Alert.alert('알림', '제품 수정 기능은 아직 구현되지 않았습니다.');
+    navigation.navigate('EditProduct', { productId: currentProduct.id });
   };
   
   // 알림 설정 화면으로 이동
   const handleNotification = () => {
     Alert.alert('알림', '알림 설정 기능은 아직 구현되지 않았습니다.');
   };
+  
+  // 소진 처리 함수
+  const handleMarkAsConsumed = () => {
+    Alert.alert(
+      '소진 처리',
+      '이 제품을 소진 처리하시겠습니까?\n소진 처리된 제품은 소진 처리 목록으로 이동합니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        { 
+          text: '소진 처리', 
+          style: 'default',
+          onPress: () => {
+            dispatch(markProductAsConsumedAsync(currentProduct.id))
+              .unwrap()
+              .then((result) => {
+                setConsumedProduct(result);
+                setShowConsumedModal(true);
+              })
+              .catch((err) => {
+                Alert.alert('오류', `소진 처리 중 오류가 발생했습니다: ${err.message}`);
+              });
+          }
+        }
+      ]
+    );
+  };
+  
+  // 소진 처리 모달 닫기 및 화면 이동
+  const handleConsumedModalClose = () => {
+    setShowConsumedModal(false);
+    // 이전 화면으로 돌아간 후 Profile 탭의 소진 처리 목록으로 이동
+    navigation.goBack();
+    setTimeout(() => {
+      navigation.navigate('Profile', { screen: 'ConsumedProducts' });
+    }, 100);
+  };
 
   const expiryPercentage = calculateExpiryPercentage();
   const consumptionPercentage = calculateConsumptionPercentage();
   const expiryDays = calculateExpiryDays();
   const consumptionDays = calculateConsumptionDays();
+  
+  // 소진 처리가 필요한지 확인 (HP가 0%인 경우)
+  const needsConsumption = 
+    (expiryPercentage !== null && expiryPercentage === 0) || 
+    (consumptionPercentage !== null && consumptionPercentage === 0);
   
   // 정보 항목 컴포넌트
   const InfoItem = ({ label, value, icon }) => {
@@ -207,6 +257,58 @@ const ProductDetailScreen = () => {
       </View>
     );
   };
+  
+  // 소진 처리 성공 모달
+  const ConsumedModal = () => (
+    <Modal
+      visible={showConsumedModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={handleConsumedModalClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.successIconContainer}>
+            <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
+          </View>
+          
+          <Text style={styles.successTitle}>소진 처리 완료!</Text>
+          
+          <Text style={styles.successMessage}>
+            {consumedProduct?.name} 제품이 성공적으로 소진 처리되었습니다.
+          </Text>
+          
+          <View style={styles.productInfoContainer}>
+            <View style={styles.productInfoRow}>
+              <Text style={styles.productInfoLabel}>제품명:</Text>
+              <Text style={styles.productInfoValue}>{consumedProduct?.name}</Text>
+            </View>
+            
+            {consumedProduct?.brand && (
+              <View style={styles.productInfoRow}>
+                <Text style={styles.productInfoLabel}>브랜드:</Text>
+                <Text style={styles.productInfoValue}>{consumedProduct.brand}</Text>
+              </View>
+            )}
+            
+            <View style={styles.productInfoRow}>
+              <Text style={styles.productInfoLabel}>소진일:</Text>
+              <Text style={styles.productInfoValue}>
+                {consumedProduct ? new Date(consumedProduct.consumedAt).toLocaleDateString() : ''}
+              </Text>
+            </View>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.successButton}
+            onPress={handleConsumedModalClose}
+          >
+            <Text style={styles.successButtonText}>소진 목록 보기</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   return (
     <ScrollView style={styles.container}>
@@ -324,6 +426,19 @@ const ProductDetailScreen = () => {
         </View>
       )}
       
+      {/* 소진 처리 버튼 (HP가 0%인 경우에만 표시) */}
+      {needsConsumption && (
+        <TouchableOpacity 
+          style={styles.consumeButtonContainer}
+          onPress={handleMarkAsConsumed}
+        >
+          <View style={styles.consumeButton}>
+            <Ionicons name="checkmark-circle" size={24} color="#fff" />
+            <Text style={styles.consumeButtonText}>소진 처리하기</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+      
       {/* 작업 버튼 */}
       <View style={styles.actionsContainer}>
         <TouchableOpacity style={styles.actionButton} onPress={handleEdit}>
@@ -344,6 +459,9 @@ const ProductDetailScreen = () => {
           <Text style={styles.actionButtonText}>삭제</Text>
         </TouchableOpacity>
       </View>
+      
+      {/* 소진 처리 성공 모달 */}
+      <ConsumedModal />
     </ScrollView>
   );
 };
@@ -527,6 +645,25 @@ const styles = StyleSheet.create({
     color: '#333',
     lineHeight: 20,
   },
+  // 소진 처리 버튼 스타일
+  consumeButtonContainer: {
+    padding: 16,
+    marginTop: 16,
+  },
+  consumeButton: {
+    backgroundColor: '#FF9800',
+    borderRadius: 8,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  consumeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
   actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -552,6 +689,69 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '500',
     marginLeft: 4,
+  },
+  // 모달 스타일
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 20,
+    width: '80%',
+    maxWidth: 400,
+  },
+  successIconContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  successMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  productInfoContainer: {
+    backgroundColor: '#f9f9f9',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  productInfoRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  productInfoLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666',
+    width: 80,
+  },
+  productInfoValue: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  successButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  successButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

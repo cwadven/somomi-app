@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -15,8 +15,8 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { addLocation } from '../redux/slices/locationsSlice';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { addLocation, updateLocation } from '../redux/slices/locationsSlice';
 
 // 조건부 ImagePicker 임포트
 let ImagePicker;
@@ -47,7 +47,12 @@ const availableIcons = [
 const AddLocationScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
+  const route = useRoute();
   const { status } = useSelector(state => state.locations);
+  
+  // 수정 모드 확인
+  const isEditing = route.params?.isEditing || false;
+  const locationToEdit = route.params?.location || null;
   
   // 폼 상태
   const [title, setTitle] = useState('');
@@ -55,9 +60,19 @@ const AddLocationScreen = () => {
   const [selectedIcon, setSelectedIcon] = useState('cube-outline');
   const [image, setImage] = useState(null);
   
-  // 등록 성공 모달
+  // 등록/수정 성공 모달
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [registeredLocation, setRegisteredLocation] = useState(null);
+
+  // 수정 모드일 경우 기존 데이터 로드
+  useEffect(() => {
+    if (isEditing && locationToEdit) {
+      setTitle(locationToEdit.title || '');
+      setDescription(locationToEdit.description || '');
+      setSelectedIcon(locationToEdit.icon || 'cube-outline');
+      setImage(locationToEdit.image || null);
+    }
+  }, [isEditing, locationToEdit]);
 
   // 폼 유효성 검사
   const isFormValid = () => {
@@ -121,27 +136,45 @@ const AddLocationScreen = () => {
     }
   };
 
-  // 영역 등록 처리
+  // 영역 등록/수정 처리
   const handleSubmit = () => {
     if (!isFormValid()) return;
     
-    const newLocation = {
+    const locationData = {
       title,
       description,
       icon: selectedIcon,
       image,
     };
     
-    dispatch(addLocation(newLocation))
-      .unwrap()
-      .then((result) => {
-        // 등록된 영역 정보 저장 및 성공 모달 표시
-        setRegisteredLocation(result);
-        setShowSuccessModal(true);
-      })
-      .catch((error) => {
-        Alert.alert('오류', `영역 등록에 실패했습니다: ${error.message}`);
-      });
+    if (isEditing) {
+      // 수정 모드: 기존 ID 포함
+      const updatedLocation = {
+        ...locationData,
+        id: locationToEdit.id
+      };
+      
+      dispatch(updateLocation(updatedLocation))
+        .unwrap()
+        .then((result) => {
+          setRegisteredLocation(result);
+          setShowSuccessModal(true);
+        })
+        .catch((error) => {
+          Alert.alert('오류', `영역 수정에 실패했습니다: ${error.message}`);
+        });
+    } else {
+      // 신규 등록 모드
+      dispatch(addLocation(locationData))
+        .unwrap()
+        .then((result) => {
+          setRegisteredLocation(result);
+          setShowSuccessModal(true);
+        })
+        .catch((error) => {
+          Alert.alert('오류', `영역 등록에 실패했습니다: ${error.message}`);
+        });
+    }
   };
   
   // 성공 모달 닫기 및 화면 이동
@@ -179,7 +212,7 @@ const AddLocationScreen = () => {
     </View>
   );
   
-  // 등록 성공 모달
+  // 등록/수정 성공 모달
   const SuccessModal = () => (
     <Modal
       visible={showSuccessModal}
@@ -193,10 +226,10 @@ const AddLocationScreen = () => {
             <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
           </View>
           
-          <Text style={styles.successTitle}>등록 완료!</Text>
+          <Text style={styles.successTitle}>{isEditing ? '수정 완료!' : '등록 완료!'}</Text>
           
           <Text style={styles.successMessage}>
-            "{registeredLocation?.title}" 영역이 성공적으로 등록되었습니다.
+            "{registeredLocation?.title}" 영역이 성공적으로 {isEditing ? '수정' : '등록'}되었습니다.
           </Text>
           
           <View style={styles.locationInfoContainer}>
@@ -236,7 +269,7 @@ const AddLocationScreen = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Text style={styles.title}>영역 추가</Text>
+        <Text style={styles.title}>{isEditing ? '영역 수정' : '영역 추가'}</Text>
         
         {/* 영역 제목 입력 */}
         <View style={styles.inputGroup}>
@@ -251,57 +284,45 @@ const AddLocationScreen = () => {
         
         {/* 영역 설명 입력 */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>영역 설명 (선택)</Text>
+          <Text style={styles.label}>영역 설명</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
             value={description}
             onChangeText={setDescription}
-            placeholder="이 영역에 대한 설명을 입력하세요"
+            placeholder="영역에 대한 설명을 입력하세요 (선택사항)"
             multiline
             numberOfLines={4}
-            textAlignVertical="top"
           />
         </View>
         
         {/* 아이콘 선택 */}
         <IconSelector />
         
-        {/* 이미지 선택 */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>영역 이미지 (선택)</Text>
-          <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
-            {image ? (
-              <Image source={{ uri: image }} style={styles.previewImage} />
-            ) : (
-              <View style={styles.imagePlaceholder}>
-                <Ionicons name="image-outline" size={40} color="#CCCCCC" />
-                <Text style={styles.imagePlaceholderText}>이미지 선택</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+        {/* 이미지 선택 (향후 구현) */}
+        <View style={styles.imageSection}>
+          <Text style={styles.sectionTitle}>대표 이미지 (선택사항)</Text>
+          <Text style={styles.imageDescription}>
+            현재 버전에서는 이미지 업로드가 지원되지 않습니다.
+          </Text>
         </View>
         
-        {/* 등록 버튼 */}
+        {/* 등록/수정 버튼 */}
         <TouchableOpacity 
-          style={[
-            styles.submitButton,
-            status === 'loading' && styles.disabledButton
-          ]} 
+          style={styles.submitButton}
           onPress={handleSubmit}
           disabled={status === 'loading'}
         >
           {status === 'loading' ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#ffffff" />
-              <Text style={[styles.submitButtonText, styles.loadingText]}>등록 중...</Text>
-            </View>
+            <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.submitButtonText}>영역 등록</Text>
+            <Text style={styles.submitButtonText}>
+              {isEditing ? '영역 수정하기' : '영역 등록하기'}
+            </Text>
           )}
         </TouchableOpacity>
       </ScrollView>
       
-      {/* 등록 성공 모달 */}
+      {/* 성공 모달 */}
       <SuccessModal />
     </KeyboardAvoidingView>
   );
@@ -310,7 +331,7 @@ const AddLocationScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f8f8',
   },
   scrollContainer: {
     padding: 16,
@@ -328,97 +349,67 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 8,
     color: '#333',
-    fontWeight: '500',
   },
   input: {
     backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
   },
   textArea: {
-    height: 100,
+    minHeight: 100,
+    textAlignVertical: 'top',
   },
   iconSelectorContainer: {
     marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 16,
-    marginBottom: 8,
-    color: '#333',
     fontWeight: '500',
+    marginBottom: 12,
+    color: '#333',
   },
   iconsList: {
-    flexDirection: 'row',
     paddingVertical: 8,
-    flexWrap: 'wrap',
   },
   iconItem: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#fff',
+    backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#ddd',
   },
   selectedIconItem: {
     backgroundColor: '#4CAF50',
     borderColor: '#4CAF50',
   },
-  imagePickerButton: {
-    width: '100%',
-    height: 150,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    overflow: 'hidden',
+  imageSection: {
+    marginBottom: 20,
   },
-  imagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imagePlaceholderText: {
-    marginTop: 8,
-    color: '#999',
+  imageDescription: {
+    color: '#666',
     fontSize: 14,
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
+    marginBottom: 8,
   },
   submitButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 8,
-    padding: 16,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 16,
-  },
-  disabledButton: {
-    backgroundColor: '#A5D6A7',
+    marginTop: 20,
   },
   submitButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginLeft: 8,
-  },
+  // 모달 스타일
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

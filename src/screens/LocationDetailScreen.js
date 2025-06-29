@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -6,12 +6,14 @@ import {
   FlatList, 
   TouchableOpacity, 
   ActivityIndicator,
-  Image
+  Image,
+  Alert,
+  Modal
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchLocationById, fetchProductsByLocation } from '../redux/slices/locationsSlice';
+import { fetchLocationById, fetchProductsByLocation, deleteLocation, updateLocation } from '../redux/slices/locationsSlice';
 import ProductCard from '../components/ProductCard';
 
 const LocationDetailScreen = () => {
@@ -29,14 +31,19 @@ const LocationDetailScreen = () => {
     error 
   } = useSelector(state => state.locations);
   
+  const { products: allProducts } = useSelector(state => state.products);
   const [products, setProducts] = useState([]);
+  
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  useEffect(() => {
-    if (!isAllProducts) {
-      dispatch(fetchLocationById(locationId));
-    }
-    dispatch(fetchProductsByLocation(locationId));
-  }, [dispatch, locationId, isAllProducts]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAllProducts) {
+        dispatch(fetchLocationById(locationId));
+      }
+      dispatch(fetchProductsByLocation(locationId));
+    }, [dispatch, locationId, isAllProducts])
+  );
 
   useEffect(() => {
     if (locationProducts && locationProducts[locationId]) {
@@ -51,12 +58,96 @@ const LocationDetailScreen = () => {
   const handleProductPress = (productId) => {
     navigation.navigate('ProductDetail', { productId });
   };
+  
+  const handleEditLocation = () => {
+    if (isAllProducts) return;
+    
+    navigation.navigate('AddLocation', { 
+      isEditing: true, 
+      location: currentLocation 
+    });
+  };
+  
+  const handleDeleteLocation = () => {
+    if (isAllProducts) return;
+    
+    if (products && products.length > 0) {
+      setShowDeleteModal(true);
+    } else {
+      confirmDeleteLocation();
+    }
+  };
+  
+  const confirmDeleteLocation = () => {
+    Alert.alert(
+      '영역 삭제',
+      '이 영역을 삭제하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel', onPress: () => setShowDeleteModal(false) },
+        { 
+          text: '삭제', 
+          style: 'destructive',
+          onPress: () => {
+            setShowDeleteModal(false);
+            dispatch(deleteLocation(locationId))
+              .unwrap()
+              .then(() => {
+                navigation.goBack();
+              })
+              .catch((err) => {
+                Alert.alert('오류', `영역 삭제 중 오류가 발생했습니다: ${err.message}`);
+              });
+          }
+        }
+      ]
+    );
+  };
 
   const renderItem = ({ item }) => (
     <ProductCard 
       product={item} 
       onPress={() => handleProductPress(item.id)}
     />
+  );
+  
+  const DeleteConfirmModal = () => (
+    <Modal
+      visible={showDeleteModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowDeleteModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.warningIconContainer}>
+            <Ionicons name="warning" size={60} color="#FF9800" />
+          </View>
+          
+          <Text style={styles.warningTitle}>주의!</Text>
+          
+          <Text style={styles.warningMessage}>
+            이 영역에는 {products.length}개의 제품이 등록되어 있습니다.
+            영역을 삭제하면 모든 제품 데이터가 함께 삭제됩니다.
+          </Text>
+          
+          <View style={styles.modalButtonContainer}>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={() => setShowDeleteModal(false)}
+            >
+              <Text style={styles.cancelButtonText}>취소</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.deleteButton]}
+              onPress={confirmDeleteLocation}
+            >
+              <Text style={styles.deleteButtonText}>삭제</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 
   if (status === 'loading' && !products.length) {
@@ -101,12 +192,30 @@ const LocationDetailScreen = () => {
               />
             </View>
           )}
-          <View>
+          <View style={styles.headerTextContainer}>
             <Text style={styles.title}>{title}</Text>
             {!isAllProducts && currentLocation && (
               <Text style={styles.description}>{currentLocation.description}</Text>
             )}
           </View>
+          
+          {!isAllProducts && (
+            <View style={styles.headerActions}>
+              <TouchableOpacity 
+                style={styles.headerActionButton}
+                onPress={handleEditLocation}
+              >
+                <Ionicons name="create-outline" size={24} color="#4CAF50" />
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.headerActionButton}
+                onPress={handleDeleteLocation}
+              >
+                <Ionicons name="trash-outline" size={24} color="#F44336" />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
       
@@ -131,6 +240,8 @@ const LocationDetailScreen = () => {
       >
         <Ionicons name="add" size={30} color="white" />
       </TouchableOpacity>
+      
+      <DeleteConfirmModal />
     </View>
   );
 };
@@ -159,6 +270,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 16,
   },
+  headerTextContainer: {
+    flex: 1,
+  },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -168,6 +282,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerActionButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   listContainer: {
     padding: 16,
@@ -222,6 +344,62 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 20,
+    width: '80%',
+    maxWidth: 400,
+  },
+  warningIconContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  warningTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FF9800',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  warningMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  deleteButton: {
+    backgroundColor: '#F44336',
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 
