@@ -4,8 +4,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
-// 스크린 임포트 (나중에 구현)
+// 스크린 임포트
 import HomeScreen from '../screens/HomeScreen';
+import MyProductsScreen from '../screens/MyProductsScreen';
 import AddProductScreen from '../screens/AddProductScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
@@ -37,6 +38,34 @@ const HomeStack = () => {
   );
 };
 
+// 내 목록 스택 네비게이터
+const MyProductsStack = () => {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen 
+        name="MyProductsScreen" 
+        component={MyProductsScreen} 
+        options={{ title: '내 목록', headerShown: false }}
+      />
+      <Stack.Screen 
+        name="AddProduct" 
+        component={AddProductScreen} 
+        options={{ title: '제품 등록' }}
+      />
+      <Stack.Screen 
+        name="ProductDetail" 
+        component={ProductDetailScreen} 
+        options={{ title: '제품 상세' }}
+      />
+      <Stack.Screen 
+        name="Category" 
+        component={CategoryScreen} 
+        options={{ title: '카테고리' }}
+      />
+    </Stack.Navigator>
+  );
+};
+
 // 메인 탭 네비게이터
 const AppNavigator = () => {
   return (
@@ -48,8 +77,8 @@ const AppNavigator = () => {
 
             if (route.name === 'Home') {
               iconName = focused ? 'home' : 'home-outline';
-            } else if (route.name === 'AddProduct') {
-              iconName = focused ? 'add-circle' : 'add-circle-outline';
+            } else if (route.name === 'MyProducts') {
+              iconName = focused ? 'list' : 'list-outline';
             } else if (route.name === 'Profile') {
               iconName = focused ? 'person' : 'person-outline';
             }
@@ -66,9 +95,9 @@ const AppNavigator = () => {
           options={{ headerShown: false, title: '홈' }}
         />
         <Tab.Screen 
-          name="AddProduct" 
-          component={AddProductScreen} 
-          options={{ title: '제품 등록' }}
+          name="MyProducts" 
+          component={MyProductsStack} 
+          options={{ headerShown: false, title: '내 목록' }}
         />
         <Tab.Screen 
           name="Profile" 

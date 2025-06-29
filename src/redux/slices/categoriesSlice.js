@@ -1,4 +1,5 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { fetchCategoriesApi } from '../../api/productsApi';
 
 // 기본 카테고리 정의
 const defaultCategories = [
@@ -9,9 +10,22 @@ const defaultCategories = [
   { id: '5', name: '휴지', description: '화장지, 키친타올 등 종이 제품' },
 ];
 
+// 비동기 액션 생성
+export const fetchCategories = createAsyncThunk(
+  'categories/fetchCategories',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await fetchCategoriesApi();
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 const initialState = {
   categories: defaultCategories,
-  loading: false,
+  status: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
   error: null,
 };
 
@@ -39,14 +53,28 @@ export const categoriesSlice = createSlice({
     setCategories: (state, action) => {
       state.categories = action.payload;
     },
-    // 로딩 상태 설정
-    setLoading: (state, action) => {
-      state.loading = action.payload;
-    },
     // 에러 상태 설정
     setError: (state, action) => {
       state.error = action.payload;
     },
+    clearError: (state) => {
+      state.error = null;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      // fetchCategories 처리
+      .addCase(fetchCategories.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(fetchCategories.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.categories = action.payload;
+      })
+      .addCase(fetchCategories.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
+      });
   },
 });
 
@@ -55,8 +83,8 @@ export const {
   updateCategory, 
   deleteCategory, 
   setCategories,
-  setLoading,
-  setError
+  setError,
+  clearError
 } = categoriesSlice.actions;
 
 export default categoriesSlice.reducer; 

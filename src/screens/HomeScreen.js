@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -6,152 +6,106 @@ import {
   FlatList, 
   TouchableOpacity, 
   SafeAreaView,
-  TextInput
+  TextInput,
+  Image,
+  ScrollView,
+  ActivityIndicator
 } from 'react-native';
-import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import ProductCard from '../components/ProductCard';
+import { fetchPopularProductsApi } from '../api/productsApi';
 
-const HomeScreen = () => {
-  const { products } = useSelector(state => state.products);
-  const { categories } = useSelector(state => state.categories);
-  
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [filteredProducts, setFilteredProducts] = useState([]);
-  const [filterType, setFilterType] = useState('all'); // 'all', 'expiringSoon', 'lowHP'
+const HomeScreen = ({ navigation }) => {
+  const [popularProducts, setPopularProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // 필터링된 제품 목록 업데이트
+  // 인기 상품 데이터 로드
   useEffect(() => {
-    let result = [...products];
-    
-    // 검색어 필터링
-    if (searchQuery) {
-      result = result.filter(product => 
-        product.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-    
-    // 카테고리 필터링
-    if (selectedCategory) {
-      result = result.filter(product => product.categoryId === selectedCategory);
-    }
-    
-    // 특별 필터 적용
-    if (filterType === 'expiringSoon') {
-      // 유통기한이 7일 이내인 제품
-      const today = new Date();
-      const sevenDaysLater = new Date(today.setDate(today.getDate() + 7));
-      
-      result = result.filter(product => {
-        if (!product.expiryDate) return false;
-        const expiryDate = new Date(product.expiryDate);
-        return expiryDate <= sevenDaysLater;
-      });
-    } else if (filterType === 'lowHP') {
-      // HP가 30% 이하인 제품
-      result = result.filter(product => {
-        if (!product.expiryDate && !product.estimatedEndDate) return false;
-        
-        const today = new Date();
-        let targetDate;
-        
-        if (product.expiryDate) {
-          targetDate = new Date(product.expiryDate);
-        } else if (product.estimatedEndDate) {
-          targetDate = new Date(product.estimatedEndDate);
-        }
-        
-        const purchaseDate = new Date(product.purchaseDate);
-        const totalDays = (targetDate - purchaseDate) / (1000 * 60 * 60 * 24);
-        const remainingDays = (targetDate - today) / (1000 * 60 * 60 * 24);
-        
-        const percentage = (remainingDays / totalDays) * 100;
-        return percentage <= 30;
-      });
-    }
-    
-    setFilteredProducts(result);
-  }, [products, searchQuery, selectedCategory, filterType]);
+    const loadPopularProducts = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchPopularProductsApi();
+        setPopularProducts(data);
+        setLoading(false);
+      } catch (err) {
+        setError(err.message);
+        setLoading(false);
+      }
+    };
 
-  // 필터 버튼 컴포넌트
-  const FilterButton = ({ title, type, icon }) => (
-    <TouchableOpacity 
-      style={[
-        styles.filterButton,
-        filterType === type && styles.activeFilterButton
-      ]}
-      onPress={() => setFilterType(type)}
-    >
-      <Ionicons 
-        name={icon} 
-        size={16} 
-        color={filterType === type ? '#fff' : '#4CAF50'} 
-      />
-      <Text 
-        style={[
-          styles.filterButtonText,
-          filterType === type && styles.activeFilterButtonText
-        ]}
-      >
-        {title}
-      </Text>
-    </TouchableOpacity>
-  );
+    loadPopularProducts();
+  }, []);
 
-  // 카테고리 칩 컴포넌트
-  const CategoryChip = ({ category }) => (
-    <TouchableOpacity 
-      style={[
-        styles.categoryChip,
-        selectedCategory === category.id && styles.activeCategoryChip
-      ]}
-      onPress={() => {
-        setSelectedCategory(selectedCategory === category.id ? null : category.id);
-      }}
-    >
-      <Text 
-        style={[
-          styles.categoryChipText,
-          selectedCategory === category.id && styles.activeCategoryChipText
-        ]}
-      >
-        {category.name}
-      </Text>
-    </TouchableOpacity>
-  );
+  // 배너 데이터
+  const banners = [
+    { id: '1', title: '소모품 관리의 시작, 소모미', description: '지금 시작하세요!' },
+    { id: '2', title: '이달의 추천 생활용품', description: '최대 30% 할인' },
+    { id: '3', title: '소모품 관리 팁', description: '효율적인 관리 방법' },
+  ];
 
-  // 샘플 데이터 (실제 구현 시 제거)
-  const sampleProducts = [
-    {
-      id: '1',
-      name: '바디워시',
-      category: '화장품',
-      categoryId: '2',
-      purchaseDate: '2025-05-01',
-      estimatedEndDate: '2025-07-15',
-      expiryDate: '2026-05-01',
+  // 팁 데이터
+  const tips = [
+    { 
+      id: '1', 
+      title: '치약 보관 방법', 
+      content: '치약은 직사광선을 피해 서늘한 곳에 보관하면 유통기한을 더 오래 유지할 수 있습니다.' 
     },
-    {
-      id: '2',
-      name: '세탁세제',
-      category: '세제',
-      categoryId: '3',
-      purchaseDate: '2025-04-15',
-      estimatedEndDate: '2025-06-30',
+    { 
+      id: '2', 
+      title: '세제 사용량', 
+      content: '세제는 제품 지침보다 약간 적게 사용해도 충분한 세척력을 발휘합니다. 경제적이고 환경에도 좋아요!' 
     },
-    {
-      id: '3',
-      name: '우유',
-      category: '식품',
-      categoryId: '1',
-      purchaseDate: '2025-06-20',
-      expiryDate: '2025-06-30',
+    { 
+      id: '3', 
+      title: '화장품 유통기한', 
+      content: '개봉 후 화장품은 보통 6개월~1년 내에 사용하는 것이 좋습니다.' 
     },
   ];
 
-  // 렌더링할 제품 목록 (실제 데이터가 없을 경우 샘플 데이터 사용)
-  const productsToRender = filteredProducts.length > 0 ? filteredProducts : sampleProducts;
+  // 배너 렌더링
+  const renderBanner = ({ item }) => (
+    <TouchableOpacity style={styles.bannerItem}>
+      <View style={styles.bannerContent}>
+        <Text style={styles.bannerTitle}>{item.title}</Text>
+        <Text style={styles.bannerDescription}>{item.description}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  // 추천 상품 렌더링
+  const renderRecommendedProduct = ({ item }) => (
+    <TouchableOpacity 
+      style={styles.recommendedProductItem}
+      onPress={() => navigation.navigate('MyProducts', { 
+        screen: 'ProductDetail', 
+        params: { productId: item.id } 
+      })}
+    >
+      <View style={styles.recommendedProductImageContainer}>
+        <View style={styles.recommendedProductImage}>
+          <Ionicons name="cube-outline" size={40} color="#4CAF50" />
+        </View>
+      </View>
+      <Text style={styles.recommendedProductBrand}>{item.brand}</Text>
+      <Text style={styles.recommendedProductName}>{item.name}</Text>
+      <View style={styles.recommendedProductPopularity}>
+        <Ionicons name="star" size={12} color="#FFD700" />
+        <Text style={styles.recommendedProductPopularityText}>인기도 {item.popularity}%</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  // 팁 렌더링
+  const renderTip = ({ item }) => (
+    <TouchableOpacity style={styles.tipItem}>
+      <Ionicons name="bulb-outline" size={24} color="#4CAF50" style={styles.tipIcon} />
+      <View style={styles.tipContent}>
+        <Text style={styles.tipTitle}>{item.title}</Text>
+        <Text style={styles.tipText}>{item.content}</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -167,35 +121,67 @@ const HomeScreen = () => {
         <TextInput
           style={styles.searchInput}
           placeholder="제품 검색"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
         />
       </View>
       
-      <View style={styles.filterContainer}>
-        <FilterButton title="전체" type="all" icon="apps-outline" />
-        <FilterButton title="유통기한 임박" type="expiringSoon" icon="alert-circle-outline" />
-        <FilterButton title="소진 임박" type="lowHP" icon="battery-dead-outline" />
-      </View>
-      
-      <View style={styles.categoriesContainer}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={categories}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <CategoryChip category={item} />}
-          contentContainerStyle={styles.categoriesList}
-        />
-      </View>
-      
-      <FlatList
-        data={productsToRender}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ProductCard product={item} />}
-        contentContainerStyle={styles.productsList}
-        showsVerticalScrollIndicator={false}
-      />
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* 배너 섹션 */}
+        <View style={styles.section}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={banners}
+            renderItem={renderBanner}
+            keyExtractor={item => item.id}
+            pagingEnabled
+            snapToAlignment="center"
+            contentContainerStyle={styles.bannerList}
+          />
+        </View>
+        
+        {/* 추천 상품 섹션 */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>인기 상품</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>전체보기</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#4CAF50" />
+            </View>
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>데이터를 불러올 수 없습니다.</Text>
+            </View>
+          ) : (
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={popularProducts}
+              renderItem={renderRecommendedProduct}
+              keyExtractor={item => item.id}
+              contentContainerStyle={styles.recommendedProductsList}
+            />
+          )}
+        </View>
+        
+        {/* 팁 섹션 */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>소모품 관리 팁</Text>
+          </View>
+          <FlatList
+            data={tips}
+            renderItem={renderTip}
+            keyExtractor={item => item.id}
+            scrollEnabled={false}
+            contentContainerStyle={styles.tipsList}
+          />
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -239,59 +225,141 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  filterContainer: {
+  section: {
+    marginVertical: 12,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginVertical: 8,
-  },
-  filterButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E8F5E9',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
-  activeFilterButton: {
-    backgroundColor: '#4CAF50',
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
-  filterButtonText: {
-    marginLeft: 4,
+  seeAllText: {
     fontSize: 14,
     color: '#4CAF50',
   },
-  activeFilterButtonText: {
+  bannerList: {
+    paddingLeft: 16,
+  },
+  bannerItem: {
+    width: 300,
+    height: 150,
+    marginRight: 16,
+    borderRadius: 12,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  bannerContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  bannerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  bannerDescription: {
+    fontSize: 14,
     color: '#fff',
   },
-  categoriesContainer: {
-    marginVertical: 8,
+  recommendedProductsList: {
+    paddingLeft: 16,
   },
-  categoriesList: {
+  recommendedProductItem: {
+    width: 120,
+    marginRight: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  recommendedProductImageContainer: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  recommendedProductImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recommendedProductBrand: {
+    fontSize: 12,
+    color: '#888',
+  },
+  recommendedProductName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 4,
+  },
+  recommendedProductPopularity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  recommendedProductPopularityText: {
+    fontSize: 12,
+    color: '#888',
+    marginLeft: 4,
+  },
+  tipsList: {
     paddingHorizontal: 16,
   },
-  categoryChip: {
+  tipItem: {
+    flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  activeCategoryChip: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
-  },
-  categoryChipText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  activeCategoryChipText: {
-    color: '#fff',
-  },
-  productsList: {
+    borderRadius: 12,
     padding: 16,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  tipIcon: {
+    marginRight: 12,
+  },
+  tipContent: {
+    flex: 1,
+  },
+  tipTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  tipText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  loadingContainer: {
+    height: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    height: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: 'red',
   },
 });
 

@@ -6,12 +6,13 @@ import {
   ScrollView, 
   Image, 
   TouchableOpacity,
-  Alert
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { deleteProduct } from '../redux/slices/productsSlice';
+import { fetchProductById, deleteProductAsync } from '../redux/slices/productsSlice';
 
 // HP 바 컴포넌트
 const HPBar = ({ percentage }) => {
@@ -40,85 +41,64 @@ const ProductDetailScreen = () => {
   const dispatch = useDispatch();
   
   const { productId } = route.params;
-  const { products } = useSelector(state => state.products);
-  const { categories } = useSelector(state => state.categories);
-  
-  // 제품 정보 가져오기
-  const [product, setProduct] = useState(null);
+  const { currentProduct, status, error } = useSelector(state => state.products);
   
   useEffect(() => {
-    // 실제 제품 데이터가 있으면 해당 데이터 사용
-    const foundProduct = products.find(p => p.id === productId);
-    
-    // 실제 데이터가 없으면 샘플 데이터 사용 (개발용)
-    if (foundProduct) {
-      setProduct(foundProduct);
-    } else {
-      // 샘플 데이터
-      const sampleProducts = [
-        {
-          id: '1',
-          name: '바디워시',
-          category: '화장품',
-          categoryId: '2',
-          purchaseDate: '2025-05-01',
-          estimatedEndDate: '2025-07-15',
-          expiryDate: '2026-05-01',
-          purchaseMethod: '온라인 쇼핑몰',
-          purchaseLink: 'https://example.com/product',
-          price: 12000,
-          memo: '향이 좋아서 구매함',
-        },
-        {
-          id: '2',
-          name: '세탁세제',
-          category: '세제',
-          categoryId: '3',
-          purchaseDate: '2025-04-15',
-          estimatedEndDate: '2025-06-30',
-          purchaseMethod: '마트',
-          price: 15000,
-        },
-        {
-          id: '3',
-          name: '우유',
-          category: '식품',
-          categoryId: '1',
-          purchaseDate: '2025-06-20',
-          expiryDate: '2025-06-30',
-          purchaseMethod: '편의점',
-          price: 3000,
-        },
-      ];
-      
-      const sampleProduct = sampleProducts.find(p => p.id === productId);
-      setProduct(sampleProduct);
-    }
-  }, [productId, products]);
+    dispatch(fetchProductById(productId));
+  }, [dispatch, productId]);
   
-  // 제품 데이터가 없을 경우 로딩 화면 표시
-  if (!product) {
+  // 제품 데이터가 로딩 중일 경우 로딩 화면 표시
+  if (status === 'loading') {
     return (
       <View style={styles.loadingContainer}>
-        <Text>로딩 중...</Text>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
+  
+  // 에러가 발생한 경우 에러 메시지 표시
+  if (status === 'failed') {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.errorText}>오류: {error}</Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={() => dispatch(fetchProductById(productId))}
+        >
+          <Text style={styles.retryButtonText}>다시 시도</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+  
+  // 제품 데이터가 없을 경우 메시지 표시
+  if (!currentProduct) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>제품을 찾을 수 없습니다.</Text>
       </View>
     );
   }
   
   // 남은 수명 계산 (%)
   const calculateRemainingLife = () => {
-    if (!product.expiryDate && !product.estimatedEndDate) return 100;
+    // remainingPercentage가 있으면 그대로 사용
+    if (currentProduct.remainingPercentage !== undefined) {
+      return currentProduct.remainingPercentage;
+    }
+    
+    if (!currentProduct.expiryDate && !currentProduct.estimatedEndDate) return 100;
     
     const today = new Date();
     let targetDate;
     
-    if (product.expiryDate) {
-      targetDate = new Date(product.expiryDate);
-    } else if (product.estimatedEndDate) {
-      targetDate = new Date(product.estimatedEndDate);
+    if (currentProduct.expiryDate) {
+      targetDate = new Date(currentProduct.expiryDate);
+    } else if (currentProduct.estimatedEndDate) {
+      targetDate = new Date(currentProduct.estimatedEndDate);
     }
     
-    const purchaseDate = new Date(product.purchaseDate);
+    const purchaseDate = new Date(currentProduct.purchaseDate);
     const totalDays = (targetDate - purchaseDate) / (1000 * 60 * 60 * 24);
     const remainingDays = (targetDate - today) / (1000 * 60 * 60 * 24);
     
@@ -128,25 +108,32 @@ const ProductDetailScreen = () => {
   
   // 남은 일수 계산
   const calculateRemainingDays = () => {
-    if (!product.expiryDate && !product.estimatedEndDate) return null;
+    if (!currentProduct.expiryDate && !currentProduct.estimatedEndDate) return null;
     
     const today = new Date();
     let targetDate;
     
-    if (product.expiryDate) {
-      targetDate = new Date(product.expiryDate);
-    } else if (product.estimatedEndDate) {
-      targetDate = new Date(product.estimatedEndDate);
+    if (currentProduct.expiryDate) {
+      targetDate = new Date(currentProduct.expiryDate);
+    } else if (currentProduct.estimatedEndDate) {
+      targetDate = new Date(currentProduct.estimatedEndDate);
     }
     
     const remainingDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
     return remainingDays;
   };
 
-  // 캐릭터 이미지 선택 (카테고리에 따라 다른 이미지 사용 가능)
-  const getCharacterImage = () => {
-    // 실제 구현 시 카테고리별 이미지 매핑
-    return require('../../assets/icon.png');
+  // 카테고리에 맞는 아이콘 선택
+  const getCategoryIcon = () => {
+    const categoryIcons = {
+      '식품': 'fast-food',
+      '화장품': 'color-palette',
+      '세제': 'water',
+      '욕실용품': 'water-outline',
+      '주방용품': 'restaurant',
+    };
+    
+    return categoryIcons[currentProduct.category] || 'cube-outline';
   };
   
   // 제품 삭제 처리
@@ -160,8 +147,14 @@ const ProductDetailScreen = () => {
           text: '삭제', 
           style: 'destructive',
           onPress: () => {
-            dispatch(deleteProduct(product.id));
-            navigation.goBack();
+            dispatch(deleteProductAsync(currentProduct.id))
+              .unwrap()
+              .then(() => {
+                navigation.goBack();
+              })
+              .catch((err) => {
+                Alert.alert('오류', `삭제 중 오류가 발생했습니다: ${err.message}`);
+              });
           }
         }
       ]
@@ -200,10 +193,15 @@ const ProductDetailScreen = () => {
     <ScrollView style={styles.container}>
       {/* 제품 헤더 */}
       <View style={styles.header}>
-        <Image source={getCharacterImage()} style={styles.characterImage} />
+        <View style={styles.characterImageContainer}>
+          <Ionicons name={getCategoryIcon()} size={50} color="#4CAF50" />
+        </View>
         <View style={styles.headerInfo}>
-          <Text style={styles.productName}>{product.name}</Text>
-          <Text style={styles.categoryName}>{product.category}</Text>
+          <Text style={styles.productName}>{currentProduct.name}</Text>
+          <View style={styles.brandCategoryContainer}>
+            <Text style={styles.brandName}>{currentProduct.brand}</Text>
+            <Text style={styles.categoryName}>{currentProduct.category}</Text>
+          </View>
           
           <View style={styles.hpSection}>
             <View style={styles.hpLabelContainer}>
@@ -230,50 +228,50 @@ const ProductDetailScreen = () => {
         
         <InfoItem 
           label="구매일" 
-          value={new Date(product.purchaseDate).toLocaleDateString()} 
+          value={currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate).toLocaleDateString() : null} 
           icon="calendar-outline" 
         />
         
-        {product.expiryDate && (
+        {currentProduct.expiryDate && (
           <InfoItem 
             label="유통기한" 
-            value={new Date(product.expiryDate).toLocaleDateString()} 
+            value={new Date(currentProduct.expiryDate).toLocaleDateString()} 
             icon="alarm-outline" 
           />
         )}
         
-        {product.estimatedEndDate && (
+        {currentProduct.estimatedEndDate && (
           <InfoItem 
             label="예상 소모 완료일" 
-            value={new Date(product.estimatedEndDate).toLocaleDateString()} 
+            value={new Date(currentProduct.estimatedEndDate).toLocaleDateString()} 
             icon="hourglass-outline" 
           />
         )}
         
         <InfoItem 
           label="구매 방법" 
-          value={product.purchaseMethod} 
+          value={currentProduct.purchaseMethod} 
           icon="cart-outline" 
         />
         
         <InfoItem 
           label="구매 링크" 
-          value={product.purchaseLink} 
+          value={currentProduct.purchaseLink} 
           icon="link-outline" 
         />
         
         <InfoItem 
           label="가격" 
-          value={product.price ? `${product.price.toLocaleString()}원` : null} 
+          value={currentProduct.price ? `${currentProduct.price.toLocaleString()}원` : null} 
           icon="pricetag-outline" 
         />
       </View>
       
       {/* 메모 섹션 */}
-      {product.memo && (
+      {currentProduct.memo && (
         <View style={styles.memoSection}>
           <Text style={styles.sectionTitle}>메모</Text>
-          <Text style={styles.memoText}>{product.memo}</Text>
+          <Text style={styles.memoText}>{currentProduct.memo}</Text>
         </View>
       )}
       
@@ -311,6 +309,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  errorText: {
+    color: 'red',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: '500',
+  },
   header: {
     backgroundColor: '#fff',
     padding: 20,
@@ -318,10 +330,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
-  characterImage: {
+  characterImageContainer: {
     width: 100,
     height: 100,
     borderRadius: 50,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 16,
   },
   headerInfo: {
@@ -333,10 +348,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 4,
   },
-  categoryName: {
+  brandCategoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  brandName: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 12,
+    marginRight: 8,
+  },
+  categoryName: {
+    fontSize: 12,
+    color: '#fff',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   hpSection: {
     marginTop: 8,

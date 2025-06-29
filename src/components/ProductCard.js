@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 // HP 바 컴포넌트
@@ -24,16 +23,15 @@ const HPBar = ({ percentage }) => {
   );
 };
 
-const ProductCard = ({ product }) => {
-  const navigation = useNavigation();
-  
-  // 제품 상세 페이지로 이동
-  const handlePress = () => {
-    navigation.navigate('ProductDetail', { productId: product.id });
-  };
-
+const ProductCard = ({ product, onPress }) => {
   // 남은 수명 계산 (%)
   const calculateRemainingLife = () => {
+    // remainingPercentage가 있으면 그대로 사용
+    if (product.remainingPercentage !== undefined) {
+      return product.remainingPercentage;
+    }
+    
+    // 없으면 계산
     if (!product.expiryDate && !product.estimatedEndDate) return 100;
     
     const today = new Date();
@@ -53,21 +51,33 @@ const ProductCard = ({ product }) => {
     return Math.round(percentage);
   };
 
-  // 캐릭터 이미지 선택 (카테고리에 따라 다른 이미지 사용 가능)
-  const getCharacterImage = () => {
-    // 실제 구현 시 카테고리별 이미지 매핑
-    return require('../../assets/icon.png');
+  // 카테고리에 맞는 아이콘 선택
+  const getCategoryIcon = () => {
+    const categoryIcons = {
+      '식품': 'fast-food',
+      '화장품': 'color-palette',
+      '세제': 'water',
+      '욕실용품': 'water-outline',
+      '주방용품': 'restaurant',
+    };
+    
+    return categoryIcons[product.category] || 'cube-outline';
   };
 
   const hpPercentage = calculateRemainingLife();
 
   return (
-    <TouchableOpacity style={styles.container} onPress={handlePress}>
+    <TouchableOpacity style={styles.container} onPress={onPress}>
       <View style={styles.card}>
-        <Image source={getCharacterImage()} style={styles.characterImage} />
+        <View style={styles.characterImageContainer}>
+          <Ionicons name={getCategoryIcon()} size={40} color="#4CAF50" />
+        </View>
         <View style={styles.infoContainer}>
           <Text style={styles.productName}>{product.name}</Text>
-          <Text style={styles.category}>{product.category}</Text>
+          <View style={styles.brandContainer}>
+            <Text style={styles.brand}>{product.brand}</Text>
+            <Text style={styles.category}>{product.category}</Text>
+          </View>
           <HPBar percentage={hpPercentage} />
           <View style={styles.dateInfo}>
             <Ionicons name="calendar-outline" size={14} color="#666" />
@@ -102,10 +112,13 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
   },
-  characterImage: {
+  characterImageContainer: {
     width: 70,
     height: 70,
     borderRadius: 35,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   infoContainer: {
@@ -116,10 +129,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 4,
   },
-  category: {
+  brandContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  brand: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
+    marginRight: 8,
+  },
+  category: {
+    fontSize: 12,
+    color: '#fff',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   hpBarContainer: {
     height: 8,
