@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -6,62 +6,55 @@ import {
   FlatList, 
   TouchableOpacity, 
   SafeAreaView,
-  TextInput,
   Image,
   ScrollView,
-  ActivityIndicator
+  ActivityIndicator,
+  Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ProductCard from '../components/ProductCard';
 import { fetchPopularProductsApi } from '../api/productsApi';
 
+const { width } = Dimensions.get('window');
+
 const HomeScreen = ({ navigation }) => {
   const [popularProducts, setPopularProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // 인기 상품 데이터 로드
-  useEffect(() => {
-    const loadPopularProducts = async () => {
-      try {
-        setLoading(true);
-        const data = await fetchPopularProductsApi();
-        setPopularProducts(data);
-        setLoading(false);
-      } catch (err) {
-        setError(err.message);
-        setLoading(false);
-      }
-    };
-
-    loadPopularProducts();
-  }, []);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const flatListRef = useRef(null);
 
   // 배너 데이터
   const banners = [
-    { id: '1', title: '소모품 관리의 시작, 소모미', description: '지금 시작하세요!' },
-    { id: '2', title: '이달의 추천 생활용품', description: '최대 30% 할인' },
-    { id: '3', title: '소모품 관리 팁', description: '효율적인 관리 방법' },
+    { id: '1', title: '소모품 관리의 시작', description: '소모미와 함께 체계적으로 관리해보세요.' },
+    { id: '2', title: '유통기한 알림', description: '유통기한이 다가오면 알려드립니다.' },
+    { id: '3', title: '소모품 위치 관리', description: '어디에 보관했는지 잊지 마세요.' },
   ];
 
   // 팁 데이터
   const tips = [
-    { 
-      id: '1', 
-      title: '치약 보관 방법', 
-      content: '치약은 직사광선을 피해 서늘한 곳에 보관하면 유통기한을 더 오래 유지할 수 있습니다.' 
-    },
-    { 
-      id: '2', 
-      title: '세제 사용량', 
-      content: '세제는 제품 지침보다 약간 적게 사용해도 충분한 세척력을 발휘합니다. 경제적이고 환경에도 좋아요!' 
-    },
-    { 
-      id: '3', 
-      title: '화장품 유통기한', 
-      content: '개봉 후 화장품은 보통 6개월~1년 내에 사용하는 것이 좋습니다.' 
-    },
+    { id: '1', title: '유통기한 관리', text: '제품 구매 시 유통기한을 확인하고 등록하세요.' },
+    { id: '2', title: '보관 장소', text: '같은 종류의 제품은 같은 장소에 보관하는 것이 좋습니다.' },
+    { id: '3', title: '재고 확인', text: '주기적으로 재고를 확인하여 부족한 물품을 미리 준비하세요.' },
   ];
+
+  useEffect(() => {
+    loadPopularProducts();
+  }, []);
+
+  const loadPopularProducts = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchPopularProductsApi();
+      setPopularProducts(data);
+      setError(null);
+    } catch (err) {
+      setError('인기 상품을 불러오는데 실패했습니다.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 배너 렌더링
   const renderBanner = ({ item }) => (
@@ -73,38 +66,44 @@ const HomeScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
+  // 배너 스크롤 이벤트 핸들러
+  const handleBannerScroll = (event) => {
+    const scrollPosition = event.nativeEvent.contentOffset.x;
+    const index = Math.round(scrollPosition / width);
+    setCurrentBannerIndex(index);
+  };
+
   // 추천 상품 렌더링
   const renderRecommendedProduct = ({ item }) => (
     <TouchableOpacity 
       style={styles.recommendedProductItem}
-      onPress={() => navigation.navigate('MyProducts', { 
-        screen: 'ProductDetail', 
-        params: { productId: item.id } 
-      })}
+      onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
     >
       <View style={styles.recommendedProductImageContainer}>
         <View style={styles.recommendedProductImage}>
-          <Ionicons name="cube-outline" size={40} color="#4CAF50" />
+          <Ionicons name="cube-outline" size={32} color="#4CAF50" />
         </View>
       </View>
       <Text style={styles.recommendedProductBrand}>{item.brand}</Text>
       <Text style={styles.recommendedProductName}>{item.name}</Text>
       <View style={styles.recommendedProductPopularity}>
         <Ionicons name="star" size={12} color="#FFD700" />
-        <Text style={styles.recommendedProductPopularityText}>인기도 {item.popularity}%</Text>
+        <Text style={styles.recommendedProductPopularityText}>{item.popularity}</Text>
       </View>
     </TouchableOpacity>
   );
 
   // 팁 렌더링
   const renderTip = ({ item }) => (
-    <TouchableOpacity style={styles.tipItem}>
-      <Ionicons name="bulb-outline" size={24} color="#4CAF50" style={styles.tipIcon} />
+    <View style={styles.tipItem}>
+      <View style={styles.tipIcon}>
+        <Ionicons name="bulb-outline" size={24} color="#4CAF50" />
+      </View>
       <View style={styles.tipContent}>
         <Text style={styles.tipTitle}>{item.title}</Text>
-        <Text style={styles.tipText}>{item.content}</Text>
+        <Text style={styles.tipText}>{item.text}</Text>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 
   return (
@@ -116,18 +115,11 @@ const HomeScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
       
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="제품 검색"
-        />
-      </View>
-      
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* 배너 섹션 */}
-        <View style={styles.section}>
+        <View style={styles.bannerSection}>
           <FlatList
+            ref={flatListRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             data={banners}
@@ -135,8 +127,15 @@ const HomeScreen = ({ navigation }) => {
             keyExtractor={item => item.id}
             pagingEnabled
             snapToAlignment="center"
-            contentContainerStyle={styles.bannerList}
+            onScroll={handleBannerScroll}
+            decelerationRate="fast"
+            snapToInterval={width}
           />
+          <View style={styles.bannerIndicator}>
+            <Text style={styles.bannerIndicatorText}>
+              {currentBannerIndex + 1}/{banners.length}
+            </Text>
+          </View>
         </View>
         
         {/* 추천 상품 섹션 */}
@@ -207,23 +206,9 @@ const styles = StyleSheet.create({
   notificationButton: {
     padding: 8,
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
+  bannerSection: {
+    position: 'relative',
+    marginVertical: 12,
   },
   section: {
     marginVertical: 12,
@@ -244,14 +229,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4CAF50',
   },
-  bannerList: {
-    paddingLeft: 16,
-  },
   bannerItem: {
-    width: 300,
+    width: width,
     height: 150,
-    marginRight: 16,
-    borderRadius: 12,
     backgroundColor: '#4CAF50',
     justifyContent: 'center',
     padding: 16,
@@ -270,6 +250,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#fff',
   },
+  bannerIndicator: {
+    position: 'absolute',
+    bottom: 10,
+    right: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  bannerIndicatorText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   recommendedProductsList: {
     paddingLeft: 16,
   },
@@ -279,11 +273,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   recommendedProductImageContainer: {
     alignItems: 'center',
@@ -326,11 +315,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   tipIcon: {
     marginRight: 12,
