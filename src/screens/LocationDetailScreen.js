@@ -8,13 +8,15 @@ import {
   ActivityIndicator,
   Image,
   Alert,
-  Modal
+  Modal,
+  Platform
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchLocationById, fetchProductsByLocation, deleteLocation, updateLocation } from '../redux/slices/locationsSlice';
 import ProductCard from '../components/ProductCard';
+import AlertModal from '../components/AlertModal';
 
 const LocationDetailScreen = () => {
   const route = useRoute();
@@ -35,6 +37,14 @@ const LocationDetailScreen = () => {
   const [products, setProducts] = useState([]);
   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertModalConfig, setAlertModalConfig] = useState({
+    title: '',
+    message: '',
+    buttons: [],
+    icon: '',
+    iconColor: ''
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -79,11 +89,15 @@ const LocationDetailScreen = () => {
   };
   
   const confirmDeleteLocation = () => {
-    Alert.alert(
-      '영역 삭제',
-      '이 영역을 삭제하시겠습니까?',
-      [
-        { text: '취소', style: 'cancel', onPress: () => setShowDeleteModal(false) },
+    setAlertModalConfig({
+      title: '영역 삭제',
+      message: '이 영역을 삭제하시겠습니까?',
+      buttons: [
+        { 
+          text: '취소', 
+          style: 'cancel', 
+          onPress: () => setShowDeleteModal(false) 
+        },
         { 
           text: '삭제', 
           style: 'destructive',
@@ -95,12 +109,26 @@ const LocationDetailScreen = () => {
                 navigation.goBack();
               })
               .catch((err) => {
-                Alert.alert('오류', `영역 삭제 중 오류가 발생했습니다: ${err.message}`);
+                showErrorAlert(`영역 삭제 중 오류가 발생했습니다: ${err.message}`);
               });
           }
         }
-      ]
-    );
+      ],
+      icon: 'trash-outline',
+      iconColor: '#F44336'
+    });
+    setAlertModalVisible(true);
+  };
+
+  const showErrorAlert = (message) => {
+    setAlertModalConfig({
+      title: '오류',
+      message,
+      buttons: [{ text: '확인', style: 'default' }],
+      icon: 'alert-circle',
+      iconColor: '#F44336'
+    });
+    setAlertModalVisible(true);
   };
 
   const renderItem = ({ item }) => (
@@ -242,6 +270,16 @@ const LocationDetailScreen = () => {
       </TouchableOpacity>
       
       <DeleteConfirmModal />
+      
+      <AlertModal
+        visible={alertModalVisible}
+        title={alertModalConfig.title}
+        message={alertModalConfig.message}
+        buttons={alertModalConfig.buttons}
+        onClose={() => setAlertModalVisible(false)}
+        icon={alertModalConfig.icon}
+        iconColor={alertModalConfig.iconColor}
+      />
     </View>
   );
 };

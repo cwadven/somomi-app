@@ -17,6 +17,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { addLocation, updateLocation } from '../redux/slices/locationsSlice';
+import AlertModal from '../components/AlertModal';
 
 // 조건부 ImagePicker 임포트
 let ImagePicker;
@@ -63,6 +64,16 @@ const AddLocationScreen = () => {
   // 등록/수정 성공 모달
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [registeredLocation, setRegisteredLocation] = useState(null);
+  
+  // 커스텀 알림 모달 상태
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertModalConfig, setAlertModalConfig] = useState({
+    title: '',
+    message: '',
+    buttons: [],
+    icon: '',
+    iconColor: ''
+  });
 
   // 수정 모드일 경우 기존 데이터 로드
   useEffect(() => {
@@ -77,11 +88,35 @@ const AddLocationScreen = () => {
   // 폼 유효성 검사
   const isFormValid = () => {
     if (!title.trim()) {
-      Alert.alert('알림', '영역 제목을 입력해주세요.');
+      showAlert('알림', '영역 제목을 입력해주세요.');
       return false;
     }
     
     return true;
+  };
+  
+  // 알림 표시 함수
+  const showAlert = (title, message) => {
+    setAlertModalConfig({
+      title,
+      message,
+      buttons: [{ text: '확인', style: 'default' }],
+      icon: 'information-circle',
+      iconColor: '#4CAF50'
+    });
+    setAlertModalVisible(true);
+  };
+  
+  // 오류 알림 표시 함수
+  const showErrorAlert = (message) => {
+    setAlertModalConfig({
+      title: '오류',
+      message,
+      buttons: [{ text: '확인', style: 'default' }],
+      icon: 'alert-circle',
+      iconColor: '#F44336'
+    });
+    setAlertModalVisible(true);
   };
 
   // 이미지 선택 핸들러 (네이티브)
@@ -91,7 +126,7 @@ const AddLocationScreen = () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (status !== 'granted') {
-      Alert.alert('권한 오류', '갤러리 접근 권한이 필요합니다.');
+      showAlert('권한 오류', '갤러리 접근 권한이 필요합니다.');
       return;
     }
     
@@ -161,7 +196,7 @@ const AddLocationScreen = () => {
           setShowSuccessModal(true);
         })
         .catch((error) => {
-          Alert.alert('오류', `영역 수정에 실패했습니다: ${error.message}`);
+          showErrorAlert(`영역 수정에 실패했습니다: ${error.message}`);
         });
     } else {
       // 신규 등록 모드
@@ -172,7 +207,7 @@ const AddLocationScreen = () => {
           setShowSuccessModal(true);
         })
         .catch((error) => {
-          Alert.alert('오류', `영역 등록에 실패했습니다: ${error.message}`);
+          showErrorAlert(`영역 등록에 실패했습니다: ${error.message}`);
         });
     }
   };
@@ -324,6 +359,17 @@ const AddLocationScreen = () => {
       
       {/* 성공 모달 */}
       <SuccessModal />
+      
+      {/* 커스텀 알림 모달 */}
+      <AlertModal
+        visible={alertModalVisible}
+        title={alertModalConfig.title}
+        message={alertModalConfig.message}
+        buttons={alertModalConfig.buttons}
+        onClose={() => setAlertModalVisible(false)}
+        icon={alertModalConfig.icon}
+        iconColor={alertModalConfig.iconColor}
+      />
     </KeyboardAvoidingView>
   );
 };

@@ -8,12 +8,14 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Modal
+  Modal,
+  Platform
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchProductById, deleteProductAsync, markProductAsConsumedAsync } from '../redux/slices/productsSlice';
+import AlertModal from '../components/AlertModal';
 
 // HP 바 컴포넌트
 const HPBar = ({ percentage, type }) => {
@@ -55,6 +57,16 @@ const ProductDetailScreen = () => {
   // 소진 처리 성공 모달 상태
   const [showConsumedModal, setShowConsumedModal] = useState(false);
   const [consumedProduct, setConsumedProduct] = useState(null);
+  
+  // 커스텀 알림 모달 상태
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertModalConfig, setAlertModalConfig] = useState({
+    title: '',
+    message: '',
+    buttons: [],
+    icon: '',
+    iconColor: ''
+  });
   
   useEffect(() => {
     dispatch(fetchProductById(productId));
@@ -164,10 +176,10 @@ const ProductDetailScreen = () => {
   
   // 제품 삭제 처리
   const handleDelete = () => {
-    Alert.alert(
-      '제품 삭제',
-      '정말 이 제품을 삭제하시겠습니까?',
-      [
+    setAlertModalConfig({
+      title: '제품 삭제',
+      message: '정말 이 제품을 삭제하시겠습니까?',
+      buttons: [
         { text: '취소', style: 'cancel' },
         { 
           text: '삭제', 
@@ -179,12 +191,15 @@ const ProductDetailScreen = () => {
                 navigation.goBack();
               })
               .catch((err) => {
-                Alert.alert('오류', `삭제 중 오류가 발생했습니다: ${err.message}`);
+                showErrorAlert(`삭제 중 오류가 발생했습니다: ${err.message}`);
               });
           }
         }
-      ]
-    );
+      ],
+      icon: 'trash-outline',
+      iconColor: '#F44336'
+    });
+    setAlertModalVisible(true);
   };
   
   // 제품 수정 화면으로 이동
@@ -199,38 +214,63 @@ const ProductDetailScreen = () => {
   
   // 소진 처리 함수
   const handleMarkAsConsumed = () => {
-    Alert.alert(
-      '소진 처리',
-      '이 제품을 소진 처리하시겠습니까?\n소진 처리된 제품은 소진 처리 목록으로 이동합니다.',
-      [
+    setAlertModalConfig({
+      title: '소진 처리',
+      message: '이 제품을 소진 처리하시겠습니까?\n소진 처리된 제품은 소진 처리 목록으로 이동합니다.',
+      buttons: [
         { text: '취소', style: 'cancel' },
         { 
           text: '소진 처리', 
           style: 'default',
           onPress: () => {
+            // 소진 처리 전에 필요한 정보 저장
+            const locationId = currentProduct.locationId;
+            
             dispatch(markProductAsConsumedAsync(currentProduct.id))
               .unwrap()
               .then((result) => {
-                setConsumedProduct(result);
-                setShowConsumedModal(true);
+                // 소진 처리 성공 후 바로 이전 화면으로 이동
+                navigation.goBack();
+                
+                // 약간의 딜레이 후 영역 상세 화면으로 이동
+                setTimeout(() => {
+                  if (locationId) {
+                    // 특정 영역이 있는 경우 해당 영역 상세로 이동
+                    navigation.navigate('Locations', { 
+                      screen: 'LocationDetail',
+                      params: { locationId }
+                    });
+                  } else {
+                    // 영역이 없는 경우 전체 제품 목록으로 이동
+                    navigation.navigate('Locations', { 
+                      screen: 'LocationDetail',
+                      params: { locationId: 'all' }
+                    });
+                  }
+                }, 100);
               })
               .catch((err) => {
-                Alert.alert('오류', `소진 처리 중 오류가 발생했습니다: ${err.message}`);
+                showErrorAlert(`소진 처리 중 오류가 발생했습니다: ${err.message}`);
               });
           }
         }
-      ]
-    );
+      ],
+      icon: 'checkmark-circle',
+      iconColor: '#4CAF50'
+    });
+    setAlertModalVisible(true);
   };
   
-  // 소진 처리 모달 닫기 및 화면 이동
-  const handleConsumedModalClose = () => {
-    setShowConsumedModal(false);
-    // 이전 화면으로 돌아간 후 Profile 탭의 소진 처리 목록으로 이동
-    navigation.goBack();
-    setTimeout(() => {
-      navigation.navigate('Profile', { screen: 'ConsumedProducts' });
-    }, 100);
+  // 오류 알림 표시 함수
+  const showErrorAlert = (message) => {
+    setAlertModalConfig({
+      title: '오류',
+      message,
+      buttons: [{ text: '확인', style: 'default' }],
+      icon: 'alert-circle',
+      iconColor: '#F44336'
+    });
+    setAlertModalVisible(true);
   };
 
   const expiryPercentage = calculateExpiryPercentage();
@@ -258,57 +298,12 @@ const ProductDetailScreen = () => {
     );
   };
   
-  // 소진 처리 성공 모달
-  const ConsumedModal = () => (
-    <Modal
-      visible={showConsumedModal}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={handleConsumedModalClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.successIconContainer}>
-            <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
-          </View>
-          
-          <Text style={styles.successTitle}>소진 처리 완료!</Text>
-          
-          <Text style={styles.successMessage}>
-            {consumedProduct?.name} 제품이 성공적으로 소진 처리되었습니다.
-          </Text>
-          
-          <View style={styles.productInfoContainer}>
-            <View style={styles.productInfoRow}>
-              <Text style={styles.productInfoLabel}>제품명:</Text>
-              <Text style={styles.productInfoValue}>{consumedProduct?.name}</Text>
-            </View>
-            
-            {consumedProduct?.brand && (
-              <View style={styles.productInfoRow}>
-                <Text style={styles.productInfoLabel}>브랜드:</Text>
-                <Text style={styles.productInfoValue}>{consumedProduct.brand}</Text>
-              </View>
-            )}
-            
-            <View style={styles.productInfoRow}>
-              <Text style={styles.productInfoLabel}>소진일:</Text>
-              <Text style={styles.productInfoValue}>
-                {consumedProduct ? new Date(consumedProduct.consumedAt).toLocaleDateString() : ''}
-              </Text>
-            </View>
-          </View>
-          
-          <TouchableOpacity 
-            style={styles.successButton}
-            onPress={handleConsumedModalClose}
-          >
-            <Text style={styles.successButtonText}>소진 목록 보기</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
+  // 소진 처리 모달은 더 이상 필요하지 않으므로 제거
+  // 소진 처리 모달 닫기 및 화면 이동
+  const handleConsumedModalClose = () => {
+    setShowConsumedModal(false);
+    navigation.goBack();
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -426,18 +421,25 @@ const ProductDetailScreen = () => {
         </View>
       )}
       
-      {/* 소진 처리 버튼 (HP가 0%인 경우에만 표시) */}
-      {needsConsumption && (
-        <TouchableOpacity 
-          style={styles.consumeButtonContainer}
-          onPress={handleMarkAsConsumed}
-        >
-          <View style={styles.consumeButton}>
-            <Ionicons name="checkmark-circle" size={24} color="#fff" />
-            <Text style={styles.consumeButtonText}>소진 처리하기</Text>
-          </View>
-        </TouchableOpacity>
-      )}
+      {/* 소진 처리 버튼 (항상 표시) */}
+      <TouchableOpacity 
+        style={styles.consumeButtonContainer}
+        onPress={handleMarkAsConsumed}
+      >
+        <View style={[
+          styles.consumeButton,
+          needsConsumption && styles.urgentConsumeButton
+        ]}>
+          <Ionicons 
+            name="checkmark-circle" 
+            size={24} 
+            color="#fff" 
+          />
+          <Text style={styles.consumeButtonText}>
+            {needsConsumption ? '소진 처리하기 (필요)' : '소진 처리하기'}
+          </Text>
+        </View>
+      </TouchableOpacity>
       
       {/* 작업 버튼 */}
       <View style={styles.actionsContainer}>
@@ -460,8 +462,16 @@ const ProductDetailScreen = () => {
         </TouchableOpacity>
       </View>
       
-      {/* 소진 처리 성공 모달 */}
-      <ConsumedModal />
+      {/* 커스텀 알림 모달 */}
+      <AlertModal
+        visible={alertModalVisible}
+        title={alertModalConfig.title}
+        message={alertModalConfig.message}
+        buttons={alertModalConfig.buttons}
+        onClose={() => setAlertModalVisible(false)}
+        icon={alertModalConfig.icon}
+        iconColor={alertModalConfig.iconColor}
+      />
     </ScrollView>
   );
 };
@@ -651,12 +661,15 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   consumeButton: {
-    backgroundColor: '#FF9800',
+    backgroundColor: '#4CAF50',
     borderRadius: 8,
     paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  urgentConsumeButton: {
+    backgroundColor: '#FF9800',
   },
   consumeButtonText: {
     color: '#fff',
