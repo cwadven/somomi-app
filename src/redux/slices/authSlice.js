@@ -20,6 +20,33 @@ export const getAnonymousToken = createAsyncThunk(
   }
 );
 
+// 카카오 로그인 API 호출
+export const kakaoLogin = createAsyncThunk(
+  'auth/kakaoLogin',
+  async (kakaoToken, { rejectWithValue }) => {
+    try {
+      // 실제 구현에서는 서버에 카카오 토큰을 전송하여 JWT 토큰을 받아옴
+      // 여기서는 임시로 성공 응답을 반환
+      const response = {
+        token: `kakao_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`,
+        user: {
+          id: kakaoToken.id || '1',
+          username: kakaoToken.profile?.nickname || '카카오 사용자',
+          email: kakaoToken.email || 'kakao@example.com',
+          profileImage: kakaoToken.profile?.profile_image_url,
+        }
+      };
+      
+      // 토큰을 AsyncStorage에 저장
+      await AsyncStorage.setItem('jwt_token', response.token);
+      
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 // 로그인 API 호출
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
@@ -169,6 +196,23 @@ export const authSlice = createSlice({
         state.error = null;
       })
       .addCase(getAnonymousToken.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      
+      // 카카오 로그인 처리
+      .addCase(kakaoLogin.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(kakaoLogin.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isLoggedIn = true;
+        state.isAnonymous = false;
+        state.token = action.payload.token;
+        state.user = action.payload.user;
+        state.error = null;
+      })
+      .addCase(kakaoLogin.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })

@@ -7,14 +7,14 @@ import {
   Image, 
   ScrollView,
   Alert,
-  TextInput,
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { logout, loginUser, registerUser } from '../redux/slices/authSlice';
+import { logout } from '../redux/slices/authSlice';
+import KakaoLoginButton from '../components/KakaoLoginButton';
 
 const ProfileScreen = () => {
   const dispatch = useDispatch();
@@ -23,11 +23,7 @@ const ProfileScreen = () => {
   const { user, isLoggedIn, isAnonymous, loading, error } = useSelector(state => state.auth);
   
   // 로그인/회원가입 모드 상태
-  const [mode, setMode] = useState('profile'); // 'profile', 'login', 'signup'
-  const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [mode, setMode] = useState('profile'); // 'profile', 'login'
 
   // route.params로 전달된 initialMode가 있으면 해당 모드로 설정
   useEffect(() => {
@@ -52,49 +48,18 @@ const ProfileScreen = () => {
     );
   };
   
-  // 로그인 처리
-  const handleLogin = () => {
-    if (!email || !password) {
-      Alert.alert('알림', '이메일과 비밀번호를 모두 입력해주세요.');
-      return;
-    }
-    
-    dispatch(loginUser({ email, password }))
-      .unwrap()
-      .then(() => {
-        setMode('profile');
-        setEmail('');
-        setPassword('');
-      })
-      .catch(err => {
-        Alert.alert('로그인 실패', err || '로그인에 실패했습니다. 다시 시도해주세요.');
-      });
+  // 카카오 로그인 관련 콜백
+  const handleLoginStart = () => {
+    console.log('카카오 로그인 시작');
   };
-
-  // 회원가입 처리
-  const handleSignup = () => {
-    if (!email || !username || !password || !confirmPassword) {
-      Alert.alert('알림', '모든 필드를 입력해주세요.');
-      return;
-    }
-    
-    if (password !== confirmPassword) {
-      Alert.alert('알림', '비밀번호가 일치하지 않습니다.');
-      return;
-    }
-    
-    dispatch(registerUser({ email, username, password }))
-      .unwrap()
-      .then(() => {
-        setMode('profile');
-        setEmail('');
-        setUsername('');
-        setPassword('');
-        setConfirmPassword('');
-      })
-      .catch(err => {
-        Alert.alert('회원가입 실패', err || '회원가입에 실패했습니다. 다시 시도해주세요.');
-      });
+  
+  const handleLoginComplete = () => {
+    console.log('카카오 로그인 완료');
+    setMode('profile');
+  };
+  
+  const handleLoginError = (errorMsg) => {
+    Alert.alert('로그인 실패', errorMsg);
   };
 
   // 설정 메뉴 아이템 컴포넌트
@@ -111,8 +76,8 @@ const ProfileScreen = () => {
     </TouchableOpacity>
   );
 
-  // 로그인 폼
-  const renderLoginForm = () => (
+  // 로그인 화면
+  const renderLoginScreen = () => (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.formContainer}
@@ -128,128 +93,16 @@ const ProfileScreen = () => {
         <View style={{ width: 24 }} />
       </View>
 
-      <View style={styles.inputContainer}>
-        <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
-        <TextInput
-          style={styles.input}
-          placeholder="이메일"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
+      <View style={styles.kakaoLoginContainer}>
+        <Text style={styles.loginGuideText}>
+          카카오 계정으로 간편하게 로그인하세요
+        </Text>
+        
+        <KakaoLoginButton 
+          onLoginStart={handleLoginStart}
+          onLoginComplete={handleLoginComplete}
+          onLoginError={handleLoginError}
         />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
-        <TextInput
-          style={styles.input}
-          placeholder="비밀번호"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-      </View>
-
-      <TouchableOpacity 
-        style={[styles.submitButton, loading && styles.disabledButton]}
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        {loading ? (
-          <Text style={styles.submitButtonText}>로그인 중...</Text>
-        ) : (
-          <Text style={styles.submitButtonText}>로그인</Text>
-        )}
-      </TouchableOpacity>
-
-      <View style={styles.formFooter}>
-        <Text style={styles.formFooterText}>계정이 없으신가요?</Text>
-        <TouchableOpacity onPress={() => setMode('signup')}>
-          <Text style={styles.formFooterLink}>회원가입</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
-  );
-
-  // 회원가입 폼
-  const renderSignupForm = () => (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.formContainer}
-    >
-      <View style={styles.formHeader}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => setMode('profile')}
-        >
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.formTitle}>회원가입</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
-        <TextInput
-          style={styles.input}
-          placeholder="이메일"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="person-outline" size={20} color="#999" style={styles.inputIcon} />
-        <TextInput
-          style={styles.input}
-          placeholder="사용자 이름"
-          value={username}
-          onChangeText={setUsername}
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
-        <TextInput
-          style={styles.input}
-          placeholder="비밀번호"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
-        <TextInput
-          style={styles.input}
-          placeholder="비밀번호 확인"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-        />
-      </View>
-
-      <TouchableOpacity 
-        style={[styles.submitButton, loading && styles.disabledButton]}
-        onPress={handleSignup}
-        disabled={loading}
-      >
-        {loading ? (
-          <Text style={styles.submitButtonText}>회원가입 중...</Text>
-        ) : (
-          <Text style={styles.submitButtonText}>회원가입</Text>
-        )}
-      </TouchableOpacity>
-
-      <View style={styles.formFooter}>
-        <Text style={styles.formFooterText}>이미 계정이 있으신가요?</Text>
-        <TouchableOpacity onPress={() => setMode('login')}>
-          <Text style={styles.formFooterLink}>로그인</Text>
-        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -281,18 +134,11 @@ const ProfileScreen = () => {
               {'\n'}(영역 무제한 생성, 상품 무제한 등록)
             </Text>
             <View style={styles.authButtonsContainer}>
-              <TouchableOpacity 
-                style={[styles.authButton, styles.signupButton]} 
-                onPress={() => setMode('signup')}
-              >
-                <Text style={styles.signupButtonText}>회원가입</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.authButton, styles.loginButton]} 
-                onPress={() => setMode('login')}
-              >
-                <Text style={styles.loginButtonText}>로그인</Text>
-              </TouchableOpacity>
+              <KakaoLoginButton 
+                onLoginStart={handleLoginStart}
+                onLoginComplete={handleLoginComplete}
+                onLoginError={handleLoginError}
+              />
             </View>
           </View>
         ) : (
@@ -302,18 +148,11 @@ const ProfileScreen = () => {
               제품 정보를 클라우드에 저장하고 여러 기기에서 동기화하려면 로그인하세요.
             </Text>
             <View style={styles.authButtonsContainer}>
-              <TouchableOpacity 
-                style={[styles.authButton, styles.signupButton]} 
-                onPress={() => setMode('signup')}
-              >
-                <Text style={styles.signupButtonText}>회원가입</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.authButton, styles.loginButton]} 
-                onPress={() => setMode('login')}
-              >
-                <Text style={styles.loginButtonText}>로그인</Text>
-              </TouchableOpacity>
+              <KakaoLoginButton 
+                onLoginStart={handleLoginStart}
+                onLoginComplete={handleLoginComplete}
+                onLoginError={handleLoginError}
+              />
             </View>
           </View>
         )}
@@ -380,9 +219,7 @@ const ProfileScreen = () => {
 
   // 현재 모드에 따라 다른 화면 렌더링
   if (mode === 'login') {
-    return renderLoginForm();
-  } else if (mode === 'signup') {
-    return renderSignupForm();
+    return renderLoginScreen();
   } else {
     return renderProfileScreen();
   }
@@ -450,31 +287,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   authButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
     width: '100%',
-  },
-  authButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginHorizontal: 6,
-    minWidth: 120,
-    alignItems: 'center',
-  },
-  signupButton: {
-    backgroundColor: '#4CAF50',
-  },
-  loginButton: {
-    backgroundColor: '#2196F3',
-  },
-  signupButtonText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  loginButtonText: {
-    color: 'white',
-    fontWeight: '600',
+    paddingHorizontal: 20,
   },
   settingsSection: {
     backgroundColor: '#fff',
@@ -530,7 +344,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
   },
-  // 로그인/회원가입 폼 스타일
+  // 로그인 폼 스타일
   formContainer: {
     flex: 1,
     backgroundColor: '#fff',
@@ -550,48 +364,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    marginBottom: 20,
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
+  kakaoLoginContainer: {
     flex: 1,
-    height: 50,
-    fontSize: 16,
-  },
-  submitButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  disabledButton: {
-    backgroundColor: '#A5D6A7',
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  formFooter: {
-    flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 20,
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
-  formFooterText: {
-    color: '#666',
-    marginRight: 5,
-  },
-  formFooterLink: {
-    color: '#4CAF50',
-    fontWeight: 'bold',
+  loginGuideText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 32,
   },
 });
 
