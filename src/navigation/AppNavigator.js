@@ -60,7 +60,8 @@ const LocationsStack = () => {
         name="LocationDetail" 
         component={LocationDetailScreen} 
         options={({ route }) => ({ 
-          title: route.params.locationId === 'all' ? '모든 제품' : '영역 상세' 
+          title: route.params.locationId === 'all' ? '모든 제품' : '영역 상세',
+          headerLeft: () => null // 기본 뒤로가기 버튼 숨김
         })}
       />
       <Stack.Screen 

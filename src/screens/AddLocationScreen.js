@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { addLocation, updateLocation } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
+import SignupPromptModal from '../components/SignupPromptModal';
+import { checkAnonymousLimits } from '../utils/authUtils';
 
 // 조건부 ImagePicker 임포트
 let ImagePicker;
@@ -50,6 +52,8 @@ const AddLocationScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { status } = useSelector(state => state.locations);
+  const { isAnonymous } = useSelector(state => state.auth);
+  const { locations } = useSelector(state => state.locations);
   
   // 수정 모드 확인
   const isEditing = route.params?.isEditing || false;
@@ -75,6 +79,11 @@ const AddLocationScreen = () => {
     iconColor: ''
   });
 
+  // 회원가입 유도 모달 상태
+  const [signupPromptVisible, setSignupPromptVisible] = useState(false);
+  const [signupPromptMessage, setSignupPromptMessage] = useState('');
+  const [limitInfo, setLimitInfo] = useState({ currentCount: 0, maxCount: 1 });
+
   // 수정 모드일 경우 기존 데이터 로드
   useEffect(() => {
     if (isEditing && locationToEdit) {
@@ -84,6 +93,29 @@ const AddLocationScreen = () => {
       setImage(locationToEdit.image || null);
     }
   }, [isEditing, locationToEdit]);
+
+  // 화면 진입 시 비회원 제한 확인 (수정 모드가 아닐 때만)
+  useEffect(() => {
+    if (!isEditing) {
+      checkLocationLimits();
+    }
+  }, [isEditing, isAnonymous]);
+
+  // 비회원 영역 제한 확인
+  const checkLocationLimits = async () => {
+    if (isAnonymous) {
+      const limitResult = await checkAnonymousLimits('location');
+      
+      if (limitResult.limited) {
+        setSignupPromptMessage(limitResult.message);
+        setLimitInfo({
+          currentCount: limitResult.currentCount,
+          maxCount: limitResult.maxCount
+        });
+        setSignupPromptVisible(true);
+      }
+    }
+  };
 
   // 폼 유효성 검사
   const isFormValid = () => {
@@ -172,8 +204,23 @@ const AddLocationScreen = () => {
   };
 
   // 영역 등록/수정 처리
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isFormValid()) return;
+    
+    // 비회원 제한 확인 (수정 모드가 아닐 때만)
+    if (!isEditing && isAnonymous) {
+      const limitResult = await checkAnonymousLimits('location');
+      
+      if (limitResult.limited) {
+        setSignupPromptMessage(limitResult.message);
+        setLimitInfo({
+          currentCount: limitResult.currentCount,
+          maxCount: limitResult.maxCount
+        });
+        setSignupPromptVisible(true);
+        return;
+      }
+    }
     
     const locationData = {
       title,
@@ -215,6 +262,12 @@ const AddLocationScreen = () => {
   // 성공 모달 닫기 및 화면 이동
   const handleSuccessModalClose = () => {
     setShowSuccessModal(false);
+    navigation.goBack();
+  };
+
+  // 회원가입 유도 모달 닫기
+  const handleSignupPromptClose = () => {
+    setSignupPromptVisible(false);
     navigation.goBack();
   };
 
@@ -341,6 +394,16 @@ const AddLocationScreen = () => {
           </Text>
         </View>
         
+        {/* 비회원 안내 메시지 */}
+        {isAnonymous && !isEditing && (
+          <View style={styles.anonymousInfoContainer}>
+            <Ionicons name="information-circle" size={20} color="#2196F3" style={styles.infoIcon} />
+            <Text style={styles.anonymousInfoText}>
+              비회원은 영역을 1개만 추가할 수 있습니다. 현재 {locations.length}/1
+            </Text>
+          </View>
+        )}
+        
         {/* 등록/수정 버튼 */}
         <TouchableOpacity 
           style={styles.submitButton}
@@ -369,6 +432,15 @@ const AddLocationScreen = () => {
         onClose={() => setAlertModalVisible(false)}
         icon={alertModalConfig.icon}
         iconColor={alertModalConfig.iconColor}
+      />
+      
+      {/* 회원가입 유도 모달 */}
+      <SignupPromptModal
+        visible={signupPromptVisible}
+        onClose={handleSignupPromptClose}
+        message={signupPromptMessage}
+        currentCount={limitInfo.currentCount}
+        maxCount={limitInfo.maxCount}
       />
     </KeyboardAvoidingView>
   );
@@ -443,6 +515,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 8,
   },
+  anonymousInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  infoIcon: {
+    marginRight: 8,
+  },
+  anonymousInfoText: {
+    color: '#0D47A1',
+    fontSize: 14,
+    flex: 1,
+  },
   submitButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 8,
@@ -495,12 +583,13 @@ const styles = StyleSheet.create({
   locationInfoRow: {
     flexDirection: 'row',
     marginBottom: 8,
+    alignItems: 'center',
   },
   locationInfoLabel: {
     fontSize: 14,
     fontWeight: '500',
     color: '#666',
-    width: 80,
+    width: 60,
   },
   locationInfoValue: {
     fontSize: 14,
@@ -508,17 +597,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconPreview: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
     backgroundColor: '#f0f0f0',
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   successButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 8,
-    padding: 12,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   successButtonText: {

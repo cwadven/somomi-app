@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -6,17 +6,35 @@ import {
   TouchableOpacity, 
   Image, 
   ScrollView,
-  Alert
+  Alert,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { logout } from '../redux/slices/authSlice';
+import { logout, loginUser, registerUser } from '../redux/slices/authSlice';
 
 const ProfileScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
-  const { user, isLoggedIn } = useSelector(state => state.auth);
+  const route = useRoute();
+  const { user, isLoggedIn, isAnonymous, loading, error } = useSelector(state => state.auth);
+  
+  // 로그인/회원가입 모드 상태
+  const [mode, setMode] = useState('profile'); // 'profile', 'login', 'signup'
+  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  // route.params로 전달된 initialMode가 있으면 해당 모드로 설정
+  useEffect(() => {
+    if (route.params?.initialMode) {
+      setMode(route.params.initialMode);
+    }
+  }, [route.params]);
   
   // 로그아웃 처리
   const handleLogout = () => {
@@ -34,18 +52,49 @@ const ProfileScreen = () => {
     );
   };
   
-  // 로그인 처리 (실제로는 카카오 로그인 연동 필요)
+  // 로그인 처리
   const handleLogin = () => {
-    // 임시 사용자 데이터
-    const mockUser = {
-      id: '123456789',
-      name: '홍길동',
-      email: 'user@example.com',
-      profileImage: 'https://via.placeholder.com/150',
-    };
+    if (!email || !password) {
+      Alert.alert('알림', '이메일과 비밀번호를 모두 입력해주세요.');
+      return;
+    }
     
-    // 실제 구현에서는 카카오 로그인 API 연동 필요
-    Alert.alert('알림', '카카오 로그인 기능은 아직 구현되지 않았습니다.');
+    dispatch(loginUser({ email, password }))
+      .unwrap()
+      .then(() => {
+        setMode('profile');
+        setEmail('');
+        setPassword('');
+      })
+      .catch(err => {
+        Alert.alert('로그인 실패', err || '로그인에 실패했습니다. 다시 시도해주세요.');
+      });
+  };
+
+  // 회원가입 처리
+  const handleSignup = () => {
+    if (!email || !username || !password || !confirmPassword) {
+      Alert.alert('알림', '모든 필드를 입력해주세요.');
+      return;
+    }
+    
+    if (password !== confirmPassword) {
+      Alert.alert('알림', '비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    
+    dispatch(registerUser({ email, username, password }))
+      .unwrap()
+      .then(() => {
+        setMode('profile');
+        setEmail('');
+        setUsername('');
+        setPassword('');
+        setConfirmPassword('');
+      })
+      .catch(err => {
+        Alert.alert('회원가입 실패', err || '회원가입에 실패했습니다. 다시 시도해주세요.');
+      });
   };
 
   // 설정 메뉴 아이템 컴포넌트
@@ -62,7 +111,151 @@ const ProfileScreen = () => {
     </TouchableOpacity>
   );
 
-  return (
+  // 로그인 폼
+  const renderLoginForm = () => (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.formContainer}
+    >
+      <View style={styles.formHeader}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => setMode('profile')}
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.formTitle}>로그인</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder="이메일"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder="비밀번호"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+      </View>
+
+      <TouchableOpacity 
+        style={[styles.submitButton, loading && styles.disabledButton]}
+        onPress={handleLogin}
+        disabled={loading}
+      >
+        {loading ? (
+          <Text style={styles.submitButtonText}>로그인 중...</Text>
+        ) : (
+          <Text style={styles.submitButtonText}>로그인</Text>
+        )}
+      </TouchableOpacity>
+
+      <View style={styles.formFooter}>
+        <Text style={styles.formFooterText}>계정이 없으신가요?</Text>
+        <TouchableOpacity onPress={() => setMode('signup')}>
+          <Text style={styles.formFooterLink}>회원가입</Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
+  );
+
+  // 회원가입 폼
+  const renderSignupForm = () => (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.formContainer}
+    >
+      <View style={styles.formHeader}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => setMode('profile')}
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.formTitle}>회원가입</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder="이메일"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Ionicons name="person-outline" size={20} color="#999" style={styles.inputIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder="사용자 이름"
+          value={username}
+          onChangeText={setUsername}
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder="비밀번호"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder="비밀번호 확인"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry
+        />
+      </View>
+
+      <TouchableOpacity 
+        style={[styles.submitButton, loading && styles.disabledButton]}
+        onPress={handleSignup}
+        disabled={loading}
+      >
+        {loading ? (
+          <Text style={styles.submitButtonText}>회원가입 중...</Text>
+        ) : (
+          <Text style={styles.submitButtonText}>회원가입</Text>
+        )}
+      </TouchableOpacity>
+
+      <View style={styles.formFooter}>
+        <Text style={styles.formFooterText}>이미 계정이 있으신가요?</Text>
+        <TouchableOpacity onPress={() => setMode('login')}>
+          <Text style={styles.formFooterLink}>로그인</Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
+  );
+
+  // 프로필 화면
+  const renderProfileScreen = () => (
     <ScrollView style={styles.container}>
       {/* 프로필 헤더 */}
       <View style={styles.profileHeader}>
@@ -73,22 +266,55 @@ const ProfileScreen = () => {
               style={styles.profileImage} 
             />
             <View style={styles.profileInfo}>
-              <Text style={styles.userName}>{user.name}</Text>
+              <Text style={styles.userName}>{user.username || user.name}</Text>
               <Text style={styles.userEmail}>{user.email}</Text>
             </View>
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
               <Text style={styles.logoutText}>로그아웃</Text>
             </TouchableOpacity>
           </>
+        ) : isAnonymous ? (
+          <View style={styles.loginContainer}>
+            <Text style={styles.loginTitle}>비회원으로 이용 중</Text>
+            <Text style={styles.loginSubtitle}>
+              회원가입하면 더 많은 기능을 이용할 수 있습니다.
+              {'\n'}(영역 무제한 생성, 상품 무제한 등록)
+            </Text>
+            <View style={styles.authButtonsContainer}>
+              <TouchableOpacity 
+                style={[styles.authButton, styles.signupButton]} 
+                onPress={() => setMode('signup')}
+              >
+                <Text style={styles.signupButtonText}>회원가입</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.authButton, styles.loginButton]} 
+                onPress={() => setMode('login')}
+              >
+                <Text style={styles.loginButtonText}>로그인</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         ) : (
           <View style={styles.loginContainer}>
             <Text style={styles.loginTitle}>로그인이 필요합니다</Text>
             <Text style={styles.loginSubtitle}>
               제품 정보를 클라우드에 저장하고 여러 기기에서 동기화하려면 로그인하세요.
             </Text>
-            <TouchableOpacity style={styles.kakaoLoginButton} onPress={handleLogin}>
-              <Text style={styles.kakaoLoginText}>카카오 계정으로 로그인</Text>
-            </TouchableOpacity>
+            <View style={styles.authButtonsContainer}>
+              <TouchableOpacity 
+                style={[styles.authButton, styles.signupButton]} 
+                onPress={() => setMode('signup')}
+              >
+                <Text style={styles.signupButtonText}>회원가입</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.authButton, styles.loginButton]} 
+                onPress={() => setMode('login')}
+              >
+                <Text style={styles.loginButtonText}>로그인</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </View>
@@ -148,6 +374,15 @@ const ProfileScreen = () => {
       </View>
     </ScrollView>
   );
+
+  // 현재 모드에 따라 다른 화면 렌더링
+  if (mode === 'login') {
+    return renderLoginForm();
+  } else if (mode === 'signup') {
+    return renderSignupForm();
+  } else {
+    return renderProfileScreen();
+  }
 };
 
 const styles = StyleSheet.create({
@@ -196,6 +431,7 @@ const styles = StyleSheet.create({
   loginContainer: {
     alignItems: 'center',
     paddingVertical: 20,
+    width: '100%',
   },
   loginTitle: {
     fontSize: 18,
@@ -208,15 +444,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
     paddingHorizontal: 20,
+    lineHeight: 20,
   },
-  kakaoLoginButton: {
-    backgroundColor: '#FEE500',
+  authButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  authButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
+    marginHorizontal: 6,
+    minWidth: 120,
+    alignItems: 'center',
   },
-  kakaoLoginText: {
-    color: '#3C1E1E',
+  signupButton: {
+    backgroundColor: '#4CAF50',
+  },
+  loginButton: {
+    backgroundColor: '#2196F3',
+  },
+  signupButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  loginButtonText: {
+    color: 'white',
     fontWeight: '600',
   },
   settingsSection: {
@@ -272,6 +526,69 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     color: '#999',
+  },
+  // 로그인/회원가입 폼 스타일
+  formContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    padding: 20,
+  },
+  formHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 30,
+  },
+  backButton: {
+    padding: 5,
+  },
+  formTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    marginBottom: 20,
+  },
+  inputIcon: {
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
+    height: 50,
+    fontSize: 16,
+  },
+  submitButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  disabledButton: {
+    backgroundColor: '#A5D6A7',
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  formFooter: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  formFooterText: {
+    color: '#666',
+    marginRight: 5,
+  },
+  formFooterLink: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
   },
 });
 

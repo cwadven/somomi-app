@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { fetchLocationById, fetchProductsByLocation, deleteLocation, updateLocation } from '../redux/slices/locationsSlice';
 import ProductCard from '../components/ProductCard';
 import AlertModal from '../components/AlertModal';
+import SignupPromptModal from '../components/SignupPromptModal';
 
 const LocationDetailScreen = () => {
   const route = useRoute();
@@ -45,6 +46,30 @@ const LocationDetailScreen = () => {
     icon: '',
     iconColor: ''
   });
+  
+  // 회원 상태 확인
+  const { isAnonymous } = useSelector(state => state.auth);
+  
+  // 회원가입 유도 모달
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity
+          style={{ marginLeft: 16 }}
+          onPress={() => {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'LocationsScreen' }],
+            });
+          }}
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
   useFocusEffect(
     useCallback(() => {
@@ -62,6 +87,12 @@ const LocationDetailScreen = () => {
   }, [locationProducts, locationId]);
 
   const handleAddProduct = () => {
+    // 비회원인 경우 제품 개수 제한 체크
+    if (isAnonymous && products.length >= 5) {
+      setShowSignupPrompt(true);
+      return;
+    }
+    
     navigation.navigate('AddProduct', { locationId });
   };
 
@@ -245,6 +276,15 @@ const LocationDetailScreen = () => {
             </View>
           )}
         </View>
+        
+        {/* 비회원 사용자의 경우 제품 개수 표시 */}
+        {isAnonymous && !isAllProducts && (
+          <View style={styles.limitInfoContainer}>
+            <Text style={styles.limitInfoText}>
+              비회원은 영역당 최대 5개의 제품만 등록할 수 있습니다. ({products.length}/5)
+            </Text>
+          </View>
+        )}
       </View>
       
       <FlatList
@@ -263,7 +303,11 @@ const LocationDetailScreen = () => {
       />
       
       <TouchableOpacity 
-        style={styles.addButton}
+        style={[
+          styles.addButton,
+          // 비회원이고 제품이 5개 이상이면 버튼 비활성화 스타일 적용
+          isAnonymous && products.length >= 5 && styles.disabledAddButton
+        ]}
         onPress={handleAddProduct}
       >
         <Ionicons name="add" size={30} color="white" />
@@ -279,6 +323,13 @@ const LocationDetailScreen = () => {
         onClose={() => setAlertModalVisible(false)}
         icon={alertModalConfig.icon}
         iconColor={alertModalConfig.iconColor}
+      />
+      
+      {/* 회원가입 유도 모달 */}
+      <SignupPromptModal 
+        visible={showSignupPrompt}
+        onClose={() => setShowSignupPrompt(false)}
+        message="비회원은 영역당 최대 5개의 제품만 등록할 수 있습니다. 회원가입하여 무제한으로 제품을 등록하세요!"
       />
     </View>
   );
@@ -438,6 +489,21 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  limitInfoContainer: {
+    backgroundColor: '#FFF9C4',
+    padding: 8,
+    marginTop: 8,
+    borderRadius: 4,
+  },
+  limitInfoText: {
+    fontSize: 12,
+    color: '#FF8F00',
+    textAlign: 'center',
+  },
+  disabledAddButton: {
+    backgroundColor: '#A5D6A7',
+    opacity: 0.7,
   },
 });
 

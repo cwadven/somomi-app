@@ -17,12 +17,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { addProductAsync } from '../redux/slices/productsSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
+import { fetchCategories } from '../redux/slices/categoriesSlice';
+import SignupPromptModal from '../components/SignupPromptModal';
 
 // 조건부 DateTimePicker 임포트
 let DateTimePicker;
 if (Platform.OS !== 'web') {
-  // 네이티브 환경에서만 임포트
-  DateTimePicker = require('@react-native-community/datetimepicker').default;
+  try {
+    // 네이티브 환경에서만 임포트
+    DateTimePicker = require('@react-native-community/datetimepicker').default;
+  } catch (error) {
+    console.error('DateTimePicker 임포트 실패:', error);
+  }
 }
 
 const AddProductScreen = () => {
@@ -31,9 +37,10 @@ const AddProductScreen = () => {
   const route = useRoute();
   const { locationId } = route.params || {};
   
-  const { categories } = useSelector(state => state.categories);
+  const { categories, status: categoriesStatus } = useSelector(state => state.categories);
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
-  const { status: productsStatus } = useSelector(state => state.products);
+  const { products: allProducts, status: productsStatus } = useSelector(state => state.products);
+  const { isAnonymous } = useSelector(state => state.auth);
   
   // 폼 상태
   const [productName, setProductName] = useState('');
@@ -62,23 +69,42 @@ const AddProductScreen = () => {
   // 등록 성공 모달
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [registeredProduct, setRegisteredProduct] = useState(null);
+  
+  // 회원가입 유도 모달
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  
+  // 현재 선택된 영역의 제품 개수
+  const [currentLocationProducts, setCurrentLocationProducts] = useState([]);
 
-  // 영역 데이터 로드
+  // 카테고리 및 영역 데이터 로드
   useEffect(() => {
+    if (categoriesStatus === 'idle') {
+      dispatch(fetchCategories());
+    }
+    
     if (locationsStatus === 'idle') {
       dispatch(fetchLocations());
     }
-  }, [dispatch, locationsStatus]);
+  }, [dispatch, categoriesStatus, locationsStatus]);
 
-  // 초기 선택된 영역 설정
+  // 초기 선택된 영역 설정 및 해당 영역의 제품 개수 확인
   useEffect(() => {
     if (locationId && locations.length > 0) {
       const location = locations.find(loc => loc.id === locationId);
       if (location) {
         setSelectedLocation(location);
+        
+        // 해당 영역의 제품 목록 필터링
+        const productsInLocation = allProducts.filter(p => p.locationId === locationId);
+        setCurrentLocationProducts(productsInLocation);
+        
+        // 비회원이고 제품이 5개 이상인 경우 회원가입 유도 모달 표시
+        if (isAnonymous && productsInLocation.length >= 5) {
+          setShowSignupPrompt(true);
+        }
       }
     }
-  }, [locationId, locations]);
+  }, [locationId, locations, allProducts, isAnonymous]);
 
   // 폼 유효성 검사
   const isFormValid = () => {
@@ -97,53 +123,109 @@ const AddProductScreen = () => {
       return false;
     }
     
+    // 영역이 존재하는지 확인
+    if (locations.length === 0) {
+      Alert.alert(
+        '알림',
+        '등록된 영역이 없습니다. 영역을 먼저 등록해주세요.',
+        [
+          { text: '취소', style: 'cancel' },
+          { 
+            text: '영역 등록하기', 
+            onPress: () => navigation.navigate('AddLocation')
+          }
+        ]
+      );
+      return false;
+    }
+    
+    // 비회원인 경우 제품 개수 제한 확인
+    if (isAnonymous && currentLocationProducts.length >= 5) {
+      setShowSignupPrompt(true);
+      return false;
+    }
+    
     return true;
   };
 
   // 제품 등록 처리
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isFormValid()) return;
     
-    const newProduct = {
-      name: productName,
-      categoryId: selectedCategory ? selectedCategory.id : null,
-      category: selectedCategory ? selectedCategory.name : '미분류',
-      locationId: selectedLocation.id,
-      purchaseDate: purchaseDate.toISOString(),
-      expiryDate: expiryDate ? expiryDate.toISOString() : null,
-      estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
-      purchaseMethod,
-      purchaseLink,
-      price: price ? parseFloat(price) : null,
-      memo,
-      brand,
-      createdAt: new Date().toISOString(),
-    };
-    
-    dispatch(addProductAsync(newProduct))
-      .unwrap()
-      .then((result) => {
-        // 등록된 제품 정보 저장 및 성공 모달 표시
-        setRegisteredProduct(result);
-        setShowSuccessModal(true);
-      })
-      .catch((error) => {
-        Alert.alert('오류', `제품 등록에 실패했습니다: ${error.message}`);
-      });
+    try {
+      const newProduct = {
+        name: productName.trim(),
+        categoryId: selectedCategory ? selectedCategory.id : null,
+        category: selectedCategory ? selectedCategory.name : '미분류',
+        locationId: selectedLocation.id,
+        purchaseDate: purchaseDate.toISOString(),
+        expiryDate: expiryDate ? expiryDate.toISOString() : null,
+        estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
+        purchaseMethod: purchaseMethod.trim(),
+        purchaseLink: purchaseLink.trim(),
+        price: price ? parseFloat(price) : null,
+        memo: memo.trim(),
+        brand: brand.trim(),
+        createdAt: new Date().toISOString(),
+        remainingPercentage: 100, // 새 제품은 100% 남음
+      };
+      
+      const result = await dispatch(addProductAsync(newProduct)).unwrap();
+      console.log('제품 등록 성공:', result);
+      
+      // 등록된 제품 정보 저장 및 성공 모달 표시
+      setRegisteredProduct(result);
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error('제품 등록 실패:', error);
+      Alert.alert('오류', `제품 등록에 실패했습니다: ${error.message || '알 수 없는 오류'}`);
+    }
   };
   
   // 성공 모달 닫기 및 화면 이동
   const handleSuccessModalClose = () => {
     setShowSuccessModal(false);
+    
+    // 폼 초기화
+    setProductName('');
+    setSelectedCategory(null);
+    setBrand('');
+    setPurchaseMethod('');
+    setPurchaseLink('');
+    setPrice('');
+    setMemo('');
+    setExpiryDate(null);
+    setEstimatedEndDate(null);
+    
+    // 화면 이동 - replace 사용하여 현재 화면을 대체
     if (locationId) {
-      navigation.navigate('LocationDetail', { locationId });
+      // 현재 화면을 LocationDetail로 교체하여 뒤로가기 시 Locations로 이동하게 함
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: 'LocationsScreen' },
+          { name: 'LocationDetail', params: { locationId } }
+        ],
+      });
     } else {
-      navigation.navigate('Locations');
+      // 현재 화면을 Locations로 교체
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'LocationsScreen' }],
+      });
     }
   };
 
   // 날짜 선택 핸들러 (네이티브)
   const handleDateChange = (event, selectedDate, dateType) => {
+    // 안드로이드에서는 취소 시 selectedDate가 undefined
+    if (event.type === 'dismissed' || !selectedDate) {
+      setShowPurchaseDatePicker(false);
+      setShowExpiryDatePicker(false);
+      setShowEstimatedEndDatePicker(false);
+      return;
+    }
+    
     if (Platform.OS === 'android') {
       setShowPurchaseDatePicker(false);
       setShowExpiryDatePicker(false);
@@ -181,13 +263,22 @@ const AddProductScreen = () => {
   
   // 웹용 날짜 입력 확인
   const handleConfirmWebDate = () => {
-    let date;
     try {
       // 입력된 문자열에서 날짜 객체 생성
-      date = new Date(tempDateString);
+      const [year, month, day] = tempDateString.split('-').map(Number);
+      
+      // 유효한 날짜 형식인지 확인
+      if (!year || !month || !day || 
+          isNaN(year) || isNaN(month) || isNaN(day) ||
+          month < 1 || month > 12 || day < 1 || day > 31) {
+        throw new Error('유효하지 않은 날짜 형식');
+      }
+      
+      // JavaScript의 월은 0부터 시작하므로 1을 빼줌
+      const date = new Date(year, month - 1, day);
       
       if (isNaN(date.getTime())) {
-        throw new Error('Invalid date');
+        throw new Error('유효하지 않은 날짜');
       }
       
       if (currentDateType === 'purchase') {
@@ -208,49 +299,65 @@ const AddProductScreen = () => {
   const formatDate = (date) => {
     if (!date) return '날짜 선택';
     
-    return date.toLocaleDateString();
+    try {
+      return date.toLocaleDateString();
+    } catch (error) {
+      console.error('날짜 포맷 오류:', error);
+      return '날짜 선택';
+    }
   };
   
   // 입력용 날짜 포맷 함수 (YYYY-MM-DD)
   const formatDateForInput = (date) => {
     if (!date) return '';
     
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    
-    return `${year}-${month}-${day}`;
+    try {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      
+      return `${year}-${month}-${day}`;
+    } catch (error) {
+      console.error('입력용 날짜 포맷 오류:', error);
+      return '';
+    }
   };
 
   // 카테고리 선택 컴포넌트
   const CategorySelector = () => (
     <View style={styles.categoriesContainer}>
       <Text style={styles.sectionTitle}>카테고리</Text>
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesList}
-      >
-        {categories.map(category => (
-          <TouchableOpacity
-            key={category.id}
-            style={[
-              styles.categoryChip,
-              selectedCategory?.id === category.id && styles.selectedCategoryChip
-            ]}
-            onPress={() => setSelectedCategory(category)}
-          >
-            <Text
+      {categoriesStatus === 'loading' ? (
+        <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
+      ) : categories.length > 0 ? (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesList}
+        >
+          {categories.map(category => (
+            <TouchableOpacity
+              key={category.id}
               style={[
-                styles.categoryChipText,
-                selectedCategory?.id === category.id && styles.selectedCategoryChipText
+                styles.categoryChip,
+                selectedCategory?.id === category.id && styles.selectedCategoryChip
               ]}
+              onPress={() => setSelectedCategory(category)}
             >
-              {category.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+              <Text
+                style={[
+                  styles.categoryChipText,
+                  selectedCategory?.id === category.id && styles.selectedCategoryChipText
+                ]}
+              >
+                {category.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      ) : (
+        <Text style={styles.emptyText}>등록된 카테고리가 없습니다.</Text>
+      )}
     </View>
   );
 
@@ -258,37 +365,51 @@ const AddProductScreen = () => {
   const LocationSelector = () => (
     <View style={styles.categoriesContainer}>
       <Text style={styles.sectionTitle}>영역 *</Text>
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesList}
-      >
-        {locations.map(location => (
-          <TouchableOpacity
-            key={location.id}
-            style={[
-              styles.locationChip,
-              selectedLocation?.id === location.id && styles.selectedLocationChip
-            ]}
-            onPress={() => setSelectedLocation(location)}
-          >
-            <Ionicons 
-              name={location.icon || 'cube-outline'} 
-              size={16} 
-              color={selectedLocation?.id === location.id ? '#fff' : '#4CAF50'} 
-              style={styles.locationChipIcon}
-            />
-            <Text
+      {locationsStatus === 'loading' ? (
+        <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
+      ) : locations.length > 0 ? (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesList}
+        >
+          {locations.map(location => (
+            <TouchableOpacity
+              key={location.id}
               style={[
-                styles.locationChipText,
-                selectedLocation?.id === location.id && styles.selectedLocationChipText
+                styles.locationChip,
+                selectedLocation?.id === location.id && styles.selectedLocationChip
               ]}
+              onPress={() => setSelectedLocation(location)}
             >
-              {location.title}
-            </Text>
+              <Ionicons 
+                name={location.icon || 'cube-outline'} 
+                size={16} 
+                color={selectedLocation?.id === location.id ? '#fff' : '#4CAF50'} 
+                style={styles.locationChipIcon}
+              />
+              <Text
+                style={[
+                  styles.locationChipText,
+                  selectedLocation?.id === location.id && styles.selectedLocationChipText
+                ]}
+              >
+                {location.title}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
+          <TouchableOpacity 
+            style={styles.addLocationButton}
+            onPress={() => navigation.navigate('AddLocation')}
+          >
+            <Text style={styles.addLocationButtonText}>영역 추가하기</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+        </View>
+      )}
     </View>
   );
   
@@ -351,28 +472,30 @@ const AddProductScreen = () => {
           <Text style={styles.successTitle}>등록 완료!</Text>
           
           <Text style={styles.successMessage}>
-            {registeredProduct?.name} 제품이 성공적으로 등록되었습니다.
+            {registeredProduct?.name || '제품'}이(가) 성공적으로 등록되었습니다.
           </Text>
           
           <View style={styles.productInfoContainer}>
-            <View style={styles.productInfoRow}>
-              <Text style={styles.productInfoLabel}>영역:</Text>
-              <Text style={styles.productInfoValue}>
-                {locations.find(l => l.id === registeredProduct?.locationId)?.title || ''}
-              </Text>
-            </View>
+            {selectedLocation && (
+              <View style={styles.productInfoRow}>
+                <Text style={styles.productInfoLabel}>영역:</Text>
+                <Text style={styles.productInfoValue}>
+                  {selectedLocation.title || ''}
+                </Text>
+              </View>
+            )}
             
-            {registeredProduct?.brand && (
+            {brand && (
               <View style={styles.productInfoRow}>
                 <Text style={styles.productInfoLabel}>브랜드:</Text>
-                <Text style={styles.productInfoValue}>{registeredProduct.brand}</Text>
+                <Text style={styles.productInfoValue}>{brand}</Text>
               </View>
             )}
             
             <View style={styles.productInfoRow}>
               <Text style={styles.productInfoLabel}>구매일:</Text>
               <Text style={styles.productInfoValue}>
-                {registeredProduct ? new Date(registeredProduct.purchaseDate).toLocaleDateString() : ''}
+                {formatDate(purchaseDate)}
               </Text>
             </View>
           </View>
@@ -582,6 +705,13 @@ const AddProductScreen = () => {
       
       {/* 등록 성공 모달 */}
       <SuccessModal />
+      
+      {/* 회원가입 유도 모달 */}
+      <SignupPromptModal 
+        visible={showSignupPrompt}
+        onClose={() => setShowSignupPrompt(false)}
+        message="비회원은 영역당 최대 5개의 제품만 등록할 수 있습니다. 회원가입하여 무제한으로 제품을 등록하세요!"
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -777,10 +907,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   productInfoContainer: {
-    backgroundColor: '#f9f9f9',
-    padding: 16,
+    backgroundColor: '#f5f5f5',
     borderRadius: 8,
-    marginBottom: 20,
+    padding: 16,
+    marginBottom: 16,
   },
   productInfoRow: {
     flexDirection: 'row',
@@ -788,7 +918,6 @@ const styles = StyleSheet.create({
   },
   productInfoLabel: {
     fontSize: 14,
-    fontWeight: '500',
     color: '#666',
     width: 80,
   },
@@ -806,6 +935,30 @@ const styles = StyleSheet.create({
   successButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  loader: {
+    marginVertical: 16,
+  },
+  emptyText: {
+    color: '#666',
+    textAlign: 'center',
+    marginVertical: 16,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  addLocationButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  addLocationButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: 'bold',
   },
 });
