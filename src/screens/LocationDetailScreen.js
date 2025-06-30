@@ -115,42 +115,44 @@ const LocationDetailScreen = () => {
     if (products && products.length > 0) {
       setShowDeleteModal(true);
     } else {
-      confirmDeleteLocation();
+      // 제품이 없는 경우 바로 삭제 확인 모달
+      setAlertModalConfig({
+        title: '영역 삭제',
+        message: '이 영역을 삭제하시겠습니까?',
+        buttons: [
+          { 
+            text: '취소', 
+            style: 'cancel', 
+            onPress: () => {} 
+          },
+          { 
+            text: '삭제', 
+            style: 'destructive',
+            onPress: () => deleteLocationAndNavigate()
+          }
+        ],
+        icon: 'trash-outline',
+        iconColor: '#F44336'
+      });
+      setAlertModalVisible(true);
     }
   };
   
-  const confirmDeleteLocation = () => {
-    setAlertModalConfig({
-      title: '영역 삭제',
-      message: '이 영역을 삭제하시겠습니까?',
-      buttons: [
-        { 
-          text: '취소', 
-          style: 'cancel', 
-          onPress: () => setShowDeleteModal(false) 
-        },
-        { 
-          text: '삭제', 
-          style: 'destructive',
-          onPress: () => {
-            setShowDeleteModal(false);
-            dispatch(deleteLocation(locationId))
-              .unwrap()
-              .then(() => {
-                navigation.goBack();
-              })
-              .catch((err) => {
-                showErrorAlert(`영역 삭제 중 오류가 발생했습니다: ${err.message}`);
-              });
-          }
-        }
-      ],
-      icon: 'trash-outline',
-      iconColor: '#F44336'
-    });
-    setAlertModalVisible(true);
+  // 영역 삭제 및 화면 이동 함수
+  const deleteLocationAndNavigate = () => {
+    dispatch(deleteLocation(locationId))
+      .unwrap()
+      .then(() => {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'LocationsScreen' }],
+        });
+      })
+      .catch((err) => {
+        showErrorAlert(`영역 삭제 중 오류가 발생했습니다: ${err.message}`);
+      });
   };
-
+  
   const showErrorAlert = (message) => {
     setAlertModalConfig({
       title: '오류',
@@ -199,7 +201,10 @@ const LocationDetailScreen = () => {
             
             <TouchableOpacity 
               style={[styles.modalButton, styles.deleteButton]}
-              onPress={confirmDeleteLocation}
+              onPress={() => {
+                setShowDeleteModal(false); // 먼저 현재 모달 닫기
+                deleteLocationAndNavigate(); // 영역 삭제 및 화면 이동
+              }}
             >
               <Text style={styles.deleteButtonText}>삭제</Text>
             </TouchableOpacity>

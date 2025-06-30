@@ -55,6 +55,20 @@ const AddProductScreen = () => {
   const [memo, setMemo] = useState('');
   const [brand, setBrand] = useState('');
   
+  // 폼 유효성 검사 상태
+  const [errors, setErrors] = useState({
+    productName: '',
+    location: '',
+    purchaseDate: ''
+  });
+  
+  // 필드 터치 상태 (사용자가 필드를 터치했는지 여부를 추적)
+  const [touched, setTouched] = useState({
+    productName: false,
+    location: false,
+    purchaseDate: false
+  });
+  
   // 날짜 선택기 표시 상태
   const [showPurchaseDatePicker, setShowPurchaseDatePicker] = useState(false);
   const [showExpiryDatePicker, setShowExpiryDatePicker] = useState(false);
@@ -106,22 +120,89 @@ const AddProductScreen = () => {
     }
   }, [locationId, locations, allProducts, isAnonymous]);
 
-  // 폼 유효성 검사
+  // 필드 유효성 검사 함수
+  const validateField = (name, value) => {
+    let errorMessage = '';
+    
+    switch (name) {
+      case 'productName':
+        if (!value.trim()) {
+          errorMessage = '제품명을 입력해주세요';
+        }
+        break;
+      case 'location':
+        if (!value) {
+          errorMessage = '영역을 선택해주세요';
+        }
+        break;
+      case 'purchaseDate':
+        if (!value) {
+          errorMessage = '구매일을 선택해주세요';
+        }
+        break;
+      default:
+        break;
+    }
+    
+    return errorMessage;
+  };
+  
+  // 필드 변경 핸들러
+  const handleFieldChange = (name, value) => {
+    // 필드 값 업데이트
+    switch (name) {
+      case 'productName':
+        setProductName(value);
+        break;
+      case 'location':
+        setSelectedLocation(value);
+        break;
+      case 'purchaseDate':
+        setPurchaseDate(value);
+        break;
+      default:
+        break;
+    }
+    
+    // 필드가 터치되었음을 표시
+    setTouched(prev => ({ ...prev, [name]: true }));
+    
+    // 유효성 검사 수행
+    const errorMessage = validateField(name, value);
+    setErrors(prev => ({ ...prev, [name]: errorMessage }));
+  };
+  
+  // 필드 블러(포커스 아웃) 핸들러
+  const handleFieldBlur = (name, value) => {
+    // 필드가 터치되었음을 표시
+    setTouched(prev => ({ ...prev, [name]: true }));
+    
+    // 유효성 검사 수행
+    const errorMessage = validateField(name, value);
+    setErrors(prev => ({ ...prev, [name]: errorMessage }));
+  };
+
+  // 폼 전체 유효성 검사
   const isFormValid = () => {
-    if (!productName.trim()) {
-      Alert.alert('알림', '제품명을 입력해주세요.');
-      return false;
-    }
+    // 모든 필수 필드에 대해 유효성 검사 수행
+    const newErrors = {
+      productName: validateField('productName', productName),
+      location: validateField('location', selectedLocation),
+      purchaseDate: validateField('purchaseDate', purchaseDate)
+    };
     
-    if (!purchaseDate) {
-      Alert.alert('알림', '구매일을 선택해주세요.');
-      return false;
-    }
+    // 에러 상태 업데이트
+    setErrors(newErrors);
     
-    if (!selectedLocation) {
-      Alert.alert('알림', '영역을 선택해주세요.');
-      return false;
-    }
+    // 모든 필드가 터치되었음을 표시
+    setTouched({
+      productName: true,
+      location: true,
+      purchaseDate: true
+    });
+    
+    // 에러가 있는지 확인
+    const hasErrors = Object.values(newErrors).some(error => error !== '');
     
     // 영역이 존재하는지 확인
     if (locations.length === 0) {
@@ -145,7 +226,7 @@ const AddProductScreen = () => {
       return false;
     }
     
-    return true;
+    return !hasErrors;
   };
 
   // 제품 등록 처리
@@ -364,41 +445,50 @@ const AddProductScreen = () => {
   // 영역 선택 컴포넌트
   const LocationSelector = () => (
     <View style={styles.categoriesContainer}>
-      <Text style={styles.sectionTitle}>영역 *</Text>
+      <View style={styles.labelContainer}>
+        <Text style={styles.sectionTitle}>영역</Text>
+        <Text style={styles.requiredMark}>*</Text>
+      </View>
       {locationsStatus === 'loading' ? (
         <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
       ) : locations.length > 0 ? (
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
-        >
-          {locations.map(location => (
-            <TouchableOpacity
-              key={location.id}
-              style={[
-                styles.locationChip,
-                selectedLocation?.id === location.id && styles.selectedLocationChip
-              ]}
-              onPress={() => setSelectedLocation(location)}
-            >
-              <Ionicons 
-                name={location.icon || 'cube-outline'} 
-                size={16} 
-                color={selectedLocation?.id === location.id ? '#fff' : '#4CAF50'} 
-                style={styles.locationChipIcon}
-              />
-              <Text
+        <>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesList}
+          >
+            {locations.map(location => (
+              <TouchableOpacity
+                key={location.id}
                 style={[
-                  styles.locationChipText,
-                  selectedLocation?.id === location.id && styles.selectedLocationChipText
+                  styles.locationChip,
+                  selectedLocation?.id === location.id && styles.selectedLocationChip,
+                  touched.location && errors.location && !selectedLocation ? styles.locationChipError : null
                 ]}
+                onPress={() => handleFieldChange('location', location)}
               >
-                {location.title}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+                <Ionicons 
+                  name={location.icon || 'cube-outline'} 
+                  size={16} 
+                  color={selectedLocation?.id === location.id ? '#fff' : '#4CAF50'} 
+                  style={styles.locationChipIcon}
+                />
+                <Text
+                  style={[
+                    styles.locationChipText,
+                    selectedLocation?.id === location.id && styles.selectedLocationChipText
+                  ]}
+                >
+                  {location.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          {touched.location && errors.location ? (
+            <Text style={styles.errorText}>{errors.location}</Text>
+          ) : null}
+        </>
       ) : (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
@@ -445,7 +535,15 @@ const AddProductScreen = () => {
             
             <TouchableOpacity 
               style={[styles.modalButton, styles.confirmButton]} 
-              onPress={handleConfirmWebDate}
+              onPress={() => {
+                handleConfirmWebDate();
+                if (currentDateType === 'purchase') {
+                  // 필드 터치 표시 및 유효성 검사
+                  setTouched(prev => ({ ...prev, purchaseDate: true }));
+                  const errorMessage = validateField('purchaseDate', tempDate);
+                  setErrors(prev => ({ ...prev, purchaseDate: errorMessage }));
+                }
+              }}
             >
               <Text style={styles.confirmButtonText}>확인</Text>
             </TouchableOpacity>
@@ -521,13 +619,23 @@ const AddProductScreen = () => {
         
         {/* 제품명 입력 */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>제품명 *</Text>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>제품명</Text>
+            <Text style={styles.requiredMark}>*</Text>
+          </View>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              touched.productName && errors.productName ? styles.inputError : null
+            ]}
             value={productName}
-            onChangeText={setProductName}
+            onChangeText={(text) => handleFieldChange('productName', text)}
+            onBlur={() => handleFieldBlur('productName', productName)}
             placeholder="제품명을 입력하세요"
           />
+          {touched.productName && errors.productName ? (
+            <Text style={styles.errorText}>{errors.productName}</Text>
+          ) : null}
         </View>
         
         {/* 브랜드 입력 */}
@@ -549,15 +657,23 @@ const AddProductScreen = () => {
         
         {/* 구매일 선택 */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>구매일 *</Text>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>구매일</Text>
+            <Text style={styles.requiredMark}>*</Text>
+          </View>
           <TouchableOpacity 
-            style={styles.dateInput}
+            style={[
+              styles.dateInput,
+              touched.purchaseDate && errors.purchaseDate ? styles.inputError : null
+            ]}
             onPress={() => {
               if (Platform.OS === 'web') {
                 handleWebDateSelect('purchase');
               } else {
                 setShowPurchaseDatePicker(true);
               }
+              // 필드 터치 표시
+              setTouched(prev => ({ ...prev, purchaseDate: true }));
             }}
           >
             <Text style={styles.dateText}>
@@ -565,12 +681,18 @@ const AddProductScreen = () => {
             </Text>
             <Ionicons name="calendar-outline" size={20} color="#666" />
           </TouchableOpacity>
+          {touched.purchaseDate && errors.purchaseDate ? (
+            <Text style={styles.errorText}>{errors.purchaseDate}</Text>
+          ) : null}
           {Platform.OS !== 'web' && showPurchaseDatePicker && (
             <DateTimePicker
               value={purchaseDate || new Date()}
               mode="date"
               display="default"
-              onChange={(event, date) => handleDateChange(event, date, 'purchase')}
+              onChange={(event, date) => {
+                handleDateChange(event, date, 'purchase');
+                handleFieldChange('purchaseDate', date);
+              }}
             />
           )}
         </View>
@@ -733,11 +855,21 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 20,
   },
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   label: {
     fontSize: 16,
-    marginBottom: 8,
     color: '#333',
     fontWeight: '500',
+  },
+  requiredMark: {
+    color: 'red',
+    fontWeight: 'bold',
+    marginLeft: 4,
+    fontSize: 16,
   },
   input: {
     backgroundColor: '#fff',
@@ -746,6 +878,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#E0E0E0',
+  },
+  inputError: {
+    borderColor: 'red',
   },
   textArea: {
     height: 100,
@@ -770,7 +905,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    marginBottom: 8,
     color: '#333',
     fontWeight: '500',
   },
@@ -813,6 +947,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     borderColor: '#4CAF50',
   },
+  locationChipError: {
+    borderColor: 'red',
+  },
   locationChipIcon: {
     marginRight: 4,
   },
@@ -845,6 +982,35 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginLeft: 8,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  emptyText: {
+    color: '#666',
+    textAlign: 'center',
+    marginVertical: 16,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  addLocationButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  addLocationButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  loader: {
+    marginVertical: 16,
   },
   modalOverlay: {
     flex: 1,
@@ -935,30 +1101,6 @@ const styles = StyleSheet.create({
   successButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
-  },
-  loader: {
-    marginVertical: 16,
-  },
-  emptyText: {
-    color: '#666',
-    textAlign: 'center',
-    marginVertical: 16,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  addLocationButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginTop: 8,
-  },
-  addLocationButtonText: {
-    color: '#fff',
-    fontSize: 14,
     fontWeight: 'bold',
   },
 });
