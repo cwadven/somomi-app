@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   ScrollView,
   Alert,
   TextInput,
+  Modal,
+  Platform,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -24,6 +26,12 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
   const dispatch = useDispatch();
   const { currentNotifications, status, error } = useSelector(state => state.notifications);
   
+  const scrollViewRef = useRef(null);
+  const formRefs = {
+    notifyType: useRef(null),
+    daysBeforeTarget: useRef(null)
+  };
+  
   const [notifications, setNotifications] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newNotification, setNewNotification] = useState({
@@ -36,10 +44,19 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
     message: '',
   });
   
-  // 알림 유형별 존재 여부 확인
+  // 필수 값 검증 오류 상태
+  const [validationErrors, setValidationErrors] = useState({
+    notifyType: false
+  });
+  
+  // 알림 유형별 존재 여부 확인 (제품과 영역 모두 적용)
   const [hasExpiryNotification, setHasExpiryNotification] = useState(false);
   const [hasEstimatedNotification, setHasEstimatedNotification] = useState(false);
   const [hasAiNotification, setHasAiNotification] = useState(false);
+  
+  // 직접 입력 모달 상태
+  const [showCustomDaysModal, setShowCustomDaysModal] = useState(false);
+  const [customDays, setCustomDays] = useState('');
   
   useEffect(() => {
     // 제품 또는 영역에 따라 알림 데이터 로드
@@ -62,18 +79,16 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
       
       setNotifications(updatedNotifications);
       
-      // 알림 유형별 존재 여부 확인
-      if (isLocation) {
-        const expiryNotification = updatedNotifications.find(n => n.notifyType === 'expiry');
-        const estimatedNotification = updatedNotifications.find(n => n.notifyType === 'estimated');
-        const aiNotification = updatedNotifications.find(n => n.notifyType === 'ai');
-        
-        setHasExpiryNotification(!!expiryNotification);
-        setHasEstimatedNotification(!!estimatedNotification);
-        setHasAiNotification(!!aiNotification);
-      }
+      // 알림 유형별 존재 여부 확인 (제품과 영역 모두 적용)
+      const expiryNotification = updatedNotifications.find(n => n.notifyType === 'expiry');
+      const estimatedNotification = updatedNotifications.find(n => n.notifyType === 'estimated');
+      const aiNotification = updatedNotifications.find(n => n.notifyType === 'ai');
+      
+      setHasExpiryNotification(!!expiryNotification);
+      setHasEstimatedNotification(!!estimatedNotification);
+      setHasAiNotification(!!aiNotification);
     }
-  }, [currentNotifications, isLocation]);
+  }, [currentNotifications]);
   
   useEffect(() => {
     if (status === 'failed' && error) {
@@ -81,27 +96,71 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
     }
   }, [status, error]);
   
-  const handleAddNotification = () => {
-    // 영역 알림 제한 확인 (영역인 경우 알림 유형별 1개씩만 허용)
-    if (isLocation) {
-      if (newNotification.notifyType === 'expiry' && hasExpiryNotification) {
-        Alert.alert('알림 제한', '유통기한 알림은 이미 설정되어 있습니다. 기존 알림을 수정하거나 삭제한 후 다시 시도해주세요.');
-        return;
-      }
-      
-      if (newNotification.notifyType === 'estimated' && hasEstimatedNotification) {
-        Alert.alert('알림 제한', '소진 예상 알림은 이미 설정되어 있습니다. 기존 알림을 수정하거나 삭제한 후 다시 시도해주세요.');
-        return;
-      }
-      
-      if (newNotification.notifyType === 'ai' && hasAiNotification) {
-        Alert.alert('알림 제한', 'AI 알림은 이미 설정되어 있습니다. 기존 알림을 수정하거나 삭제한 후 다시 시도해주세요.');
-        return;
-      }
+  // 필수 값 검증 함수
+  const validateForm = () => {
+    // 초기화
+    const errors = {
+      notifyType: false
+    };
+    let isValid = true;
+    let firstErrorField = null;
+    
+    // 알림 타입 검증
+    if (!newNotification.notifyType) {
+      errors.notifyType = true;
+      isValid = false;
+      if (!firstErrorField) firstErrorField = 'notifyType';
     }
-    // 제품 알림 제한 확인 (제품별 최대 3개)
-    else if (!isLocation && notifications.length >= 3) {
-      Alert.alert('알림 제한', '제품당 최대 3개의 알림만 설정할 수 있습니다.');
+    
+    // 추후 다른 필수 값이 추가되면 여기에 검증 로직 추가
+    // 예: if (!newNotification.someRequiredField) { errors.someRequiredField = true; ... }
+    
+    setValidationErrors(errors);
+    return { isValid, firstErrorField };
+  };
+  
+  // 오류 필드로 스크롤하는 함수
+  const scrollToField = (fieldName) => {
+    if (formRefs[fieldName]?.current && scrollViewRef.current) {
+      // 해당 요소로 스크롤
+      formRefs[fieldName].current.measureLayout(
+        scrollViewRef.current,
+        (x, y) => {
+          scrollViewRef.current.scrollTo({ y: y - 50, animated: true });
+        },
+        () => console.log('측정 실패')
+      );
+    }
+  };
+  
+  const handleAddNotification = () => {
+    // 필수 값 검증
+    const { isValid, firstErrorField } = validateForm();
+    
+    if (!isValid) {
+      // 첫 번째 오류 필드로 스크롤
+      if (firstErrorField) {
+        setTimeout(() => scrollToField(firstErrorField), 100);
+      }
+      
+      // 오류 메시지 표시
+      Alert.alert('필수 정보 누락', '필수 정보를 모두 입력해주세요.');
+      return;
+    }
+    
+    // 알림 유형별 1개씩만 허용 (제품과 영역 모두 적용)
+    if (newNotification.notifyType === 'expiry' && hasExpiryNotification) {
+      Alert.alert('알림 제한', '유통기한 알림은 이미 설정되어 있습니다. 기존 알림을 수정하거나 삭제한 후 다시 시도해주세요.');
+      return;
+    }
+    
+    if (newNotification.notifyType === 'estimated' && hasEstimatedNotification) {
+      Alert.alert('알림 제한', '소진 예상 알림은 이미 설정되어 있습니다. 기존 알림을 수정하거나 삭제한 후 다시 시도해주세요.');
+      return;
+    }
+    
+    if (newNotification.notifyType === 'ai' && hasAiNotification) {
+      Alert.alert('알림 제한', 'AI 알림은 이미 설정되어 있습니다. 기존 알림을 수정하거나 삭제한 후 다시 시도해주세요.');
       return;
     }
     
@@ -130,16 +189,18 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
           title: '',
           message: '',
         });
+        // 검증 오류 초기화
+        setValidationErrors({
+          notifyType: false
+        });
         
-        // 영역인 경우 알림 유형별 존재 여부 업데이트
-        if (isLocation) {
-          if (notificationData.notifyType === 'expiry') {
-            setHasExpiryNotification(true);
-          } else if (notificationData.notifyType === 'estimated') {
-            setHasEstimatedNotification(true);
-          } else if (notificationData.notifyType === 'ai') {
-            setHasAiNotification(true);
-          }
+        // 알림 유형별 존재 여부 업데이트
+        if (notificationData.notifyType === 'expiry') {
+          setHasExpiryNotification(true);
+        } else if (notificationData.notifyType === 'estimated') {
+          setHasEstimatedNotification(true);
+        } else if (notificationData.notifyType === 'ai') {
+          setHasAiNotification(true);
         }
       })
       .catch(err => {
@@ -173,8 +234,8 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
             dispatch(deleteNotification(id))
               .unwrap()
               .then(() => {
-                // 영역인 경우 알림 유형별 존재 여부 업데이트
-                if (isLocation && notificationToDelete) {
+                // 알림 유형별 존재 여부 업데이트
+                if (notificationToDelete) {
                   if (notificationToDelete.notifyType === 'expiry') {
                     setHasExpiryNotification(false);
                   } else if (notificationToDelete.notifyType === 'estimated') {
@@ -196,24 +257,34 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
   
   // 알림 유형 선택 시 이미 존재하는 유형인지 확인
   const handleNotifyTypeChange = (type) => {
-    if (isLocation) {
-      if (type === 'expiry' && hasExpiryNotification) {
-        Alert.alert('알림 제한', '유통기한 알림은 이미 설정되어 있습니다.');
-        return;
-      }
-      
-      if (type === 'estimated' && hasEstimatedNotification) {
-        Alert.alert('알림 제한', '소진 예상 알림은 이미 설정되어 있습니다.');
-        return;
-      }
-      
-      if (type === 'ai' && hasAiNotification) {
-        Alert.alert('알림 제한', 'AI 알림은 이미 설정되어 있습니다.');
-        return;
-      }
+    // 제품과 영역 모두 동일한 검증 적용
+    if (type === 'expiry' && hasExpiryNotification) {
+      Alert.alert('알림 제한', '유통기한 알림은 이미 설정되어 있습니다.');
+      return;
+    }
+    
+    if (type === 'estimated' && hasEstimatedNotification) {
+      Alert.alert('알림 제한', '소진 예상 알림은 이미 설정되어 있습니다.');
+      return;
+    }
+    
+    if (type === 'ai' && hasAiNotification) {
+      Alert.alert('알림 제한', 'AI 알림은 이미 설정되어 있습니다.');
+      return;
     }
     
     setNewNotification({ ...newNotification, notifyType: type });
+  };
+  
+  // 직접 입력 처리 함수
+  const handleCustomDaysSubmit = () => {
+    const daysNum = parseInt(customDays);
+    if (isNaN(daysNum) || daysNum < 1 || daysNum > 365) {
+      Alert.alert('오류', '1에서 365 사이의 숫자를 입력해주세요.');
+    } else {
+      setNewNotification({ ...newNotification, daysBeforeTarget: daysNum });
+      setShowCustomDaysModal(false);
+    }
   };
   
   const renderNotificationItem = (notification) => {
@@ -274,19 +345,12 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
   
   // 알림 추가 버튼 활성화 여부 확인
   const canAddMoreNotifications = () => {
-    if (!isLocation) {
-      // 제품인 경우 최대 3개까지 허용
-      return notifications.length < 3;
-    } else {
-      // 영역인 경우 각 유형별로 1개씩만 허용
-      return !hasExpiryNotification || !hasEstimatedNotification || !hasAiNotification;
-    }
+    // 각 유형별로 1개씩만 허용
+    return !hasExpiryNotification || !hasEstimatedNotification || !hasAiNotification;
   };
   
   // 알림 유형 선택 버튼 활성화 여부 확인
   const isNotifyTypeAvailable = (type) => {
-    if (!isLocation) return true;
-    
     if (type === 'expiry') return !hasExpiryNotification;
     if (type === 'estimated') return !hasEstimatedNotification;
     if (type === 'ai') return !hasAiNotification;
@@ -295,7 +359,10 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
   };
   
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      ref={scrollViewRef}
+    >
       {/* 알림 목록 */}
       <View style={styles.notificationsContainer}>
         <Text style={styles.sectionTitle}>알림 설정</Text>
@@ -324,8 +391,7 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
                 !canAddMoreNotifications() && styles.disabledText
               ]}
             >
-              알림 추가하기 {!isLocation && `(${notifications.length}/3)`}
-              {isLocation && ' (유형별 1개씩)'}
+              알림 추가하기 (유형별 1개씩)
             </Text>
           </TouchableOpacity>
         )}
@@ -337,22 +403,36 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
           <Text style={styles.formTitle}>새 알림 설정</Text>
           
           {/* 알림 타입 선택 */}
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>알림 타입</Text>
+          <View 
+            style={[
+              styles.formGroup,
+              validationErrors.notifyType && styles.errorFormGroup
+            ]}
+            ref={formRefs.notifyType}
+          >
+            <Text style={[
+              styles.formLabel,
+              validationErrors.notifyType && styles.errorLabel
+            ]}>
+              알림 타입 <Text style={styles.requiredMark}>*</Text>
+            </Text>
             <View style={styles.segmentedControl}>
               <TouchableOpacity
                 style={[
                   styles.segmentButton,
                   newNotification.notifyType === 'expiry' && styles.activeSegment,
-                  isLocation && hasExpiryNotification && styles.disabledSegment
+                  hasExpiryNotification && styles.disabledSegment
                 ]}
-                onPress={() => handleNotifyTypeChange('expiry')}
-                disabled={isLocation && hasExpiryNotification}
+                onPress={() => {
+                  handleNotifyTypeChange('expiry');
+                  setValidationErrors({...validationErrors, notifyType: false});
+                }}
+                disabled={hasExpiryNotification}
               >
                 <Text style={[
                   styles.segmentText,
                   newNotification.notifyType === 'expiry' && styles.activeSegmentText,
-                  isLocation && hasExpiryNotification && styles.disabledSegmentText
+                  hasExpiryNotification && styles.disabledSegmentText
                 ]}>
                   유통기한
                 </Text>
@@ -362,15 +442,18 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
                 style={[
                   styles.segmentButton,
                   newNotification.notifyType === 'estimated' && styles.activeSegment,
-                  isLocation && hasEstimatedNotification && styles.disabledSegment
+                  hasEstimatedNotification && styles.disabledSegment
                 ]}
-                onPress={() => handleNotifyTypeChange('estimated')}
-                disabled={isLocation && hasEstimatedNotification}
+                onPress={() => {
+                  handleNotifyTypeChange('estimated');
+                  setValidationErrors({...validationErrors, notifyType: false});
+                }}
+                disabled={hasEstimatedNotification}
               >
                 <Text style={[
                   styles.segmentText,
                   newNotification.notifyType === 'estimated' && styles.activeSegmentText,
-                  isLocation && hasEstimatedNotification && styles.disabledSegmentText
+                  hasEstimatedNotification && styles.disabledSegmentText
                 ]}>
                   소진 예상
                 </Text>
@@ -380,30 +463,35 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
                 style={[
                   styles.segmentButton,
                   newNotification.notifyType === 'ai' && styles.activeSegment,
-                  isLocation && hasAiNotification && styles.disabledSegment
+                  hasAiNotification && styles.disabledSegment
                 ]}
-                onPress={() => handleNotifyTypeChange('ai')}
-                disabled={isLocation && hasAiNotification}
+                onPress={() => {
+                  handleNotifyTypeChange('ai');
+                  setValidationErrors({...validationErrors, notifyType: false});
+                }}
+                disabled={hasAiNotification}
               >
                 <Text style={[
                   styles.segmentText,
                   newNotification.notifyType === 'ai' && styles.activeSegmentText,
-                  isLocation && hasAiNotification && styles.disabledSegmentText
+                  hasAiNotification && styles.disabledSegmentText
                 ]}>
                   AI 알림
                 </Text>
               </TouchableOpacity>
             </View>
             
-            {isLocation && (
-              <Text style={styles.typeInfoText}>
-                영역 알림은 각 유형별로 1개씩만 설정할 수 있습니다.
-              </Text>
+            {validationErrors.notifyType && (
+              <Text style={styles.errorText}>알림 타입을 선택해주세요.</Text>
             )}
+            
+            <Text style={styles.typeInfoText}>
+              각 유형별로 1개씩만 알림을 설정할 수 있습니다.
+            </Text>
           </View>
           
-          {/* AI 알림 설정 (영역 상세에서만 표시) */}
-          {isLocation && newNotification.notifyType === 'ai' && (
+          {/* AI 알림 설정 */}
+          {newNotification.notifyType === 'ai' && (
             <View style={styles.aiNotificationInfo}>
               <Ionicons name="bulb-outline" size={24} color="#FF9800" style={styles.aiIcon} />
               <Text style={styles.aiInfoText}>
@@ -414,7 +502,10 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
           
           {/* 유통기한/소진 예상 알림 설정 */}
           {newNotification.notifyType !== 'ai' && (
-            <View style={styles.formGroup}>
+            <View 
+              style={styles.formGroup}
+              ref={formRefs.daysBeforeTarget}
+            >
               <Text style={styles.formLabel}>
                 {newNotification.notifyType === 'expiry' ? '유통기한' : '소진 예상일'}까지 며칠 전에 알림을 받을까요?
               </Text>
@@ -436,6 +527,27 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
                     </Text>
                   </TouchableOpacity>
                 ))}
+                
+                {/* 직접 입력 옵션 추가 */}
+                <TouchableOpacity
+                  style={[
+                    styles.daysBeforeButton,
+                    styles.customDaysButton,
+                    !([1, 3, 5, 7, 14, 30].includes(newNotification.daysBeforeTarget)) && styles.selectedDaysBeforeButton,
+                  ]}
+                  onPress={() => {
+                    setCustomDays(newNotification.daysBeforeTarget.toString());
+                    setShowCustomDaysModal(true);
+                  }}
+                >
+                  <Text style={[
+                    styles.daysBeforeText,
+                    !([1, 3, 5, 7, 14, 30].includes(newNotification.daysBeforeTarget)) && styles.selectedDaysBeforeText,
+                  ]}>
+                    직접 입력
+                    {!([1, 3, 5, 7, 14, 30].includes(newNotification.daysBeforeTarget)) && ` (${newNotification.daysBeforeTarget}일)`}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -491,7 +603,10 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
           <View style={styles.formButtons}>
             <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
-              onPress={() => setShowAddForm(false)}
+              onPress={() => {
+                setShowAddForm(false);
+                setValidationErrors({ notifyType: false });
+              }}
             >
               <Text style={styles.buttonText}>취소</Text>
             </TouchableOpacity>
@@ -505,6 +620,46 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
           </View>
         </View>
       )}
+      
+      {/* 직접 입력 모달 */}
+      <Modal
+        visible={showCustomDaysModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCustomDaysModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>직접 입력</Text>
+            <Text style={styles.modalSubtitle}>알림을 받을 일수를 입력하세요 (1-365일)</Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              value={customDays}
+              onChangeText={setCustomDays}
+              keyboardType="number-pad"
+              autoFocus={true}
+              maxLength={3}
+            />
+            
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowCustomDaysModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>취소</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleCustomDaysSubmit}
+              >
+                <Text style={styles.confirmButtonText}>확인</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -667,6 +822,10 @@ const styles = StyleSheet.create({
   selectedDaysBeforeText: {
     color: '#fff',
   },
+  customDaysButton: {
+    borderStyle: 'dashed',
+    minWidth: 80,
+  },
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -726,6 +885,86 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // 모달 스타일
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 20,
+    width: '80%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#333',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  confirmButton: {
+    backgroundColor: '#007AFF',
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  // 필수 값 검증 관련 스타일
+  errorFormGroup: {
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    backgroundColor: 'rgba(255, 59, 48, 0.05)',
+  },
+  errorLabel: {
+    color: '#FF3B30',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 14,
+    marginTop: 8,
+  },
+  requiredMark: {
+    color: '#FF3B30',
     fontWeight: 'bold',
   },
 });
