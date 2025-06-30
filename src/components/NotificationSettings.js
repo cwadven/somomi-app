@@ -10,6 +10,7 @@ import {
   TextInput,
   Modal,
   Platform,
+  BackHandler,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -22,10 +23,12 @@ import {
   fetchLocationNotifications 
 } from '../redux/slices/notificationsSlice';
 import AlertModal from './AlertModal';
+import SignupPromptModal from './SignupPromptModal';
 
 const NotificationSettings = ({ type, targetId, isLocation = false, locationId = null }) => {
   const dispatch = useDispatch();
   const { currentNotifications, status, error } = useSelector(state => state.notifications);
+  const { isAnonymous } = useSelector(state => state.auth);
   
   const scrollViewRef = useRef(null);
   const formRefs = {
@@ -73,6 +76,42 @@ const NotificationSettings = ({ type, targetId, isLocation = false, locationId =
     title: '',
     message: '',
   });
+  
+  // 회원가입 안내 모달 상태
+  const [signupPromptVisible, setSignupPromptVisible] = useState(false);
+  
+  // 뒤로가기 버튼 처리를 위한 useEffect 추가
+  useEffect(() => {
+    // 안드로이드에서만 BackHandler 이벤트 처리
+    if (Platform.OS === 'android') {
+      const backAction = () => {
+        // 모달이 열려있으면 모달을 닫고 뒤로가기 이벤트 소비
+        if (deleteModalVisible) {
+          setDeleteModalVisible(false);
+          setNotificationToDelete(null);
+          return true; // 이벤트 소비
+        }
+        
+        if (errorModalVisible) {
+          setErrorModalVisible(false);
+          return true; // 이벤트 소비
+        }
+        
+        if (showCustomDaysModal) {
+          setShowCustomDaysModal(false);
+          return true; // 이벤트 소비
+        }
+        
+        return false; // 다른 핸들러가 처리하도록 함
+      };
+      
+      // BackHandler 이벤트 리스너 등록
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+      
+      // 컴포넌트 언마운트 시 이벤트 리스너 제거
+      return () => backHandler.remove();
+    }
+  }, [deleteModalVisible, errorModalVisible, showCustomDaysModal]);
   
   useEffect(() => {
     // 제품 또는 영역에 따라 알림 데이터 로드
@@ -159,10 +198,15 @@ const NotificationSettings = ({ type, targetId, isLocation = false, locationId =
   
   // 전체 영역 알림 무시 옵션 변경 처리
   const handleIgnoreAllLocationSettingsChange = (value) => {
-    setIgnoreAllLocationSettings(value);
-    
-    // 전체 영역 알림 무시는 새로 추가되는 알림에만 적용되도록 수정
-    // 기존 알림의 설정은 변경하지 않음
+    if (isAnonymous) {
+      // 비회원인 경우 회원가입 안내 모달 표시
+      setSignupPromptVisible(true);
+    } else {
+      // 회원인 경우 전체 영역 알림 무시 설정 변경
+      setIgnoreAllLocationSettings(value);
+      // 전체 영역 알림 무시는 새로 추가되는 알림에만 적용되도록 수정
+      // 기존 알림의 설정은 변경하지 않음
+    }
   };
   
   const handleAddNotification = () => {
@@ -367,7 +411,13 @@ const NotificationSettings = ({ type, targetId, isLocation = false, locationId =
   
   // 영역 알림 무시 옵션 변경 처리
   const handleIgnoreLocationSettingsChange = (value) => {
-    setNewNotification({ ...newNotification, ignoreLocationSettings: value });
+    if (isAnonymous) {
+      // 비회원인 경우 회원가입 안내 모달 표시
+      setSignupPromptVisible(true);
+    } else {
+      // 회원인 경우 영역 알림 무시 설정 변경
+      setNewNotification({ ...newNotification, ignoreLocationSettings: value });
+    }
   };
   
   const renderNotificationItem = (notification) => {
@@ -391,16 +441,27 @@ const NotificationSettings = ({ type, targetId, isLocation = false, locationId =
           <View style={styles.notificationActions}>
             <Switch
               value={isActive}
-              onValueChange={(value) => handleUpdateNotification(id, { isActive: value })}
+              onValueChange={(value) => {
+                if (isAnonymous) {
+                  // 비회원인 경우 회원가입 안내 모달 표시
+                  setSignupPromptVisible(true);
+                } else {
+                  // 회원인 경우 알림 활성화/비활성화 처리
+                  handleUpdateNotification(id, { isActive: value });
+                }
+              }}
               trackColor={{ false: '#767577', true: '#81b0ff' }}
               thumbColor={isActive ? '#f5dd4b' : '#f4f3f4'}
+              disabled={isAnonymous} // 비회원인 경우 비활성화
             />
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => handleDeleteNotification(id)}
-            >
-              <Ionicons name="trash-outline" size={24} color="red" />
-            </TouchableOpacity>
+            {!isAnonymous && ( // 회원인 경우에만 삭제 버튼 표시
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={() => handleDeleteNotification(id)}
+              >
+                <Ionicons name="trash-outline" size={24} color="red" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
         
@@ -444,6 +505,17 @@ const NotificationSettings = ({ type, targetId, isLocation = false, locationId =
     return true;
   };
   
+  // 알림 추가 버튼 클릭 시 비회원 확인 처리
+  const handleAddButtonClick = () => {
+    if (isAnonymous) {
+      // 비회원인 경우 회원가입 안내 모달 표시
+      setSignupPromptVisible(true);
+    } else {
+      // 회원인 경우 알림 추가 폼 표시
+      setShowAddForm(true);
+    }
+  };
+  
   return (
     <ScrollView 
       style={styles.container}
@@ -459,6 +531,7 @@ const NotificationSettings = ({ type, targetId, isLocation = false, locationId =
               onValueChange={handleIgnoreAllLocationSettingsChange}
               trackColor={{ false: '#767577', true: '#81b0ff' }}
               thumbColor={ignoreAllLocationSettings ? '#f5dd4b' : '#f4f3f4'}
+              disabled={isAnonymous} // 비회원인 경우 비활성화
             />
           </View>
           
@@ -484,7 +557,7 @@ const NotificationSettings = ({ type, targetId, isLocation = false, locationId =
         {!showAddForm && (
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => setShowAddForm(true)}
+            onPress={handleAddButtonClick}
             disabled={!canAddMoreNotifications()}
           >
             <Ionicons 
@@ -604,11 +677,10 @@ const NotificationSettings = ({ type, targetId, isLocation = false, locationId =
                 <Text style={styles.formLabel}>영역 알림 무시</Text>
                 <Switch
                   value={newNotification.ignoreLocationSettings}
-                  onValueChange={(value) => {
-                    setNewNotification({ ...newNotification, ignoreLocationSettings: value });
-                  }}
+                  onValueChange={handleIgnoreLocationSettingsChange}
                   trackColor={{ false: '#767577', true: '#81b0ff' }}
                   thumbColor={newNotification.ignoreLocationSettings ? '#f5dd4b' : '#f4f3f4'}
+                  disabled={isAnonymous} // 비회원인 경우 비활성화
                 />
               </View>
               
@@ -819,7 +891,7 @@ const NotificationSettings = ({ type, targetId, isLocation = false, locationId =
             
             <View style={styles.modalButtonContainer}>
               <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]}
+                style={[styles.modalButton, styles.modalCancelButton]}
                 onPress={() => setShowCustomDaysModal(false)}
               >
                 <Text style={styles.cancelButtonText}>취소</Text>
@@ -835,6 +907,13 @@ const NotificationSettings = ({ type, targetId, isLocation = false, locationId =
           </View>
         </View>
       </Modal>
+      
+      {/* 회원가입 안내 모달 */}
+      <SignupPromptModal
+        visible={signupPromptVisible}
+        onClose={() => setSignupPromptVisible(false)}
+        message="알림 설정은 회원만 이용할 수 있는 기능입니다. 회원가입 후 이용해주세요."
+      />
     </ScrollView>
   );
 };
@@ -1107,7 +1186,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 8,
   },
-  cancelButton: {
+  modalCancelButton: {
     backgroundColor: '#f0f0f0',
   },
   cancelButtonText: {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -6,7 +6,8 @@ import {
   Modal, 
   TouchableOpacity,
   TouchableWithoutFeedback,
-  Platform
+  Platform,
+  BackHandler
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -31,6 +32,21 @@ const AlertModal = ({
   icon,
   iconColor = '#4CAF50'
 }) => {
+  // 안드로이드 뒤로가기 버튼 처리
+  useEffect(() => {
+    if (Platform.OS === 'android' && visible) {
+      const backAction = () => {
+        if (onClose) {
+          onClose();
+        }
+        return true; // 이벤트 소비
+      };
+      
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+      return () => backHandler.remove();
+    }
+  }, [visible, onClose]);
+
   // 버튼 스타일 계산
   const getButtonStyle = (style) => {
     switch (style) {
