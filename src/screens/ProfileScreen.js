@@ -362,11 +362,14 @@ const ProfileScreen = () => {
           onPress={() => Alert.alert('알림', '도움말 기능은 아직 구현되지 않았습니다.')}
         />
         
-        <SettingItem 
-          icon="mail-outline" 
-          title="문의하기" 
-          onPress={() => Alert.alert('알림', '문의하기 기능은 아직 구현되지 않았습니다.')}
-        />
+        {/* 문의하기는 로그인한 사용자에게만 표시 */}
+        {isLoggedIn && (
+          <SettingItem 
+            icon="mail-outline" 
+            title="문의하기" 
+            onPress={() => Alert.alert('알림', '문의하기 기능은 아직 구현되지 않았습니다.')}
+          />
+        )}
       </View>
       
       <View style={styles.footer}>
