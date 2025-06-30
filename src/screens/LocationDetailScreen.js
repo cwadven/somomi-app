@@ -9,7 +9,8 @@ import {
   Image,
   Alert,
   Modal,
-  Platform
+  Platform,
+  ScrollView
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -18,6 +19,7 @@ import { fetchLocationById, fetchProductsByLocation, deleteLocation, updateLocat
 import ProductCard from '../components/ProductCard';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
+import NotificationSettings from '../components/NotificationSettings';
 
 const LocationDetailScreen = () => {
   const route = useRoute();
@@ -52,6 +54,8 @@ const LocationDetailScreen = () => {
   
   // 회원가입 유도 모달
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+
+  const [activeTab, setActiveTab] = useState('products'); // 'products' 또는 'notifications'
 
   useEffect(() => {
     navigation.setOptions({
@@ -290,33 +294,78 @@ const LocationDetailScreen = () => {
             </Text>
           </View>
         )}
+        
+        {/* 탭 메뉴 (제품 목록 / 알림 설정) */}
+        {!isAllProducts && (
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[
+                styles.tabButton,
+                activeTab === 'products' && styles.activeTabButton
+              ]}
+              onPress={() => setActiveTab('products')}
+            >
+              <Text style={[
+                styles.tabButtonText,
+                activeTab === 'products' && styles.activeTabButtonText
+              ]}>
+                제품 목록
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.tabButton,
+                activeTab === 'notifications' && styles.activeTabButton
+              ]}
+              onPress={() => setActiveTab('notifications')}
+            >
+              <Text style={[
+                styles.tabButtonText,
+                activeTab === 'notifications' && styles.activeTabButtonText
+              ]}>
+                알림 설정
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
       
-      <FlatList
-        data={products}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
-            <Text style={styles.emptySubText}>
-              오른쪽 하단의 + 버튼을 눌러 제품을 추가하세요.
-            </Text>
-          </View>
-        }
-      />
-      
-      <TouchableOpacity 
-        style={[
-          styles.addButton,
-          // 비회원이고 제품이 5개 이상이면 버튼 비활성화 스타일 적용
-          isAnonymous && products.length >= 5 && styles.disabledAddButton
-        ]}
-        onPress={handleAddProduct}
-      >
-        <Ionicons name="add" size={30} color="white" />
-      </TouchableOpacity>
+      {activeTab === 'products' ? (
+        <>
+          <FlatList
+            data={products}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContainer}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
+                <Text style={styles.emptySubText}>
+                  오른쪽 하단의 + 버튼을 눌러 제품을 추가하세요.
+                </Text>
+              </View>
+            }
+          />
+          
+          <TouchableOpacity 
+            style={[
+              styles.addButton,
+              // 비회원이고 제품이 5개 이상이면 버튼 비활성화 스타일 적용
+              isAnonymous && products.length >= 5 && styles.disabledAddButton
+            ]}
+            onPress={handleAddProduct}
+          >
+            <Ionicons name="add" size={30} color="white" />
+          </TouchableOpacity>
+        </>
+      ) : (
+        <NotificationSettings 
+          type="location"
+          targetId={locationId}
+          isLocation={true}
+        />
+      )}
       
       <DeleteConfirmModal />
       
@@ -509,6 +558,29 @@ const styles = StyleSheet.create({
   disabledAddButton: {
     backgroundColor: '#A5D6A7',
     opacity: 0.7,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginTop: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  activeTabButton: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#4CAF50',
+  },
+  tabButtonText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  activeTabButtonText: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
   },
 });
 

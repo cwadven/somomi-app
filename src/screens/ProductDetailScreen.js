@@ -16,6 +16,7 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchProductById, deleteProductAsync, markProductAsConsumedAsync } from '../redux/slices/productsSlice';
 import AlertModal from '../components/AlertModal';
+import NotificationSettings from '../components/NotificationSettings';
 
 // HP 바 컴포넌트
 const HPBar = ({ percentage, type }) => {
@@ -67,6 +68,9 @@ const ProductDetailScreen = () => {
     icon: '',
     iconColor: ''
   });
+  
+  // 활성화된 탭 상태
+  const [activeTab, setActiveTab] = useState('details'); // 'details' 또는 'notifications'
   
   useEffect(() => {
     dispatch(fetchProductById(productId));
@@ -207,9 +211,9 @@ const ProductDetailScreen = () => {
     navigation.navigate('EditProduct', { productId: currentProduct.id });
   };
   
-  // 알림 설정 화면으로 이동
+  // 알림 설정 탭으로 전환
   const handleNotification = () => {
-    Alert.alert('알림', '알림 설정 기능은 아직 구현되지 않았습니다.');
+    setActiveTab('notifications');
   };
   
   // 소진 처리 함수
@@ -305,164 +309,220 @@ const ProductDetailScreen = () => {
     navigation.goBack();
   };
 
-  return (
-    <ScrollView style={styles.container}>
-      {/* 제품 헤더 */}
-      <View style={styles.header}>
-        <View style={styles.characterImageContainer}>
-          <Ionicons name={getCategoryIcon()} size={50} color="#4CAF50" />
-        </View>
-        <View style={styles.headerInfo}>
-          <Text style={styles.productName}>{currentProduct.name}</Text>
-          <View style={styles.brandCategoryContainer}>
-            <Text style={styles.brandName}>{currentProduct.brand}</Text>
-            <Text style={styles.categoryName}>{currentProduct.category}</Text>
+  // 제품 상세 정보 렌더링
+  const renderProductDetails = () => {
+    return (
+      <ScrollView style={styles.container}>
+        {/* 제품 이미지 및 기본 정보 */}
+        <View style={styles.productHeader}>
+          <View style={styles.imageContainer}>
+            {currentProduct.image ? (
+              <Image 
+                source={{ uri: currentProduct.image }} 
+                style={styles.productImage} 
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.noImageContainer}>
+                <Ionicons 
+                  name={getCategoryIcon()} 
+                  size={60} 
+                  color="#4CAF50" 
+                />
+                <Text style={styles.noImageText}>이미지 없음</Text>
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.productInfo}>
+            <Text style={styles.productName}>{currentProduct.name}</Text>
+            <Text style={styles.productCategory}>{currentProduct.category}</Text>
+            
+            {currentProduct.location && (
+              <View style={styles.locationBadge}>
+                <Ionicons name="location-outline" size={14} color="#4CAF50" />
+                <Text style={styles.locationText}>{currentProduct.location}</Text>
+              </View>
+            )}
           </View>
         </View>
-      </View>
-      
-      {/* HP 바 섹션 */}
-      <View style={styles.hpSectionContainer}>
-        {expiryPercentage !== null && (
-          <View style={styles.hpSection}>
-            <View style={styles.hpHeader}>
-              <View style={styles.hpTitleContainer}>
-                <Ionicons name="alarm-outline" size={18} color="#2196F3" style={styles.hpIcon} />
+        
+        {/* 유통기한 및 소진 예상일 정보 */}
+        <View style={styles.infoSection}>
+          {/* 유통기한 정보 */}
+          {currentProduct.expiryDate && (
+            <View style={styles.hpSection}>
+              <View style={styles.hpHeader}>
+                <Ionicons name="calendar-outline" size={20} color="#2196F3" />
                 <Text style={styles.hpTitle}>유통기한</Text>
+                <Text style={styles.hpDate}>
+                  {new Date(currentProduct.expiryDate).toLocaleDateString()}
+                </Text>
               </View>
-              <Text style={styles.hpDate}>
-                {new Date(currentProduct.expiryDate).toLocaleDateString()}
+              
+              <HPBar 
+                percentage={calculateExpiryPercentage() || 0} 
+                type="expiry" 
+              />
+              
+              <Text style={styles.hpText}>
+                {calculateExpiryDays() > 0 
+                  ? `유통기한까지 ${calculateExpiryDays()}일 남았습니다.`
+                  : '유통기한이 지났습니다!'
+                }
               </Text>
             </View>
-            <View style={styles.hpLabelContainer}>
-              <Text style={styles.hpLabel}>남은 수명</Text>
-              <Text style={[styles.hpPercentage, { color: '#2196F3' }]}>
-                {expiryPercentage}%
-              </Text>
-            </View>
-            <HPBar percentage={expiryPercentage} type="expiry" />
-            {expiryDays !== null && (
-              <Text style={styles.remainingDays}>
-                {expiryDays > 0 
-                  ? `${expiryDays}일 남음` 
-                  : expiryDays === 0 
-                    ? '오늘까지' 
-                    : `${Math.abs(expiryDays)}일 지남`}
-              </Text>
-            )}
-          </View>
-        )}
-        
-        {consumptionPercentage !== null && (
-          <View style={styles.hpSection}>
-            <View style={styles.hpHeader}>
-              <View style={styles.hpTitleContainer}>
-                <Ionicons name="hourglass-outline" size={18} color="#4CAF50" style={styles.hpIcon} />
+          )}
+          
+          {/* 소진 예상일 정보 */}
+          {currentProduct.estimatedEndDate && (
+            <View style={styles.hpSection}>
+              <View style={styles.hpHeader}>
+                <Ionicons name="hourglass-outline" size={20} color="#4CAF50" />
                 <Text style={styles.hpTitle}>소진 예상</Text>
+                <Text style={styles.hpDate}>
+                  {new Date(currentProduct.estimatedEndDate).toLocaleDateString()}
+                </Text>
               </View>
-              <Text style={styles.hpDate}>
-                {new Date(currentProduct.estimatedEndDate).toLocaleDateString()}
+              
+              <HPBar 
+                percentage={calculateConsumptionPercentage() || 0} 
+                type="consumption" 
+              />
+              
+              <Text style={styles.hpText}>
+                {calculateConsumptionDays() > 0 
+                  ? `소진 예상일까지 ${calculateConsumptionDays()}일 남았습니다.`
+                  : '소진 예상일이 지났습니다!'
+                }
               </Text>
             </View>
-            <View style={styles.hpLabelContainer}>
-              <Text style={styles.hpLabel}>남은 수명</Text>
-              <Text style={[styles.hpPercentage, { color: '#4CAF50' }]}>
-                {consumptionPercentage}%
-              </Text>
-            </View>
-            <HPBar percentage={consumptionPercentage} type="consumption" />
-            {consumptionDays !== null && (
-              <Text style={styles.remainingDays}>
-                {consumptionDays > 0 
-                  ? `${consumptionDays}일 남음` 
-                  : consumptionDays === 0 
-                    ? '오늘까지' 
-                    : `${Math.abs(consumptionDays)}일 지남`}
-              </Text>
-            )}
-          </View>
-        )}
-      </View>
-      
-      {/* 제품 정보 */}
-      <View style={styles.infoSection}>
-        <Text style={styles.sectionTitle}>제품 정보</Text>
-        
-        <InfoItem 
-          label="구매일" 
-          value={currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate).toLocaleDateString() : null} 
-          icon="calendar-outline" 
-        />
-        
-        <InfoItem 
-          label="구매 방법" 
-          value={currentProduct.purchaseMethod} 
-          icon="cart-outline" 
-        />
-        
-        <InfoItem 
-          label="구매 링크" 
-          value={currentProduct.purchaseLink} 
-          icon="link-outline" 
-        />
-        
-        <InfoItem 
-          label="가격" 
-          value={currentProduct.price ? `${currentProduct.price.toLocaleString()}원` : null} 
-          icon="pricetag-outline" 
-        />
-      </View>
-      
-      {/* 메모 섹션 */}
-      {currentProduct.memo && (
-        <View style={styles.memoSection}>
-          <Text style={styles.sectionTitle}>메모</Text>
-          <Text style={styles.memoText}>{currentProduct.memo}</Text>
+          )}
         </View>
-      )}
-      
-      {/* 소진 처리 버튼 (항상 표시) */}
-      <TouchableOpacity 
-        style={styles.consumeButtonContainer}
-        onPress={handleMarkAsConsumed}
-      >
-        <View style={[
-          styles.consumeButton,
-          needsConsumption && styles.urgentConsumeButton
-        ]}>
-          <Ionicons 
-            name="checkmark-circle" 
-            size={24} 
-            color="#fff" 
+        
+        {/* 추가 정보 섹션 */}
+        <View style={styles.detailsSection}>
+          <Text style={styles.sectionTitle}>제품 정보</Text>
+          
+          <InfoItem 
+            label="구매일" 
+            value={currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate).toLocaleDateString() : '정보 없음'} 
+            icon="calendar-outline" 
           />
-          <Text style={styles.consumeButtonText}>
-            {needsConsumption ? '소진 처리하기 (필요)' : '소진 처리하기'}
-          </Text>
+          
+          <InfoItem 
+            label="브랜드" 
+            value={currentProduct.brand || '정보 없음'} 
+            icon="pricetag-outline" 
+          />
+          
+          <InfoItem 
+            label="구매처" 
+            value={currentProduct.purchasePlace || '정보 없음'} 
+            icon="cart-outline" 
+          />
+          
+          <InfoItem 
+            label="가격" 
+            value={currentProduct.price ? `${currentProduct.price.toLocaleString()}원` : '정보 없음'} 
+            icon="cash-outline" 
+          />
+          
+          {currentProduct.memo && (
+            <View style={styles.memoContainer}>
+              <Text style={styles.memoLabel}>메모</Text>
+              <Text style={styles.memoText}>{currentProduct.memo}</Text>
+            </View>
+          )}
         </View>
-      </TouchableOpacity>
-      
-      {/* 작업 버튼 */}
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity style={styles.actionButton} onPress={handleEdit}>
-          <Ionicons name="create-outline" size={20} color="#fff" />
-          <Text style={styles.actionButtonText}>수정</Text>
+        
+        {/* 버튼 섹션 */}
+        <View style={styles.buttonSection}>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.consumedButton]}
+            onPress={handleMarkAsConsumed}
+          >
+            <Ionicons name="checkmark-circle-outline" size={24} color="#fff" />
+            <Text style={styles.actionButtonText}>소진 처리</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  };
+  
+  return (
+    <View style={styles.mainContainer}>
+      {/* 탭 메뉴 */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'details' && styles.activeTabButton
+          ]}
+          onPress={() => setActiveTab('details')}
+        >
+          <Text style={[
+            styles.tabButtonText,
+            activeTab === 'details' && styles.activeTabButtonText
+          ]}>
+            제품 상세
+          </Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.actionButton} onPress={handleNotification}>
-          <Ionicons name="notifications-outline" size={20} color="#fff" />
-          <Text style={styles.actionButtonText}>알림 설정</Text>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'notifications' && styles.activeTabButton
+          ]}
+          onPress={() => setActiveTab('notifications')}
+        >
+          <Text style={[
+            styles.tabButtonText,
+            activeTab === 'notifications' && styles.activeTabButtonText
+          ]}>
+            알림 설정
+          </Text>
+        </TouchableOpacity>
+      </View>
+      
+      {/* 탭 내용 */}
+      {activeTab === 'details' ? (
+        renderProductDetails()
+      ) : (
+        <NotificationSettings 
+          type="product"
+          targetId={productId}
+          isLocation={false}
+        />
+      )}
+      
+      {/* 하단 액션 버튼 */}
+      <View style={styles.bottomActionBar}>
+        <TouchableOpacity 
+          style={styles.bottomActionButton}
+          onPress={handleEdit}
+        >
+          <Ionicons name="create-outline" size={24} color="#4CAF50" />
+          <Text style={styles.bottomActionText}>수정</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={[styles.actionButton, styles.deleteButton]} 
+          style={styles.bottomActionButton}
+          onPress={handleNotification}
+        >
+          <Ionicons name="notifications-outline" size={24} color="#FF9800" />
+          <Text style={styles.bottomActionText}>알림</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.bottomActionButton}
           onPress={handleDelete}
         >
-          <Ionicons name="trash-outline" size={20} color="#fff" />
-          <Text style={styles.actionButtonText}>삭제</Text>
+          <Ionicons name="trash-outline" size={24} color="#F44336" />
+          <Text style={styles.bottomActionText}>삭제</Text>
         </TouchableOpacity>
       </View>
       
-      {/* 커스텀 알림 모달 */}
       <AlertModal
         visible={alertModalVisible}
         title={alertModalConfig.title}
@@ -472,7 +532,7 @@ const ProductDetailScreen = () => {
         icon={alertModalConfig.icon}
         iconColor={alertModalConfig.iconColor}
       />
-    </ScrollView>
+    </View>
   );
 };
 
@@ -608,10 +668,7 @@ const styles = StyleSheet.create({
   infoSection: {
     backgroundColor: '#fff',
     padding: 16,
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#E0E0E0',
+    marginTop: 8,
   },
   memoSection: {
     backgroundColor: '#fff',
@@ -700,8 +757,9 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: '#fff',
-    fontWeight: '500',
-    marginLeft: 4,
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   // 모달 스타일
   modalOverlay: {
@@ -765,6 +823,136 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  mainContainer: {
+    flex: 1,
+    backgroundColor: '#f8f8f8',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  activeTabButton: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#4CAF50',
+  },
+  tabButtonText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  activeTabButtonText: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  productHeader: {
+    backgroundColor: '#fff',
+    padding: 20,
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  imageContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  productImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    resizeMode: 'cover',
+  },
+  noImageContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noImageText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  locationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    padding: 4,
+    borderRadius: 4,
+  },
+  locationText: {
+    fontSize: 12,
+    color: '#fff',
+    marginLeft: 4,
+  },
+  productInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  productCategory: {
+    fontSize: 12,
+    color: '#666',
+  },
+  bottomActionBar: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  bottomActionButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  bottomActionText: {
+    fontSize: 14,
+    marginTop: 4,
+    color: '#666',
+  },
+  detailsSection: {
+    backgroundColor: '#fff',
+    padding: 16,
+    marginTop: 8,
+  },
+  memoContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  memoLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#666',
+  },
+  buttonSection: {
+    padding: 16,
+    marginBottom: 16,
+  },
+  consumedButton: {
+    backgroundColor: '#4CAF50',
+  },
+  hpText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 

@@ -10,7 +10,8 @@ import {
   Platform,
   Alert,
   Modal,
-  ActivityIndicator
+  ActivityIndicator,
+  Switch
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { addProductAsync } from '../redux/slices/productsSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { fetchCategories } from '../redux/slices/categoriesSlice';
+import { addNotification } from '../redux/slices/notificationsSlice';
 import SignupPromptModal from '../components/SignupPromptModal';
 
 // 조건부 DateTimePicker 임포트
@@ -98,6 +100,13 @@ const AddProductScreen = () => {
   // 현재 선택된 영역의 제품 개수
   const [currentLocationProducts, setCurrentLocationProducts] = useState([]);
 
+  // 알림 설정 상태
+  const [enableNotifications, setEnableNotifications] = useState(true);
+  const [useLocationNotifications, setUseLocationNotifications] = useState(true);
+  const [notificationType, setNotificationType] = useState('expiry'); // 'expiry' 또는 'estimated'
+  const [daysBeforeTarget, setDaysBeforeTarget] = useState(3);
+  const [isRepeating, setIsRepeating] = useState(false);
+
   // 카테고리 및 영역 데이터 로드
   useEffect(() => {
     if (categoriesStatus === 'idle') {
@@ -123,6 +132,17 @@ const AddProductScreen = () => {
         // 비회원이고 제품이 5개 이상인 경우 회원가입 유도 모달 표시
         if (isAnonymous && productsInLocation.length >= 5) {
           setShowSignupPrompt(true);
+        }
+        
+        // 영역의 알림 설정 적용 (실제로는 API에서 가져와야 함)
+        if (location.enableNotifications !== false) {
+          setEnableNotifications(true);
+          setUseLocationNotifications(true);
+          setNotificationType(location.notificationType || 'expiry');
+          setDaysBeforeTarget(location.daysBeforeTarget || 3);
+          setIsRepeating(location.isRepeating || false);
+        } else {
+          setUseLocationNotifications(false);
         }
       }
     }
@@ -292,34 +312,69 @@ const AddProductScreen = () => {
   const handleSubmit = async () => {
     if (!isFormValid()) return;
     
-    try {
-      const newProduct = {
-        name: productName.trim(),
-        categoryId: selectedCategory ? selectedCategory.id : null,
-        category: selectedCategory ? selectedCategory.name : '미분류',
-        locationId: selectedLocation.id,
-        purchaseDate: purchaseDate.toISOString(),
-        expiryDate: expiryDate ? expiryDate.toISOString() : null,
-        estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
-        purchaseMethod: purchaseMethod.trim(),
-        purchaseLink: purchaseLink.trim(),
-        price: price ? parseFloat(price) : null,
-        memo: memo.trim(),
-        brand: brand.trim(),
-        createdAt: new Date().toISOString(),
-        remainingPercentage: 100, // 새 제품은 100% 남음
-      };
-      
-      const result = await dispatch(addProductAsync(newProduct)).unwrap();
-      console.log('제품 등록 성공:', result);
-      
-      // 등록된 제품 정보 저장 및 성공 모달 표시
-      setRegisteredProduct(result);
-      setShowSuccessModal(true);
-    } catch (error) {
-      console.error('제품 등록 실패:', error);
-      Alert.alert('오류', `제품 등록에 실패했습니다: ${error.message || '알 수 없는 오류'}`);
+    // 비회원 제한 확인
+    if (isAnonymous && selectedLocation) {
+      const productsInLocation = allProducts.filter(p => p.locationId === selectedLocation.id);
+      if (productsInLocation.length >= 5) {
+        setShowSignupPrompt(true);
+        return;
+      }
     }
+    
+    const productData = {
+      name: productName,
+      category: selectedCategory?.name || null,
+      locationId: selectedLocation?.id || null,
+      location: selectedLocation?.title || null,
+      purchaseDate: purchaseDate ? purchaseDate.toISOString() : null,
+      expiryDate: expiryDate ? expiryDate.toISOString() : null,
+      estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
+      purchaseMethod,
+      purchaseLink,
+      price: price ? parseFloat(price) : null,
+      memo,
+      brand,
+      enableNotifications,
+      useLocationNotifications,
+      notificationType,
+      daysBeforeTarget,
+      isRepeating
+    };
+    
+    dispatch(addProductAsync(productData))
+      .unwrap()
+      .then((result) => {
+        // 알림 설정이 활성화되어 있으면 알림 추가
+        if (enableNotifications) {
+          saveNotificationSettings(result.id);
+        }
+        
+        setRegisteredProduct(result);
+        setShowSuccessModal(true);
+      })
+      .catch((error) => {
+        Alert.alert('오류', `제품 등록에 실패했습니다: ${error.message}`);
+      });
+  };
+  
+  // 알림 설정 저장
+  const saveNotificationSettings = (productId) => {
+    const notificationData = {
+      type: 'product',
+      targetId: productId,
+      title: `${productName} ${notificationType === 'expiry' ? '유통기한' : '소진 예상'} 알림`,
+      message: `${productName}의 ${notificationType === 'expiry' ? '유통기한' : '소진 예상일'}이 ${daysBeforeTarget}일 남았습니다.`,
+      notifyType: notificationType,
+      daysBeforeTarget: daysBeforeTarget,
+      isActive: true,
+      isRepeating: isRepeating,
+    };
+    
+    dispatch(addNotification(notificationData))
+      .unwrap()
+      .catch((error) => {
+        console.error('알림 설정 저장 실패:', error);
+      });
   };
   
   // 성공 모달 닫기 및 화면 이동
@@ -871,6 +926,109 @@ const AddProductScreen = () => {
           />
         </View>
         
+        {/* 알림 설정 */}
+        <View style={styles.notificationSection}>
+          <Text style={styles.sectionTitle}>알림 설정</Text>
+          
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>제품 알림 사용</Text>
+            <Switch
+              value={enableNotifications}
+              onValueChange={setEnableNotifications}
+              trackColor={{ false: '#767577', true: '#81b0ff' }}
+              thumbColor={enableNotifications ? '#f5dd4b' : '#f4f3f4'}
+            />
+          </View>
+          
+          {enableNotifications && selectedLocation && (
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>영역 기본 알림 설정 사용</Text>
+              <Switch
+                value={useLocationNotifications}
+                onValueChange={setUseLocationNotifications}
+                trackColor={{ false: '#767577', true: '#81b0ff' }}
+                thumbColor={useLocationNotifications ? '#f5dd4b' : '#f4f3f4'}
+              />
+            </View>
+          )}
+          
+          {enableNotifications && !useLocationNotifications && (
+            <>
+              <View style={styles.notificationTypeContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.notificationTypeButton,
+                    notificationType === 'expiry' && styles.selectedNotificationType
+                  ]}
+                  onPress={() => setNotificationType('expiry')}
+                >
+                  <Text style={[
+                    styles.notificationTypeText,
+                    notificationType === 'expiry' && styles.selectedNotificationTypeText
+                  ]}>
+                    유통기한 기준
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.notificationTypeButton,
+                    notificationType === 'estimated' && styles.selectedNotificationType
+                  ]}
+                  onPress={() => setNotificationType('estimated')}
+                >
+                  <Text style={[
+                    styles.notificationTypeText,
+                    notificationType === 'estimated' && styles.selectedNotificationTypeText
+                  ]}>
+                    소진 예상 기준
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={styles.daysBeforeLabel}>
+                {notificationType === 'expiry' ? '유통기한' : '소진 예상일'}까지 며칠 전에 알림을 받을까요?
+              </Text>
+              
+              <View style={styles.daysBeforeContainer}>
+                {[1, 3, 5, 7, 14, 30].map(days => (
+                  <TouchableOpacity
+                    key={days}
+                    style={[
+                      styles.daysBeforeButton,
+                      daysBeforeTarget === days && styles.selectedDaysBeforeButton
+                    ]}
+                    onPress={() => setDaysBeforeTarget(days)}
+                  >
+                    <Text style={[
+                      styles.daysBeforeText,
+                      daysBeforeTarget === days && styles.selectedDaysBeforeText
+                    ]}>
+                      {days}일 전
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.switchRow}>
+                <Text style={styles.switchLabel}>연속 알림</Text>
+                <Switch
+                  value={isRepeating}
+                  onValueChange={setIsRepeating}
+                  trackColor={{ false: '#767577', true: '#81b0ff' }}
+                  thumbColor={isRepeating ? '#f5dd4b' : '#f4f3f4'}
+                />
+              </View>
+              
+              {isRepeating && (
+                <Text style={styles.repeatDescription}>
+                  D-{daysBeforeTarget}일부터 D-day까지 매일 알림을 받습니다.
+                </Text>
+              )}
+            </>
+          )}
+        </View>
+        
         {/* 등록 버튼 */}
         <TouchableOpacity 
           style={[
@@ -1171,6 +1329,79 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  notificationSection: {
+    marginBottom: 20,
+    backgroundColor: '#f9f9f9',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  switchLabel: {
+    fontSize: 16,
+    color: '#333',
+  },
+  notificationTypeContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  notificationTypeButton: {
+    flex: 1,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    marginHorizontal: 4,
+  },
+  selectedNotificationType: {
+    backgroundColor: '#4CAF50',
+  },
+  notificationTypeText: {
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  selectedNotificationTypeText: {
+    color: '#fff',
+  },
+  daysBeforeLabel: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 12,
+  },
+  daysBeforeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -4,
+  },
+  daysBeforeButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    margin: 4,
+  },
+  selectedDaysBeforeButton: {
+    backgroundColor: '#4CAF50',
+  },
+  daysBeforeText: {
+    fontSize: 14,
+    color: '#4CAF50',
+  },
+  selectedDaysBeforeText: {
+    color: '#fff',
+  },
+  repeatDescription: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 8,
   },
 });
 
