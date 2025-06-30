@@ -493,6 +493,7 @@ const ProductDetailScreen = () => {
           type="product"
           targetId={productId}
           isLocation={false}
+          locationId={currentProduct?.locationId}
         />
       )}
       

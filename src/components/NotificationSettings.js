@@ -21,8 +21,9 @@ import {
   fetchProductNotifications, 
   fetchLocationNotifications 
 } from '../redux/slices/notificationsSlice';
+import AlertModal from './AlertModal';
 
-const NotificationSettings = ({ type, targetId, isLocation = false }) => {
+const NotificationSettings = ({ type, targetId, isLocation = false, locationId = null }) => {
   const dispatch = useDispatch();
   const { currentNotifications, status, error } = useSelector(state => state.notifications);
   
@@ -42,7 +43,11 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
     notifyDate: new Date(),
     title: '',
     message: '',
+    ignoreLocationSettings: false, // 영역 알림 무시 옵션 추가
   });
+  
+  // 전체 영역 알림 무시 상태
+  const [ignoreAllLocationSettings, setIgnoreAllLocationSettings] = useState(false);
   
   // 필수 값 검증 오류 상태
   const [validationErrors, setValidationErrors] = useState({
@@ -57,6 +62,17 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
   // 직접 입력 모달 상태
   const [showCustomDaysModal, setShowCustomDaysModal] = useState(false);
   const [customDays, setCustomDays] = useState('');
+  
+  // 알림 삭제 확인 모달 상태
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [notificationToDelete, setNotificationToDelete] = useState(null);
+  
+  // 오류 알림 모달 상태
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorModalConfig, setErrorModalConfig] = useState({
+    title: '',
+    message: '',
+  });
   
   useEffect(() => {
     // 제품 또는 영역에 따라 알림 데이터 로드
@@ -87,8 +103,16 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
       setHasExpiryNotification(!!expiryNotification);
       setHasEstimatedNotification(!!estimatedNotification);
       setHasAiNotification(!!aiNotification);
+      
+      // 전체 영역 알림 무시 상태 업데이트
+      if (!isLocation && updatedNotifications.length > 0) {
+        // 모든 알림이 영역 알림 무시 상태인지 확인
+        const allIgnoreLocation = updatedNotifications.every(notification => notification.ignoreLocationSettings);
+        // 알림이 있고 모두 영역 알림 무시 상태인 경우에만 전체 영역 알림 무시 true
+        setIgnoreAllLocationSettings(updatedNotifications.length > 0 && allIgnoreLocation);
+      }
     }
-  }, [currentNotifications]);
+  }, [currentNotifications, isLocation]);
   
   useEffect(() => {
     if (status === 'failed' && error) {
@@ -131,6 +155,14 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
         () => console.log('측정 실패')
       );
     }
+  };
+  
+  // 전체 영역 알림 무시 옵션 변경 처리
+  const handleIgnoreAllLocationSettingsChange = (value) => {
+    setIgnoreAllLocationSettings(value);
+    
+    // 전체 영역 알림 무시는 새로 추가되는 알림에만 적용되도록 수정
+    // 기존 알림의 설정은 변경하지 않음
   };
   
   const handleAddNotification = () => {
@@ -188,6 +220,7 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
           notifyDate: new Date(),
           title: '',
           message: '',
+          ignoreLocationSettings: ignoreAllLocationSettings, // 전체 영역 알림 무시 상태를 기본값으로 설정
         });
         // 검증 오류 초기화
         setValidationErrors({
@@ -202,6 +235,11 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
         } else if (notificationData.notifyType === 'ai') {
           setHasAiNotification(true);
         }
+        
+        // 영역 알림 무시가 아닌 경우 전체 영역 알림 무시는 false로 설정
+        if (!isLocation && !notificationData.ignoreLocationSettings) {
+          setIgnoreAllLocationSettings(false);
+        }
       })
       .catch(err => {
         Alert.alert('알림 추가 실패', err);
@@ -211,6 +249,26 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
   const handleUpdateNotification = (id, data) => {
     dispatch(updateNotification({ id, ...data }))
       .unwrap()
+      .then(() => {
+        // ignoreLocationSettings가 변경된 경우
+        if (data.hasOwnProperty('ignoreLocationSettings')) {
+          // 알림 목록을 다시 확인하여 전체 영역 알림 무시 상태 업데이트
+          const updatedNotifications = notifications.map(n => {
+            if (n.id === id) {
+              return { ...n, ...data };
+            }
+            return n;
+          });
+          
+          // 모든 알림이 영역 알림 무시 상태인지 확인
+          const allIgnoreLocation = updatedNotifications.every(notification => 
+            notification.id === id ? data.ignoreLocationSettings : notification.ignoreLocationSettings
+          );
+          
+          // 하나라도 영역 알림 무시가 아닌 경우 전체 영역 알림 무시는 false
+          setIgnoreAllLocationSettings(allIgnoreLocation);
+        }
+      })
       .catch(err => {
         Alert.alert('알림 업데이트 실패', err);
       });
@@ -218,41 +276,61 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
   
   const handleDeleteNotification = (id) => {
     // 삭제할 알림 정보 찾기
-    const notificationToDelete = notifications.find(n => n.id === id);
+    const notification = notifications.find(n => n.id === id);
     
-    Alert.alert(
-      '알림 삭제',
-      '이 알림을 삭제하시겠습니까?',
-      [
-        {
-          text: '취소',
-          style: 'cancel',
-        },
-        {
-          text: '삭제',
-          onPress: () => {
-            dispatch(deleteNotification(id))
-              .unwrap()
-              .then(() => {
-                // 알림 유형별 존재 여부 업데이트
-                if (notificationToDelete) {
-                  if (notificationToDelete.notifyType === 'expiry') {
-                    setHasExpiryNotification(false);
-                  } else if (notificationToDelete.notifyType === 'estimated') {
-                    setHasEstimatedNotification(false);
-                  } else if (notificationToDelete.notifyType === 'ai') {
-                    setHasAiNotification(false);
-                  }
-                }
-              })
-              .catch(err => {
-                Alert.alert('알림 삭제 실패', err);
-              });
-          },
-          style: 'destructive',
-        },
-      ]
-    );
+    if (!notification) {
+      showErrorModal('오류', '삭제할 알림을 찾을 수 없습니다.');
+      return;
+    }
+    
+    // 삭제할 알림 정보 저장 및 모달 표시
+    setNotificationToDelete(notification);
+    setDeleteModalVisible(true);
+  };
+  
+  // 알림 실제 삭제 처리 함수
+  const confirmDeleteNotification = () => {
+    if (!notificationToDelete) return;
+    
+    const id = notificationToDelete.id;
+    
+    dispatch(deleteNotification(id))
+      .unwrap()
+      .then(() => {
+        // 알림 목록에서 삭제된 알림 제거
+        const updatedNotifications = notifications.filter(n => n.id !== id);
+        setNotifications(updatedNotifications);
+        
+        // 알림 유형별 존재 여부 업데이트
+        const hasExpiryLeft = updatedNotifications.some(n => n.notifyType === 'expiry');
+        const hasEstimatedLeft = updatedNotifications.some(n => n.notifyType === 'estimated');
+        const hasAiLeft = updatedNotifications.some(n => n.notifyType === 'ai');
+        
+        // 알림 유형별 상태 업데이트
+        setHasExpiryNotification(hasExpiryLeft);
+        setHasEstimatedNotification(hasEstimatedLeft);
+        setHasAiNotification(hasAiLeft);
+        
+        // 전체 영역 알림 무시 상태 업데이트 (제품 상세에서만)
+        if (!isLocation && updatedNotifications.length > 0) {
+          const allIgnoreLocation = updatedNotifications.every(n => n.ignoreLocationSettings);
+          setIgnoreAllLocationSettings(updatedNotifications.length > 0 && allIgnoreLocation);
+        }
+      })
+      .catch(err => {
+        showErrorModal('알림 삭제 실패', err.toString());
+      })
+      .finally(() => {
+        // 모달 닫기 및 상태 초기화
+        setDeleteModalVisible(false);
+        setNotificationToDelete(null);
+      });
+  };
+  
+  // 오류 모달 표시 함수
+  const showErrorModal = (title, message) => {
+    setErrorModalConfig({ title, message });
+    setErrorModalVisible(true);
   };
   
   // 알림 유형 선택 시 이미 존재하는 유형인지 확인
@@ -287,8 +365,13 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
     }
   };
   
+  // 영역 알림 무시 옵션 변경 처리
+  const handleIgnoreLocationSettingsChange = (value) => {
+    setNewNotification({ ...newNotification, ignoreLocationSettings: value });
+  };
+  
   const renderNotificationItem = (notification) => {
-    const { id, notifyType, daysBeforeTarget, isActive, isRepeating, notifyDate, title } = notification;
+    const { id, notifyType, daysBeforeTarget, isActive, isRepeating, notifyDate, title, ignoreLocationSettings } = notification;
     
     return (
       <View key={id} style={styles.notificationItem}>
@@ -300,6 +383,9 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
                 : notifyType === 'estimated' 
                   ? '소진 예상 알림' 
                   : 'AI 알림'
+            )}
+            {!isLocation && ignoreLocationSettings && (
+              <Text style={styles.ignoreLocationBadge}> (영역 알림 무시)</Text>
             )}
           </Text>
           <View style={styles.notificationActions}>
@@ -363,6 +449,27 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
       style={styles.container}
       ref={scrollViewRef}
     >
+      {/* 제품 상세에서만 표시되는 전체 영역 알림 무시 옵션 (화면 최상단에 배치) */}
+      {!isLocation && locationId && locationId !== 'all' && (
+        <View style={[styles.notificationsContainer, styles.ignoreLocationContainer]}>
+          <View style={styles.switchRow}>
+            <Text style={styles.formLabel}>전체 영역 알림 무시</Text>
+            <Switch
+              value={ignoreAllLocationSettings}
+              onValueChange={handleIgnoreAllLocationSettingsChange}
+              trackColor={{ false: '#767577', true: '#81b0ff' }}
+              thumbColor={ignoreAllLocationSettings ? '#f5dd4b' : '#f4f3f4'}
+            />
+          </View>
+          
+          <Text style={styles.infoText}>
+            {ignoreAllLocationSettings 
+              ? '이 제품의 모든 알림에 대해 영역의 알림 설정을 무시합니다.' 
+              : '이 제품의 일부 또는 모든 알림이 영역의 알림 설정을 따릅니다.'}
+          </Text>
+        </View>
+      )}
+
       {/* 알림 목록 */}
       <View style={styles.notificationsContainer}>
         <Text style={styles.sectionTitle}>알림 설정</Text>
@@ -489,6 +596,29 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
               각 유형별로 1개씩만 알림을 설정할 수 있습니다.
             </Text>
           </View>
+          
+          {/* 제품 상세에서만 표시되는 영역 알림 무시 옵션 */}
+          {!isLocation && locationId && locationId !== 'all' && (
+            <View style={styles.formGroup}>
+              <View style={styles.switchRow}>
+                <Text style={styles.formLabel}>영역 알림 무시</Text>
+                <Switch
+                  value={newNotification.ignoreLocationSettings}
+                  onValueChange={(value) => {
+                    setNewNotification({ ...newNotification, ignoreLocationSettings: value });
+                  }}
+                  trackColor={{ false: '#767577', true: '#81b0ff' }}
+                  thumbColor={newNotification.ignoreLocationSettings ? '#f5dd4b' : '#f4f3f4'}
+                />
+              </View>
+              
+              <Text style={styles.infoText}>
+                {newNotification.ignoreLocationSettings 
+                  ? '이 알림에 대해 영역의 알림 설정을 무시하고 별도로 알림을 받습니다.' 
+                  : '이 알림은 영역의 알림 설정을 따릅니다.'}
+              </Text>
+            </View>
+          )}
           
           {/* AI 알림 설정 */}
           {newNotification.notifyType === 'ai' && (
@@ -620,6 +750,51 @@ const NotificationSettings = ({ type, targetId, isLocation = false }) => {
           </View>
         </View>
       )}
+      
+      {/* 알림 삭제 확인 모달 */}
+      <AlertModal
+        visible={deleteModalVisible}
+        title="알림 삭제"
+        message="이 알림을 삭제하시겠습니까?"
+        buttons={[
+          {
+            text: '취소',
+            style: 'cancel',
+            onPress: () => {
+              setDeleteModalVisible(false);
+              setNotificationToDelete(null);
+            }
+          },
+          {
+            text: '삭제',
+            style: 'destructive',
+            onPress: confirmDeleteNotification
+          }
+        ]}
+        onClose={() => {
+          setDeleteModalVisible(false);
+          setNotificationToDelete(null);
+        }}
+        icon="trash-outline"
+        iconColor="#F44336"
+      />
+      
+      {/* 오류 알림 모달 */}
+      <AlertModal
+        visible={errorModalVisible}
+        title={errorModalConfig.title}
+        message={errorModalConfig.message}
+        buttons={[
+          {
+            text: '확인',
+            style: 'default',
+            onPress: () => setErrorModalVisible(false)
+          }
+        ]}
+        onClose={() => setErrorModalVisible(false)}
+        icon="alert-circle-outline"
+        iconColor="#F44336"
+      />
       
       {/* 직접 입력 모달 */}
       <Modal
@@ -966,6 +1141,35 @@ const styles = StyleSheet.create({
   requiredMark: {
     color: '#FF3B30',
     fontWeight: 'bold',
+  },
+  // 영역 알림 무시 관련 스타일
+  ignoreLocationContainer: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  ignoreLocationBadge: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontStyle: 'italic',
+  },
+  infoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: 8,
+    flex: 1,
   },
 });
 
