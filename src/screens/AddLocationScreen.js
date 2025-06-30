@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -55,6 +55,12 @@ const AddLocationScreen = () => {
   const { isAnonymous } = useSelector(state => state.auth);
   const { locations } = useSelector(state => state.locations);
   
+  // 스크롤 뷰 참조
+  const scrollViewRef = useRef(null);
+  
+  // 입력 필드 참조
+  const titleInputRef = useRef(null);
+  
   // 수정 모드 확인
   const isEditing = route.params?.isEditing || false;
   const locationToEdit = route.params?.location || null;
@@ -64,6 +70,16 @@ const AddLocationScreen = () => {
   const [description, setDescription] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('cube-outline');
   const [image, setImage] = useState(null);
+  
+  // 폼 유효성 검사 상태
+  const [errors, setErrors] = useState({
+    title: ''
+  });
+  
+  // 필드 터치 상태
+  const [touched, setTouched] = useState({
+    title: false
+  });
   
   // 등록/수정 성공 모달
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -117,14 +133,98 @@ const AddLocationScreen = () => {
     }
   };
 
-  // 폼 유효성 검사
-  const isFormValid = () => {
-    if (!title.trim()) {
-      showAlert('알림', '영역 제목을 입력해주세요.');
-      return false;
+  // 필드 유효성 검사 함수
+  const validateField = (name, value) => {
+    let errorMessage = '';
+    
+    switch (name) {
+      case 'title':
+        if (!value.trim()) {
+          errorMessage = '영역 제목을 입력해주세요';
+        }
+        break;
+      default:
+        break;
     }
     
-    return true;
+    return errorMessage;
+  };
+  
+  // 필드 변경 핸들러
+  const handleFieldChange = (name, value) => {
+    // 필드 값 업데이트
+    switch (name) {
+      case 'title':
+        setTitle(value);
+        break;
+      default:
+        break;
+    }
+    
+    // 필드가 터치되었음을 표시
+    setTouched(prev => ({ ...prev, [name]: true }));
+    
+    // 유효성 검사 수행
+    const errorMessage = validateField(name, value);
+    setErrors(prev => ({ ...prev, [name]: errorMessage }));
+  };
+  
+  // 필드 블러(포커스 아웃) 핸들러
+  const handleFieldBlur = (name, value) => {
+    // 필드가 터치되었음을 표시
+    setTouched(prev => ({ ...prev, [name]: true }));
+    
+    // 유효성 검사 수행
+    const errorMessage = validateField(name, value);
+    setErrors(prev => ({ ...prev, [name]: errorMessage }));
+  };
+
+  // 폼 유효성 검사
+  const isFormValid = () => {
+    // 모든 필수 필드에 대해 유효성 검사 수행
+    const newErrors = {
+      title: validateField('title', title)
+    };
+    
+    // 에러 상태 업데이트
+    setErrors(newErrors);
+    
+    // 모든 필드가 터치되었음을 표시
+    setTouched({
+      title: true
+    });
+    
+    // 에러가 있는지 확인
+    const hasErrors = Object.values(newErrors).some(error => error !== '');
+    
+    // 에러가 있으면 해당 필드로 스크롤
+    if (hasErrors) {
+      if (newErrors.title) {
+        scrollToField('title');
+      }
+    }
+    
+    return !hasErrors;
+  };
+  
+  // 특정 필드로 스크롤하는 함수
+  const scrollToField = (fieldName) => {
+    if (scrollViewRef.current) {
+      switch (fieldName) {
+        case 'title':
+          if (titleInputRef.current) {
+            titleInputRef.current.measure((fx, fy, width, height, px, py) => {
+              scrollViewRef.current.scrollTo({
+                y: py - 50,
+                animated: true
+              });
+            });
+          }
+          break;
+        default:
+          break;
+      }
+    }
   };
   
   // 알림 표시 함수
@@ -356,18 +456,32 @@ const AddLocationScreen = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView 
+        ref={scrollViewRef}
+        contentContainerStyle={styles.scrollContainer}
+      >
         <Text style={styles.title}>{isEditing ? '영역 수정' : '영역 추가'}</Text>
         
         {/* 영역 제목 입력 */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>영역 제목 *</Text>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>영역 제목</Text>
+            <Text style={styles.requiredMark}>*</Text>
+          </View>
           <TextInput
-            style={styles.input}
+            ref={titleInputRef}
+            style={[
+              styles.input,
+              touched.title && errors.title ? styles.inputError : null
+            ]}
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(text) => handleFieldChange('title', text)}
+            onBlur={() => handleFieldBlur('title', title)}
             placeholder="예: 주방, 화장실, 거실 등"
           />
+          {touched.title && errors.title ? (
+            <Text style={styles.errorText}>{errors.title}</Text>
+          ) : null}
         </View>
         
         {/* 영역 설명 입력 */}
@@ -463,10 +577,20 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 20,
   },
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   label: {
     fontSize: 16,
-    marginBottom: 8,
     color: '#333',
+  },
+  requiredMark: {
+    color: 'red',
+    fontWeight: 'bold',
+    marginLeft: 4,
+    fontSize: 16,
   },
   input: {
     backgroundColor: '#fff',
@@ -475,6 +599,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+  },
+  inputError: {
+    borderColor: 'red',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginTop: 4,
   },
   textArea: {
     minHeight: 100,

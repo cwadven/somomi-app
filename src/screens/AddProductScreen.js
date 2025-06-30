@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -36,6 +36,14 @@ const AddProductScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { locationId } = route.params || {};
+  
+  // 스크롤 뷰 참조
+  const scrollViewRef = useRef(null);
+  
+  // 입력 필드 참조
+  const productNameInputRef = useRef(null);
+  const locationSectionRef = useRef(null);
+  const purchaseDateSectionRef = useRef(null);
   
   const { categories, status: categoriesStatus } = useSelector(state => state.categories);
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
@@ -182,6 +190,46 @@ const AddProductScreen = () => {
     setErrors(prev => ({ ...prev, [name]: errorMessage }));
   };
 
+  // 특정 필드로 스크롤하는 함수
+  const scrollToField = (fieldName) => {
+    if (scrollViewRef.current) {
+      switch (fieldName) {
+        case 'productName':
+          if (productNameInputRef.current) {
+            productNameInputRef.current.measure((fx, fy, width, height, px, py) => {
+              scrollViewRef.current.scrollTo({
+                y: py - 50,
+                animated: true
+              });
+            });
+          }
+          break;
+        case 'location':
+          if (locationSectionRef.current) {
+            locationSectionRef.current.measure((fx, fy, width, height, px, py) => {
+              scrollViewRef.current.scrollTo({
+                y: py - 50,
+                animated: true
+              });
+            });
+          }
+          break;
+        case 'purchaseDate':
+          if (purchaseDateSectionRef.current) {
+            purchaseDateSectionRef.current.measure((fx, fy, width, height, px, py) => {
+              scrollViewRef.current.scrollTo({
+                y: py - 50,
+                animated: true
+              });
+            });
+          }
+          break;
+        default:
+          break;
+      }
+    }
+  };
+
   // 폼 전체 유효성 검사
   const isFormValid = () => {
     // 모든 필수 필드에 대해 유효성 검사 수행
@@ -203,6 +251,17 @@ const AddProductScreen = () => {
     
     // 에러가 있는지 확인
     const hasErrors = Object.values(newErrors).some(error => error !== '');
+    
+    // 에러가 있으면 해당 필드로 스크롤
+    if (hasErrors) {
+      if (newErrors.productName) {
+        scrollToField('productName');
+      } else if (newErrors.location) {
+        scrollToField('location');
+      } else if (newErrors.purchaseDate) {
+        scrollToField('purchaseDate');
+      }
+    }
     
     // 영역이 존재하는지 확인
     if (locations.length === 0) {
@@ -444,7 +503,10 @@ const AddProductScreen = () => {
 
   // 영역 선택 컴포넌트
   const LocationSelector = () => (
-    <View style={styles.categoriesContainer}>
+    <View 
+      ref={locationSectionRef}
+      style={styles.categoriesContainer}
+    >
       <View style={styles.labelContainer}>
         <Text style={styles.sectionTitle}>영역</Text>
         <Text style={styles.requiredMark}>*</Text>
@@ -614,7 +676,10 @@ const AddProductScreen = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView 
+        ref={scrollViewRef}
+        contentContainerStyle={styles.scrollContainer}
+      >
         <Text style={styles.title}>제품 등록</Text>
         
         {/* 제품명 입력 */}
@@ -624,6 +689,7 @@ const AddProductScreen = () => {
             <Text style={styles.requiredMark}>*</Text>
           </View>
           <TextInput
+            ref={productNameInputRef}
             style={[
               styles.input,
               touched.productName && errors.productName ? styles.inputError : null
@@ -656,7 +722,10 @@ const AddProductScreen = () => {
         <LocationSelector />
         
         {/* 구매일 선택 */}
-        <View style={styles.inputGroup}>
+        <View 
+          ref={purchaseDateSectionRef}
+          style={styles.inputGroup}
+        >
           <View style={styles.labelContainer}>
             <Text style={styles.label}>구매일</Text>
             <Text style={styles.requiredMark}>*</Text>
