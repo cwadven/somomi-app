@@ -30,18 +30,8 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-notifications",
-      "expo-updates"
+      "expo-notifications"
     ],
-    "updates": {
-      "enabled": true,
-      "fallbackToCacheTimeout": 0,
-      "checkAutomatically": "ON_LOAD",
-      "url": "https://u.expo.dev/25a0cbfb-df85-4335-8012-d06cc57c6fc6"
-    },
-    "runtimeVersion": {
-      "policy": "sdkVersion"
-    },
     "extra": {
       "eas": {
         "projectId": "25a0cbfb-df85-4335-8012-d06cc57c6fc6"
