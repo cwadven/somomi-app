@@ -471,3 +471,12 @@ cd android
    ```
 
 app.json 설정도 잘되어있어야함.
+
+
+npm 재설치 시
+
+```
+sudo rm -rf node_modules
+npm cache clean --force
+npm install
+```
