@@ -6,7 +6,10 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "bundle-android": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res",
+    "clean-android": "cd android && ./gradlew clean && cd ..",
+    "build-android": "npm run bundle-android && cd android && ./gradlew assembleRelease -x lint && cd .."
   },
   "dependencies": {
     "@expo/metro-runtime": "~5.0.4",
@@ -17,7 +20,7 @@
     "@react-navigation/stack": "^7.4.2",
     "@reduxjs/toolkit": "^2.8.2",
     "axios": "^1.10.0",
-    "expo": "~53.0.13",
+    "expo": "^53.0.15",
     "expo-auth-session": "~6.2.0",
     "expo-constants": "~17.1.6",
     "expo-image-picker": "^16.1.4",
