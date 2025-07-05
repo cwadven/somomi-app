@@ -18,7 +18,7 @@ EXPO_UPDATES_URL=https://u.expo.dev/ProjectID
 4. Android Prebuild
 
 ```bash
-npx expo prebuild -p android --clean
+rm -rf node_modules/.cache && npx expo prebuild -p android --clean
 ```
 
 5. my-release-key.keystore 생성
