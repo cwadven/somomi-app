@@ -22,8 +22,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#ffffff",
-        "edgeToEdgeEnabled": true
+        "backgroundColor": "#ffffff"
       },
       "package": "com.next_story.somomi"
     },
