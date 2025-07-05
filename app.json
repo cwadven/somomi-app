@@ -36,7 +36,8 @@
     "updates": {
       "enabled": true,
       "fallbackToCacheTimeout": 0,
-      "channel": "production"
+      "channel": "production",
+      "url": "https://u.expo.dev/25a0cbfb-df85-4335-8012-d06cc57c6fc6"
     },
     "runtimeVersion": {
       "policy": "sdkVersion"

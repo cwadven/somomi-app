@@ -471,6 +471,7 @@ cd android
    ```
 
 app.json 설정도 잘되어있어야함.
+App.js 도 코드가 잘 되어있는지 확인 필요.
 
 
 npm 재설치 시
