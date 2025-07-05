@@ -17,14 +17,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.next_story.somomi"
+      "bundleIdentifier": "com.nextstory.somomi"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.next_story.somomi"
+      "package": "com.nextstory.somomi"
     },
     "web": {
       "favicon": "./assets/favicon.png"
