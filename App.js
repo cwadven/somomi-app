@@ -3,20 +3,11 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider, useDispatch } from 'react-redux';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, getAnonymousToken } from './src/redux/slices/authSlice';
-
-// expo-updates를 조건부로 가져오기 (웹에서는 사용하지 않음)
-const Updates = Platform.OS === 'web' 
-  ? { 
-      isEnabled: false,
-      checkForUpdateAsync: async () => ({ isAvailable: false }),
-      fetchUpdateAsync: async () => ({}),
-      reloadAsync: async () => {}
-    } 
-  : require('expo-updates');
+import * as Updates from 'expo-updates';
 
 // localStorage 폴리필
 if (typeof localStorage === 'undefined') {
@@ -44,8 +35,14 @@ const AppContent = () => {
     try {
       console.log('업데이트 확인 시작...');
       
+      // Updates 객체가 존재하는지 확인
+      if (!Updates) {
+        console.error('expo-updates가 로드되지 않았습니다.');
+        return;
+      }
+      
       // Updates.isEnabled 확인
-      if (!Updates.isEnabled) {
+      if (!Updates.isEnabled()) {
         console.log('expo-updates가 활성화되어 있지 않습니다. 앱 설정을 확인하세요.');
         return;
       }
@@ -65,15 +62,34 @@ const AppContent = () => {
           const fetchResult = await Updates.fetchUpdateAsync();
           console.log('업데이트 다운로드 완료:', JSON.stringify(fetchResult));
           
-          // 업데이트 자동 적용
-          console.log('업데이트 자동 적용 시작...');
-          try {
-            await Updates.reloadAsync();
-          } catch (reloadError) {
-            console.error('업데이트 적용 오류:', reloadError);
-            setUpdateError(`업데이트 적용 오류: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`);
-            setIsUpdating(false);
-          }
+          // 사용자에게 업데이트 알림
+          Alert.alert(
+            '업데이트 알림',
+            '새로운 버전이 다운로드되었습니다. 지금 적용하시겠습니까?',
+            [
+              {
+                text: '나중에',
+                onPress: () => {
+                  console.log('업데이트 연기됨');
+                  setIsUpdating(false);
+                },
+                style: 'cancel'
+              },
+              {
+                text: '지금 적용',
+                onPress: async () => {
+                  console.log('업데이트 적용 시작...');
+                  try {
+                    await Updates.reloadAsync();
+                  } catch (reloadError) {
+                    console.error('업데이트 적용 오류:', reloadError);
+                    setUpdateError(`업데이트 적용 오류: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`);
+                    setIsUpdating(false);
+                  }
+                }
+              }
+            ]
+          );
         } catch (fetchError) {
           const errorMessage = fetchError instanceof Error ? 
             fetchError.message : String(fetchError);
