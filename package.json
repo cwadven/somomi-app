@@ -9,7 +9,9 @@
     "web": "expo start --web",
     "bundle-android": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res",
     "clean-android": "cd android && ./gradlew clean && cd ..",
-    "build-android": "npm run bundle-android && cd android && ./gradlew assembleRelease -x lint && cd .."
+    "build-android": "npm run bundle-android && cd android && ./gradlew assembleRelease -x lint && cd ..",
+    "update:dev": "eas update --branch development --message \"개발 환경 업데이트\"",
+    "update:prod": "eas update --branch production --message \"프로덕션 환경 업데이트\""
   },
   "dependencies": {
     "@expo/metro-runtime": "~5.0.4",
