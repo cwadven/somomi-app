@@ -480,3 +480,17 @@ sudo rm -rf node_modules
 npm cache clean --force
 npm install
 ```
+
+에러나는 경우
+
+```
+› Press ? │ show all commands
+Error: EMFILE: too many open files, watch
+    at FSEvent.FSWatcher._handle.onchange (node:internal/fs/watchers:207:21)
+```
+
+실행
+
+```
+watchman
+```
