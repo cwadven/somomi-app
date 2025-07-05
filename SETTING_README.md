@@ -453,8 +453,9 @@ android/app/src/main/assets 폴더 생성
 16. Android 빌드
 
 ```
-./android/gradlew clean
-./android/gradlew assembleRelease
+cd android
+./gradlew clean
+./gradlew assembleRelease
 ```
 
 17. EAS Update 사용 방법
