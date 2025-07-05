@@ -1,11 +1,22 @@
 import 'react-native-gesture-handler';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider, useDispatch } from 'react-redux';
+import { Platform } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, getAnonymousToken } from './src/redux/slices/authSlice';
+
+// expo-updates를 조건부로 가져오기 (웹에서는 사용하지 않음)
+const Updates = Platform.OS === 'web' 
+  ? { 
+      isEnabled: false,
+      checkForUpdateAsync: async () => ({ isAvailable: false }),
+      fetchUpdateAsync: async () => ({}),
+      reloadAsync: async () => {}
+    } 
+  : require('expo-updates');
 
 // localStorage 폴리필
 if (typeof localStorage === 'undefined') {
@@ -21,6 +32,65 @@ if (typeof localStorage === 'undefined') {
 // 앱 내부 컴포넌트 - 토큰 검증 및 초기화 로직을 포함
 const AppContent = () => {
   const dispatch = useDispatch();
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState(null);
+
+  const checkForUpdates = useCallback(async () => {
+    if (__DEV__ || Platform.OS === 'web') {
+      console.log('개발 모드 또는 웹 환경에서는 업데이트를 확인하지 않습니다.');
+      return;
+    }
+    
+    try {
+      console.log('업데이트 확인 시작...');
+      
+      // Updates.isEnabled 확인
+      if (!Updates.isEnabled) {
+        console.log('expo-updates가 활성화되어 있지 않습니다. 앱 설정을 확인하세요.');
+        return;
+      }
+      
+      setUpdateError(null);
+      
+      console.log('업데이트 확인 중...');
+      const update = await Updates.checkForUpdateAsync();
+      console.log('업데이트 확인 결과:', JSON.stringify(update));
+      
+      if (update.isAvailable) {
+        console.log('새 업데이트가 있습니다. 다운로드 시작...');
+        setIsUpdating(true);
+        
+        try {
+          // 업데이트 다운로드
+          const fetchResult = await Updates.fetchUpdateAsync();
+          console.log('업데이트 다운로드 완료:', JSON.stringify(fetchResult));
+          
+          // 업데이트 자동 적용
+          console.log('업데이트 자동 적용 시작...');
+          try {
+            await Updates.reloadAsync();
+          } catch (reloadError) {
+            console.error('업데이트 적용 오류:', reloadError);
+            setUpdateError(`업데이트 적용 오류: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`);
+            setIsUpdating(false);
+          }
+        } catch (fetchError) {
+          const errorMessage = fetchError instanceof Error ? 
+            fetchError.message : String(fetchError);
+          console.error('Update fetch error:', fetchError);
+          setUpdateError(`업데이트 다운로드 오류: ${errorMessage}`);
+          setIsUpdating(false);
+        }
+      } else {
+        console.log('사용 가능한 업데이트가 없습니다.');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error checking for updates:', error);
+      setUpdateError(`업데이트 확인 오류: ${errorMessage}`);
+      setIsUpdating(false);
+    }
+  }, []);
   
   useEffect(() => {
     const initializeAuth = async () => {
@@ -40,7 +110,10 @@ const AppContent = () => {
     };
     
     initializeAuth();
-  }, [dispatch]);
+    
+    // 앱 시작 시 업데이트 확인
+    checkForUpdates();
+  }, [dispatch, checkForUpdates]);
   
   return (
     <>

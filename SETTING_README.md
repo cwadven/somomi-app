@@ -469,3 +469,5 @@ cd android
    ```bash
    npm run update:prod
    ```
+
+app.json 설정도 잘되어있어야함.
