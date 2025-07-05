@@ -203,7 +203,7 @@ android.intent.category.DEFAULT 추가
 
 9. sdk 관리 (android/local.properties)
 
-local.properties 파일 생ㅓ
+local.properties 파일 생성
 
 ```
 ## This file must *NOT* be checked into Version Control Systems,
