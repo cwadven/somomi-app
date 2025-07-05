@@ -1,11 +1,10 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { store } from '../redux/store';
 import { getAnonymousToken, verifyToken } from '../redux/slices/authSlice';
 
 // JWT 토큰 가져오기
 export const getToken = async () => {
   try {
-    const token = await AsyncStorage.getItem('jwt_token');
+    const token = localStorage.getItem('jwt_token');
     return token;
   } catch (error) {
     console.error('토큰 가져오기 실패:', error);

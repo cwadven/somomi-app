@@ -1,5 +1,4 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // JWT 토큰 발급 API 호출 (실제 구현 시 서버에서 가져옴)
 export const getAnonymousToken = createAsyncThunk(
@@ -10,8 +9,8 @@ export const getAnonymousToken = createAsyncThunk(
       // 여기서는 임시로 생성된 토큰을 반환
       const token = `anonymous_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
       
-      // 토큰을 AsyncStorage에 저장
-      await AsyncStorage.setItem('jwt_token', token);
+      // 토큰을 localStorage에 저장
+      localStorage.setItem('jwt_token', token);
       
       return { token };
     } catch (error) {
@@ -37,8 +36,8 @@ export const kakaoLogin = createAsyncThunk(
         }
       };
       
-      // 토큰을 AsyncStorage에 저장
-      await AsyncStorage.setItem('jwt_token', response.token);
+      // 토큰을 localStorage에 저장
+      localStorage.setItem('jwt_token', response.token);
       
       return response;
     } catch (error) {
@@ -63,8 +62,8 @@ export const loginUser = createAsyncThunk(
         }
       };
       
-      // 토큰을 AsyncStorage에 저장
-      await AsyncStorage.setItem('jwt_token', response.token);
+      // 토큰을 localStorage에 저장
+      localStorage.setItem('jwt_token', response.token);
       
       return response;
     } catch (error) {
@@ -89,8 +88,8 @@ export const registerUser = createAsyncThunk(
         }
       };
       
-      // 토큰을 AsyncStorage에 저장
-      await AsyncStorage.setItem('jwt_token', response.token);
+      // 토큰을 localStorage에 저장
+      localStorage.setItem('jwt_token', response.token);
       
       return response;
     } catch (error) {
@@ -104,8 +103,8 @@ export const verifyToken = createAsyncThunk(
   'auth/verifyToken',
   async (_, { rejectWithValue }) => {
     try {
-      // AsyncStorage에서 토큰 가져오기
-      const token = await AsyncStorage.getItem('jwt_token');
+      // localStorage에서 토큰 가져오기
+      const token = localStorage.getItem('jwt_token');
       
       if (!token) {
         return null;
@@ -164,8 +163,8 @@ export const authSlice = createSlice({
       state.isAnonymous = false;
       state.user = null;
       state.token = null;
-      // AsyncStorage에서 토큰 제거 (실제 구현 시)
-      AsyncStorage.removeItem('jwt_token');
+      // localStorage에서 토큰 제거
+      localStorage.removeItem('jwt_token');
     },
     // 사용자 정보 업데이트
     updateUserInfo: (state, action) => {

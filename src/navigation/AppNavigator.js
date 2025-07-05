@@ -61,7 +61,7 @@ const LocationsStack = () => {
         component={LocationDetailScreen} 
         options={({ route }) => ({ 
           title: route.params.locationId === 'all' ? '모든 제품' : '영역 상세',
-          headerLeft: () => null // 기본 뒤로가기 버튼 숨김
+          headerBackVisible: false // 기본 뒤로가기 버튼 숨김 (v6 문법)
         })}
       />
       <Stack.Screen 
@@ -132,22 +132,23 @@ const AppNavigator = () => {
           },
           tabBarActiveTintColor: '#4CAF50',
           tabBarInactiveTintColor: 'gray',
+          headerShown: false
         })}
       >
         <Tab.Screen 
           name="Home" 
           component={HomeStack} 
-          options={{ headerShown: false, title: '홈' }}
+          options={{ title: '홈' }}
         />
         <Tab.Screen 
           name="Locations" 
           component={LocationsStack} 
-          options={{ headerShown: false, title: '내 영역' }}
+          options={{ title: '내 영역' }}
         />
         <Tab.Screen 
           name="Profile" 
           component={ProfileStack} 
-          options={{ headerShown: false, title: '프로필' }}
+          options={{ title: '프로필' }}
         />
       </Tab.Navigator>
     </NavigationContainer>
