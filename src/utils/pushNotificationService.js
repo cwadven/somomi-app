@@ -21,49 +21,76 @@ class PushNotificationService {
     if (Platform.OS === 'web' || channelsCreated) return; // 웹이거나 이미 생성된 경우 건너뜀
     
     if (Platform.OS === 'android') {
-      // 기본 채널
-      await Notifications.setNotificationChannelAsync('default', {
-        name: '일반 알림',
-        description: '일반적인 알림 메시지',
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
+      try {
+        console.log('[디버깅] 알림 채널 생성 시작...');
+        
+        // 기본 채널
+        await Notifications.setNotificationChannelAsync('default', {
+          name: '일반 알림',
+          description: '일반적인 알림 메시지',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+          enableLights: true,
+          enableVibrate: true,
+          showBadge: true,
+        });
+        console.log('[디버깅] 기본 채널 생성 완료');
 
-      // 제품 알림 채널
-      await Notifications.setNotificationChannelAsync('product_alerts', {
-        name: '제품 알림',
-        description: '제품 유통기한 및 소진 관련 알림',
-        importance: Notifications.AndroidImportance.HIGH,
-        sound: 'default',
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
+        // 제품 알림 채널
+        await Notifications.setNotificationChannelAsync('product_alerts', {
+          name: '제품 알림',
+          description: '제품 유통기한 및 소진 관련 알림',
+          importance: Notifications.AndroidImportance.HIGH,
+          sound: 'default',
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+          enableLights: true,
+          enableVibrate: true,
+          showBadge: true,
+        });
+        console.log('[디버깅] 제품 알림 채널 생성 완료');
 
-      // 위치 알림 채널
-      await Notifications.setNotificationChannelAsync('location_alerts', {
-        name: '위치 알림',
-        description: '위치 관련 알림',
-        importance: Notifications.AndroidImportance.HIGH,
-        sound: 'default',
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-      
-      // 백그라운드 알림 채널
-      await Notifications.setNotificationChannelAsync('background', {
-        name: '백그라운드 알림',
-        description: '앱이 백그라운드에 있을 때 수신되는 알림',
-        importance: Notifications.AndroidImportance.MAX,
-        sound: 'default',
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#4287f5',
-        enableLights: true,
-        enableVibrate: true,
-      });
-      
-      channelsCreated = true;
-      console.log('알림 채널 생성 완료');
+        // 위치 알림 채널
+        await Notifications.setNotificationChannelAsync('location_alerts', {
+          name: '위치 알림',
+          description: '위치 관련 알림',
+          importance: Notifications.AndroidImportance.HIGH,
+          sound: 'default',
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+          enableLights: true,
+          enableVibrate: true,
+          showBadge: true,
+        });
+        console.log('[디버깅] 위치 알림 채널 생성 완료');
+        
+        // 백그라운드 알림 채널
+        await Notifications.setNotificationChannelAsync('background', {
+          name: '백그라운드 알림',
+          description: '앱이 백그라운드에 있을 때 수신되는 알림',
+          importance: Notifications.AndroidImportance.MAX,
+          sound: 'default',
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#4287f5',
+          enableLights: true,
+          enableVibrate: true,
+          showBadge: true,
+        });
+        console.log('[디버깅] 백그라운드 알림 채널 생성 완료');
+        
+        // 채널 생성 확인
+        const channels = await Notifications.getNotificationChannelsAsync();
+        console.log(`[디버깅] 생성된 알림 채널 수: ${channels.length}`);
+        channels.forEach(channel => {
+          console.log(`[디버깅] 채널 ID: ${channel.id}, 이름: ${channel.name}`);
+        });
+        
+        channelsCreated = true;
+        console.log('[디버깅] 알림 채널 생성 완료');
+      } catch (error) {
+        console.error('[디버깅] 알림 채널 생성 오류:', error);
+      }
     }
   }
 
@@ -75,10 +102,14 @@ class PushNotificationService {
     
     if (Platform.OS === 'android' && Platform.Version >= 33) {
       try {
+        console.log('[디버깅] 알림 권한 확인 중...');
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        console.log(`[디버깅] 현재 알림 권한 상태: ${existingStatus}`);
+        
         let finalStatus = existingStatus;
         
         if (existingStatus !== 'granted') {
+          console.log('[디버깅] 알림 권한 요청 중...');
           const { status } = await Notifications.requestPermissionsAsync({
             ios: {
               allowAlert: true,
@@ -88,14 +119,16 @@ class PushNotificationService {
             },
           });
           finalStatus = status;
+          console.log(`[디버깅] 알림 권한 요청 결과: ${finalStatus}`);
         }
         
         return finalStatus === 'granted';
       } catch (err) {
-        console.error('Android notification permission request error:', err);
+        console.error('[디버깅] Android notification permission request error:', err);
         return false;
       }
     }
+    console.log('[디버깅] 안드로이드 13 미만 또는 iOS - 알림 권한 자동 허용');
     return true; // 안드로이드 13 미만 또는 다른 플랫폼은 자동 허용
   }
 
@@ -144,6 +177,9 @@ class PushNotificationService {
       return;
     }
     
+    // 기존 리스너 정리
+    this.cleanupNotificationHandler();
+    
     // 알림 채널 생성
     this.createNotificationChannels();
 
@@ -152,7 +188,7 @@ class PushNotificationService {
       handleNotification: async (notification) => {
         // 알림 데이터 확인
         const data = notification.request.content.data;
-        console.log('알림 데이터 처리:', data);
+        console.log('[디버깅] 알림 핸들러에서 데이터 처리:', data);
         
         return {
           shouldShowAlert: true,
@@ -165,14 +201,14 @@ class PushNotificationService {
     // 알림 수신 리스너
     this.notificationReceivedListener = Notifications.addNotificationReceivedListener(
       notification => {
-        console.log('알림 수신:', notification);
+        console.log('[디버깅] 알림 수신:', notification);
       }
     );
 
     // 알림 응답 리스너 (사용자가 알림을 탭했을 때)
     this.notificationResponseListener = Notifications.addNotificationResponseReceivedListener(
       response => {
-        console.log('알림 응답:', response);
+        console.log('[디버깅] 알림 응답:', response);
         this.handleNotificationAction(response.notification.request.content.data);
       }
     );
@@ -182,6 +218,7 @@ class PushNotificationService {
       const eventEmitter = new NativeEventEmitter(NativeModules.RCTDeviceEventEmitter);
       this.nativeNotificationListener = eventEmitter.addListener('notificationOpened', (notification) => {
         if (notification) {
+          console.log('[디버깅] 네이티브 알림 이벤트:', notification);
           this.handleNotificationAction(notification);
         }
       });
@@ -189,6 +226,8 @@ class PushNotificationService {
 
     // 앱 상태 변경 리스너
     this.appStateListener = AppState.addEventListener('change', this.handleAppStateChange);
+    
+    console.log('[디버깅] 알림 핸들러 설정 완료');
   }
 
   handleAppStateChange = async (nextAppState) => {
@@ -243,9 +282,12 @@ class PushNotificationService {
     }
     
     try {
+      console.log(`[디버깅] 알림 예약 시작 - 제목: ${title}`);
+      
+      // 알림 권한 확인 및 요청
       const hasPermission = await this.requestNotificationPermission();
       if (!hasPermission) {
-        console.log('알림 권한이 거부되었습니다.');
+        console.log('[디버깅] 알림 권한이 거부되었습니다.');
         return null;
       }
       
@@ -256,6 +298,7 @@ class PushNotificationService {
         data: {
           ...data,
           timestamp: new Date().getTime(),
+          id: `notification-${Date.now()}-${Math.floor(Math.random() * 1000)}`, // 고유 ID 추가
         },
         sound: true,
       };
@@ -273,7 +316,11 @@ class PushNotificationService {
         }
         
         notificationContent.channelId = channelId;
+        console.log(`[디버깅] 알림 채널 설정: ${channelId}`);
       }
+      
+      console.log('[디버깅] 알림 콘텐츠:', JSON.stringify(notificationContent));
+      console.log('[디버깅] 알림 트리거:', trigger ? JSON.stringify(trigger) : 'null (즉시 발송)');
       
       // 알림 예약
       const notificationId = await Notifications.scheduleNotificationAsync({
@@ -281,10 +328,19 @@ class PushNotificationService {
         trigger: trigger || null, // null이면 즉시 발송
       });
       
-      console.log('알림 예약 성공:', notificationId);
+      console.log('[디버깅] 알림 예약 성공:', notificationId);
+      
+      // 현재 예약된 모든 알림 확인 (디버깅용)
+      try {
+        const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+        console.log(`[디버깅] 현재 예약된 알림 수: ${scheduledNotifications.length}`);
+      } catch (err) {
+        console.log('[디버깅] 예약된 알림 확인 오류:', err);
+      }
+      
       return notificationId;
     } catch (error) {
-      console.error('알림 예약 실패:', error);
+      console.error('[디버깅] 알림 예약 실패:', error);
       return null;
     }
   }
@@ -297,6 +353,8 @@ class PushNotificationService {
     }
     
     try {
+      console.log(`[디버깅] 백그라운드 알림 예약 시작 - ${delayInSeconds}초 후 발송`);
+      
       // 트리거 설정 (지정된 초 후 발송)
       const trigger = {
         seconds: delayInSeconds,
@@ -307,12 +365,37 @@ class PushNotificationService {
         ...data,
         type: 'background',
         identifier: BACKGROUND_NOTIFICATION_IDENTIFIER,
+        debug_timestamp: new Date().toISOString(),
       };
       
-      // 알림 예약
-      return await this.scheduleNotification(title, body, notificationData, trigger);
+      console.log('[디버깅] 백그라운드 알림 데이터:', JSON.stringify(notificationData));
+      console.log('[디버깅] 백그라운드 알림 트리거:', JSON.stringify(trigger));
+      
+      // 알림 콘텐츠 설정
+      const notificationContent = {
+        title,
+        body,
+        data: notificationData,
+        sound: true,
+      };
+      
+      // Android 특정 옵션
+      if (Platform.OS === 'android') {
+        notificationContent.channelId = 'background';
+        notificationContent.priority = 'high';
+        notificationContent.vibrate = [0, 250, 250, 250];
+      }
+      
+      // 알림 예약 (직접 호출)
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: notificationContent,
+        trigger,
+      });
+      
+      console.log(`[디버깅] 백그라운드 알림 예약 ID: ${notificationId}`);
+      return notificationId;
     } catch (error) {
-      console.error('백그라운드 알림 예약 실패:', error);
+      console.error('[디버깅] 백그라운드 알림 예약 실패:', error);
       return null;
     }
   }

@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useCallback } from 'react';
 import { Provider, useDispatch } from 'react-redux';
-import { Platform, StyleSheet, Linking, Button, View } from 'react-native';
+import { Platform, StyleSheet, Linking, Button, View, Alert, Text } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, getAnonymousToken } from './src/redux/slices/authSlice';
@@ -52,42 +52,98 @@ const AppContent = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
   const [expoPushToken, setExpoPushToken] = useState('');
+  const [isNotificationSending, setIsNotificationSending] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   // 테스트 알림 전송 함수
   const sendTestNotification = async () => {
     if (Platform.OS !== 'web') {
-      console.log('테스트 알림 전송 시도...');
-      const notificationId = await sendImmediateNotification(
-        '테스트 알림',
-        '앱 푸시 알림이 정상적으로 작동합니다!',
-        {
-          type: 'test',
-          testData: '테스트 데이터',
-          timestamp: new Date().toISOString()
-        }
-      );
-      console.log('테스트 알림 전송 완료, ID:', notificationId);
+      try {
+        console.log('테스트 알림 전송 시도...');
+        setIsNotificationSending(true);
+        
+        const notificationId = await sendImmediateNotification(
+          '테스트 알림',
+          '앱 푸시 알림이 정상적으로 작동합니다!',
+          {
+            type: 'test',
+            testData: '테스트 데이터',
+            timestamp: new Date().toISOString(),
+            count: notificationCount + 1
+          }
+        );
+        
+        setNotificationCount(prev => prev + 1);
+        console.log('테스트 알림 전송 완료, ID:', notificationId);
+        
+        // 성공 피드백
+        Alert.alert(
+          '알림 전송 성공',
+          `알림이 성공적으로 전송되었습니다. (ID: ${notificationId})`,
+          [{ text: '확인', onPress: () => console.log('알림 전송 확인') }]
+        );
+      } catch (error) {
+        console.error('알림 전송 실패:', error);
+        Alert.alert(
+          '알림 전송 실패',
+          `오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`,
+          [{ text: '확인', onPress: () => console.log('알림 전송 오류 확인') }]
+        );
+      } finally {
+        setIsNotificationSending(false);
+      }
     }
   };
 
   // 백그라운드 테스트 알림 전송 (지연 알림)
   const sendBackgroundTestNotification = async () => {
     if (Platform.OS !== 'web') {
-      console.log('백그라운드 테스트 알림 예약 시도...');
-      
-      // 10초 후에 알림 발송
-      const notificationId = await sendBackgroundNotification(
-        '백그라운드 테스트 알림',
-        '앱이 백그라운드에 있을 때도 알림이 작동합니다!',
-        {
-          type: 'background-test',
-          testData: '백그라운드 테스트 데이터',
-          deepLink: 'somomi://product/detail/1'
-        },
-        10 // 10초 후
-      );
-      
-      console.log('백그라운드 테스트 알림 예약 완료, ID:', notificationId);
+      try {
+        console.log('백그라운드 테스트 알림 예약 시도...');
+        setIsNotificationSending(true);
+        
+        // 디버깅을 위한 즉시 알림 먼저 발송
+        await sendImmediateNotification(
+          '디버깅 알림',
+          `백그라운드 알림 테스트 버튼이 눌렸습니다. (${notificationCount + 1}번째)`,
+          { 
+            type: 'debug',
+            count: notificationCount + 1
+          }
+        );
+        
+        // 알림 예약 전 안내
+        Alert.alert(
+          '백그라운드 알림 테스트',
+          '3초 후에 알림이 발송됩니다. 지금 홈 버튼을 눌러 앱을 백그라운드로 전환하세요.',
+          [{ text: '확인', onPress: async () => {
+            // 3초 후에 알림 발송 (테스트를 위해 10초에서 3초로 변경)
+            const notificationId = await sendBackgroundNotification(
+              '백그라운드 테스트 알림',
+              `앱이 백그라운드에 있을 때도 알림이 작동합니다! (${notificationCount + 1}번째)`,
+              {
+                type: 'background-test',
+                testData: '백그라운드 테스트 데이터',
+                deepLink: 'somomi://product/detail/1',
+                count: notificationCount + 1
+              },
+              3 // 3초 후 (테스트를 위해 시간 단축)
+            );
+            
+            setNotificationCount(prev => prev + 1);
+            console.log('백그라운드 테스트 알림 예약 완료, ID:', notificationId);
+            setIsNotificationSending(false);
+          }}]
+        );
+      } catch (error) {
+        console.error('백그라운드 알림 예약 실패:', error);
+        Alert.alert(
+          '알림 예약 실패',
+          `오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`,
+          [{ text: '확인', onPress: () => console.log('알림 예약 오류 확인') }]
+        );
+        setIsNotificationSending(false);
+      }
     }
   };
 
@@ -323,21 +379,28 @@ const AppContent = () => {
     return <CodePushUpdateLoading error={updateError || undefined} />;
   }
   
-  // 테스트 알림 버튼 추가 (웹이 아닌 개발 모드에서만)
-  if (__DEV__ && Platform.OS !== 'web') {
+  // 테스트 알림 버튼 추가 (웹이 아닌 환경에서 항상 표시)
+  if (Platform.OS !== 'web') {
     return (
       <View style={{ flex: 1 }}>
         <View style={styles.testButtonContainer}>
           <Button 
-            title="즉시 알림 테스트" 
-            onPress={sendTestNotification} 
+            title={`즉시 알림 테스트 (${notificationCount})`}
+            onPress={sendTestNotification}
+            disabled={isNotificationSending}
           />
           <View style={{ height: 10 }} />
           <Button 
-            title="백그라운드 알림 테스트 (10초 후)" 
-            onPress={sendBackgroundTestNotification} 
-            color="#4287f5"
+            title={`백그라운드 알림 테스트 (${notificationCount})`}
+            onPress={sendBackgroundTestNotification}
+            color="#FF4500" // 더 눈에 띄는 색상으로 변경
+            disabled={isNotificationSending}
           />
+          {isNotificationSending && (
+            <View style={styles.loadingText}>
+              <Text style={{ color: 'gray', marginTop: 5 }}>처리 중...</Text>
+            </View>
+          )}
         </View>
         <AppNavigator linking={linking} />
       </View>
@@ -374,16 +437,22 @@ const styles = StyleSheet.create({
   },
   testButtonContainer: {
     position: 'absolute',
-    top: 40,
+    top: 50, // 위치를 조금 더 아래로 내림
     right: 20,
     zIndex: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    padding: 10,
-    borderRadius: 5,
-    elevation: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)', // 배경색을 더 불투명하게
+    padding: 15, // 패딩 증가
+    borderRadius: 8,
+    elevation: 8, // 그림자 강화
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 5,
+    borderWidth: 1, // 테두리 추가
+    borderColor: '#ddd',
+  },
+  loadingText: {
+    alignItems: 'center',
+    marginTop: 5,
   }
 });
