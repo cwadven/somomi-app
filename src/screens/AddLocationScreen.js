@@ -552,92 +552,103 @@ const AddLocationScreen = () => {
         <View style={styles.notificationSection}>
           <Text style={styles.sectionTitle}>기본 알림 설정</Text>
           
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>영역 알림 사용</Text>
-            <Switch
-              value={enableNotifications}
-              onValueChange={setEnableNotifications}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={enableNotifications ? '#f5dd4b' : '#f4f3f4'}
-            />
-          </View>
-          
-          {enableNotifications && (
+          {isAnonymous ? (
+            <View style={styles.anonymousNotificationContainer}>
+              <Ionicons name="lock-closed" size={24} color="#888" style={styles.lockIcon} />
+              <Text style={styles.anonymousNotificationText}>
+                알림 설정은 회원 전용 기능입니다. 회원가입 후 이용해주세요.
+              </Text>
+            </View>
+          ) : (
             <>
-              <Text style={styles.notificationHelp}>
-                이 영역에 추가되는 모든 제품에 기본 알림 설정이 적용됩니다.
-              </Text>
-              
-              <View style={styles.notificationTypeContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.notificationTypeButton,
-                    notificationType === 'expiry' && styles.selectedNotificationType
-                  ]}
-                  onPress={() => setNotificationType('expiry')}
-                >
-                  <Text style={[
-                    styles.notificationTypeText,
-                    notificationType === 'expiry' && styles.selectedNotificationTypeText
-                  ]}>
-                    유통기한 기준
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.notificationTypeButton,
-                    notificationType === 'estimated' && styles.selectedNotificationType
-                  ]}
-                  onPress={() => setNotificationType('estimated')}
-                >
-                  <Text style={[
-                    styles.notificationTypeText,
-                    notificationType === 'estimated' && styles.selectedNotificationTypeText
-                  ]}>
-                    소진 예상 기준
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <Text style={styles.daysBeforeLabel}>
-                {notificationType === 'expiry' ? '유통기한' : '소진 예상일'}까지 며칠 전에 알림을 받을까요?
-              </Text>
-              
-              <View style={styles.daysBeforeContainer}>
-                {[1, 3, 5, 7, 14, 30].map(days => (
-                  <TouchableOpacity
-                    key={days}
-                    style={[
-                      styles.daysBeforeButton,
-                      daysBeforeTarget === days && styles.selectedDaysBeforeButton
-                    ]}
-                    onPress={() => setDaysBeforeTarget(days)}
-                  >
-                    <Text style={[
-                      styles.daysBeforeText,
-                      daysBeforeTarget === days && styles.selectedDaysBeforeText
-                    ]}>
-                      {days}일 전
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
               <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>연속 알림</Text>
+                <Text style={styles.switchLabel}>영역 알림 사용</Text>
                 <Switch
-                  value={isRepeating}
-                  onValueChange={setIsRepeating}
+                  value={enableNotifications}
+                  onValueChange={setEnableNotifications}
                   trackColor={{ false: '#767577', true: '#81b0ff' }}
-                  thumbColor={isRepeating ? '#f5dd4b' : '#f4f3f4'}
+                  thumbColor={enableNotifications ? '#f5dd4b' : '#f4f3f4'}
                 />
               </View>
               
-              {isRepeating && (
-                <Text style={styles.repeatDescription}>
-                  D-{daysBeforeTarget}일부터 D-day까지 매일 알림을 받습니다.
-                </Text>
+              {enableNotifications && (
+                <>
+                  <Text style={styles.notificationHelp}>
+                    이 영역에 추가되는 모든 제품에 기본 알림 설정이 적용됩니다.
+                  </Text>
+                  
+                  <View style={styles.notificationTypeContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.notificationTypeButton,
+                        notificationType === 'expiry' && styles.selectedNotificationType
+                      ]}
+                      onPress={() => setNotificationType('expiry')}
+                    >
+                      <Text style={[
+                        styles.notificationTypeText,
+                        notificationType === 'expiry' && styles.selectedNotificationTypeText
+                      ]}>
+                        유통기한 기준
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={[
+                        styles.notificationTypeButton,
+                        notificationType === 'estimated' && styles.selectedNotificationType
+                      ]}
+                      onPress={() => setNotificationType('estimated')}
+                    >
+                      <Text style={[
+                        styles.notificationTypeText,
+                        notificationType === 'estimated' && styles.selectedNotificationTypeText
+                      ]}>
+                        소진 예상 기준
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <Text style={styles.daysBeforeLabel}>
+                    {notificationType === 'expiry' ? '유통기한' : '소진 예상일'}까지 며칠 전에 알림을 받을까요?
+                  </Text>
+                  
+                  <View style={styles.daysBeforeContainer}>
+                    {[1, 3, 5, 7, 14, 30].map(days => (
+                      <TouchableOpacity
+                        key={days}
+                        style={[
+                          styles.daysBeforeButton,
+                          daysBeforeTarget === days && styles.selectedDaysBeforeButton
+                        ]}
+                        onPress={() => setDaysBeforeTarget(days)}
+                      >
+                        <Text style={[
+                          styles.daysBeforeText,
+                          daysBeforeTarget === days && styles.selectedDaysBeforeText
+                        ]}>
+                          {days}일 전
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <View style={styles.switchRow}>
+                    <Text style={styles.switchLabel}>연속 알림</Text>
+                    <Switch
+                      value={isRepeating}
+                      onValueChange={setIsRepeating}
+                      trackColor={{ false: '#767577', true: '#81b0ff' }}
+                      thumbColor={isRepeating ? '#f5dd4b' : '#f4f3f4'}
+                    />
+                  </View>
+                  
+                  {isRepeating && (
+                    <Text style={styles.repeatDescription}>
+                      D-{daysBeforeTarget}일부터 D-day까지 매일 알림을 받습니다.
+                    </Text>
+                  )}
+                </>
               )}
             </>
           )}
@@ -971,6 +982,22 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+  anonymousNotificationContainer: {
+    backgroundColor: '#f0f0f0',
+    padding: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  lockIcon: {
+    marginRight: 12,
+  },
+  anonymousNotificationText: {
+    flex: 1,
+    color: '#666',
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
 
