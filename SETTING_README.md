@@ -6,6 +6,7 @@ https://expo.dev/ 접근 후, 프로젝트 생성.
 ```bash
 sudo npm install --global eas-cli
 eas init --id ProjectID
+npx expo install expo-modules-autolinking
 
 # code push 를 위해서
 npx eas channel:create
