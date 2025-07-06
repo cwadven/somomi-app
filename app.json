@@ -55,19 +55,6 @@
             "./assets/notification-sound.wav"
           ]
         }
-      ],
-      [
-        "expo-task-manager",
-        {
-          "backgroundMode": {
-            "ios": {
-              "modes": ["remote-notification"]
-            },
-            "android": {
-              "modes": ["remote-notification", "background-fetch"]
-            }
-          }
-        }
       ]
     ],
     "updates": {

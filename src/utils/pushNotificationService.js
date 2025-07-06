@@ -3,35 +3,11 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Linking, NativeEventEmitter, NativeModules } from 'react-native';
 
-// TaskManager는 웹에서 지원되지 않으므로 조건부 import
-let TaskManager;
-if (Platform.OS !== 'web') {
-  TaskManager = require('expo-task-manager');
-}
-
-// 백그라운드 알림 처리를 위한 태스크 이름
-export const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
+// 백그라운드 알림 처리를 위한 식별자
+export const BACKGROUND_NOTIFICATION_IDENTIFIER = 'BACKGROUND-NOTIFICATION-HANDLER';
 
 // 앱 시작 시 한 번만 알림 채널 생성
 let channelsCreated = false;
-
-// 백그라운드 태스크 정의 (웹이 아닌 환경에서만)
-if (Platform.OS !== 'web' && TaskManager) {
-  TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, ({ data, error, executionInfo }) => {
-    if (error) {
-      console.error('백그라운드 알림 처리 오류:', error);
-      return;
-    }
-    
-    if (data) {
-      const { notification } = data;
-      console.log('백그라운드에서 알림 수신:', notification);
-      
-      // 여기에서 백그라운드 알림 처리 로직 구현
-      // 예: 로컬 저장소에 데이터 저장, 다음 앱 시작 시 처리할 작업 예약 등
-    }
-  });
-}
 
 class PushNotificationService {
   // 앱 상태 리스너
@@ -171,7 +147,7 @@ class PushNotificationService {
     // 알림 채널 생성
     this.createNotificationChannels();
 
-    // 백그라운드 알림 핸들러 설정
+    // 알림 핸들러 설정
     Notifications.setNotificationHandler({
       handleNotification: async (notification) => {
         // 알림 데이터 확인
@@ -185,13 +161,6 @@ class PushNotificationService {
         };
       },
     });
-
-    // 백그라운드 알림 태스크 등록
-    if (TaskManager && BACKGROUND_NOTIFICATION_TASK) {
-      Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK).catch(error => {
-        console.error('백그라운드 알림 태스크 등록 실패:', error);
-      });
-    }
 
     // 알림 수신 리스너
     this.notificationReceivedListener = Notifications.addNotificationReceivedListener(
@@ -248,56 +217,68 @@ class PushNotificationService {
       return;
     }
     
+    // 리스너 제거
+    if (this.appStateListener) {
+      this.appStateListener.remove();
+    }
+    
     if (this.notificationReceivedListener) {
-      Notifications.removeNotificationSubscription(this.notificationReceivedListener);
+      this.notificationReceivedListener.remove();
     }
     
     if (this.notificationResponseListener) {
-      Notifications.removeNotificationSubscription(this.notificationResponseListener);
+      this.notificationResponseListener.remove();
     }
     
     if (this.nativeNotificationListener) {
       this.nativeNotificationListener.remove();
     }
-    
-    if (this.appStateListener) {
-      this.appStateListener.remove();
-    }
-    
-    // 백그라운드 태스크 정리
-    if (TaskManager && BACKGROUND_NOTIFICATION_TASK) {
-      Notifications.unregisterTaskAsync(BACKGROUND_NOTIFICATION_TASK).catch(error => {
-        console.error('백그라운드 알림 태스크 정리 실패:', error);
-      });
-    }
   }
 
-  // 알림 전송 함수 (로컬 알림)
+  // 알림 예약 함수
   async scheduleNotification(title, body, data = {}, trigger = null) {
     if (Platform.OS === 'web') {
-      console.log('웹에서는 로컬 알림을 지원하지 않습니다.');
+      console.log('웹에서는 알림을 지원하지 않습니다.');
       return null;
     }
     
     try {
+      const hasPermission = await this.requestNotificationPermission();
+      if (!hasPermission) {
+        console.log('알림 권한이 거부되었습니다.');
+        return null;
+      }
+      
+      // 알림 콘텐츠 설정
       const notificationContent = {
         title,
         body,
-        data,
+        data: {
+          ...data,
+          timestamp: new Date().getTime(),
+        },
         sound: true,
       };
       
-      // Android 특정 옵션
+      // 알림 채널 설정 (Android)
       if (Platform.OS === 'android') {
-        notificationContent.channelId = data.type === 'product' ? 'product_alerts' : 
-                                       data.type === 'location' ? 'location_alerts' :
-                                       data.type === 'background-test' ? 'background' : 'default';
+        // 데이터 타입에 따라 채널 선택
+        let channelId = 'default';
+        if (data.type === 'product') {
+          channelId = 'product_alerts';
+        } else if (data.type === 'location') {
+          channelId = 'location_alerts';
+        } else if (data.type === 'background') {
+          channelId = 'background';
+        }
+        
+        notificationContent.channelId = channelId;
       }
       
       // 알림 예약
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: notificationContent,
-        trigger: trigger || null, // null이면 즉시 전송
+        trigger: trigger || null, // null이면 즉시 발송
       });
       
       console.log('알림 예약 성공:', notificationId);
@@ -308,7 +289,7 @@ class PushNotificationService {
     }
   }
 
-  // 백그라운드 알림 전송 (지연 알림)
+  // 백그라운드 알림 예약 함수
   async scheduleBackgroundNotification(title, body, data = {}, delayInSeconds = 10) {
     if (Platform.OS === 'web') {
       console.log('웹에서는 백그라운드 알림을 지원하지 않습니다.');
@@ -316,47 +297,32 @@ class PushNotificationService {
     }
     
     try {
-      // 지정된 시간 후 트리거
-      const trigger = new Date(Date.now() + delayInSeconds * 1000);
-      
-      const notificationContent = {
-        title,
-        body,
-        data: {
-          ...data,
-          timestamp: new Date().toISOString(),
-          isBackground: true,
-        },
-        sound: true,
+      // 트리거 설정 (지정된 초 후 발송)
+      const trigger = {
+        seconds: delayInSeconds,
       };
       
-      // Android 특정 옵션
-      if (Platform.OS === 'android') {
-        notificationContent.channelId = 'background';
-      }
+      // 알림 데이터에 백그라운드 타입 추가
+      const notificationData = {
+        ...data,
+        type: 'background',
+        identifier: BACKGROUND_NOTIFICATION_IDENTIFIER,
+      };
       
       // 알림 예약
-      const notificationId = await Notifications.scheduleNotificationAsync({
-        content: notificationContent,
-        trigger,
-      });
-      
-      console.log('백그라운드 알림 예약 성공:', notificationId);
-      return notificationId;
+      return await this.scheduleNotification(title, body, notificationData, trigger);
     } catch (error) {
       console.error('백그라운드 알림 예약 실패:', error);
       return null;
     }
   }
 
-  // 특정 알림 취소
+  // 알림 취소 함수
   async cancelNotification(notificationId) {
-    if (Platform.OS === 'web') {
-      console.log('웹에서는 알림 취소를 지원하지 않습니다.');
+    if (Platform.OS === 'web' || !notificationId) {
+      console.log('웹에서는 알림 취소를 지원하지 않거나 알림 ID가 없습니다.');
       return;
     }
-    
-    if (!notificationId) return;
     
     try {
       await Notifications.cancelScheduledNotificationAsync(notificationId);
@@ -366,7 +332,7 @@ class PushNotificationService {
     }
   }
 
-  // 모든 알림 취소
+  // 모든 알림 취소 함수
   async cancelAllNotifications() {
     if (Platform.OS === 'web') {
       console.log('웹에서는 알림 취소를 지원하지 않습니다.');
@@ -381,27 +347,26 @@ class PushNotificationService {
     }
   }
 
-  // 딥링크 생성 함수
+  // 알림 데이터에서 딥링크 생성 함수
   buildDeepLinkFromNotificationData(data) {
     if (!data) return null;
     
-    // 제품 알림
-    if (data.type === 'product' && data.productId) {
-      return `somomi://product/detail/${data.productId}`;
-    }
+    // 기본 스킴
+    const scheme = 'somomi://';
     
-    // 위치 알림
-    if (data.type === 'location' && data.locationId) {
-      return `somomi://location/detail/${data.locationId}`;
-    }
-    
-    // 기타 딥링크가 있는 경우
+    // 딥링크 생성
     if (data.deepLink) {
       return data.deepLink;
+    } else if (data.type === 'product' && data.productId) {
+      return `${scheme}product/detail/${data.productId}`;
+    } else if (data.type === 'location' && data.locationId) {
+      return `${scheme}location/detail/${data.locationId}`;
     }
     
-    return null;
+    // 기본 딥링크
+    return `${scheme}home`;
   }
 }
 
+// 싱글톤 인스턴스 생성
 export const pushNotificationService = new PushNotificationService(); 

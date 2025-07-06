@@ -18,13 +18,6 @@ import {
   sendBackgroundNotification
 } from './src/utils/notificationUtils';
 
-// TaskManager는 웹에서 지원되지 않으므로 조건부 import
-let registerBackgroundNotificationTask;
-if (Platform.OS !== 'web') {
-  const { registerBackgroundNotificationTask: registerTask } = require('./src/utils/notificationUtils');
-  registerBackgroundNotificationTask = registerTask;
-}
-
 // localStorage 폴리필
 if (typeof localStorage === 'undefined') {
   global.localStorage = {
@@ -245,11 +238,6 @@ const AppContent = () => {
         if (Platform.OS !== 'web') {
           // 알림 권한 요청 및 초기화
           await registerForPushNotificationsAsync();
-          
-          // 백그라운드 알림 태스크 등록
-          if (registerBackgroundNotificationTask) {
-            await registerBackgroundNotificationTask();
-          }
           
           // 테스트 알림 전송 (앱 시작 3초 후)
           setTimeout(() => {
