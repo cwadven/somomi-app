@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import messaging from '@react-native-firebase/messaging';
 import { pushNotificationService } from './pushNotificationService';
 
 /**
@@ -33,10 +33,8 @@ export const scheduleProductExpiryNotification = async (
       return null;
     }
 
-    // 알림 트리거 설정
-    const trigger = {
-      date: notifyDate,
-    };
+    // 알림 발송 시간까지의 초 계산
+    const delayInSeconds = Math.floor((notifyDate.getTime() - now.getTime()) / 1000);
 
     // 알림 내용 설정
     const title = `${productName} 유통기한 알림`;
@@ -50,7 +48,7 @@ export const scheduleProductExpiryNotification = async (
     };
 
     // 알림 예약
-    return await pushNotificationService.scheduleNotification(title, body, data, trigger);
+    return await pushNotificationService.sendLocalNotification(title, body, data, delayInSeconds);
   } catch (error) {
     console.error('제품 유통기한 알림 예약 실패:', error);
     return null;
@@ -84,10 +82,8 @@ export const scheduleLocationNotification = async (
       return null;
     }
 
-    // 알림 트리거 설정
-    const trigger = {
-      date: notifyDate,
-    };
+    // 알림 발송 시간까지의 초 계산
+    const delayInSeconds = Math.floor((notifyDate.getTime() - now.getTime()) / 1000);
 
     // 알림 내용 설정
     const title = `${locationName} 알림`;
@@ -99,7 +95,7 @@ export const scheduleLocationNotification = async (
     };
 
     // 알림 예약
-    return await pushNotificationService.scheduleNotification(title, body, data, trigger);
+    return await pushNotificationService.sendLocalNotification(title, body, data, delayInSeconds);
   } catch (error) {
     console.error('위치 알림 예약 실패:', error);
     return null;
@@ -120,7 +116,7 @@ export const sendImmediateNotification = async (title, body, data = {}) => {
   }
   
   try {
-    return await pushNotificationService.scheduleNotification(title, body, data);
+    return await pushNotificationService.sendLocalNotification(title, body, data, 0);
   } catch (error) {
     console.error('즉시 알림 전송 실패:', error);
     return null;
@@ -128,23 +124,23 @@ export const sendImmediateNotification = async (title, body, data = {}) => {
 };
 
 /**
- * 백그라운드 테스트 알림을 보내는 함수
+ * 지연 알림을 보내는 함수
  * @param {string} title - 알림 제목
  * @param {string} body - 알림 내용
  * @param {Object} data - 알림 데이터
  * @param {number} delayInSeconds - 지연 시간(초)
  * @returns {Promise<string>} - 알림 ID
  */
-export const sendBackgroundNotification = async (title, body, data = {}, delayInSeconds = 10) => {
+export const sendBackgroundNotification = async (title, body, data = {}, delayInSeconds = 3) => {
   if (Platform.OS === 'web') {
-    console.log('웹에서는 백그라운드 알림을 지원하지 않습니다.');
+    console.log('웹에서는 지연 알림을 지원하지 않습니다.');
     return null;
   }
   
   try {
-    return await pushNotificationService.scheduleBackgroundNotification(title, body, data, delayInSeconds);
+    return await pushNotificationService.sendLocalNotification(title, body, data, delayInSeconds);
   } catch (error) {
-    console.error('백그라운드 알림 전송 실패:', error);
+    console.error('지연 알림 전송 실패:', error);
     return null;
   }
 };
@@ -208,6 +204,12 @@ export const initializeNotifications = () => {
     console.log('웹에서는 알림 초기화를 지원하지 않습니다.');
     return;
   }
+  
+  // Firebase Cloud Messaging 백그라운드 핸들러 설정
+  messaging().setBackgroundMessageHandler(async remoteMessage => {
+    console.log('백그라운드 메시지 처리:', remoteMessage);
+    return Promise.resolve();
+  });
   
   pushNotificationService.setupNotificationHandler();
 };

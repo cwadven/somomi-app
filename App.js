@@ -6,7 +6,8 @@ import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, getAnonymousToken } from './src/redux/slices/authSlice';
 import * as Updates from 'expo-updates';
-import * as Notifications from 'expo-notifications';
+import messaging from '@react-native-firebase/messaging';
+import notifee, { EventType } from '@notifee/react-native';
 import Constants from 'expo-constants';
 import CodePushUpdateLoading from './src/components/CodePushUpdateLoading';
 import { 
@@ -29,29 +30,12 @@ if (typeof localStorage === 'undefined') {
   };
 }
 
-// 백그라운드 알림 핸들러 설정 (웹에서는 실행하지 않음)
-if (Platform.OS !== 'web') {
-  Notifications.setNotificationHandler({
-    handleNotification: async (notification) => {
-      // 알림 데이터 확인
-      const data = notification.request.content.data;
-      console.log('알림 데이터:', data);
-      
-      return {
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-      };
-    },
-  });
-}
-
 // 앱 내부 컴포넌트 - 토큰 검증 및 초기화 로직을 포함
 const AppContent = () => {
   const dispatch = useDispatch();
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
-  const [expoPushToken, setExpoPushToken] = useState('');
+  const [pushToken, setPushToken] = useState('');
   const [isNotificationSending, setIsNotificationSending] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
 
@@ -95,48 +79,38 @@ const AppContent = () => {
     }
   };
 
-  // 백그라운드 테스트 알림 전송 (지연 알림)
-  const sendBackgroundTestNotification = async () => {
+  // 지연 알림 전송 함수
+  const sendDelayedNotification = async () => {
     if (Platform.OS !== 'web') {
       try {
-        console.log('백그라운드 테스트 알림 예약 시도...');
+        console.log('지연 알림 예약 시도...');
         setIsNotificationSending(true);
-        
-        // 디버깅을 위한 즉시 알림 먼저 발송
-        await sendImmediateNotification(
-          '디버깅 알림',
-          `백그라운드 알림 테스트 버튼이 눌렸습니다. (${notificationCount + 1}번째)`,
-          { 
-            type: 'debug',
-            count: notificationCount + 1
-          }
-        );
         
         // 알림 예약 전 안내
         Alert.alert(
-          '백그라운드 알림 테스트',
+          '지연 알림 테스트',
           '3초 후에 알림이 발송됩니다. 지금 홈 버튼을 눌러 앱을 백그라운드로 전환하세요.',
           [{ text: '확인', onPress: async () => {
-            // 3초 후에 알림 발송 (테스트를 위해 10초에서 3초로 변경)
+            // 3초 후에 알림 발송
             const notificationId = await sendBackgroundNotification(
-              '백그라운드 테스트 알림',
-              `앱이 백그라운드에 있을 때도 알림이 작동합니다! (${notificationCount + 1}번째)`,
+              '지연 알림 테스트',
+              `3초 후 알림이 발송되었습니다! (${notificationCount + 1}번째)`,
               {
-                type: 'background-test',
-                testData: '백그라운드 테스트 데이터',
+                type: 'delayed',
+                testData: '지연 알림 테스트 데이터',
                 deepLink: 'somomi://product/detail/1',
                 count: notificationCount + 1
               },
-              3 // 3초 후 (테스트를 위해 시간 단축)
+              3 // 3초 후
             );
             
             setNotificationCount(prev => prev + 1);
-            console.log('백그라운드 테스트 알림 예약 완료, ID:', notificationId);
+            console.log('지연 알림 예약 완료, ID:', notificationId);
             setIsNotificationSending(false);
           }}]
         );
       } catch (error) {
-        console.error('백그라운드 알림 예약 실패:', error);
+        console.error('지연 알림 예약 실패:', error);
         Alert.alert(
           '알림 예약 실패',
           `오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`,
@@ -147,7 +121,7 @@ const AppContent = () => {
     }
   };
 
-  // Expo 푸시 토큰 등록
+  // Firebase 푸시 토큰 등록
   const registerForPushNotificationsAsync = async () => {
     if (Platform.OS === 'web') {
       console.log('웹에서는 푸시 알림을 지원하지 않습니다.');
@@ -156,51 +130,17 @@ const AppContent = () => {
 
     try {
       // 권한 확인
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      
-      // 권한이 없으면 요청
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync({
-          ios: {
-            allowAlert: true,
-            allowBadge: true,
-            allowSound: true,
-            allowAnnouncements: true,
-          },
-        });
-        finalStatus = status;
-      }
-      
-      // 권한이 없으면 종료
-      if (finalStatus !== 'granted') {
+      const hasPermission = await requestNotificationPermissions();
+      if (!hasPermission) {
         console.log('알림 권한이 거부되었습니다!');
         return;
       }
       
-      // Expo 푸시 토큰 가져오기
-      const token = await Notifications.getExpoPushTokenAsync({
-        projectId: Constants.expoConfig.extra.eas.projectId,
-      });
-      
-      console.log('Expo 푸시 토큰:', token);
-      setExpoPushToken(token.data);
-      
-      // Android 채널 생성
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: '기본 알림',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#FF231F7C',
-        });
-        
-        await Notifications.setNotificationChannelAsync('background', {
-          name: '백그라운드 알림',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#4287f5',
-        });
+      // Firebase 푸시 토큰 가져오기
+      const token = await registerForPushNotifications();
+      if (token) {
+        console.log('Firebase 푸시 토큰:', token);
+        setPushToken(token);
       }
     } catch (error) {
       console.error('푸시 토큰 등록 오류:', error);
@@ -310,32 +250,31 @@ const AppContent = () => {
     initializeApp();
     
     // 웹이 아닌 환경에서만 알림 관련 코드 실행
-    let notificationListener;
-    let responseListener;
-    
     if (Platform.OS !== 'web') {
       // 알림 설정 초기화
       initializeNotifications();
       
-      // 알림 수신 리스너
-      notificationListener = Notifications.addNotificationReceivedListener(notification => {
-        console.log('알림 수신:', notification);
+      // Notifee 이벤트 리스너 (알림 클릭 이벤트)
+      const unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
+        if (type === EventType.PRESS && detail.notification) {
+          console.log('Notifee 알림 클릭:', detail.notification);
+          
+          // 알림 데이터 처리
+          const data = detail.notification.data;
+          console.log('알림 데이터:', data);
+          
+          // 딥링크 처리
+          if (data && data.deepLink) {
+            Linking.openURL(data.deepLink).catch(err => {
+              console.error('딥링크 오류:', err);
+            });
+          }
+        }
       });
       
-      // 알림 응답 리스너 (사용자가 알림을 탭했을 때)
-      responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-        console.log('알림 응답:', response);
-        
-        // 알림 데이터 처리
-        const data = response.notification.request.content.data;
-        console.log('알림 데이터:', data);
-        
-        // 딥링크 처리
-        if (data.deepLink) {
-          Linking.openURL(data.deepLink).catch(err => {
-            console.error('딥링크 오류:', err);
-          });
-        }
+      // Firebase 메시징 이벤트 리스너
+      const messagingUnsubscribe = messaging().onMessage(async remoteMessage => {
+        console.log('포그라운드 메시지 수신:', remoteMessage);
       });
     }
     
@@ -358,16 +297,14 @@ const AppContent = () => {
     return () => {
       // 웹이 아닌 환경에서만 알림 관련 코드 실행
       if (Platform.OS !== 'web') {
-        // 알림 리스너 정리
-        if (notificationListener) {
-          Notifications.removeNotificationSubscription(notificationListener);
-        }
-        if (responseListener) {
-          Notifications.removeNotificationSubscription(responseListener);
-        }
-        
         // 알림 설정 정리
         cleanupNotifications();
+        
+        // Notifee 이벤트 리스너 정리
+        unsubscribe();
+        
+        // Firebase 메시징 이벤트 리스너 정리
+        messagingUnsubscribe();
       }
       
       clearTimeout(checkUpdateTimer);
@@ -391,9 +328,9 @@ const AppContent = () => {
           />
           <View style={{ height: 10 }} />
           <Button 
-            title={`백그라운드 알림 테스트 (${notificationCount})`}
-            onPress={sendBackgroundTestNotification}
-            color="#FF4500" // 더 눈에 띄는 색상으로 변경
+            title={`3초 후 알림 테스트 (${notificationCount})`}
+            onPress={sendDelayedNotification}
+            color="#FF4500"
             disabled={isNotificationSending}
           />
           {isNotificationSending && (
@@ -437,18 +374,18 @@ const styles = StyleSheet.create({
   },
   testButtonContainer: {
     position: 'absolute',
-    top: 50, // 위치를 조금 더 아래로 내림
+    top: 50,
     right: 20,
     zIndex: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)', // 배경색을 더 불투명하게
-    padding: 15, // 패딩 증가
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 15,
     borderRadius: 8,
-    elevation: 8, // 그림자 강화
+    elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.5,
     shadowRadius: 5,
-    borderWidth: 1, // 테두리 추가
+    borderWidth: 1,
     borderColor: '#ddd',
   },
   loadingText: {
