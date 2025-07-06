@@ -15,6 +15,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { logout } from '../redux/slices/authSlice';
 import KakaoLoginButton from '../components/KakaoLoginButton';
+import PushNotificationTest from '../components/PushNotificationTest';
 
 const ProfileScreen = () => {
   const dispatch = useDispatch();
@@ -157,6 +158,13 @@ const ProfileScreen = () => {
           </View>
         )}
       </View>
+      
+      {/* 앱푸시 테스트 섹션 - 모든 사용자에게 표시 */}
+      {Platform.OS !== 'web' && (
+        <View style={styles.pushTestSection}>
+          <PushNotificationTest />
+        </View>
+      )}
       
       {/* 로그인 한 경우에만 제품 관리와 앱 설정 표시 */}
       {isLoggedIn && user && (
@@ -375,6 +383,10 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
     marginBottom: 32,
+  },
+  pushTestSection: {
+    marginHorizontal: 16,
+    marginBottom: 16,
   },
 });
 

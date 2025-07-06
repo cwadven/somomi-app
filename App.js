@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useCallback } from 'react';
 import { Provider, useDispatch } from 'react-redux';
-import { Platform, StyleSheet, Linking, Button, View, Alert, Text } from 'react-native';
+import { Platform, StyleSheet, Linking } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, getAnonymousToken } from './src/redux/slices/authSlice';
@@ -14,9 +14,7 @@ import {
   initializeNotifications, 
   cleanupNotifications, 
   requestNotificationPermissions, 
-  registerForPushNotifications,
-  sendImmediateNotification,
-  sendBackgroundNotification
+  registerForPushNotifications
 } from './src/utils/notificationUtils';
 
 // localStorage 폴리필
@@ -36,90 +34,6 @@ const AppContent = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
   const [pushToken, setPushToken] = useState('');
-  const [isNotificationSending, setIsNotificationSending] = useState(false);
-  const [notificationCount, setNotificationCount] = useState(0);
-
-  // 테스트 알림 전송 함수
-  const sendTestNotification = async () => {
-    if (Platform.OS !== 'web') {
-      try {
-        console.log('테스트 알림 전송 시도...');
-        setIsNotificationSending(true);
-        
-        const notificationId = await sendImmediateNotification(
-          '테스트 알림',
-          '앱 푸시 알림이 정상적으로 작동합니다!',
-          {
-            type: 'test',
-            testData: '테스트 데이터',
-            timestamp: new Date().toISOString(),
-            count: notificationCount + 1
-          }
-        );
-        
-        setNotificationCount(prev => prev + 1);
-        console.log('테스트 알림 전송 완료, ID:', notificationId);
-        
-        // 성공 피드백
-        Alert.alert(
-          '알림 전송 성공',
-          `알림이 성공적으로 전송되었습니다. (ID: ${notificationId})`,
-          [{ text: '확인', onPress: () => console.log('알림 전송 확인') }]
-        );
-      } catch (error) {
-        console.error('알림 전송 실패:', error);
-        Alert.alert(
-          '알림 전송 실패',
-          `오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`,
-          [{ text: '확인', onPress: () => console.log('알림 전송 오류 확인') }]
-        );
-      } finally {
-        setIsNotificationSending(false);
-      }
-    }
-  };
-
-  // 지연 알림 전송 함수
-  const sendDelayedNotification = async () => {
-    if (Platform.OS !== 'web') {
-      try {
-        console.log('지연 알림 예약 시도...');
-        setIsNotificationSending(true);
-        
-        // 알림 예약 전 안내
-        Alert.alert(
-          '지연 알림 테스트',
-          '3초 후에 알림이 발송됩니다. 지금 홈 버튼을 눌러 앱을 백그라운드로 전환하세요.',
-          [{ text: '확인', onPress: async () => {
-            // 3초 후에 알림 발송
-            const notificationId = await sendBackgroundNotification(
-              '지연 알림 테스트',
-              `3초 후 알림이 발송되었습니다! (${notificationCount + 1}번째)`,
-              {
-                type: 'delayed',
-                testData: '지연 알림 테스트 데이터',
-                deepLink: 'somomi://product/detail/1',
-                count: notificationCount + 1
-              },
-              3 // 3초 후
-            );
-            
-            setNotificationCount(prev => prev + 1);
-            console.log('지연 알림 예약 완료, ID:', notificationId);
-            setIsNotificationSending(false);
-          }}]
-        );
-      } catch (error) {
-        console.error('지연 알림 예약 실패:', error);
-        Alert.alert(
-          '알림 예약 실패',
-          `오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`,
-          [{ text: '확인', onPress: () => console.log('알림 예약 오류 확인') }]
-        );
-        setIsNotificationSending(false);
-      }
-    }
-  };
 
   // Firebase 푸시 토큰 등록
   const registerForPushNotificationsAsync = async () => {
@@ -234,11 +148,6 @@ const AppContent = () => {
         if (Platform.OS !== 'web') {
           // 알림 권한 요청 및 초기화
           await registerForPushNotificationsAsync();
-          
-          // 테스트 알림 전송 (앱 시작 3초 후)
-          setTimeout(() => {
-            sendTestNotification();
-          }, 3000);
         }
       } catch (error) {
         console.error('인증 초기화 실패:', error);
@@ -316,34 +225,6 @@ const AppContent = () => {
     return <CodePushUpdateLoading error={updateError || undefined} />;
   }
   
-  // 테스트 알림 버튼 추가 (웹이 아닌 환경에서 항상 표시)
-  if (Platform.OS !== 'web') {
-    return (
-      <View style={{ flex: 1 }}>
-        <View style={styles.testButtonContainer}>
-          <Button 
-            title={`즉시 알림 테스트 (${notificationCount})`}
-            onPress={sendTestNotification}
-            disabled={isNotificationSending}
-          />
-          <View style={{ height: 10 }} />
-          <Button 
-            title={`3초 후 알림 테스트 (${notificationCount})`}
-            onPress={sendDelayedNotification}
-            color="#FF4500"
-            disabled={isNotificationSending}
-          />
-          {isNotificationSending && (
-            <View style={styles.loadingText}>
-              <Text style={{ color: 'gray', marginTop: 5 }}>처리 중...</Text>
-            </View>
-          )}
-        </View>
-        <AppNavigator linking={linking} />
-      </View>
-    );
-  }
-  
   return <AppNavigator linking={linking} />;
 };
 
@@ -371,25 +252,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'red',
     marginTop: 8,
-  },
-  testButtonContainer: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 15,
-    borderRadius: 8,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.5,
-    shadowRadius: 5,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  loadingText: {
-    alignItems: 'center',
-    marginTop: 5,
   }
 });
