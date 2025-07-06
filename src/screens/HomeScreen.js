@@ -26,7 +26,7 @@ const HomeScreen = ({ navigation }) => {
 
   // 배너 데이터
   const banners = [
-    { id: '1', title: '소모품 관리의 시작222', description: '소모미와 함께 체계적으로 관리해보세요.' },
+    { id: '1', title: '소모품 관리의 시작', description: '소모미와 함께 체계적으로 관리해보세요.' },
     { id: '2', title: '유통기한 알림', description: '유통기한이 다가오면 알려드립니다.' },
     { id: '3', title: '소모품 위치 관리', description: '어디에 보관했는지 잊지 마세요.' },
   ];

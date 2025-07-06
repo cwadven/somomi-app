@@ -4,6 +4,7 @@ credentials.json
 my-release-key.keystore
 google-services.json
 local.properties
+a/
 
 .env
 android/

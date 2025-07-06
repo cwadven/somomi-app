@@ -217,7 +217,7 @@ sdk.dir=/Users/.../Library/Android/sdk
 
 10. MainActivity.kt Notification 때문에 좀 수정 했음.
 
-android/app/main/java/com/next_story/somomi/MainActivity.kt
+android/app/src/main/java/com/nextstory/somomi/MainActivity.kt
 import 부분도 추가 필요
 
 ```kotlin
