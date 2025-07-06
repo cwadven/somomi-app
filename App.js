@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider, useDispatch } from 'react-redux';
-import { Platform } from 'react-native';
+import { Platform, Text, View, StyleSheet } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, getAnonymousToken } from './src/redux/slices/authSlice';
@@ -26,6 +26,11 @@ const AppContent = () => {
   const dispatch = useDispatch();
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
+  const [updateInfo, setUpdateInfo] = useState({
+    version: '1.0.0',
+    updateTime: new Date().toLocaleString(),
+    isUpdated: false
+  });
 
   const checkForUpdates = useCallback(async () => {
     if (__DEV__ || Platform.OS === 'web') {
@@ -35,12 +40,22 @@ const AppContent = () => {
     
     try {
       console.log('업데이트 확인 시작...');
+      console.log('Updates 객체 확인:', Updates ? '존재함' : '존재하지 않음');
       
       // Updates.isEnabled 확인
-      if (!Updates.isEnabled) {
+      console.log('Updates.isEnabled 값:', Updates.isEnabled());
+      
+      if (!Updates.isEnabled()) {
         console.log('expo-updates가 활성화되어 있지 않습니다. 앱 설정을 확인하세요.');
         return;
       }
+      
+      console.log('Updates 설정:', {
+        channel: Updates.channel,
+        runtimeVersion: Updates.runtimeVersion,
+        updateId: Updates.updateId,
+        createdAt: Updates.createdAt
+      });
       
       setUpdateError(null);
       
@@ -56,6 +71,13 @@ const AppContent = () => {
           // 업데이트 다운로드
           const fetchResult = await Updates.fetchUpdateAsync();
           console.log('업데이트 다운로드 완료:', JSON.stringify(fetchResult));
+          
+          // 업데이트 정보 저장
+          setUpdateInfo({
+            version: '1.0.1', // 업데이트 버전
+            updateTime: new Date().toLocaleString(),
+            isUpdated: true
+          });
           
           // 업데이트 자동 적용
           console.log('업데이트 자동 적용 시작...');
@@ -133,9 +155,36 @@ const AppContent = () => {
     <>
       <AppNavigator />
       <StatusBar style="auto" />
+      {/* 업데이트 정보 표시 */}
+      <View style={styles.updateInfoContainer}>
+        <Text style={styles.updateInfoText}>
+          버전: {updateInfo.version} {updateInfo.isUpdated ? '(업데이트됨)' : ''}
+        </Text>
+        <Text style={styles.updateInfoText}>
+          업데이트 시간: {updateInfo.updateTime}
+        </Text>
+        <Text style={styles.updateInfoText}>
+          업데이트 테스트 - 2024-07-05 17:30
+        </Text>
+      </View>
     </>
   );
 };
+
+const styles = StyleSheet.create({
+  updateInfoContainer: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 10,
+  },
+  updateInfoText: {
+    color: 'white',
+    fontSize: 12,
+  }
+});
 
 export default function App() {
   return (
