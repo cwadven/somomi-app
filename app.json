@@ -13,7 +13,8 @@
       "backgroundColor": "#ffffff"
     },
     "assetBundlePatterns": [
-      "**/*"
+      "**/*",
+      "assets/*"
     ],
     "ios": {
       "supportsTablet": true,
@@ -24,7 +25,16 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.nextstory.somomi"
+      "package": "com.nextstory.somomi",
+      "useNextNotificationsApi": true,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -40,12 +50,15 @@
       "channel": "production",
       "url": "https://u.expo.dev/25a0cbfb-df85-4335-8012-d06cc57c6fc6"
     },
-    "runtimeVersion": "exposdk:50.0.0",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
     "extra": {
       "eas": {
         "projectId": "25a0cbfb-df85-4335-8012-d06cc57c6fc6"
       }
     },
-    "owner": "next_story"
+    "owner": "next_story",
+    "scheme": "somomi"
   }
 }

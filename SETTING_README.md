@@ -313,6 +313,43 @@ class MainActivity : ReactActivity() {
 }
 ```
 
+android/app/src/main/AndroidManifest.xml 추가
+
+```xml
+<application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="true" android:theme="@style/AppTheme">
+    <meta-data android:name="expo.modules.updates.ENABLED" android:value="true"/>
+    <meta-data android:name="expo.modules.updates.EXPO_RUNTIME_VERSION" android:value="@string/expo_runtime_version"/>
+    <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS"/>
+    <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
+    <meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL" android:value="https://u.expo.dev/c95bc6af-8605-4422-8e26-b009afa8dcc6"/>
+    <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHANNEL" android:value="@string/expo_updates_channel"/>
+    <meta-data android:name="expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY" android:value="{&quot;expo-runtime-version&quot;:&quot;exposdk:50.0.0&quot;,&quot;expo-channel-name&quot;:&quot;production&quot;}"/>
+    <!-- 여기 (시작) -->
+    <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" 
+            android:value="default_channel" 
+            tools:replace="android:value" />
+    <!-- 여기 (끝) -->
+```
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+  <!-- 여기 (시작) -->
+  <uses-permission android:name="android.permission.CAMERA" tools:node="remove"/>
+  <uses-permission android:name="android.permission.DETECT_SCREEN_CAPTURE"/>
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.NOTIFICATIONS"/>
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+  <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove"/>
+  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+  <uses-permission android:name="android.permission.VIBRATE"/>
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <!-- 여기 (끝) -->
+```
+
+
 1.  Code push 설정
 
 android/app/src/main/AndroidManifest.xml
@@ -422,39 +459,11 @@ android/app/src/main/res/values/strings.xml
 }
 ```
 
-14. 폴더 위치가 한글이면 설정
+app.json 설정도 잘되어있어야함.
 
-프로젝트 루트에 metro.config.js 생성
+App.js 도 코드가 잘 되어있는지 확인 필요.
 
-```javascript
-const { getDefaultConfig } = require('expo/metro-config');
-const path = require('path');
-
-const projectRoot = __dirname;
-const config = getDefaultConfig(projectRoot);
-
-// 한글 경로 문제 해결을 위한 설정
-config.resolver.resolveRequest = (context, moduleName, platform) => {
-  // index.js 파일을 직접 참조하는 경우 처리
-  if (moduleName.includes('index.js')) {
-    return {
-      filePath: path.resolve(projectRoot, 'index.js'),
-      type: 'sourceFile',
-    };
-  }
-  
-  // 기본 해석기 사용
-  return context.resolveRequest(context, moduleName, platform);
-};
-
-module.exports = config; 
-```
-
-15. assets 폴더 생성.
-
-android/app/src/main/assets 폴더 생성
-
-16. Android 빌드
+1.  Android 빌드
 
 ```
 cd android
@@ -477,9 +486,6 @@ npx eas update:configure
    ```bash
    npm run update:prod
    ```
-
-app.json 설정도 잘되어있어야함.
-App.js 도 코드가 잘 되어있는지 확인 필요.
 
 
 npm 재설치 시

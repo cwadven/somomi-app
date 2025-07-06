@@ -1,4 +1,9 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { 
+  scheduleProductExpiryNotification, 
+  scheduleLocationNotification,
+  cancelNotification 
+} from '../../utils/notificationUtils';
 
 // 샘플 데이터 - 실제 구현 시 API 연동 필요
 let sampleNotifications = [
@@ -57,11 +62,12 @@ export const fetchProductNotifications = createAsyncThunk(
   'notifications/fetchProductNotifications',
   async (productId, { rejectWithValue }) => {
     try {
-      // 실제 API 호출로 대체 필요
-      const notifications = sampleNotifications.filter(
-        notification => notification.type === 'product' && notification.targetId === productId
-      );
-      return notifications;
+      // API 호출로 알림 데이터 가져오기
+      // const response = await api.get(`/api/products/${productId}/notifications`);
+      // return response.data;
+      
+      // 임시 데이터 반환
+      return [];
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -73,11 +79,12 @@ export const fetchLocationNotifications = createAsyncThunk(
   'notifications/fetchLocationNotifications',
   async (locationId, { rejectWithValue }) => {
     try {
-      // 실제 API 호출로 대체 필요
-      const notifications = sampleNotifications.filter(
-        notification => notification.type === 'location' && notification.targetId === locationId
-      );
-      return notifications;
+      // API 호출로 알림 데이터 가져오기
+      // const response = await api.get(`/api/locations/${locationId}/notifications`);
+      // return response.data;
+      
+      // 임시 데이터 반환
+      return [];
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -87,27 +94,54 @@ export const fetchLocationNotifications = createAsyncThunk(
 // 알림 추가 API
 export const addNotification = createAsyncThunk(
   'notifications/addNotification',
-  async (notification, { rejectWithValue }) => {
+  async (notificationData, { rejectWithValue }) => {
     try {
-      // 실제 API 호출로 대체 필요
-      const newId = (Math.max(...sampleNotifications.map(n => parseInt(n.id))) + 1).toString();
-      const newNotification = {
-        ...notification,
-        id: newId,
-        createdAt: new Date().toISOString(),
-      };
+      // 알림 데이터 준비
+      const { type, targetId, notifyType, daysBeforeTarget, notifyDate, title, message } = notificationData;
       
-      // 타입별 알림 개수 제한 확인
-      const existingNotifications = sampleNotifications.filter(
-        n => n.type === notification.type && n.targetId === notification.targetId
-      );
+      // 알림 ID (임시)
+      const notificationId = `notification_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       
-      if (notification.type === 'product' && existingNotifications.length >= 3) {
-        return rejectWithValue('제품당 최대 3개의 알림만 설정할 수 있습니다.');
+      // 제품 알림인 경우
+      if (type === 'product' && notifyType === 'expiry') {
+        // 제품 정보 가져오기 (실제로는 API 호출)
+        const productName = '제품명'; // 임시 데이터
+        const expiryDate = new Date(); // 임시 데이터, 실제로는 제품의 유통기한
+        expiryDate.setDate(expiryDate.getDate() + 30); // 30일 후로 설정 (임시)
+        
+        // 제품 알림 스케줄링
+        await scheduleProductExpiryNotification(
+          targetId,
+          productName,
+          expiryDate,
+          daysBeforeTarget
+        );
       }
       
-      sampleNotifications.push(newNotification);
-      return newNotification;
+      // 위치 알림인 경우
+      if (type === 'location') {
+        // 위치 정보 가져오기 (실제로는 API 호출)
+        const locationName = '위치명'; // 임시 데이터
+        
+        // 위치 알림 스케줄링
+        await scheduleLocationNotification(
+          targetId,
+          locationName,
+          message || `${locationName}에 대한 알림입니다.`,
+          notifyDate
+        );
+      }
+      
+      // API 호출로 알림 데이터 저장
+      // const response = await api.post('/api/notifications', notificationData);
+      // return response.data;
+      
+      // 임시 데이터 반환
+      return {
+        id: notificationId,
+        ...notificationData,
+        createdAt: new Date().toISOString()
+      };
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -117,21 +151,18 @@ export const addNotification = createAsyncThunk(
 // 알림 수정 API
 export const updateNotification = createAsyncThunk(
   'notifications/updateNotification',
-  async (notification, { rejectWithValue }) => {
+  async ({ id, data }, { rejectWithValue }) => {
     try {
-      // 실제 API 호출로 대체 필요
-      const index = sampleNotifications.findIndex(n => n.id === notification.id);
-      if (index === -1) {
-        return rejectWithValue('알림을 찾을 수 없습니다.');
-      }
+      // API 호출로 알림 데이터 업데이트
+      // const response = await api.put(`/api/notifications/${id}`, data);
+      // return response.data;
       
-      sampleNotifications[index] = {
-        ...sampleNotifications[index],
-        ...notification,
-        updatedAt: new Date().toISOString(),
+      // 임시 데이터 반환
+      return {
+        id,
+        ...data,
+        updatedAt: new Date().toISOString()
       };
-      
-      return sampleNotifications[index];
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -143,13 +174,12 @@ export const deleteNotification = createAsyncThunk(
   'notifications/deleteNotification',
   async (id, { rejectWithValue }) => {
     try {
-      // 실제 API 호출로 대체 필요
-      const index = sampleNotifications.findIndex(n => n.id === id);
-      if (index === -1) {
-        return rejectWithValue('알림을 찾을 수 없습니다.');
-      }
+      // 알림 취소
+      await cancelNotification(id);
       
-      sampleNotifications = sampleNotifications.filter(n => n.id !== id);
+      // API 호출로 알림 데이터 삭제
+      // await api.delete(`/api/notifications/${id}`);
+      
       return id;
     } catch (error) {
       return rejectWithValue(error.message);

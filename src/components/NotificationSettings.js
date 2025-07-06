@@ -22,6 +22,7 @@ import {
   fetchProductNotifications, 
   fetchLocationNotifications 
 } from '../redux/slices/notificationsSlice';
+import { requestNotificationPermissions } from '../utils/notificationUtils';
 import AlertModal from './AlertModal';
 import SignupPromptModal from './SignupPromptModal';
 
@@ -114,6 +115,13 @@ const NotificationSettings = ({ type, targetId, isLocation = false, locationId =
   }, [deleteModalVisible, errorModalVisible, showCustomDaysModal]);
   
   useEffect(() => {
+    // 알림 권한 확인
+    const checkNotificationPermission = async () => {
+      await requestNotificationPermissions();
+    };
+    
+    checkNotificationPermission();
+    
     // 제품 또는 영역에 따라 알림 데이터 로드
     if (isLocation) {
       dispatch(fetchLocationNotifications(targetId));

@@ -1,12 +1,13 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useCallback } from 'react';
 import { Provider, useDispatch } from 'react-redux';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet, Linking } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, getAnonymousToken } from './src/redux/slices/authSlice';
 import * as Updates from 'expo-updates';
 import CodePushUpdateLoading from './src/components/CodePushUpdateLoading';
+import { initializeNotifications, cleanupNotifications, requestNotificationPermissions, registerForPushNotifications } from './src/utils/notificationUtils';
 
 // localStorage 폴리필
 if (typeof localStorage === 'undefined') {
@@ -25,13 +26,15 @@ const AppContent = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
 
-  const checkForUpdates = useCallback(async (forceCheck = false) => {
-    if ((__DEV__ || Platform.OS === 'web') && !forceCheck) {
+  const checkForUpdates = useCallback(async () => {
+    if (__DEV__ || Platform.OS === 'web') {
       console.log('개발 모드 또는 웹 환경에서는 업데이트를 확인하지 않습니다.');
       return;
     }
     
     try {
+      console.log('업데이트 확인 시작...');
+      
       // Updates.isEnabled 확인
       const isEnabled = typeof Updates.isEnabled === 'function' 
         ? await Updates.isEnabled() 
@@ -42,7 +45,11 @@ const AppContent = () => {
         return;
       }
       
+      setUpdateError(null);
+      
+      console.log('업데이트 확인 중...');
       const update = await Updates.checkForUpdateAsync();
+      console.log('업데이트 확인 결과:', JSON.stringify(update));
       
       if (update.isAvailable) {
         console.log('새 업데이트가 있습니다. 다운로드 시작...');
@@ -50,10 +57,18 @@ const AppContent = () => {
         
         try {
           // 업데이트 다운로드
-          await Updates.fetchUpdateAsync();
+          const fetchResult = await Updates.fetchUpdateAsync();
+          console.log('업데이트 다운로드 완료:', JSON.stringify(fetchResult));
           
           // 업데이트 자동 적용
-          await Updates.reloadAsync();
+          console.log('업데이트 자동 적용 시작...');
+          try {
+            await Updates.reloadAsync();
+          } catch (reloadError) {
+            console.error('업데이트 적용 오류:', reloadError);
+            setUpdateError(`업데이트 적용 오류: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`);
+            setIsUpdating(false);
+          }
         } catch (fetchError) {
           console.error('Update fetch error:', fetchError);
           setUpdateError(`업데이트 다운로드 오류: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
@@ -69,13 +84,22 @@ const AppContent = () => {
     }
   }, []);
   
-  // 수동으로 업데이트 확인을 강제하는 함수
-  const forceCheckForUpdates = useCallback(() => {
-    checkForUpdates(true);
-  }, [checkForUpdates]);
+  // 딥링크 설정
+  const linking = {
+    prefixes: [
+      'somomi://',
+      'https://somomi.co.kr',
+    ],
+    config: {
+      screens: {
+        ProductDetail: 'product/detail/:productId',
+        LocationDetail: 'location/detail/:locationId',
+      }
+    }
+  };
   
   useEffect(() => {
-    const initializeAuth = async () => {
+    const initializeApp = async () => {
       try {
         // 저장된 토큰 검증
         const result = await dispatch(verifyToken()).unwrap();
@@ -84,6 +108,10 @@ const AppContent = () => {
         if (!result) {
           await dispatch(getAnonymousToken()).unwrap();
         }
+        
+        // 알림 권한 요청 및 초기화
+        await requestNotificationPermissions();
+        await registerForPushNotifications();
       } catch (error) {
         console.error('인증 초기화 실패:', error);
         // 오류 발생 시 익명 토큰 발급
@@ -91,7 +119,10 @@ const AppContent = () => {
       }
     };
     
-    initializeAuth();
+    initializeApp();
+    
+    // 알림 설정 초기화
+    initializeNotifications();
     
     // 앱 시작 시 업데이트 확인
     const checkUpdateTimer = setTimeout(() => {
@@ -100,6 +131,8 @@ const AppContent = () => {
     
     // 앱이 포그라운드로 돌아올 때마다 업데이트 확인
     const updateSubscription = Updates.addListener(event => {
+      console.log('Updates 이벤트 발생:', event.type);
+      
       if (event.type === Updates.UpdateEventType.ERROR) {
         console.error('업데이트 이벤트: 오류 발생', event.message);
         setUpdateError(`업데이트 처리 중 오류가 발생했습니다: ${event.message}`);
@@ -110,14 +143,15 @@ const AppContent = () => {
     return () => {
       clearTimeout(checkUpdateTimer);
       updateSubscription.remove();
+      cleanupNotifications();
     };
-  }, [dispatch, checkForUpdates, forceCheckForUpdates]);
+  }, [dispatch, checkForUpdates]);
   
   if (isUpdating) {
     return <CodePushUpdateLoading error={updateError || undefined} />;
   }
   
-  return <AppNavigator />;
+  return <AppNavigator linking={linking} />;
 };
 
 export default function App() {
@@ -127,3 +161,22 @@ export default function App() {
     </Provider>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  text: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 16,
+  },
+  errorText: {
+    fontSize: 14,
+    color: 'red',
+    marginTop: 8,
+  },
+});
