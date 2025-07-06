@@ -5,7 +5,9 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   ActivityIndicator, 
-  Alert 
+  Alert,
+  AppState,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { 
@@ -57,7 +59,11 @@ const PushNotificationTest = () => {
       setIsLoading(true);
       
       // 지연 시간 설정 (초)
-      const delaySeconds = 5;
+      const delaySeconds = 10;
+      
+      // 현재 앱 상태 확인
+      const currentAppState = AppState.currentState;
+      console.log('현재 앱 상태:', currentAppState);
       
       // 알림 데이터 설정
       const title = '지연 알림 테스트';
@@ -66,12 +72,13 @@ const PushNotificationTest = () => {
         type: 'delayed',
         testData: '지연 알림 테스트 데이터',
         deepLink: 'somomi://product/detail/1',
-        count: notificationCount + 1
+        count: notificationCount + 1,
+        appStateAtSend: currentAppState
       };
       
       Alert.alert(
         '지연 알림 테스트',
-        `${delaySeconds}초 후에 알림이 발송됩니다. 지금 홈 버튼을 눌러 앱을 백그라운드로 전환하세요.`,
+        `${delaySeconds}초 후에 알림이 발송됩니다.\n\n알림을 백그라운드에서 받으려면:\n1. '확인' 버튼을 누른 후\n2. 즉시 홈 버튼을 눌러 앱을 백그라운드로 전환하세요.\n\n${Platform.OS === 'ios' ? '(iOS에서는 앱을 완전히 종료하지 마세요)' : ''}`,
         [{ 
           text: '확인', 
           onPress: async () => {
@@ -86,6 +93,18 @@ const PushNotificationTest = () => {
               
               console.log(`${delaySeconds}초 후 알림 예약 완료, ID:`, notificationId);
               setNotificationCount(prev => prev + 1);
+              
+              // 사용자에게 백그라운드로 전환하라는 메시지 표시
+              setTimeout(() => {
+                if (AppState.currentState === 'active') {
+                  Alert.alert(
+                    '앱이 아직 활성 상태입니다',
+                    '백그라운드 알림을 테스트하려면 홈 버튼을 눌러 앱을 백그라운드로 전환하세요.',
+                    [{ text: '확인' }]
+                  );
+                }
+              }, 2000); // 2초 후 확인
+              
             } catch (error) {
               console.error('지연 알림 예약 실패:', error);
               Alert.alert(
@@ -117,7 +136,7 @@ const PushNotificationTest = () => {
       
       <Text style={styles.description}>
         앱푸시 알림 기능을 테스트할 수 있습니다. 즉시 알림은 바로 표시되고, 
-        지연 알림은 앱을 백그라운드로 전환한 후 5초 뒤에 표시됩니다.
+        지연 알림은 앱을 백그라운드로 전환한 후 10초 뒤에 표시됩니다.
       </Text>
       
       <View style={styles.buttonContainer}>
@@ -134,7 +153,7 @@ const PushNotificationTest = () => {
           onPress={handleDelayedNotification}
           disabled={isLoading}
         >
-          <Text style={styles.buttonText}>5초 후 알림 테스트</Text>
+          <Text style={styles.buttonText}>10초 후 알림 테스트</Text>
         </TouchableOpacity>
       </View>
       

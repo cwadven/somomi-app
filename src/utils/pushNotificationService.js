@@ -322,27 +322,43 @@ class PushNotificationService {
             id: 'default',
           },
           importance: AndroidImportance.HIGH,
+          // 알림음 추가
+          sound: 'default',
+        },
+        ios: {
+          // iOS 설정 추가
+          sound: 'default',
+          foregroundPresentationOptions: {
+            alert: true,
+            badge: true,
+            sound: true,
+          },
         },
         data: {
           ...data,
           timestamp: Date.now(),
+          notificationId,
         },
       };
       
       // 지연 알림 설정
       if (delay > 0) {
         console.log(`${delay}초 후 알림 예약 중...`);
-        // 트리거 설정
-        const trigger = {
-          type: 'timestamp',
-          timestamp: Date.now() + (delay * 1000), // 밀리초 단위로 변환
-        };
         
-        // 지연 알림 예약
-        await notifee.createTriggerNotification(
-          notificationConfig,
-          trigger
-        );
+        // 타이머를 사용하여 지연 알림 구현
+        setTimeout(async () => {
+          try {
+            // 앱 상태 확인
+            const appState = AppState.currentState;
+            console.log(`알림 전송 시 앱 상태: ${appState}`);
+            
+            // 알림 표시
+            await notifee.displayNotification(notificationConfig);
+            console.log(`${delay}초 후 알림 전송 완료:`, notificationId);
+          } catch (timerError) {
+            console.error('지연 알림 타이머 오류:', timerError);
+          }
+        }, delay * 1000);
         
         console.log(`${delay}초 후 알림 예약 완료:`, notificationId);
       } else {

@@ -1,13 +1,13 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useCallback } from 'react';
 import { Provider, useDispatch } from 'react-redux';
-import { Platform, StyleSheet, Linking } from 'react-native';
+import { Platform, StyleSheet, Linking, AppState } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, getAnonymousToken } from './src/redux/slices/authSlice';
 import * as Updates from 'expo-updates';
 import messaging from '@react-native-firebase/messaging';
-import notifee, { EventType } from '@notifee/react-native';
+import notifee, { EventType, AndroidImportance } from '@notifee/react-native';
 import Constants from 'expo-constants';
 import CodePushUpdateLoading from './src/components/CodePushUpdateLoading';
 import { 
@@ -28,12 +28,35 @@ if (typeof localStorage === 'undefined') {
   };
 }
 
+// 백그라운드 메시지 핸들러 설정 (앱이 로드되기 전에 설정해야 함)
+messaging().setBackgroundMessageHandler(async remoteMessage => {
+  console.log('백그라운드 메시지 수신:', remoteMessage);
+  
+  // Notifee를 사용하여 알림 표시
+  if (remoteMessage.notification) {
+    await notifee.displayNotification({
+      title: remoteMessage.notification.title,
+      body: remoteMessage.notification.body,
+      android: {
+        channelId: 'default',
+        smallIcon: 'ic_launcher',
+        importance: AndroidImportance.HIGH,
+        sound: 'default',
+      },
+      data: remoteMessage.data,
+    });
+  }
+  
+  return Promise.resolve();
+});
+
 // 앱 내부 컴포넌트 - 토큰 검증 및 초기화 로직을 포함
 const AppContent = () => {
   const dispatch = useDispatch();
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
   const [pushToken, setPushToken] = useState('');
+  const [appState, setAppState] = useState(AppState.currentState);
 
   // Firebase 푸시 토큰 등록
   const registerForPushNotificationsAsync = async () => {
@@ -119,6 +142,18 @@ const AppContent = () => {
     }
   }, []);
   
+  // 앱 상태 변경 핸들러
+  const handleAppStateChange = useCallback((nextAppState) => {
+    console.log('App state changed:', nextAppState);
+    setAppState(nextAppState);
+    
+    // 앱이 백그라운드에서 포그라운드로 돌아올 때 알림 권한 확인
+    if (appState.match(/inactive|background/) && nextAppState === 'active' && Platform.OS !== 'web') {
+      console.log('앱이 포그라운드로 돌아왔습니다. 알림 권한 확인...');
+      requestNotificationPermissions();
+    }
+  }, [appState]);
+  
   // 딥링크 설정
   const linking = {
     prefixes: [
@@ -181,10 +216,48 @@ const AppContent = () => {
         }
       });
       
+      // Notifee 백그라운드 이벤트 리스너 설정
+      notifee.onBackgroundEvent(async ({ type, detail }) => {
+        console.log('Notifee 백그라운드 이벤트:', type, detail);
+        
+        if (type === EventType.PRESS && detail.notification) {
+          // 알림 데이터 처리
+          const data = detail.notification.data;
+          console.log('백그라운드 알림 데이터:', data);
+          
+          // 딥링크 처리
+          if (data && data.deepLink) {
+            Linking.openURL(data.deepLink).catch(err => {
+              console.error('딥링크 오류:', err);
+            });
+          }
+        }
+        
+        return Promise.resolve();
+      });
+      
       // Firebase 메시징 이벤트 리스너
       const messagingUnsubscribe = messaging().onMessage(async remoteMessage => {
         console.log('포그라운드 메시지 수신:', remoteMessage);
+        
+        // Notifee를 사용하여 포그라운드 알림 표시
+        if (remoteMessage.notification) {
+          await notifee.displayNotification({
+            title: remoteMessage.notification.title,
+            body: remoteMessage.notification.body,
+            android: {
+              channelId: 'default',
+              smallIcon: 'ic_launcher',
+              importance: AndroidImportance.HIGH,
+              sound: 'default',
+            },
+            data: remoteMessage.data,
+          });
+        }
       });
+      
+      // 앱 상태 변경 리스너 등록
+      const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
     }
     
     // 앱 시작 시 업데이트 확인
@@ -214,12 +287,15 @@ const AppContent = () => {
         
         // Firebase 메시징 이벤트 리스너 정리
         messagingUnsubscribe();
+        
+        // 앱 상태 변경 리스너 정리
+        appStateSubscription.remove();
       }
       
       clearTimeout(checkUpdateTimer);
       updateSubscription.remove();
     };
-  }, [dispatch, checkForUpdates]);
+  }, [dispatch, checkForUpdates, handleAppStateChange]);
   
   if (isUpdating) {
     return <CodePushUpdateLoading error={updateError || undefined} />;
