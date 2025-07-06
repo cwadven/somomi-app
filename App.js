@@ -1,13 +1,19 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useCallback } from 'react';
 import { Provider, useDispatch } from 'react-redux';
-import { Platform, StyleSheet, Linking } from 'react-native';
+import { Platform, StyleSheet, Linking, Button, View } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, getAnonymousToken } from './src/redux/slices/authSlice';
 import * as Updates from 'expo-updates';
 import CodePushUpdateLoading from './src/components/CodePushUpdateLoading';
-import { initializeNotifications, cleanupNotifications, requestNotificationPermissions, registerForPushNotifications } from './src/utils/notificationUtils';
+import { 
+  initializeNotifications, 
+  cleanupNotifications, 
+  requestNotificationPermissions, 
+  registerForPushNotifications,
+  sendImmediateNotification
+} from './src/utils/notificationUtils';
 
 // localStorage 폴리필
 if (typeof localStorage === 'undefined') {
@@ -25,6 +31,22 @@ const AppContent = () => {
   const dispatch = useDispatch();
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
+
+  // 테스트 알림 전송 함수
+  const sendTestNotification = async () => {
+    if (Platform.OS !== 'web') {
+      console.log('테스트 알림 전송 시도...');
+      const notificationId = await sendImmediateNotification(
+        '테스트 알림',
+        '앱 푸시 알림이 정상적으로 작동합니다!',
+        {
+          type: 'test',
+          testData: '테스트 데이터'
+        }
+      );
+      console.log('테스트 알림 전송 완료, ID:', notificationId);
+    }
+  };
 
   const checkForUpdates = useCallback(async () => {
     if (__DEV__ || Platform.OS === 'web') {
@@ -112,6 +134,13 @@ const AppContent = () => {
         // 알림 권한 요청 및 초기화
         await requestNotificationPermissions();
         await registerForPushNotifications();
+        
+        // 테스트 알림 전송 (앱 시작 3초 후)
+        if (Platform.OS !== 'web') {
+          setTimeout(() => {
+            sendTestNotification();
+          }, 3000);
+        }
       } catch (error) {
         console.error('인증 초기화 실패:', error);
         // 오류 발생 시 익명 토큰 발급
@@ -151,6 +180,21 @@ const AppContent = () => {
     return <CodePushUpdateLoading error={updateError || undefined} />;
   }
   
+  // 테스트 알림 버튼 추가
+  if (__DEV__ && Platform.OS !== 'web') {
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={styles.testButtonContainer}>
+          <Button 
+            title="테스트 알림 보내기" 
+            onPress={sendTestNotification} 
+          />
+        </View>
+        <AppNavigator linking={linking} />
+      </View>
+    );
+  }
+  
   return <AppNavigator linking={linking} />;
 };
 
@@ -179,4 +223,18 @@ const styles = StyleSheet.create({
     color: 'red',
     marginTop: 8,
   },
+  testButtonContainer: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    padding: 10,
+    borderRadius: 5,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  }
 });
