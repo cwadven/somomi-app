@@ -460,6 +460,10 @@ cd android
 
 17. EAS Update 사용 방법
 
+```
+npx eas update:configure
+```
+
 - 개발 환경에 업데이트 배포:
    ```bash
    npm run update:dev
