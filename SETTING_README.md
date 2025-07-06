@@ -326,9 +326,44 @@ android/app/src/main/AndroidManifest.xml 추가
     <meta-data android:name="expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY" android:value="{&quot;expo-runtime-version&quot;:&quot;exposdk:50.0.0&quot;,&quot;expo-channel-name&quot;:&quot;production&quot;}"/>
     <!-- 여기 (시작) -->
     <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" 
-            android:value="default_channel" 
+            android:value="default" 
             tools:replace="android:value" />
     <!-- 여기 (끝) -->
+```
+
+```xml
+    ...
+    <activity android:name="com.facebook.react.devsupport.DevSettingsActivity" android:exported="false"/>
+    <!-- 여기 (시작) -->
+    <!-- Firebase 메시징 서비스 -->
+    <service
+      android:name="io.invertase.firebase.messaging.ReactNativeFirebaseMessagingService"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="com.google.firebase.MESSAGING_EVENT" />
+      </intent-filter>
+    </service>
+    
+    <!-- 알림 수신자 등록 -->
+    <receiver android:name="io.invertase.firebase.notifications.ReactNativeFirebaseNotificationsReceiver"
+      android:exported="true"
+      android:permission="com.google.android.c2dm.permission.SEND">
+      <intent-filter>
+        <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+      </intent-filter>
+    </receiver>
+    
+    <!-- 부팅 시 알림 서비스 시작 -->
+    <receiver android:name="io.invertase.firebase.messaging.ReactNativeFirebaseMessagingReceiver"
+      android:exported="true"
+      android:permission="com.google.android.c2dm.permission.SEND">
+      <intent-filter>
+        <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+      </intent-filter>
+    </receiver>
+    <!-- 여기 (끝) -->
+  </application>
+</manifest>
 ```
 
 ```xml
@@ -386,7 +421,7 @@ android/app/src/main/AndroidManifest.xml
     <meta-data android:name="expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY" android:value="{&quot;expo-runtime-version&quot;:&quot;exposdk:50.0.0&quot;,&quot;expo-channel-name&quot;:&quot;production&quot;}"/>
     <!-- 여기 부분 끝 -->
     <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" 
-            android:value="default_channel" 
+            android:value="default" 
             tools:replace="android:value" />
     <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true" android:screenOrientation="portrait">
       <intent-filter>
