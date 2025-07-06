@@ -29,12 +29,20 @@ const AppContent = () => {
   const [updateInfo, setUpdateInfo] = useState({
     version: '1.0.0',
     updateTime: new Date().toLocaleString(),
-    isUpdated: false
+    isUpdated: false,
+    updateStatus: '초기화 중',
+    checkStartTime: '',
+    updateCheckStatus: '',
+    updateCheckResult: ''
   });
 
-  const checkForUpdates = useCallback(async () => {
-    if (__DEV__ || Platform.OS === 'web') {
-      console.log('개발 모드 또는 웹 환경에서는 업데이트를 확인하지 않습니다.');
+  const checkForUpdates = useCallback(async (forceCheck = false) => {
+    if ((__DEV__ || Platform.OS === 'web') && !forceCheck) {
+      console.log('개발 모드 또는 웹 환경에서는 업데이트를 확인하지 않습니다. forceCheck를 true로 설정하여 강제 확인할 수 있습니다.');
+      setUpdateInfo(prevInfo => ({
+        ...prevInfo,
+        updateStatus: '개발 모드 - 업데이트 확인 건너뜀'
+      }));
       return;
     }
     
@@ -59,9 +67,23 @@ const AppContent = () => {
       
       setUpdateError(null);
       
+      // 테스트용: 업데이트 정보 표시 (업데이트 확인 전)
+      setUpdateInfo(prevInfo => ({
+        ...prevInfo,
+        checkStartTime: new Date().toLocaleString(),
+        updateCheckStatus: '업데이트 확인 중...'
+      }));
+      
       console.log('업데이트 확인 중...');
       const update = await Updates.checkForUpdateAsync();
       console.log('업데이트 확인 결과:', JSON.stringify(update));
+      
+      // 테스트용: 업데이트 확인 결과 표시
+      setUpdateInfo(prevInfo => ({
+        ...prevInfo,
+        updateCheckResult: JSON.stringify(update),
+        updateCheckStatus: update.isAvailable ? '업데이트 있음' : '업데이트 없음'
+      }));
       
       if (update.isAvailable) {
         console.log('새 업데이트가 있습니다. 다운로드 시작...');
@@ -73,11 +95,13 @@ const AppContent = () => {
           console.log('업데이트 다운로드 완료:', JSON.stringify(fetchResult));
           
           // 업데이트 정보 저장
-          setUpdateInfo({
+          setUpdateInfo(prevInfo => ({
+            ...prevInfo,
             version: '1.0.1', // 업데이트 버전
             updateTime: new Date().toLocaleString(),
-            isUpdated: true
-          });
+            isUpdated: true,
+            updateStatus: '다운로드 완료, 적용 대기 중'
+          }));
           
           // 업데이트 자동 적용
           console.log('업데이트 자동 적용 시작...');
@@ -87,6 +111,12 @@ const AppContent = () => {
             console.error('업데이트 적용 오류:', reloadError);
             setUpdateError(`업데이트 적용 오류: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`);
             setIsUpdating(false);
+            
+            // 오류 정보 저장
+            setUpdateInfo(prevInfo => ({
+              ...prevInfo,
+              updateStatus: `적용 오류: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`
+            }));
           }
         } catch (fetchError) {
           const errorMessage = fetchError instanceof Error ? 
@@ -94,17 +124,44 @@ const AppContent = () => {
           console.error('Update fetch error:', fetchError);
           setUpdateError(`업데이트 다운로드 오류: ${errorMessage}`);
           setIsUpdating(false);
+          
+          // 오류 정보 저장
+          setUpdateInfo(prevInfo => ({
+            ...prevInfo,
+            updateStatus: `다운로드 오류: ${errorMessage}`
+          }));
         }
       } else {
         console.log('사용 가능한 업데이트가 없습니다.');
+        
+        // 업데이트 없음 정보 저장
+        setUpdateInfo(prevInfo => ({
+          ...prevInfo,
+          updateStatus: '사용 가능한 업데이트 없음'
+        }));
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Error checking for updates:', error);
       setUpdateError(`업데이트 확인 오류: ${errorMessage}`);
       setIsUpdating(false);
+      
+      // 오류 정보 저장
+      setUpdateInfo(prevInfo => ({
+        ...prevInfo,
+        updateStatus: `확인 오류: ${errorMessage}`
+      }));
     }
   }, []);
+  
+  // 수동으로 업데이트 확인을 강제하는 함수
+  const forceCheckForUpdates = useCallback(() => {
+    setUpdateInfo(prevInfo => ({
+      ...prevInfo,
+      updateStatus: '강제 업데이트 확인 시작...'
+    }));
+    checkForUpdates(true);
+  }, [checkForUpdates]);
   
   useEffect(() => {
     const initializeAuth = async () => {
@@ -127,7 +184,13 @@ const AppContent = () => {
     
     // 앱 시작 시 업데이트 확인
     const checkUpdateTimer = setTimeout(() => {
-      checkForUpdates();
+      // 개발 모드에서도 강제로 업데이트 확인 (테스트용)
+      if (__DEV__) {
+        console.log('개발 모드에서 테스트를 위해 강제로 업데이트 확인');
+        forceCheckForUpdates();
+      } else {
+        checkForUpdates();
+      }
     }, 2000); // 앱 시작 후 2초 후에 업데이트 확인
     
     // 앱이 포그라운드로 돌아올 때마다 업데이트 확인
@@ -145,7 +208,7 @@ const AppContent = () => {
       clearTimeout(checkUpdateTimer);
       updateSubscription.remove();
     };
-  }, [dispatch, checkForUpdates]);
+  }, [dispatch, checkForUpdates, forceCheckForUpdates]);
   
   if (isUpdating) {
     return <CodePushUpdateLoading error={updateError || undefined} />;
@@ -164,7 +227,16 @@ const AppContent = () => {
           업데이트 시간: {updateInfo.updateTime}
         </Text>
         <Text style={styles.updateInfoText}>
-          업데이트 테스트 - 2024-07-05 17:30
+          상태: {updateInfo.updateStatus}
+        </Text>
+        <Text style={styles.updateInfoText}>
+          확인 시작: {updateInfo.checkStartTime}
+        </Text>
+        <Text style={styles.updateInfoText}>
+          확인 결과: {updateInfo.updateCheckStatus}
+        </Text>
+        <Text style={styles.updateInfoText}>
+          테스트 마커: 2024-07-05 17:45
         </Text>
       </View>
     </>
