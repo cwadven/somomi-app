@@ -6,6 +6,10 @@ https://expo.dev/ 접근 후, 프로젝트 생성.
 ```bash
 sudo npm install --global eas-cli
 eas init --id ProjectID
+
+# code push 를 위해서
+npx eas channel:create
+# production 을 생성
 ```
 
 3. 프로젝트 root 에 .env 정의
