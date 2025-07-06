@@ -1,7 +1,5 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useCallback } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider, useDispatch } from 'react-redux';
 import { Platform } from 'react-native';
 import store from './src/redux/store';
@@ -119,20 +117,13 @@ const AppContent = () => {
     return <CodePushUpdateLoading error={updateError || undefined} />;
   }
   
-  return (
-    <>
-      <AppNavigator />
-      <StatusBar style="auto" />
-    </>
-  );
+  return <AppNavigator />;
 };
 
 export default function App() {
   return (
     <Provider store={store}>
-      <SafeAreaProvider>
-        <AppContent />
-      </SafeAreaProvider>
+      <AppContent />
     </Provider>
   );
 }
