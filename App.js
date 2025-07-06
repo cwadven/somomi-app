@@ -9,6 +9,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, getAnonymousToken } from './src/redux/slices/authSlice';
 import * as Updates from 'expo-updates';
 import CodePushUpdateLoading from './src/components/CodePushUpdateLoading';
+import Constants from 'expo-constants';
 
 // localStorage 폴리필
 if (typeof localStorage === 'undefined') {
@@ -51,19 +52,38 @@ const AppContent = () => {
       console.log('Updates 객체 확인:', Updates ? '존재함' : '존재하지 않음');
       
       // Updates.isEnabled 확인
-      console.log('Updates.isEnabled 값:', Updates.isEnabled());
+      const isEnabled = typeof Updates.isEnabled === 'function' 
+        ? Updates.isEnabled() 
+        : Updates.isEnabled;
       
-      if (!Updates.isEnabled()) {
+      console.log('Updates.isEnabled 값:', isEnabled);
+      
+      if (!isEnabled) {
         console.log('expo-updates가 활성화되어 있지 않습니다. 앱 설정을 확인하세요.');
+        setUpdateInfo(prevInfo => ({
+          ...prevInfo,
+          updateStatus: 'expo-updates가 활성화되어 있지 않음'
+        }));
         return;
       }
       
+      // 현재 앱 설정 확인
+      const runtimeVersion = Constants.expoConfig?.runtimeVersion || 'unknown';
+      const updateChannel = Constants.expoConfig?.updates?.channel || 'unknown';
+      
       console.log('Updates 설정:', {
-        channel: Updates.channel,
-        runtimeVersion: Updates.runtimeVersion,
-        updateId: Updates.updateId,
-        createdAt: Updates.createdAt
+        channel: Updates.channel || updateChannel,
+        runtimeVersion: Updates.runtimeVersion || runtimeVersion,
+        updateId: Updates.updateId || 'unknown',
+        createdAt: Updates.createdAt || 'unknown'
       });
+      
+      setUpdateInfo(prevInfo => ({
+        ...prevInfo,
+        updateStatus: '업데이트 확인 준비 완료',
+        runtimeVersion,
+        updateChannel
+      }));
       
       setUpdateError(null);
       
@@ -236,7 +256,7 @@ const AppContent = () => {
           확인 결과: {updateInfo.updateCheckStatus}
         </Text>
         <Text style={styles.updateInfoText}>
-          테스트 마커: 2024-07-05 17:45
+          테스트 마커: 2024-07-05 18:15
         </Text>
       </View>
     </>
