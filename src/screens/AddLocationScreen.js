@@ -336,12 +336,15 @@ const AddLocationScreen = () => {
       }
     }
     
+    // 비회원인 경우 알림 설정 비활성화
+    const notificationEnabled = isAnonymous ? false : enableNotifications;
+    
     const locationData = {
       title,
       description,
       icon: selectedIcon,
       image,
-      enableNotifications,
+      enableNotifications: notificationEnabled,
       notificationType,
       daysBeforeTarget,
       isRepeating
@@ -357,8 +360,8 @@ const AddLocationScreen = () => {
       dispatch(updateLocation(updatedLocation))
         .unwrap()
         .then((result) => {
-          // 알림 설정이 활성화되어 있으면 알림 설정 추가/수정
-          if (enableNotifications) {
+          // 알림 설정이 활성화되어 있고 비회원이 아닌 경우에만 알림 설정 추가/수정
+          if (notificationEnabled && !isAnonymous) {
             saveNotificationSettings(result.id);
           }
           
@@ -373,8 +376,8 @@ const AddLocationScreen = () => {
       dispatch(addLocation(locationData))
         .unwrap()
         .then((result) => {
-          // 알림 설정이 활성화되어 있으면 알림 설정 추가
-          if (enableNotifications) {
+          // 알림 설정이 활성화되어 있고 비회원이 아닌 경우에만 알림 설정 추가
+          if (notificationEnabled && !isAnonymous) {
             saveNotificationSettings(result.id);
           }
           

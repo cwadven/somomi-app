@@ -121,12 +121,14 @@ const ProductCard = ({ product, onPress }) => {
             ]}>
               {product.brand}
             </Text>
-            <Text style={[
-              styles.category,
-              isZeroHP && styles.zeroHPCategory
-            ]}>
-              {product.category}
-            </Text>
+            {product.category && (
+              <Text style={[
+                styles.category,
+                isZeroHP && styles.zeroHPCategory
+              ]}>
+                {product.category}
+              </Text>
+            )}
           </View>
           
           {expiryPercentage !== null && (

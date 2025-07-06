@@ -336,11 +336,13 @@ const ProductDetailScreen = () => {
           
           <View style={styles.productInfo}>
             <Text style={styles.productName}>{currentProduct.name}</Text>
-            <Text style={styles.productCategory}>{currentProduct.category}</Text>
+            {currentProduct.category && (
+              <Text style={styles.productCategory}>{currentProduct.category}</Text>
+            )}
             
             {currentProduct.location && (
               <View style={styles.locationBadge}>
-                <Ionicons name="location-outline" size={14} color="#4CAF50" />
+                <Ionicons name="location-outline" size={12} color="#4CAF50" />
                 <Text style={styles.locationText}>{currentProduct.location}</Text>
               </View>
             )}
@@ -889,14 +891,19 @@ const styles = StyleSheet.create({
   locationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4CAF50',
-    padding: 4,
+    backgroundColor: '#E8F5E9',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
     borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
   },
   locationText: {
-    fontSize: 12,
-    color: '#fff',
-    marginLeft: 4,
+    fontSize: 10,
+    color: '#4CAF50',
+    marginLeft: 2,
   },
   productInfo: {
     flex: 1,

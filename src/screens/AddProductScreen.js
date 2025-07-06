@@ -321,6 +321,9 @@ const AddProductScreen = () => {
       }
     }
     
+    // 비회원인 경우 알림 설정 비활성화
+    const notificationEnabled = isAnonymous ? false : enableNotifications;
+    
     const productData = {
       name: productName,
       category: selectedCategory?.name || null,
@@ -334,8 +337,8 @@ const AddProductScreen = () => {
       price: price ? parseFloat(price) : null,
       memo,
       brand,
-      enableNotifications,
-      useLocationNotifications,
+      enableNotifications: notificationEnabled,
+      useLocationNotifications: isAnonymous ? false : useLocationNotifications,
       notificationType,
       daysBeforeTarget,
       isRepeating
@@ -344,8 +347,8 @@ const AddProductScreen = () => {
     dispatch(addProductAsync(productData))
       .unwrap()
       .then((result) => {
-        // 알림 설정이 활성화되어 있으면 알림 추가
-        if (enableNotifications) {
+        // 알림 설정이 활성화되어 있고 비회원이 아닌 경우에만 알림 추가
+        if (notificationEnabled && !isAnonymous) {
           saveNotificationSettings(result.id);
         }
         
