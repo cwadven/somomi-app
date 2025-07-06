@@ -310,17 +310,8 @@ class PushNotificationService {
       // 알림 ID 생성
       const notificationId = `notification-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       
-      // 알림 트리거 설정
-      let trigger = null;
-      if (delay > 0) {
-        trigger = {
-          type: 'timestamp',
-          timestamp: Date.now() + (delay * 1000), // 밀리초 단위로 변환
-        };
-      }
-      
-      // 알림 표시
-      await notifee.displayNotification({
+      // 알림 설정
+      const notificationConfig = {
         id: notificationId,
         title,
         body,
@@ -336,9 +327,30 @@ class PushNotificationService {
           ...data,
           timestamp: Date.now(),
         },
-      });
+      };
       
-      console.log('알림 전송 성공:', notificationId);
+      // 지연 알림 설정
+      if (delay > 0) {
+        console.log(`${delay}초 후 알림 예약 중...`);
+        // 트리거 설정
+        const trigger = {
+          type: 'timestamp',
+          timestamp: Date.now() + (delay * 1000), // 밀리초 단위로 변환
+        };
+        
+        // 지연 알림 예약
+        await notifee.createTriggerNotification(
+          notificationConfig,
+          trigger
+        );
+        
+        console.log(`${delay}초 후 알림 예약 완료:`, notificationId);
+      } else {
+        // 즉시 알림 표시
+        await notifee.displayNotification(notificationConfig);
+        console.log('즉시 알림 전송 완료:', notificationId);
+      }
+      
       return notificationId;
     } catch (error) {
       console.error('알림 전송 실패:', error);
