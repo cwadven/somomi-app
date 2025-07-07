@@ -1,6 +1,17 @@
 import { Platform } from 'react-native';
-import messaging from '@react-native-firebase/messaging';
-import { pushNotificationService } from './pushNotificationService';
+
+// Firebase 관련 모듈은 웹이 아닌 환경에서만 import
+let messaging;
+let pushNotificationService;
+
+if (Platform.OS !== 'web') {
+  try {
+    messaging = require('@react-native-firebase/messaging').default;
+    pushNotificationService = require('./pushNotificationService').pushNotificationService;
+  } catch (error) {
+    console.error('Firebase 모듈 로드 실패:', error);
+  }
+}
 
 /**
  * 제품 알림을 스케줄링하는 함수
@@ -16,6 +27,11 @@ export const scheduleProductExpiryNotification = async (
   expiryDate,
   daysBeforeExpiry = 3
 ) => {
+  if (Platform.OS === 'web' || !pushNotificationService) {
+    console.log('웹 환경이거나 알림 서비스를 사용할 수 없습니다.');
+    return null;
+  }
+
   if (!productId || !productName || !expiryDate) {
     console.error('필수 정보가 누락되었습니다.');
     return null;
@@ -69,6 +85,11 @@ export const scheduleLocationNotification = async (
   message,
   notifyDate
 ) => {
+  if (Platform.OS === 'web' || !pushNotificationService) {
+    console.log('웹 환경이거나 알림 서비스를 사용할 수 없습니다.');
+    return null;
+  }
+
   if (!locationId || !locationName || !notifyDate) {
     console.error('필수 정보가 누락되었습니다.');
     return null;
@@ -110,8 +131,8 @@ export const scheduleLocationNotification = async (
  * @returns {Promise<string>} - 알림 ID
  */
 export const sendImmediateNotification = async (title, body, data = {}) => {
-  if (Platform.OS === 'web') {
-    console.log('웹에서는 알림을 지원하지 않습니다.');
+  if (Platform.OS === 'web' || !pushNotificationService) {
+    console.log('웹 환경이거나 알림 서비스를 사용할 수 없습니다.');
     return null;
   }
   
@@ -132,8 +153,8 @@ export const sendImmediateNotification = async (title, body, data = {}) => {
  * @returns {Promise<string>} - 알림 ID
  */
 export const sendBackgroundNotification = async (title, body, data = {}, delayInSeconds = 3) => {
-  if (Platform.OS === 'web') {
-    console.log('웹에서는 지연 알림을 지원하지 않습니다.');
+  if (Platform.OS === 'web' || !pushNotificationService) {
+    console.log('웹 환경이거나 알림 서비스를 사용할 수 없습니다.');
     return null;
   }
   
@@ -150,8 +171,8 @@ export const sendBackgroundNotification = async (title, body, data = {}, delayIn
  * @returns {Promise<boolean>} - 권한 부여 여부
  */
 export const requestNotificationPermissions = async () => {
-  if (Platform.OS === 'web') {
-    console.log('웹에서는 알림 권한을 지원하지 않습니다.');
+  if (Platform.OS === 'web' || !pushNotificationService) {
+    console.log('웹 환경이거나 알림 서비스를 사용할 수 없습니다.');
     return false;
   }
   
@@ -163,8 +184,8 @@ export const requestNotificationPermissions = async () => {
  * @returns {Promise<string>} - 푸시 토큰
  */
 export const registerForPushNotifications = async () => {
-  if (Platform.OS === 'web') {
-    console.log('웹에서는 푸시 알림을 지원하지 않습니다.');
+  if (Platform.OS === 'web' || !pushNotificationService) {
+    console.log('웹 환경이거나 알림 서비스를 사용할 수 없습니다.');
     return null;
   }
   
@@ -176,8 +197,8 @@ export const registerForPushNotifications = async () => {
  * @param {string} notificationId - 취소할 알림 ID
  */
 export const cancelNotification = async (notificationId) => {
-  if (Platform.OS === 'web') {
-    console.log('웹에서는 알림 취소를 지원하지 않습니다.');
+  if (Platform.OS === 'web' || !pushNotificationService) {
+    console.log('웹 환경이거나 알림 서비스를 사용할 수 없습니다.');
     return;
   }
   
@@ -188,8 +209,8 @@ export const cancelNotification = async (notificationId) => {
  * 모든 알림 취소 함수
  */
 export const cancelAllNotifications = async () => {
-  if (Platform.OS === 'web') {
-    console.log('웹에서는 알림 취소를 지원하지 않습니다.');
+  if (Platform.OS === 'web' || !pushNotificationService) {
+    console.log('웹 환경이거나 알림 서비스를 사용할 수 없습니다.');
     return;
   }
   
@@ -200,28 +221,36 @@ export const cancelAllNotifications = async () => {
  * 알림 설정 초기화 함수
  */
 export const initializeNotifications = () => {
-  if (Platform.OS === 'web') {
-    console.log('웹에서는 알림 초기화를 지원하지 않습니다.');
+  if (Platform.OS === 'web' || !pushNotificationService || !messaging) {
+    console.log('웹 환경이거나 알림 서비스를 사용할 수 없습니다.');
     return;
   }
   
-  // Firebase Cloud Messaging 백그라운드 핸들러 설정
-  messaging().setBackgroundMessageHandler(async remoteMessage => {
-    console.log('백그라운드 메시지 처리:', remoteMessage);
-    return Promise.resolve();
-  });
-  
-  pushNotificationService.setupNotificationHandler();
+  try {
+    // Firebase Cloud Messaging 백그라운드 핸들러 설정
+    messaging().setBackgroundMessageHandler(async remoteMessage => {
+      console.log('백그라운드 메시지 처리:', remoteMessage);
+      return Promise.resolve();
+    });
+    
+    pushNotificationService.setupNotificationHandler();
+  } catch (error) {
+    console.error('알림 초기화 실패:', error);
+  }
 };
 
 /**
  * 알림 설정 정리 함수
  */
 export const cleanupNotifications = () => {
-  if (Platform.OS === 'web') {
-    console.log('웹에서는 알림 정리를 지원하지 않습니다.');
+  if (Platform.OS === 'web' || !pushNotificationService) {
+    console.log('웹 환경이거나 알림 서비스를 사용할 수 없습니다.');
     return;
   }
   
-  pushNotificationService.cleanupNotificationHandler();
+  try {
+    pushNotificationService.cleanupNotificationHandler();
+  } catch (error) {
+    console.error('알림 정리 실패:', error);
+  }
 }; 

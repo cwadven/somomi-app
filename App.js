@@ -1,13 +1,11 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useCallback } from 'react';
 import { Provider, useDispatch } from 'react-redux';
-import { Platform, StyleSheet, Linking, AppState } from 'react-native';
+import { Platform, StyleSheet, Linking, AppState, View, ActivityIndicator, Text } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, getAnonymousToken } from './src/redux/slices/authSlice';
 import * as Updates from 'expo-updates';
-import messaging from '@react-native-firebase/messaging';
-import notifee, { EventType, AndroidImportance } from '@notifee/react-native';
 import Constants from 'expo-constants';
 import CodePushUpdateLoading from './src/components/CodePushUpdateLoading';
 import { 
@@ -16,6 +14,16 @@ import {
   requestNotificationPermissions, 
   registerForPushNotifications
 } from './src/utils/notificationUtils';
+import { initializeData } from './src/api/productsApi';
+import { initializeNotificationsData } from './src/redux/slices/notificationsSlice';
+
+// Firebase 관련 모듈은 웹이 아닌 환경에서만 import
+let messaging;
+let notifee;
+if (Platform.OS !== 'web') {
+  messaging = require('@react-native-firebase/messaging').default;
+  notifee = require('@notifee/react-native').default;
+}
 
 // localStorage 폴리필
 if (typeof localStorage === 'undefined') {
@@ -29,26 +37,28 @@ if (typeof localStorage === 'undefined') {
 }
 
 // 백그라운드 메시지 핸들러 설정 (앱이 로드되기 전에 설정해야 함)
-messaging().setBackgroundMessageHandler(async remoteMessage => {
-  console.log('백그라운드 메시지 수신:', remoteMessage);
-  
-  // Notifee를 사용하여 알림 표시
-  if (remoteMessage.notification) {
-    await notifee.displayNotification({
-      title: remoteMessage.notification.title,
-      body: remoteMessage.notification.body,
-      android: {
-        channelId: 'default',
-        smallIcon: 'ic_launcher',
-        importance: AndroidImportance.HIGH,
-        sound: 'default',
-      },
-      data: remoteMessage.data,
-    });
-  }
-  
-  return Promise.resolve();
-});
+if (Platform.OS !== 'web' && messaging) {
+  messaging().setBackgroundMessageHandler(async remoteMessage => {
+    console.log('백그라운드 메시지 수신:', remoteMessage);
+    
+    // Notifee를 사용하여 알림 표시
+    if (remoteMessage.notification && notifee) {
+      await notifee.displayNotification({
+        title: remoteMessage.notification.title,
+        body: remoteMessage.notification.body,
+        android: {
+          channelId: 'default',
+          smallIcon: 'ic_launcher',
+          importance: notifee.AndroidImportance.HIGH,
+          sound: 'default',
+        },
+        data: remoteMessage.data,
+      });
+    }
+    
+    return Promise.resolve();
+  });
+}
 
 // 앱 내부 컴포넌트 - 토큰 검증 및 초기화 로직을 포함
 const AppContent = () => {
@@ -57,11 +67,19 @@ const AppContent = () => {
   const [updateError, setUpdateError] = useState(null);
   const [pushToken, setPushToken] = useState('');
   const [appState, setAppState] = useState(AppState.currentState);
+  const [dataInitialized, setDataInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Firebase 푸시 토큰 등록
   const registerForPushNotificationsAsync = async () => {
     if (Platform.OS === 'web') {
       console.log('웹에서는 푸시 알림을 지원하지 않습니다.');
+      return;
+    }
+
+    // Firebase가 초기화되지 않았으면 실행하지 않음
+    if (!messaging || !notifee) {
+      console.log('Firebase가 초기화되지 않았습니다.');
       return;
     }
 
@@ -171,6 +189,12 @@ const AppContent = () => {
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        setIsLoading(true);
+        // 로컬 데이터 초기화
+        await initializeData();
+        await initializeNotificationsData();
+        setDataInitialized(true);
+        
         // 저장된 토큰 검증
         const result = await dispatch(verifyToken()).unwrap();
         
@@ -180,7 +204,7 @@ const AppContent = () => {
         }
         
         // 웹이 아닌 환경에서만 알림 관련 코드 실행
-        if (Platform.OS !== 'web') {
+        if (Platform.OS !== 'web' && messaging && notifee) {
           // 알림 권한 요청 및 초기화
           await registerForPushNotificationsAsync();
         }
@@ -188,117 +212,128 @@ const AppContent = () => {
         console.error('인증 초기화 실패:', error);
         // 오류 발생 시 익명 토큰 발급
         await dispatch(getAnonymousToken()).unwrap();
+      } finally {
+        setIsLoading(false);
       }
     };
     
     initializeApp();
     
+    // 앱 상태 변경 리스너 등록
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
     // 웹이 아닌 환경에서만 알림 관련 코드 실행
     if (Platform.OS !== 'web') {
       // 알림 설정 초기화
-      initializeNotifications();
+      if (notifee) {
+        initializeNotifications();
+      }
+      
+      // Firebase 관련 이벤트 리스너 등록
+      let unsubscribe;
+      let messagingUnsubscribe;
       
       // Notifee 이벤트 리스너 (알림 클릭 이벤트)
-      const unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
-        if (type === EventType.PRESS && detail.notification) {
-          console.log('Notifee 알림 클릭:', detail.notification);
-          
-          // 알림 데이터 처리
-          const data = detail.notification.data;
-          console.log('알림 데이터:', data);
-          
-          // 딥링크 처리
-          if (data && data.deepLink) {
-            Linking.openURL(data.deepLink).catch(err => {
-              console.error('딥링크 오류:', err);
-            });
+      if (notifee) {
+        unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
+          if (type === notifee.EventType.PRESS && detail.notification) {
+            console.log('Notifee 알림 클릭:', detail.notification);
+            
+            // 알림 데이터 처리
+            const data = detail.notification.data;
+            console.log('알림 데이터:', data);
+            
+            // 딥링크 처리
+            if (data && data.deepLink) {
+              Linking.openURL(data.deepLink).catch(err => {
+                console.error('딥링크 오류:', err);
+              });
+            }
           }
-        }
-      });
-      
-      // Notifee 백그라운드 이벤트 리스너 설정
-      notifee.onBackgroundEvent(async ({ type, detail }) => {
-        console.log('Notifee 백그라운드 이벤트:', type, detail);
+        });
         
-        if (type === EventType.PRESS && detail.notification) {
-          // 알림 데이터 처리
-          const data = detail.notification.data;
-          console.log('백그라운드 알림 데이터:', data);
+        // Notifee 백그라운드 이벤트 리스너 설정
+        notifee.onBackgroundEvent(async ({ type, detail }) => {
+          console.log('Notifee 백그라운드 이벤트:', type, detail);
           
-          // 딥링크 처리
-          if (data && data.deepLink) {
-            Linking.openURL(data.deepLink).catch(err => {
-              console.error('딥링크 오류:', err);
-            });
+          if (type === notifee.EventType.PRESS && detail.notification) {
+            // 알림 데이터 처리
+            const data = detail.notification.data;
+            console.log('백그라운드 알림 데이터:', data);
+            
+            // 딥링크 처리
+            if (data && data.deepLink) {
+              Linking.openURL(data.deepLink).catch(err => {
+                console.error('딥링크 오류:', err);
+              });
+            }
           }
-        }
-        
-        return Promise.resolve();
-      });
+          
+          return Promise.resolve();
+        });
+      }
       
       // Firebase 메시징 이벤트 리스너
-      const messagingUnsubscribe = messaging().onMessage(async remoteMessage => {
-        console.log('포그라운드 메시지 수신:', remoteMessage);
-        
-        // Notifee를 사용하여 포그라운드 알림 표시
-        if (remoteMessage.notification) {
-          await notifee.displayNotification({
-            title: remoteMessage.notification.title,
-            body: remoteMessage.notification.body,
-            android: {
-              channelId: 'default',
-              smallIcon: 'ic_launcher',
-              importance: AndroidImportance.HIGH,
-              sound: 'default',
-            },
-            data: remoteMessage.data,
-          });
-        }
-      });
+      if (messaging) {
+        messagingUnsubscribe = messaging().onMessage(async remoteMessage => {
+          console.log('포그라운드 메시지 수신:', remoteMessage);
+          
+          // Notifee를 사용하여 포그라운드 알림 표시
+          if (remoteMessage.notification && notifee) {
+            await notifee.displayNotification({
+              title: remoteMessage.notification.title,
+              body: remoteMessage.notification.body,
+              android: {
+                channelId: 'default',
+                smallIcon: 'ic_launcher',
+                importance: notifee.AndroidImportance.HIGH,
+                sound: 'default',
+              },
+              data: remoteMessage.data,
+            });
+          }
+        });
+      }
       
-      // 앱 상태 변경 리스너 등록
-      const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+      return () => {
+        // 앱 상태 변경 리스너 정리
+        subscription.remove();
+        
+        // 알림 설정 정리
+        if (notifee) {
+          cleanupNotifications();
+        }
+        
+        // 이벤트 리스너 정리
+        if (unsubscribe) unsubscribe();
+        if (messagingUnsubscribe) messagingUnsubscribe();
+      };
+    } else {
+      // 웹 환경에서는 앱 상태 변경 리스너만 정리
+      return () => {
+        subscription.remove();
+      };
     }
     
-    // 앱 시작 시 업데이트 확인
-    const checkUpdateTimer = setTimeout(() => {
+    // 업데이트 확인
+    if (!__DEV__) {
       checkForUpdates();
-    }, 2000); // 앱 시작 후 2초 후에 업데이트 확인
-    
-    // 앱이 포그라운드로 돌아올 때마다 업데이트 확인
-    const updateSubscription = Updates.addListener(event => {
-      console.log('Updates 이벤트 발생:', event.type);
-      
-      if (event.type === Updates.UpdateEventType.ERROR) {
-        console.error('업데이트 이벤트: 오류 발생', event.message);
-        setUpdateError(`업데이트 처리 중 오류가 발생했습니다: ${event.message}`);
-        setIsUpdating(false);
-      }
-    });
-
-    return () => {
-      // 웹이 아닌 환경에서만 알림 관련 코드 실행
-      if (Platform.OS !== 'web') {
-        // 알림 설정 정리
-        cleanupNotifications();
-        
-        // Notifee 이벤트 리스너 정리
-        unsubscribe();
-        
-        // Firebase 메시징 이벤트 리스너 정리
-        messagingUnsubscribe();
-        
-        // 앱 상태 변경 리스너 정리
-        appStateSubscription.remove();
-      }
-      
-      clearTimeout(checkUpdateTimer);
-      updateSubscription.remove();
-    };
+    }
   }, [dispatch, checkForUpdates, handleAppStateChange]);
   
+  // 업데이트 로딩 중이거나 데이터 초기화 중이면 로딩 화면 표시
   if (isUpdating) {
-    return <CodePushUpdateLoading error={updateError || undefined} />;
+    return <CodePushUpdateLoading error={updateError} />;
+  }
+  
+  // 데이터 초기화 중이면 로딩 화면 표시
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text style={styles.loadingText}>데이터를 불러오는 중...</Text>
+      </View>
+    );
   }
   
   return <AppNavigator linking={linking} />;
@@ -328,5 +363,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'red',
     marginTop: 8,
-  }
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+  },
 });

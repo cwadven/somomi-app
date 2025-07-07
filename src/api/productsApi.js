@@ -1,5 +1,8 @@
 // 샘플 데이터 (나중에 실제 API로 대체)
-let sampleProducts = [
+import { loadData, saveData, STORAGE_KEYS } from '../utils/storageUtils';
+
+// 초기 샘플 데이터
+const initialSampleProducts = [
   {
     id: '1',
     name: '바디워시',
@@ -72,11 +75,12 @@ let sampleProducts = [
   },
 ];
 
-// 소진 처리된 제품 목록
+// 메모리 내 데이터 (AsyncStorage에서 로드될 예정)
+let sampleProducts = [...initialSampleProducts];
 let consumedProducts = [];
 
 // 샘플 카테고리 데이터
-const sampleCategories = [
+const initialSampleCategories = [
   { id: '1', name: '식품', icon: 'fast-food' },
   { id: '2', name: '화장품', icon: 'color-palette' },
   { id: '3', name: '세제', icon: 'water' },
@@ -85,7 +89,7 @@ const sampleCategories = [
 ];
 
 // 샘플 영역(Location) 데이터
-let sampleLocations = [
+const initialSampleLocations = [
   { 
     id: '1', 
     title: '주방', 
@@ -116,284 +120,423 @@ let sampleLocations = [
   },
 ];
 
+let sampleLocations = [...initialSampleLocations];
+let sampleCategories = [...initialSampleCategories];
+
+// 데이터 초기화 함수 - 앱 시작 시 호출
+export const initializeData = async () => {
+  try {
+    // 제품 데이터 로드
+    const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
+    if (storedProducts) {
+      sampleProducts = storedProducts;
+    } else {
+      // 저장된 데이터가 없으면 초기 데이터 저장
+      await saveData(STORAGE_KEYS.PRODUCTS, initialSampleProducts);
+    }
+
+    // 소진된 제품 데이터 로드
+    const storedConsumedProducts = await loadData(STORAGE_KEYS.CONSUMED_PRODUCTS);
+    if (storedConsumedProducts) {
+      consumedProducts = storedConsumedProducts;
+    } else {
+      await saveData(STORAGE_KEYS.CONSUMED_PRODUCTS, []);
+    }
+
+    // 영역 데이터 로드
+    const storedLocations = await loadData(STORAGE_KEYS.LOCATIONS);
+    if (storedLocations) {
+      sampleLocations = storedLocations;
+    } else {
+      await saveData(STORAGE_KEYS.LOCATIONS, initialSampleLocations);
+    }
+
+    // 카테고리 데이터 로드
+    const storedCategories = await loadData(STORAGE_KEYS.CATEGORIES);
+    if (storedCategories) {
+      sampleCategories = storedCategories;
+    } else {
+      await saveData(STORAGE_KEYS.CATEGORIES, initialSampleCategories);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('데이터 초기화 중 오류 발생:', error);
+    return false;
+  }
+};
+
 // API 서비스 함수
 // 실제 API 구현 시 이 함수들만 수정하면 됩니다.
-export const fetchProductsApi = () => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      try {
-        // 소진 처리된 제품 제외
-        const activeProducts = sampleProducts.filter(p => !p.isConsumed);
-        resolve([...activeProducts]); // 배열 복사본 반환
-      } catch (error) {
-        reject(new Error('Failed to fetch products'));
-      }
-    }, 500);
-  });
+export const fetchProductsApi = async () => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
+    if (storedProducts) {
+      sampleProducts = storedProducts;
+    }
+    
+    // 소진 처리된 제품 제외
+    const activeProducts = sampleProducts.filter(p => !p.isConsumed);
+    return [...activeProducts]; // 배열 복사본 반환
+  } catch (error) {
+    console.error('제품 조회 중 오류 발생:', error);
+    throw new Error('Failed to fetch products');
+  }
 };
 
-export const fetchProductByIdApi = (id) => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const product = sampleProducts.find(product => product.id === id);
-      if (product) {
-        resolve({...product}); // 객체 복사본 반환
-      } else {
-        reject(new Error('Product not found'));
-      }
-    }, 300);
-  });
+export const fetchProductByIdApi = async (id) => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
+    if (storedProducts) {
+      sampleProducts = storedProducts;
+    }
+    
+    const product = sampleProducts.find(product => product.id === id);
+    if (product) {
+      return {...product}; // 객체 복사본 반환
+    } else {
+      throw new Error('Product not found');
+    }
+  } catch (error) {
+    console.error('제품 상세 조회 중 오류 발생:', error);
+    throw error;
+  }
 };
 
-export const addProductApi = (product) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // 실제 API에서는 서버에서 ID를 생성합니다
-      const newId = (Math.max(...sampleProducts.map(p => parseInt(p.id))) + 1).toString();
-      const newProduct = {
-        ...product,
-        id: newId,
-        remainingPercentage: 100, // 새 제품은 100% 남음
-      };
+export const addProductApi = async (product) => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
+    if (storedProducts) {
+      sampleProducts = storedProducts;
+    }
+    
+    // 실제 API에서는 서버에서 ID를 생성합니다
+    const newId = (Math.max(...sampleProducts.map(p => parseInt(p.id)), 0) + 1).toString();
+    const newProduct = {
+      ...product,
+      id: newId,
+      remainingPercentage: 100, // 새 제품은 100% 남음
+    };
+    
+    // 데이터베이스에 추가
+    const updatedProducts = [...sampleProducts, newProduct];
+    sampleProducts = updatedProducts;
+    
+    // AsyncStorage에 저장
+    await saveData(STORAGE_KEYS.PRODUCTS, updatedProducts);
+    
+    return {...newProduct}; // 객체 복사본 반환
+  } catch (error) {
+    console.error('제품 추가 중 오류 발생:', error);
+    throw new Error('Failed to add product');
+  }
+};
+
+export const updateProductApi = async (product) => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
+    if (storedProducts) {
+      sampleProducts = storedProducts;
+    }
+    
+    const index = sampleProducts.findIndex(p => p.id === product.id);
+    if (index !== -1) {
+      // 데이터베이스 업데이트
+      const updatedProducts = [
+        ...sampleProducts.slice(0, index),
+        {...product},
+        ...sampleProducts.slice(index + 1)
+      ];
+      sampleProducts = updatedProducts;
       
-      // 데이터베이스에 추가
-      sampleProducts = [...sampleProducts, newProduct];
+      // AsyncStorage에 저장
+      await saveData(STORAGE_KEYS.PRODUCTS, updatedProducts);
       
-      resolve({...newProduct}); // 객체 복사본 반환
-    }, 500);
-  });
+      return {...product}; // 객체 복사본 반환
+    } else {
+      throw new Error('Product not found');
+    }
+  } catch (error) {
+    console.error('제품 업데이트 중 오류 발생:', error);
+    throw error;
+  }
 };
 
-export const updateProductApi = (product) => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const index = sampleProducts.findIndex(p => p.id === product.id);
-      if (index !== -1) {
-        // 데이터베이스 업데이트
-        sampleProducts = [
-          ...sampleProducts.slice(0, index),
-          {...product},
-          ...sampleProducts.slice(index + 1)
-        ];
-        resolve({...product}); // 객체 복사본 반환
-      } else {
-        reject(new Error('Product not found'));
-      }
-    }, 500);
-  });
-};
-
-export const deleteProductApi = (id) => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const index = sampleProducts.findIndex(p => p.id === id);
-      if (index !== -1) {
-        // 데이터베이스에서 삭제
-        sampleProducts = [
-          ...sampleProducts.slice(0, index),
-          ...sampleProducts.slice(index + 1)
-        ];
-        resolve({ success: true, id });
-      } else {
-        reject(new Error('Product not found'));
-      }
-    }, 500);
-  });
+export const deleteProductApi = async (id) => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
+    if (storedProducts) {
+      sampleProducts = storedProducts;
+    }
+    
+    const index = sampleProducts.findIndex(p => p.id === id);
+    if (index !== -1) {
+      // 데이터베이스에서 삭제
+      const updatedProducts = [
+        ...sampleProducts.slice(0, index),
+        ...sampleProducts.slice(index + 1)
+      ];
+      sampleProducts = updatedProducts;
+      
+      // AsyncStorage에 저장
+      await saveData(STORAGE_KEYS.PRODUCTS, updatedProducts);
+      
+      return { success: true, id };
+    } else {
+      throw new Error('Product not found');
+    }
+  } catch (error) {
+    console.error('제품 삭제 중 오류 발생:', error);
+    throw error;
+  }
 };
 
 // 소진 처리 API 함수
-export const markProductAsConsumedApi = (id) => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const index = sampleProducts.findIndex(p => p.id === id);
-      if (index !== -1) {
-        // 제품 복사
-        const product = { ...sampleProducts[index] };
-        
-        // 소진 처리 정보 추가
-        product.consumedAt = new Date().toISOString();
-        product.isConsumed = true;
-        
-        // 일반 제품 목록에서 제거
-        sampleProducts = [
-          ...sampleProducts.slice(0, index),
-          ...sampleProducts.slice(index + 1)
-        ];
-        
-        // 소진 처리된 제품 목록에 추가
-        consumedProducts = [...consumedProducts, product];
-        
-        resolve(product);
-      } else {
-        reject(new Error('Product not found'));
-      }
-    }, 500);
-  });
+export const markProductAsConsumedApi = async (id) => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
+    const storedConsumedProducts = await loadData(STORAGE_KEYS.CONSUMED_PRODUCTS);
+    
+    if (storedProducts) {
+      sampleProducts = storedProducts;
+    }
+    if (storedConsumedProducts) {
+      consumedProducts = storedConsumedProducts;
+    }
+    
+    const index = sampleProducts.findIndex(p => p.id === id);
+    if (index !== -1) {
+      // 제품 복사
+      const product = { ...sampleProducts[index] };
+      
+      // 소진 처리 정보 추가
+      product.consumedAt = new Date().toISOString();
+      product.isConsumed = true;
+      
+      // 일반 제품 목록에서 제거
+      const updatedProducts = [
+        ...sampleProducts.slice(0, index),
+        ...sampleProducts.slice(index + 1)
+      ];
+      sampleProducts = updatedProducts;
+      
+      // 소진 처리된 제품 목록에 추가
+      const updatedConsumedProducts = [...consumedProducts, product];
+      consumedProducts = updatedConsumedProducts;
+      
+      // AsyncStorage에 저장
+      await saveData(STORAGE_KEYS.PRODUCTS, updatedProducts);
+      await saveData(STORAGE_KEYS.CONSUMED_PRODUCTS, updatedConsumedProducts);
+      
+      return product;
+    } else {
+      throw new Error('Product not found');
+    }
+  } catch (error) {
+    console.error('제품 소진 처리 중 오류 발생:', error);
+    throw error;
+  }
 };
 
 // 소진 처리된 제품 목록 조회 API 함수
-export const fetchConsumedProductsApi = () => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([...consumedProducts]); // 배열 복사본 반환
-    }, 500);
-  });
+export const fetchConsumedProductsApi = async () => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedConsumedProducts = await loadData(STORAGE_KEYS.CONSUMED_PRODUCTS);
+    if (storedConsumedProducts) {
+      consumedProducts = storedConsumedProducts;
+    }
+    
+    return [...consumedProducts]; // 배열 복사본 반환
+  } catch (error) {
+    console.error('소진 제품 조회 중 오류 발생:', error);
+    throw new Error('Failed to fetch consumed products');
+  }
 };
 
-export const fetchCategoriesApi = () => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([...sampleCategories]); // 배열 복사본 반환
-    }, 300);
-  });
+export const fetchCategoriesApi = async () => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedCategories = await loadData(STORAGE_KEYS.CATEGORIES);
+    if (storedCategories) {
+      sampleCategories = storedCategories;
+    }
+    
+    return [...sampleCategories]; // 배열 복사본 반환
+  } catch (error) {
+    console.error('카테고리 조회 중 오류 발생:', error);
+    throw new Error('Failed to fetch categories');
+  }
 };
 
-// 영역(Location) 관련 API 함수
-export const fetchLocationsApi = () => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([...sampleLocations]); // 배열 복사본 반환
-    }, 300);
-  });
+export const fetchLocationsApi = async () => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedLocations = await loadData(STORAGE_KEYS.LOCATIONS);
+    if (storedLocations) {
+      sampleLocations = storedLocations;
+    }
+    
+    return [...sampleLocations]; // 배열 복사본 반환
+  } catch (error) {
+    console.error('영역 조회 중 오류 발생:', error);
+    throw new Error('Failed to fetch locations');
+  }
 };
 
-export const fetchLocationByIdApi = (id) => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const location = sampleLocations.find(location => location.id === id);
-      if (location) {
-        resolve({...location}); // 객체 복사본 반환
-      } else {
-        reject(new Error('Location not found'));
-      }
-    }, 300);
-  });
+export const fetchLocationByIdApi = async (id) => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedLocations = await loadData(STORAGE_KEYS.LOCATIONS);
+    if (storedLocations) {
+      sampleLocations = storedLocations;
+    }
+    
+    const location = sampleLocations.find(location => location.id === id);
+    if (location) {
+      return {...location}; // 객체 복사본 반환
+    } else {
+      throw new Error('Location not found');
+    }
+  } catch (error) {
+    console.error('영역 상세 조회 중 오류 발생:', error);
+    throw error;
+  }
 };
 
-export const addLocationApi = (location) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // 실제 API에서는 서버에서 ID를 생성합니다
-      const newId = (Math.max(...sampleLocations.map(l => parseInt(l.id))) + 1).toString();
-      const newLocation = {
-        ...location,
-        id: newId,
-      };
+export const addLocationApi = async (location) => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedLocations = await loadData(STORAGE_KEYS.LOCATIONS);
+    if (storedLocations) {
+      sampleLocations = storedLocations;
+    }
+    
+    // 실제 API에서는 서버에서 ID를 생성합니다
+    const newId = (Math.max(...sampleLocations.map(l => parseInt(l.id)), 0) + 1).toString();
+    const newLocation = {
+      ...location,
+      id: newId,
+    };
+    
+    // 데이터베이스에 추가
+    const updatedLocations = [...sampleLocations, newLocation];
+    sampleLocations = updatedLocations;
+    
+    // AsyncStorage에 저장
+    await saveData(STORAGE_KEYS.LOCATIONS, updatedLocations);
+    
+    return {...newLocation}; // 객체 복사본 반환
+  } catch (error) {
+    console.error('영역 추가 중 오류 발생:', error);
+    throw new Error('Failed to add location');
+  }
+};
+
+export const updateLocationApi = async (location) => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedLocations = await loadData(STORAGE_KEYS.LOCATIONS);
+    if (storedLocations) {
+      sampleLocations = storedLocations;
+    }
+    
+    const index = sampleLocations.findIndex(l => l.id === location.id);
+    if (index !== -1) {
+      // 데이터베이스 업데이트
+      const updatedLocations = [
+        ...sampleLocations.slice(0, index),
+        {...location},
+        ...sampleLocations.slice(index + 1)
+      ];
+      sampleLocations = updatedLocations;
       
-      // 데이터베이스에 추가
-      sampleLocations = [...sampleLocations, newLocation];
+      // AsyncStorage에 저장
+      await saveData(STORAGE_KEYS.LOCATIONS, updatedLocations);
       
-      resolve({...newLocation}); // 객체 복사본 반환
-    }, 500);
-  });
+      return {...location}; // 객체 복사본 반환
+    } else {
+      throw new Error('Location not found');
+    }
+  } catch (error) {
+    console.error('영역 업데이트 중 오류 발생:', error);
+    throw error;
+  }
 };
 
-export const updateLocationApi = (location) => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const index = sampleLocations.findIndex(l => l.id === location.id);
-      if (index !== -1) {
-        // 데이터베이스 업데이트
-        sampleLocations = [
-          ...sampleLocations.slice(0, index),
-          {...location},
-          ...sampleLocations.slice(index + 1)
-        ];
-        resolve({...location}); // 객체 복사본 반환
-      } else {
-        reject(new Error('Location not found'));
-      }
-    }, 500);
-  });
+export const deleteLocationApi = async (id) => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedLocations = await loadData(STORAGE_KEYS.LOCATIONS);
+    if (storedLocations) {
+      sampleLocations = storedLocations;
+    }
+    
+    const index = sampleLocations.findIndex(l => l.id === id);
+    if (index !== -1) {
+      // 데이터베이스에서 삭제
+      const updatedLocations = [
+        ...sampleLocations.slice(0, index),
+        ...sampleLocations.slice(index + 1)
+      ];
+      sampleLocations = updatedLocations;
+      
+      // AsyncStorage에 저장
+      await saveData(STORAGE_KEYS.LOCATIONS, updatedLocations);
+      
+      return id;
+    } else {
+      throw new Error('Location not found');
+    }
+  } catch (error) {
+    console.error('영역 삭제 중 오류 발생:', error);
+    throw error;
+  }
 };
 
-export const deleteLocationApi = (id) => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const index = sampleLocations.findIndex(l => l.id === id);
-      if (index !== -1) {
-        // 데이터베이스에서 삭제
-        sampleLocations = [
-          ...sampleLocations.slice(0, index),
-          ...sampleLocations.slice(index + 1)
-        ];
-        resolve({ success: true, id });
-      } else {
-        reject(new Error('Location not found'));
-      }
-    }, 500);
-  });
+export const fetchProductsByLocationApi = async (locationId) => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
+    if (storedProducts) {
+      sampleProducts = storedProducts;
+    }
+    
+    // 해당 영역의 제품만 필터링
+    const locationProducts = sampleProducts.filter(
+      product => product.locationId === locationId && !product.isConsumed
+    );
+    
+    return [...locationProducts]; // 배열 복사본 반환
+  } catch (error) {
+    console.error('영역별 제품 조회 중 오류 발생:', error);
+    throw new Error(`Failed to fetch products for location ${locationId}`);
+  }
 };
 
-// 위치별 제품 목록 조회 API 함수
-export const fetchProductsByLocationApi = (locationId) => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      try {
-        let filteredProducts;
-        
-        if (locationId === 'all') {
-          // 모든 제품 (소진 처리된 제품 제외)
-          filteredProducts = sampleProducts.filter(p => !p.isConsumed);
-        } else {
-          // 특정 위치의 제품 (소진 처리된 제품 제외)
-          filteredProducts = sampleProducts.filter(p => 
-            p.locationId === locationId && !p.isConsumed
-          );
-        }
-        
-        resolve(filteredProducts);
-      } catch (error) {
-        reject(new Error('Failed to fetch products by location'));
-      }
-    }, 500);
-  });
-};
-
-export const fetchPopularProductsApi = () => {
-  // 인기 상품 데이터 (실제 구현 시 서버에서 가져옴)
-  const popularProducts = [
-    {
-      id: '101',
-      name: '바디워시',
-      category: '화장품',
-      categoryId: '2',
-      image: null,
-      brand: '도브',
-      popularity: 95,
-    },
-    {
-      id: '102',
-      name: '세탁세제',
-      category: '세제',
-      categoryId: '3',
-      image: null,
-      brand: '액츠',
-      popularity: 88,
-    },
-    {
-      id: '103',
-      name: '주방세제',
-      category: '세제',
-      categoryId: '3',
-      image: null,
-      brand: '참그린',
-      popularity: 92,
-    },
-    {
-      id: '104',
-      name: '치약',
-      category: '욕실용품',
-      categoryId: '4',
-      image: null,
-      brand: '2080',
-      popularity: 90,
-    },
-  ];
-  
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([...popularProducts]); // 배열 복사본 반환
-    }, 500);
-  });
+export const fetchPopularProductsApi = async () => {
+  try {
+    // 저장된 최신 데이터 로드
+    const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
+    if (storedProducts) {
+      sampleProducts = storedProducts;
+    }
+    
+    // 실제로는 인기 제품을 서버에서 계산하겠지만, 여기서는 임의로 선택
+    const popularProducts = sampleProducts
+      .filter(p => !p.isConsumed)
+      .sort(() => 0.5 - Math.random())
+      .slice(0, Math.min(3, sampleProducts.length));
+    
+    return [...popularProducts]; // 배열 복사본 반환
+  } catch (error) {
+    console.error('인기 제품 조회 중 오류 발생:', error);
+    throw new Error('Failed to fetch popular products');
+  }
 }; 

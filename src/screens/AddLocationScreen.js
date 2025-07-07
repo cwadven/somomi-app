@@ -564,92 +564,92 @@ const AddLocationScreen = () => {
             </View>
           ) : (
             <>
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>영역 알림 사용</Text>
+            <Switch
+              value={enableNotifications}
+              onValueChange={setEnableNotifications}
+              trackColor={{ false: '#767577', true: '#81b0ff' }}
+              thumbColor={enableNotifications ? '#f5dd4b' : '#f4f3f4'}
+            />
+          </View>
+          
+          {enableNotifications && (
+            <>
+              <Text style={styles.notificationHelp}>
+                이 영역에 추가되는 모든 제품에 기본 알림 설정이 적용됩니다.
+              </Text>
+              
+              <View style={styles.notificationTypeContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.notificationTypeButton,
+                    notificationType === 'expiry' && styles.selectedNotificationType
+                  ]}
+                  onPress={() => setNotificationType('expiry')}
+                >
+                  <Text style={[
+                    styles.notificationTypeText,
+                    notificationType === 'expiry' && styles.selectedNotificationTypeText
+                  ]}>
+                    유통기한 기준
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.notificationTypeButton,
+                    notificationType === 'estimated' && styles.selectedNotificationType
+                  ]}
+                  onPress={() => setNotificationType('estimated')}
+                >
+                  <Text style={[
+                    styles.notificationTypeText,
+                    notificationType === 'estimated' && styles.selectedNotificationTypeText
+                  ]}>
+                    소진 예상 기준
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={styles.daysBeforeLabel}>
+                {notificationType === 'expiry' ? '유통기한' : '소진 예상일'}까지 며칠 전에 알림을 받을까요?
+              </Text>
+              
+              <View style={styles.daysBeforeContainer}>
+                {[1, 3, 5, 7, 14, 30].map(days => (
+                  <TouchableOpacity
+                    key={days}
+                    style={[
+                      styles.daysBeforeButton,
+                      daysBeforeTarget === days && styles.selectedDaysBeforeButton
+                    ]}
+                    onPress={() => setDaysBeforeTarget(days)}
+                  >
+                    <Text style={[
+                      styles.daysBeforeText,
+                      daysBeforeTarget === days && styles.selectedDaysBeforeText
+                    ]}>
+                      {days}일 전
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>영역 알림 사용</Text>
+                <Text style={styles.switchLabel}>연속 알림</Text>
                 <Switch
-                  value={enableNotifications}
-                  onValueChange={setEnableNotifications}
+                  value={isRepeating}
+                  onValueChange={setIsRepeating}
                   trackColor={{ false: '#767577', true: '#81b0ff' }}
-                  thumbColor={enableNotifications ? '#f5dd4b' : '#f4f3f4'}
+                  thumbColor={isRepeating ? '#f5dd4b' : '#f4f3f4'}
                 />
               </View>
               
-              {enableNotifications && (
-                <>
-                  <Text style={styles.notificationHelp}>
-                    이 영역에 추가되는 모든 제품에 기본 알림 설정이 적용됩니다.
-                  </Text>
-                  
-                  <View style={styles.notificationTypeContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.notificationTypeButton,
-                        notificationType === 'expiry' && styles.selectedNotificationType
-                      ]}
-                      onPress={() => setNotificationType('expiry')}
-                    >
-                      <Text style={[
-                        styles.notificationTypeText,
-                        notificationType === 'expiry' && styles.selectedNotificationTypeText
-                      ]}>
-                        유통기한 기준
-                      </Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity
-                      style={[
-                        styles.notificationTypeButton,
-                        notificationType === 'estimated' && styles.selectedNotificationType
-                      ]}
-                      onPress={() => setNotificationType('estimated')}
-                    >
-                      <Text style={[
-                        styles.notificationTypeText,
-                        notificationType === 'estimated' && styles.selectedNotificationTypeText
-                      ]}>
-                        소진 예상 기준
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                  
-                  <Text style={styles.daysBeforeLabel}>
-                    {notificationType === 'expiry' ? '유통기한' : '소진 예상일'}까지 며칠 전에 알림을 받을까요?
-                  </Text>
-                  
-                  <View style={styles.daysBeforeContainer}>
-                    {[1, 3, 5, 7, 14, 30].map(days => (
-                      <TouchableOpacity
-                        key={days}
-                        style={[
-                          styles.daysBeforeButton,
-                          daysBeforeTarget === days && styles.selectedDaysBeforeButton
-                        ]}
-                        onPress={() => setDaysBeforeTarget(days)}
-                      >
-                        <Text style={[
-                          styles.daysBeforeText,
-                          daysBeforeTarget === days && styles.selectedDaysBeforeText
-                        ]}>
-                          {days}일 전
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  <View style={styles.switchRow}>
-                    <Text style={styles.switchLabel}>연속 알림</Text>
-                    <Switch
-                      value={isRepeating}
-                      onValueChange={setIsRepeating}
-                      trackColor={{ false: '#767577', true: '#81b0ff' }}
-                      thumbColor={isRepeating ? '#f5dd4b' : '#f4f3f4'}
-                    />
-                  </View>
-                  
-                  {isRepeating && (
-                    <Text style={styles.repeatDescription}>
-                      D-{daysBeforeTarget}일부터 D-day까지 매일 알림을 받습니다.
-                    </Text>
+              {isRepeating && (
+                <Text style={styles.repeatDescription}>
+                  D-{daysBeforeTarget}일부터 D-day까지 매일 알림을 받습니다.
+                </Text>
                   )}
                 </>
               )}

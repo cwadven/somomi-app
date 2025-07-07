@@ -122,12 +122,12 @@ const ProductCard = ({ product, onPress }) => {
               {product.brand}
             </Text>
             {product.category && (
-              <Text style={[
-                styles.category,
-                isZeroHP && styles.zeroHPCategory
-              ]}>
-                {product.category}
-              </Text>
+            <Text style={[
+              styles.category,
+              isZeroHP && styles.zeroHPCategory
+            ]}>
+              {product.category}
+            </Text>
             )}
           </View>
           

@@ -337,7 +337,7 @@ const ProductDetailScreen = () => {
           <View style={styles.productInfo}>
             <Text style={styles.productName}>{currentProduct.name}</Text>
             {currentProduct.category && (
-              <Text style={styles.productCategory}>{currentProduct.category}</Text>
+            <Text style={styles.productCategory}>{currentProduct.category}</Text>
             )}
             
             {currentProduct.location && (
