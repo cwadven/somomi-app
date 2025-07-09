@@ -46,7 +46,10 @@ const ProductCard = ({ product, onPress }) => {
     // 유통기한이 가까워질수록 HP바가 줄어들도록 변경
     // 남은 일수의 비율을 직접 사용 (구매일부터 유통기한까지의 총 기간 중 남은 비율)
     const percentage = Math.max(0, Math.min(100, (remainingDays / totalDays) * 100));
-    return Math.round(percentage);
+    return {
+      percentage: Math.round(percentage),
+      remainingDays: Math.ceil(remainingDays)
+    };
   };
 
   // 소진 예상일 남은 수명 계산 (%)
@@ -63,7 +66,10 @@ const ProductCard = ({ product, onPress }) => {
     // 소진예상일이 가까워질수록 HP바가 줄어들도록 변경
     // 남은 일수의 비율을 직접 사용 (구매일부터 소진예상일까지의 총 기간 중 남은 비율)
     const percentage = Math.max(0, Math.min(100, (remainingDays / totalDays) * 100));
-    return Math.round(percentage);
+    return {
+      percentage: Math.round(percentage),
+      remainingDays: Math.ceil(remainingDays)
+    };
   };
 
   // 카테고리에 맞는 아이콘 선택
@@ -79,11 +85,40 @@ const ProductCard = ({ product, onPress }) => {
     return categoryIcons[product.category] || 'cube-outline';
   };
 
-  const expiryPercentage = calculateExpiryPercentage();
-  const consumptionPercentage = calculateConsumptionPercentage();
+  const expiryResult = calculateExpiryPercentage();
+  const consumptionResult = calculateConsumptionPercentage();
+  
+  const expiryPercentage = expiryResult?.percentage;
+  const expiryDaysLeft = expiryResult?.remainingDays;
+  
+  const consumptionPercentage = consumptionResult?.percentage;
+  const consumptionDaysLeft = consumptionResult?.remainingDays;
   
   // HP가 0%인지 확인
   const isZeroHP = (expiryPercentage === 0 || consumptionPercentage === 0);
+  
+  // 유통기한 또는 소진 예상일이 3일 이하로 남았는지 확인
+  const showExpiryBadge = expiryDaysLeft !== undefined && expiryDaysLeft <= 3 && expiryDaysLeft > 0;
+  const showConsumptionBadge = consumptionDaysLeft !== undefined && consumptionDaysLeft <= 3 && consumptionDaysLeft > 0;
+  
+  // 뱃지 텍스트 생성
+  const getBadgeText = () => {
+    if (showExpiryBadge) {
+      return `D-${expiryDaysLeft}`;
+    }
+    if (showConsumptionBadge) {
+      return `D-${consumptionDaysLeft}`;
+    }
+    return null;
+  };
+  
+  // 뱃지 색상 결정
+  const getBadgeColor = () => {
+    const daysLeft = showExpiryBadge ? expiryDaysLeft : consumptionDaysLeft;
+    if (daysLeft === 1) return '#F44336'; // 빨간색 (D-1)
+    if (daysLeft === 2) return '#FF9800'; // 주황색 (D-2)
+    return '#FFC107'; // 노란색 (D-3)
+  };
 
   return (
     <TouchableOpacity style={styles.container} onPress={onPress}>
@@ -103,6 +138,13 @@ const ProductCard = ({ product, onPress }) => {
           {isZeroHP && (
             <View style={styles.warningIconContainer}>
               <Ionicons name="warning" size={20} color="#FFF" />
+            </View>
+          )}
+          
+          {/* D-day 뱃지 */}
+          {(showExpiryBadge || showConsumptionBadge) && (
+            <View style={[styles.dDayBadge, { backgroundColor: getBadgeColor() }]}>
+              <Text style={styles.dDayText}>{getBadgeText()}</Text>
             </View>
           )}
         </View>
@@ -239,6 +281,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // D-day 뱃지 스타일
+  dDayBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'white',
+  },
+  dDayText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   infoContainer: {
     flex: 1,
   },
@@ -250,11 +310,9 @@ const styles = StyleSheet.create({
   // HP가 0%인 텍스트 스타일
   zeroHPText: {
     color: '#888',
-    textDecorationLine: 'line-through',
   },
-  // HP가 0%인 서브 텍스트 스타일
   zeroHPSubText: {
-    color: '#888',
+    color: '#999',
   },
   brandContainer: {
     flexDirection: 'row',
@@ -274,17 +332,15 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  // HP가 0%인 카테고리 스타일
   zeroHPCategory: {
     backgroundColor: '#9E9E9E',
   },
   hpSection: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   hpLabelContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 2,
   },
   hpLabel: {
@@ -297,17 +353,17 @@ const styles = StyleSheet.create({
   },
   hpBarContainer: {
     height: 6,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#e0e0e0',
     borderRadius: 3,
     overflow: 'hidden',
   },
   hpBar: {
     height: '100%',
-    borderRadius: 3,
   },
   dateInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 4,
   },
   dateText: {
     fontSize: 12,
