@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -6,60 +6,80 @@ import {
   FlatList, 
   TouchableOpacity, 
   ActivityIndicator,
-  Alert
+  Alert,
+  Image
 } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { fetchLocations } from '../redux/slices/locationsSlice';
+import SignupPromptModal from '../components/SignupPromptModal';
+import { checkAnonymousLimits } from '../utils/authUtils';
 
-const LocationsScreen = ({ navigation }) => {
+const LocationsScreen = () => {
   const dispatch = useDispatch();
+  const navigation = useNavigation();
+  
   const { locations, status, error } = useSelector(state => state.locations);
-
-  useEffect(() => {
-    if (status === 'idle') {
+  const { isAnonymous } = useSelector(state => state.auth);
+  
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  
+  useFocusEffect(
+    useCallback(() => {
       dispatch(fetchLocations());
-    }
-  }, [status, dispatch]);
-
+    }, [dispatch])
+  );
+  
   const handleAddLocation = () => {
+    // 비회원인 경우 영역 개수 제한 체크
+    if (isAnonymous && locations.length >= 1) {
+      setShowSignupPrompt(true);
+      return;
+    }
+    
     navigation.navigate('AddLocation');
   };
-
-  const handleLocationPress = (locationId) => {
-    navigation.navigate('LocationDetail', { locationId });
+  
+  const handleLocationPress = (location) => {
+    navigation.navigate('LocationDetail', { locationId: location.id });
   };
-
+  
   const handleAllProductsPress = () => {
-    navigation.navigate('LocationDetail', { locationId: 'all' });
+    navigation.navigate('LocationDetail', { 
+      locationId: 'all',
+      isAllProducts: true 
+    });
   };
-
-  const renderLocationItem = ({ item }) => (
+  
+  const renderItem = ({ item }) => (
     <TouchableOpacity 
-      style={styles.locationItem}
-      onPress={() => handleLocationPress(item.id)}
+      style={styles.locationCard}
+      onPress={() => handleLocationPress(item)}
     >
       <View style={styles.locationIconContainer}>
-        <Ionicons name={item.icon || 'cube-outline'} size={24} color="#4CAF50" />
+        <Ionicons name={item.icon || 'cube-outline'} size={30} color="#4CAF50" />
       </View>
       <View style={styles.locationInfo}>
         <Text style={styles.locationTitle}>{item.title}</Text>
-        <Text style={styles.locationDescription} numberOfLines={1}>
-          {item.description}
-        </Text>
+        {item.description && (
+          <Text style={styles.locationDescription} numberOfLines={1}>
+            {item.description}
+          </Text>
+        )}
       </View>
-      <Ionicons name="chevron-forward" size={24} color="#CCCCCC" />
+      <Ionicons name="chevron-forward" size={24} color="#999" />
     </TouchableOpacity>
   );
-
-  if (status === 'loading' && locations.length === 0) {
+  
+  if (status === 'loading' && !locations.length) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#4CAF50" />
       </View>
     );
   }
-
+  
   if (error) {
     return (
       <View style={styles.centered}>
@@ -73,32 +93,41 @@ const LocationsScreen = ({ navigation }) => {
       </View>
     );
   }
-
+  
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>영역 목록</Text>
-      </View>
-
+      {/* 모든 제품 버튼 */}
       <TouchableOpacity 
-        style={styles.allProductsItem}
+        style={styles.allProductsCard}
         onPress={handleAllProductsPress}
       >
-        <View style={[styles.locationIconContainer, { backgroundColor: '#E8F5E9' }]}>
-          <Ionicons name="apps-outline" size={24} color="#4CAF50" />
+        <View style={styles.allProductsIconContainer}>
+          <Ionicons name="albums-outline" size={30} color="#4CAF50" />
         </View>
         <View style={styles.locationInfo}>
           <Text style={styles.locationTitle}>모든 제품</Text>
           <Text style={styles.locationDescription} numberOfLines={1}>
-            등록된 모든 제품 보기
+            등록된 모든 제품을 확인합니다
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={24} color="#CCCCCC" />
+        <Ionicons name="chevron-forward" size={24} color="#999" />
       </TouchableOpacity>
-
+      
+      {/* 영역 목록 */}
+      <Text style={styles.sectionTitle}>내 영역 목록</Text>
+      
+      {/* 비회원 사용자의 경우 영역 개수 제한 안내 */}
+      {isAnonymous && (
+        <View style={styles.limitInfoContainer}>
+          <Text style={styles.limitInfoText}>
+            비회원은 최대 1개의 영역만 생성할 수 있습니다. ({locations.length}/1)
+          </Text>
+        </View>
+      )}
+      
       <FlatList
         data={locations}
-        renderItem={renderLocationItem}
+        renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
@@ -110,13 +139,24 @@ const LocationsScreen = ({ navigation }) => {
           </View>
         }
       />
-
+      
       <TouchableOpacity 
-        style={styles.addButton}
+        style={[
+          styles.addButton,
+          // 비회원이고 영역이 1개 이상이면 버튼 비활성화 스타일 적용
+          isAnonymous && locations.length >= 1 && styles.disabledAddButton
+        ]}
         onPress={handleAddLocation}
       >
         <Ionicons name="add" size={30} color="white" />
       </TouchableOpacity>
+      
+      {/* 회원가입 유도 모달 */}
+      <SignupPromptModal 
+        visible={showSignupPrompt}
+        onClose={() => setShowSignupPrompt(false)}
+        message="비회원은 최대 1개의 영역만 생성할 수 있습니다. 회원가입하여 무제한으로 영역을 생성하세요!"
+      />
     </View>
   );
 };
@@ -125,54 +165,62 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',
-  },
-  header: {
     padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
-  title: {
-    fontSize: 20,
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
+    marginVertical: 12,
     color: '#333',
   },
   listContainer: {
-    paddingBottom: 16,
+    paddingBottom: 80,
   },
-  locationItem: {
+  locationCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
+    borderRadius: 12,
     padding: 16,
-    marginTop: 8,
-    marginHorizontal: 16,
-    borderRadius: 8,
-    elevation: 2,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+    elevation: 2,
   },
-  allProductsItem: {
+  allProductsCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#e8f5e9',
+    borderRadius: 12,
     padding: 16,
-    marginTop: 16,
-    marginHorizontal: 16,
-    borderRadius: 8,
-    elevation: 2,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+    elevation: 2,
   },
   locationIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  allProductsIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#c8e6c9',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -184,50 +232,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 4,
   },
   locationDescription: {
     fontSize: 14,
     color: '#666',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    color: 'red',
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 4,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontWeight: '500',
-  },
-  emptyContainer: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#666',
-    marginBottom: 8,
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
+    marginTop: 4,
   },
   addButton: {
     position: 'absolute',
-    bottom: 20,
     right: 20,
+    bottom: 20,
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -237,8 +251,51 @@ const styles = StyleSheet.create({
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  disabledAddButton: {
+    backgroundColor: '#a5d6a7',
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#666',
+    marginBottom: 8,
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#F44336',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 4,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  limitInfoContainer: {
+    backgroundColor: '#FFF9C4',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  limitInfoText: {
+    fontSize: 14,
+    color: '#F57F17',
   },
 });
 

@@ -1,176 +1,124 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
-  FlatList, 
   TouchableOpacity, 
-  ActivityIndicator,
-  Image,
+  FlatList,
   Alert,
   Modal,
-  Platform,
-  ScrollView
+  ActivityIndicator
 } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
-import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchLocationById, fetchProductsByLocation, deleteLocation, updateLocation } from '../redux/slices/locationsSlice';
-import ProductCard from '../components/ProductCard';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { fetchProducts, deleteProductAsync } from '../redux/slices/productsSlice';
+import { deleteLocation, fetchLocationById } from '../redux/slices/locationsSlice';
+import NotificationSettings from '../components/NotificationSettings';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
-import NotificationSettings from '../components/NotificationSettings';
+import ProductCard from '../components/ProductCard';
+import { checkAnonymousLimits } from '../utils/authUtils';
 
 const LocationDetailScreen = () => {
-  const route = useRoute();
-  const navigation = useNavigation();
   const dispatch = useDispatch();
+  const navigation = useNavigation();
+  const route = useRoute();
   
-  const { locationId } = route.params;
+  const { locationId } = route.params || {};
   const isAllProducts = locationId === 'all';
   
-  const { 
-    currentLocation, 
-    locationProducts, 
-    status, 
-    error 
-  } = useSelector(state => state.locations);
-  
-  const { products: allProducts } = useSelector(state => state.products);
-  const [products, setProducts] = useState([]);
-  
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('products');
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [alertModalConfig, setAlertModalConfig] = useState({
     title: '',
     message: '',
     buttons: [],
     icon: '',
-    iconColor: ''
+    iconColor: '',
   });
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   
-  // 회원 상태 확인
+  const { locations, status: locationStatus } = useSelector(state => state.locations);
+  const { products, status: productStatus } = useSelector(state => state.products);
   const { isAnonymous } = useSelector(state => state.auth);
   
-  // 회원가입 유도 모달
-  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
-
-  const [activeTab, setActiveTab] = useState('products'); // 'products' 또는 'notifications'
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity
-          style={{ marginLeft: 16 }}
-          onPress={() => {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'LocationsScreen' }],
-            });
-          }}
-        >
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation]);
-
+  const currentLocation = locations.find(location => location.id === locationId);
+  
+  // 모든 제품 또는 특정 영역의 제품만 필터링
+  const filteredProducts = isAllProducts 
+    ? products.filter(product => !product.isConsumed)  // 모든 제품 (소진되지 않은)
+    : products.filter(product => product.locationId === locationId && !product.isConsumed);  // 특정 영역 제품만
+  
   useFocusEffect(
     useCallback(() => {
-      if (!isAllProducts) {
+      dispatch(fetchProducts());
+      if (!isAllProducts && locationId) {
         dispatch(fetchLocationById(locationId));
       }
-      dispatch(fetchProductsByLocation(locationId));
     }, [dispatch, locationId, isAllProducts])
   );
-
-  useEffect(() => {
-    if (locationProducts && locationProducts[locationId]) {
-      setProducts(locationProducts[locationId]);
-    }
-  }, [locationProducts, locationId]);
-
+  
   const handleAddProduct = () => {
-    // 모든 제품 영역에서는 제품 추가 불가
-    if (isAllProducts) return;
-    
-    // 비회원인 경우 제품 개수 제한 체크
-    if (isAnonymous && products.length >= 5) {
+    // 비회원 제한 확인
+    if (isAnonymous && filteredProducts.length >= 5) {
       setShowSignupPrompt(true);
       return;
     }
     
     navigation.navigate('AddProduct', { locationId });
   };
-
+  
   const handleProductPress = (productId) => {
     navigation.navigate('ProductDetail', { productId });
   };
   
   const handleEditLocation = () => {
-    if (isAllProducts) return;
-    
-    navigation.navigate('AddLocation', { 
-      isEditing: true, 
-      location: currentLocation 
-    });
-  };
-  
-  const handleDeleteLocation = () => {
-    if (isAllProducts) return;
-    
-    if (products && products.length > 0) {
-      setShowDeleteModal(true);
-    } else {
-      // 제품이 없는 경우 바로 삭제 확인 모달
-      setAlertModalConfig({
-        title: '영역 삭제',
-        message: '이 영역을 삭제하시겠습니까?',
-        buttons: [
-          { 
-            text: '취소', 
-            style: 'cancel', 
-            onPress: () => {} 
-          },
-          { 
-            text: '삭제', 
-            style: 'destructive',
-            onPress: () => deleteLocationAndNavigate()
-          }
-        ],
-        icon: 'trash-outline',
-        iconColor: '#F44336'
+    if (currentLocation) {
+      navigation.navigate('AddLocation', { 
+        isEditing: true, 
+        location: currentLocation 
       });
-      setAlertModalVisible(true);
     }
   };
   
-  // 영역 삭제 및 화면 이동 함수
+  const handleDeleteLocation = () => {
+    if (filteredProducts.length > 0) {
+      showErrorAlert(
+        '이 영역에 제품이 있어 삭제할 수 없습니다. 먼저 제품을 다른 영역으로 이동하거나 삭제해주세요.'
+      );
+    } else {
+      setDeleteConfirmVisible(true);
+    }
+  };
+  
   const deleteLocationAndNavigate = () => {
-    dispatch(deleteLocation(locationId))
-      .unwrap()
-      .then(() => {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'LocationsScreen' }],
+    setDeleteConfirmVisible(false);
+    
+    if (locationId) {
+      dispatch(deleteLocation(locationId))
+        .unwrap()
+        .then(() => {
+          navigation.goBack();
+        })
+        .catch((error) => {
+          showErrorAlert(`영역 삭제 중 오류가 발생했습니다: ${error}`);
         });
-      })
-      .catch((err) => {
-        showErrorAlert(`영역 삭제 중 오류가 발생했습니다: ${err.message}`);
-      });
+    }
   };
   
   const showErrorAlert = (message) => {
     setAlertModalConfig({
       title: '오류',
       message,
-      buttons: [{ text: '확인', style: 'default' }],
+      buttons: [{ text: '확인', onPress: () => setAlertModalVisible(false) }],
       icon: 'alert-circle',
-      iconColor: '#F44336'
+      iconColor: '#F44336',
     });
     setAlertModalVisible(true);
   };
-
+  
   const renderItem = ({ item }) => (
     <ProductCard 
       product={item} 
@@ -180,38 +128,26 @@ const LocationDetailScreen = () => {
   
   const DeleteConfirmModal = () => (
     <Modal
-      visible={showDeleteModal}
+      visible={deleteConfirmVisible}
       transparent={true}
       animationType="fade"
-      onRequestClose={() => setShowDeleteModal(false)}
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <View style={styles.warningIconContainer}>
-            <Ionicons name="warning" size={60} color="#FF9800" />
-          </View>
-          
-          <Text style={styles.warningTitle}>주의!</Text>
-          
-          <Text style={styles.warningMessage}>
-            이 영역에는 {products.length}개의 제품이 등록되어 있습니다.
-            영역을 삭제하면 모든 제품 데이터가 함께 삭제됩니다.
+          <Text style={styles.modalTitle}>영역 삭제</Text>
+          <Text style={styles.modalMessage}>
+            정말 이 영역을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
           </Text>
-          
-          <View style={styles.modalButtonContainer}>
+          <View style={styles.modalButtons}>
             <TouchableOpacity 
               style={[styles.modalButton, styles.cancelButton]}
-              onPress={() => setShowDeleteModal(false)}
+              onPress={() => setDeleteConfirmVisible(false)}
             >
               <Text style={styles.cancelButtonText}>취소</Text>
             </TouchableOpacity>
-            
             <TouchableOpacity 
               style={[styles.modalButton, styles.deleteButton]}
-              onPress={() => {
-                setShowDeleteModal(false); // 먼저 현재 모달 닫기
-                deleteLocationAndNavigate(); // 영역 삭제 및 화면 이동
-              }}
+              onPress={deleteLocationAndNavigate}
             >
               <Text style={styles.deleteButtonText}>삭제</Text>
             </TouchableOpacity>
@@ -220,34 +156,16 @@ const LocationDetailScreen = () => {
       </View>
     </Modal>
   );
-
-  if (status === 'loading' && !products.length) {
+  
+  // 로딩 중이거나 데이터가 없는 경우
+  if (locationStatus === 'loading' || (productStatus === 'loading' && !filteredProducts.length)) {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color="#4CAF50" />
       </View>
     );
   }
-
-  if (error) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>오류: {error}</Text>
-        <TouchableOpacity 
-          style={styles.retryButton}
-          onPress={() => {
-            if (!isAllProducts) {
-              dispatch(fetchLocationById(locationId));
-            }
-            dispatch(fetchProductsByLocation(locationId));
-          }}
-        >
-          <Text style={styles.retryButtonText}>다시 시도</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
+  
   const title = isAllProducts ? '모든 제품' : currentLocation?.title || '영역 상세';
 
   return (
@@ -293,7 +211,7 @@ const LocationDetailScreen = () => {
         {isAnonymous && !isAllProducts && (
           <View style={styles.limitInfoContainer}>
             <Text style={styles.limitInfoText}>
-              비회원은 영역당 최대 5개의 제품만 등록할 수 있습니다. ({products.length}/5)
+              비회원은 영역당 최대 5개의 제품만 등록할 수 있습니다. ({filteredProducts.length}/5)
             </Text>
           </View>
         )}
@@ -337,7 +255,7 @@ const LocationDetailScreen = () => {
       {activeTab === 'products' ? (
         <>
           <FlatList
-            data={products}
+            data={filteredProducts}
             renderItem={renderItem}
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={styles.listContainer}
@@ -356,7 +274,7 @@ const LocationDetailScreen = () => {
               style={[
                 styles.addButton,
                 // 비회원이고 제품이 5개 이상이면 버튼 비활성화 스타일 적용
-                isAnonymous && products.length >= 5 && styles.disabledAddButton
+                isAnonymous && filteredProducts.length >= 5 && styles.disabledAddButton
               ]}
               onPress={handleAddProduct}
             >
@@ -506,25 +424,21 @@ const styles = StyleSheet.create({
     width: '80%',
     maxWidth: 400,
   },
-  warningIconContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  warningTitle: {
+  modalTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#FF9800',
     textAlign: 'center',
     marginBottom: 8,
   },
-  warningMessage: {
+  modalMessage: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 22,
   },
-  modalButtonContainer: {
+  modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
