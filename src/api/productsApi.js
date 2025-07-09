@@ -2,123 +2,17 @@
 import { loadData, saveData, STORAGE_KEYS } from '../utils/storageUtils';
 
 // 초기 샘플 데이터
-const initialSampleProducts = [
-  {
-    id: '1',
-    name: '바디워시',
-    category: '화장품',
-    categoryId: '2',
-    purchaseDate: '2023-05-01',
-    estimatedEndDate: '2023-07-15',
-    expiryDate: '2024-05-01',
-    image: null,
-    brand: '도브',
-    remainingPercentage: 65,
-    memo: '샤워할 때 사용하는 바디워시',
-    locationId: '2', // 화장실
-  },
-  {
-    id: '2',
-    name: '세탁세제',
-    category: '세제',
-    categoryId: '3',
-    purchaseDate: '2023-04-15',
-    estimatedEndDate: '2023-06-30',
-    expiryDate: null,
-    image: null,
-    brand: '액츠',
-    remainingPercentage: 45,
-    memo: '드럼세탁기용',
-    locationId: '3', // 세탁실
-  },
-  {
-    id: '3',
-    name: '우유',
-    category: '식품',
-    categoryId: '1',
-    purchaseDate: '2023-06-20',
-    estimatedEndDate: null,
-    expiryDate: '2023-06-30',
-    image: null,
-    brand: '서울우유',
-    remainingPercentage: 20,
-    memo: '아침 시리얼용',
-    locationId: '1', // 주방
-  },
-  {
-    id: '4',
-    name: '치약',
-    category: '욕실용품',
-    categoryId: '4',
-    purchaseDate: '2023-05-10',
-    estimatedEndDate: '2023-08-10',
-    expiryDate: '2024-05-10',
-    image: null,
-    brand: '2080',
-    remainingPercentage: 80,
-    memo: '',
-    locationId: '2', // 화장실
-  },
-  {
-    id: '5',
-    name: '주방세제',
-    category: '세제',
-    categoryId: '3',
-    purchaseDate: '2023-05-20',
-    estimatedEndDate: '2023-07-20',
-    expiryDate: null,
-    image: null,
-    brand: '참그린',
-    remainingPercentage: 50,
-    memo: '설거지용',
-    locationId: '1', // 주방
-  },
-];
+const initialSampleProducts = [];
 
 // 메모리 내 데이터 (AsyncStorage에서 로드될 예정)
 let sampleProducts = [...initialSampleProducts];
 let consumedProducts = [];
 
 // 샘플 카테고리 데이터
-const initialSampleCategories = [
-  { id: '1', name: '식품', icon: 'fast-food' },
-  { id: '2', name: '화장품', icon: 'color-palette' },
-  { id: '3', name: '세제', icon: 'water' },
-  { id: '4', name: '욕실용품', icon: 'water-outline' },
-  { id: '5', name: '주방용품', icon: 'restaurant' },
-];
+const initialSampleCategories = [];
 
 // 샘플 영역(Location) 데이터
-const initialSampleLocations = [
-  { 
-    id: '1', 
-    title: '주방', 
-    description: '부엌에 있는 생활용품들', 
-    image: null,
-    icon: 'restaurant-outline'
-  },
-  { 
-    id: '2', 
-    title: '화장실', 
-    description: '화장실에 있는 생활용품들', 
-    image: null,
-    icon: 'water-outline'
-  },
-  { 
-    id: '3', 
-    title: '세탁실', 
-    description: '세탁실에 있는 생활용품들', 
-    image: null,
-    icon: 'shirt-outline'
-  },
-  { 
-    id: '4', 
-    title: '거실', 
-    description: '거실에 있는 생활용품들', 
-    image: null,
-    icon: 'tv-outline'
-  },
-];
+const initialSampleLocations = [];
 
 let sampleLocations = [...initialSampleLocations];
 let sampleCategories = [...initialSampleCategories];
