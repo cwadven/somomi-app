@@ -430,6 +430,11 @@ const AddLocationScreen = () => {
         horizontal 
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.iconsList}
+        keyboardShouldPersistTaps="handled"
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 10
+        }}
       >
         {availableIcons.map((icon, index) => (
           <TouchableOpacity
@@ -438,7 +443,10 @@ const AddLocationScreen = () => {
               styles.iconItem,
               selectedIcon === icon && styles.selectedIconItem
             ]}
-            onPress={() => setSelectedIcon(icon)}
+            onPress={() => {
+              // 스크롤 위치를 유지하면서 아이콘만 변경
+              setSelectedIcon(icon);
+            }}
           >
             <Ionicons 
               name={icon} 
@@ -510,6 +518,9 @@ const AddLocationScreen = () => {
       <ScrollView 
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={16}
+        removeClippedSubviews={false}
       >
         <Text style={styles.title}>{isEditing ? '영역 수정' : '영역 추가'}</Text>
         

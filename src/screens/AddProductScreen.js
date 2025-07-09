@@ -11,16 +11,20 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
-  Switch
+  Switch,
+  TouchableWithoutFeedback,
+  Keyboard,
+  FlatList
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { addProductAsync } from '../redux/slices/productsSlice';
-import { fetchLocations } from '../redux/slices/locationsSlice';
 import { fetchCategories } from '../redux/slices/categoriesSlice';
+import { fetchLocations } from '../redux/slices/locationsSlice';
 import { addNotification } from '../redux/slices/notificationsSlice';
 import SignupPromptModal from '../components/SignupPromptModal';
+import CategoryAddModal from '../components/CategoryAddModal';
 
 // 조건부 DateTimePicker 임포트
 let DateTimePicker;
@@ -37,8 +41,50 @@ const AddProductScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const route = useRoute();
+  
+  // 라우트 파라미터에서 영역 ID 가져오기
   const { locationId } = route.params || {};
   
+  // Redux 상태
+  const { categories, status: categoriesStatus } = useSelector(state => state.categories);
+  const { locations, status: locationsStatus } = useSelector(state => state.locations);
+  const { allProducts, status: productsStatus } = useSelector(state => state.products);
+  const { isAuthenticated } = useSelector(state => state.auth);
+  
+  // 상태
+  const [productName, setProductName] = useState('');
+  const [brand, setBrand] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [purchaseDate, setPurchaseDate] = useState(new Date());
+  const [expiryDate, setExpiryDate] = useState(null);
+  const [estimatedEndDate, setEstimatedEndDate] = useState(null);
+  const [memo, setMemo] = useState('');
+  
+  // 날짜 선택기 상태
+  const [showPurchaseDatePicker, setShowPurchaseDatePicker] = useState(false);
+  const [showExpiryDatePicker, setShowExpiryDatePicker] = useState(false);
+  const [showEstimatedEndDatePicker, setShowEstimatedEndDatePicker] = useState(false);
+  const [showWebDateModal, setShowWebDateModal] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
+  const [tempDateString, setTempDateString] = useState('');
+  const [currentDateType, setCurrentDateType] = useState('');
+  
+  // 알림 설정
+  const [enableExpiryNotification, setEnableExpiryNotification] = useState(true);
+  const [expiryNotificationDays, setExpiryNotificationDays] = useState(7);
+  const [enableEstimatedNotification, setEnableEstimatedNotification] = useState(true);
+  const [estimatedNotificationDays, setEstimatedNotificationDays] = useState(7);
+  
+  // 모달
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [createdProduct, setCreatedProduct] = useState(null);
+  
+  // 현재 영역의 제품 목록
+  const [currentLocationProducts, setCurrentLocationProducts] = useState([]);
+
   // 스크롤 뷰 참조
   const scrollViewRef = useRef(null);
   
@@ -46,24 +92,6 @@ const AddProductScreen = () => {
   const productNameInputRef = useRef(null);
   const locationSectionRef = useRef(null);
   const purchaseDateSectionRef = useRef(null);
-  
-  const { categories, status: categoriesStatus } = useSelector(state => state.categories);
-  const { locations, status: locationsStatus } = useSelector(state => state.locations);
-  const { products: allProducts, status: productsStatus } = useSelector(state => state.products);
-  const { isAnonymous } = useSelector(state => state.auth);
-  
-  // 폼 상태
-  const [productName, setProductName] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [selectedLocation, setSelectedLocation] = useState(null);
-  const [purchaseDate, setPurchaseDate] = useState(new Date());
-  const [expiryDate, setExpiryDate] = useState(null);
-  const [estimatedEndDate, setEstimatedEndDate] = useState(null);
-  const [purchaseMethod, setPurchaseMethod] = useState('');
-  const [purchaseLink, setPurchaseLink] = useState('');
-  const [price, setPrice] = useState('');
-  const [memo, setMemo] = useState('');
-  const [brand, setBrand] = useState('');
   
   // 폼 유효성 검사 상태
   const [errors, setErrors] = useState({
@@ -80,32 +108,13 @@ const AddProductScreen = () => {
   });
   
   // 날짜 선택기 표시 상태
-  const [showPurchaseDatePicker, setShowPurchaseDatePicker] = useState(false);
-  const [showExpiryDatePicker, setShowExpiryDatePicker] = useState(false);
-  const [showEstimatedEndDatePicker, setShowEstimatedEndDatePicker] = useState(false);
-  
-  // 웹용 날짜 입력 모달
-  const [showWebDateModal, setShowWebDateModal] = useState(false);
-  const [currentDateType, setCurrentDateType] = useState(null);
-  const [tempDate, setTempDate] = useState(new Date());
-  const [tempDateString, setTempDateString] = useState('');
-  
-  // 등록 성공 모달
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [registeredProduct, setRegisteredProduct] = useState(null);
-  
-  // 회원가입 유도 모달
-  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
-  
-  // 현재 선택된 영역의 제품 개수
-  const [currentLocationProducts, setCurrentLocationProducts] = useState([]);
-
-  // 알림 설정 상태
-  const [enableNotifications, setEnableNotifications] = useState(true);
-  const [useLocationNotifications, setUseLocationNotifications] = useState(true);
   const [notificationType, setNotificationType] = useState('expiry'); // 'expiry' 또는 'estimated'
-  const [daysBeforeTarget, setDaysBeforeTarget] = useState(3);
   const [isRepeating, setIsRepeating] = useState(false);
+
+  // 상태 추가
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryDescription, setNewCategoryDescription] = useState('');
+  const [categoryError, setCategoryError] = useState('');
 
   // 카테고리 및 영역 데이터 로드
   useEffect(() => {
@@ -126,27 +135,402 @@ const AddProductScreen = () => {
         setSelectedLocation(location);
         
         // 해당 영역의 제품 목록 필터링
-        const productsInLocation = allProducts.filter(p => p.locationId === locationId);
+        const productsInLocation = allProducts && allProducts.filter(p => p.locationId === locationId) || [];
         setCurrentLocationProducts(productsInLocation);
         
         // 비회원이고 제품이 5개 이상인 경우 회원가입 유도 모달 표시
-        if (isAnonymous && productsInLocation.length >= 5) {
+        if (!isAuthenticated && productsInLocation.length >= 5) {
           setShowSignupPrompt(true);
         }
         
         // 영역의 알림 설정 적용 (실제로는 API에서 가져와야 함)
         if (location.enableNotifications !== false) {
-          setEnableNotifications(true);
-          setUseLocationNotifications(true);
-          setNotificationType(location.notificationType || 'expiry');
-          setDaysBeforeTarget(location.daysBeforeTarget || 3);
+          setEnableExpiryNotification(true);
+          setExpiryNotificationDays(location.daysBeforeTarget || 7);
+          setEnableEstimatedNotification(true);
+          setEstimatedNotificationDays(location.daysBeforeTarget || 7);
           setIsRepeating(location.isRepeating || false);
         } else {
-          setUseLocationNotifications(false);
+          setEnableExpiryNotification(false);
+          setEnableEstimatedNotification(false);
         }
       }
     }
-  }, [locationId, locations, allProducts, isAnonymous]);
+  }, [locationId, locations, allProducts, isAuthenticated]);
+
+  // 카테고리 추가 모달 열기
+  const handleOpenCategoryModal = () => {
+    setShowCategoryModal(true);
+  };
+
+  // 카테고리 추가 처리
+  const handleAddCategory = (newCategory) => {
+    // 새 카테고리 선택
+    setSelectedCategory(newCategory);
+    setShowCategoryModal(false);
+    
+    // 스크롤 위치 유지
+    if (categoryListRef.current) {
+      setTimeout(() => {
+        categoryListRef.current.scrollToOffset({
+          offset: categoryScrollPosition,
+          animated: false
+        });
+      }, 100);
+    }
+  };
+
+  // 카테고리 선택 컴포넌트
+  const CategorySelector = () => (
+    <View style={styles.categoriesContainer}>
+      <Text style={styles.sectionTitle}>카테고리</Text>
+      {categoriesStatus === 'loading' ? (
+        <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
+      ) : categories.length > 0 ? (
+        <View style={styles.categoryListContainer}>
+          <FlatList
+            ref={categoryListRef}
+            data={[...categories, { id: 'add-category', isAddButton: true }]}
+            keyExtractor={item => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesList}
+            renderItem={({ item }) => {
+              if (item.isAddButton) {
+                return (
+                  <TouchableOpacity
+                    style={styles.addCategoryChip}
+                    onPress={handleOpenCategoryModal}
+                  >
+                    <Ionicons name="add" size={18} color="#4CAF50" style={styles.addCategoryIcon} />
+                    <Text style={styles.addCategoryText}>카테고리 추가</Text>
+                  </TouchableOpacity>
+                );
+              }
+              
+              return (
+                <TouchableOpacity
+                  style={[
+                    styles.categoryChip,
+                    selectedCategory?.id === item.id && styles.selectedCategoryChip
+                  ]}
+                  onPress={() => setSelectedCategory(item)}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      selectedCategory?.id === item.id && styles.selectedCategoryChipText
+                    ]}
+                  >
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+            onScroll={(e) => {
+              setCategoryScrollPosition(e.nativeEvent.contentOffset.x);
+            }}
+          />
+        </View>
+      ) : (
+        <View style={styles.emptyCategories}>
+          <Text style={styles.emptyText}>등록된 카테고리가 없습니다.</Text>
+          <TouchableOpacity
+            style={styles.addCategoryButton}
+            onPress={handleOpenCategoryModal}
+          >
+            <Text style={styles.addCategoryButtonText}>카테고리 추가하기</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
+  // 영역 선택 컴포넌트
+  const LocationSelector = () => (
+    <View 
+      ref={locationSectionRef}
+      style={styles.categoriesContainer}
+    >
+      <View style={styles.labelContainer}>
+        <Text style={styles.sectionTitle}>영역</Text>
+        <Text style={styles.requiredMark}>*</Text>
+      </View>
+      {locationsStatus === 'loading' ? (
+        <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
+      ) : locations.length > 0 ? (
+        <>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesList}
+          >
+            {locations.map(location => (
+              <TouchableOpacity
+                key={location.id}
+                style={[
+                  styles.locationChip,
+                  selectedLocation?.id === location.id && styles.selectedLocationChip,
+                  touched.location && errors.location && !selectedLocation ? styles.locationChipError : null
+                ]}
+                onPress={() => handleFieldChange('location', location)}
+              >
+                <Ionicons 
+                  name={location.icon || 'cube-outline'} 
+                  size={16} 
+                  color={selectedLocation?.id === location.id ? '#fff' : '#4CAF50'} 
+                  style={styles.locationChipIcon}
+                />
+                <Text
+                  style={[
+                    styles.locationChipText,
+                    selectedLocation?.id === location.id && styles.selectedLocationChipText
+                  ]}
+                >
+                  {location.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          {touched.location && errors.location ? (
+            <Text style={styles.errorText}>{errors.location}</Text>
+          ) : null}
+        </>
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
+          <TouchableOpacity 
+            style={styles.addLocationButton}
+            onPress={() => navigation.navigate('AddLocation')}
+          >
+            <Text style={styles.addLocationButtonText}>영역 추가하기</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+  
+  // 웹용 날짜 선택 모달
+  const WebDatePickerModal = () => (
+    <Modal
+      visible={showWebDateModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowWebDateModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>
+            {currentDateType === 'purchase' ? '구매일 선택' : 
+             currentDateType === 'expiry' ? '유통기한 선택' : '예상 소모 완료일 선택'}
+          </Text>
+          
+          <TextInput
+            style={styles.dateInput}
+            value={tempDateString}
+            onChangeText={setTempDateString}
+            placeholder="YYYY-MM-DD"
+          />
+          
+          <View style={styles.modalButtons}>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.cancelButton]} 
+              onPress={() => setShowWebDateModal(false)}
+            >
+              <Text style={styles.cancelButtonText}>취소</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.confirmButton]} 
+              onPress={() => {
+                handleConfirmWebDate();
+                if (currentDateType === 'purchase') {
+                  // 필드 터치 표시 및 유효성 검사
+                  setTouched(prev => ({ ...prev, purchaseDate: true }));
+                  const errorMessage = validateField('purchaseDate', tempDate);
+                  setErrors(prev => ({ ...prev, purchaseDate: errorMessage }));
+                }
+              }}
+            >
+              <Text style={styles.confirmButtonText}>확인</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+  
+  // 등록 성공 모달
+  const SuccessModal = () => (
+    <Modal
+      visible={showSuccessModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={handleSuccessModalClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.successIconContainer}>
+            <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
+          </View>
+          
+          <Text style={styles.successTitle}>등록 완료!</Text>
+          
+          <Text style={styles.successMessage}>
+            {createdProduct?.name || '제품'}이(가) 성공적으로 등록되었습니다.
+          </Text>
+          
+          <View style={styles.productInfoContainer}>
+            {selectedLocation && (
+              <View style={styles.productInfoRow}>
+                <Text style={styles.productInfoLabel}>영역:</Text>
+                <Text style={styles.productInfoValue}>
+                  {selectedLocation.title || ''}
+                </Text>
+              </View>
+            )}
+            
+            {brand && (
+              <View style={styles.productInfoRow}>
+                <Text style={styles.productInfoLabel}>브랜드:</Text>
+                <Text style={styles.productInfoValue}>{brand}</Text>
+              </View>
+            )}
+            
+            <View style={styles.productInfoRow}>
+              <Text style={styles.productInfoLabel}>구매일:</Text>
+              <Text style={styles.productInfoValue}>
+                {formatDate(purchaseDate)}
+              </Text>
+            </View>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.successButton}
+            onPress={handleSuccessModalClose}
+          >
+            <Text style={styles.successButtonText}>확인</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // 카테고리 추가 모달
+  const CategoryModal = () => (
+    <CategoryAddModal
+      visible={showCategoryModal}
+      onClose={() => setShowCategoryModal(false)}
+      onCategoryAdded={handleAddCategory}
+    />
+  );
+
+  // 날짜 선택 핸들러 (네이티브)
+  const handleDateChange = (event, selectedDate, dateType) => {
+    // 안드로이드에서는 취소 시 selectedDate가 undefined
+    if (event.type === 'dismissed' || !selectedDate) {
+      setShowPurchaseDatePicker(false);
+      setShowExpiryDatePicker(false);
+      setShowEstimatedEndDatePicker(false);
+      return;
+    }
+    
+    if (Platform.OS === 'android') {
+      setShowPurchaseDatePicker(false);
+      setShowExpiryDatePicker(false);
+      setShowEstimatedEndDatePicker(false);
+    }
+    
+    if (selectedDate) {
+      if (dateType === 'purchase') {
+        setPurchaseDate(selectedDate);
+      } else if (dateType === 'expiry') {
+        setExpiryDate(selectedDate);
+      } else if (dateType === 'estimated') {
+        setEstimatedEndDate(selectedDate);
+      }
+    }
+  };
+  
+  // 웹용 날짜 선택 핸들러
+  const handleWebDateSelect = (dateType) => {
+    setCurrentDateType(dateType);
+    
+    let initialDate;
+    if (dateType === 'purchase') {
+      initialDate = purchaseDate || new Date();
+    } else if (dateType === 'expiry') {
+      initialDate = expiryDate || new Date();
+    } else if (dateType === 'estimated') {
+      initialDate = estimatedEndDate || new Date();
+    }
+    
+    setTempDate(initialDate);
+    setTempDateString(formatDateForInput(initialDate));
+    setShowWebDateModal(true);
+  };
+  
+  // 웹용 날짜 입력 확인
+  const handleConfirmWebDate = () => {
+    try {
+      // 입력된 문자열에서 날짜 객체 생성
+      const [year, month, day] = tempDateString.split('-').map(Number);
+      
+      // 유효한 날짜 형식인지 확인
+      if (!year || !month || !day || 
+          isNaN(year) || isNaN(month) || isNaN(day) ||
+          month < 1 || month > 12 || day < 1 || day > 31) {
+        throw new Error('유효하지 않은 날짜 형식');
+      }
+      
+      // JavaScript의 월은 0부터 시작하므로 1을 빼줌
+      const date = new Date(year, month - 1, day);
+      
+      if (isNaN(date.getTime())) {
+        throw new Error('유효하지 않은 날짜');
+      }
+      
+      if (currentDateType === 'purchase') {
+        setPurchaseDate(date);
+      } else if (currentDateType === 'expiry') {
+        setExpiryDate(date);
+      } else if (currentDateType === 'estimated') {
+        setEstimatedEndDate(date);
+      }
+      
+      setShowWebDateModal(false);
+    } catch (error) {
+      Alert.alert('오류', '유효한 날짜 형식이 아닙니다. (YYYY-MM-DD)');
+    }
+  };
+  
+  // 날짜 포맷 함수
+  const formatDate = (date) => {
+    if (!date) return '날짜 선택';
+    
+    try {
+      return date.toLocaleDateString();
+    } catch (error) {
+      console.error('날짜 포맷 오류:', error);
+      return '날짜 선택';
+    }
+  };
+  
+  // 입력용 날짜 포맷 함수 (YYYY-MM-DD)
+  const formatDateForInput = (date) => {
+    if (!date) return '';
+    
+    try {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      
+      return `${year}-${month}-${day}`;
+    } catch (error) {
+      console.error('입력용 날짜 포맷 오류:', error);
+      return '';
+    }
+  };
 
   // 필드 유효성 검사 함수
   const validateField = (name, value) => {
@@ -300,7 +684,7 @@ const AddProductScreen = () => {
     }
     
     // 비회원인 경우 제품 개수 제한 확인
-    if (isAnonymous && currentLocationProducts.length >= 5) {
+    if (!isAuthenticated && currentLocationProducts.length >= 5) {
       setShowSignupPrompt(true);
       return false;
     }
@@ -313,8 +697,8 @@ const AddProductScreen = () => {
     if (!isFormValid()) return;
     
     // 비회원 제한 확인
-    if (isAnonymous && selectedLocation) {
-      const productsInLocation = allProducts.filter(p => p.locationId === selectedLocation.id);
+    if (!isAuthenticated && selectedLocation) {
+      const productsInLocation = allProducts && allProducts.filter(p => p.locationId === selectedLocation.id) || [];
       if (productsInLocation.length >= 5) {
         setShowSignupPrompt(true);
         return;
@@ -322,7 +706,8 @@ const AddProductScreen = () => {
     }
     
     // 비회원인 경우 알림 설정 비활성화
-    const notificationEnabled = isAnonymous ? false : enableNotifications;
+    const notificationEnabled = isAuthenticated ? enableExpiryNotification : false;
+    const estimatedNotificationEnabled = isAuthenticated ? enableEstimatedNotification : false;
     
     const productData = {
       name: productName,
@@ -332,52 +717,62 @@ const AddProductScreen = () => {
       purchaseDate: purchaseDate ? purchaseDate.toISOString() : null,
       expiryDate: expiryDate ? expiryDate.toISOString() : null,
       estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
-      purchaseMethod,
-      purchaseLink,
-      price: price ? parseFloat(price) : null,
+      purchaseMethod: '', // 입력 필드 제거
+      purchaseLink: '', // 입력 필드 제거
+      price: null, // 입력 필드 제거
       memo,
       brand,
       enableNotifications: notificationEnabled,
-      useLocationNotifications: isAnonymous ? false : useLocationNotifications,
-      notificationType,
-      daysBeforeTarget,
-      isRepeating
-    };
-    
-    dispatch(addProductAsync(productData))
-      .unwrap()
-      .then((result) => {
-        // 알림 설정이 활성화되어 있고 비회원이 아닌 경우에만 알림 추가
-        if (notificationEnabled && !isAnonymous) {
-          saveNotificationSettings(result.id);
-        }
-        
-        setRegisteredProduct(result);
-        setShowSuccessModal(true);
-      })
-      .catch((error) => {
-        Alert.alert('오류', `제품 등록에 실패했습니다: ${error.message}`);
-      });
-  };
-  
-  // 알림 설정 저장
-  const saveNotificationSettings = (productId) => {
-    const notificationData = {
-      type: 'product',
-      targetId: productId,
-      title: `${productName} ${notificationType === 'expiry' ? '유통기한' : '소진 예상'} 알림`,
-      message: `${productName}의 ${notificationType === 'expiry' ? '유통기한' : '소진 예상일'}이 ${daysBeforeTarget}일 남았습니다.`,
-      notifyType: notificationType,
-      daysBeforeTarget: daysBeforeTarget,
-      isActive: true,
+      useLocationNotifications: false, // 비회원은 영역 기본 알림 비활성화
+      notificationType: 'expiry', // 기본값
+      daysBeforeTarget: expiryNotificationDays,
       isRepeating: isRepeating,
     };
     
-    dispatch(addNotification(notificationData))
-      .unwrap()
-      .catch((error) => {
-        console.error('알림 설정 저장 실패:', error);
-      });
+    try {
+      const result = await dispatch(addProductAsync(productData)).unwrap();
+      
+      // 알림 설정이 활성화되어 있고 비회원이 아닌 경우에만 알림 추가
+      if (notificationEnabled && isAuthenticated) {
+        try {
+          await saveNotificationSettings(result.id);
+        } catch (notificationError) {
+          console.error('알림 설정 저장 중 오류 발생:', notificationError);
+          // 알림 설정 실패해도 제품 등록은 성공으로 처리
+        }
+      }
+      
+      setCreatedProduct(result);
+      setShowSuccessModal(true);
+    } catch (error) {
+      Alert.alert('오류', `제품 등록에 실패했습니다: ${error.message}`);
+    }
+  };
+  
+  // 알림 설정 저장
+  const saveNotificationSettings = async (productId) => {
+    try {
+      const notificationData = {
+        type: 'product',
+        targetId: productId,
+        title: `${productName} 유통기한 알림`,
+        message: `${productName}의 유통기한이 ${expiryNotificationDays}일 남았습니다.`,
+        notifyType: 'expiry',
+        daysBeforeTarget: expiryNotificationDays,
+        isActive: true,
+        isRepeating: isRepeating,
+      };
+      
+      // 알림 설정은 별도의 액션으로 처리하거나, 제품 등록 시 함께 저장
+      // 현재는 제품 등록 시 알림 설정을 저장하도록 변경
+      // 알림 설정 저장 로직은 별도의 액션으로 분리하는 것이 더 좋을 수 있음
+      // 여기서는 제품 등록 성공 시 알림 설정을 저장하도록 변경
+      // 실제 알림 설정 저장은 알림 관리 화면에서 처리
+      return notificationData;
+    } catch (error) {
+      console.error('알림 설정 생성 중 오류 발생:', error);
+      throw error;
+    }
   };
   
   // 성공 모달 닫기 및 화면 이동
@@ -388,12 +783,10 @@ const AddProductScreen = () => {
     setProductName('');
     setSelectedCategory(null);
     setBrand('');
-    setPurchaseMethod('');
-    setPurchaseLink('');
-    setPrice('');
-    setMemo('');
-    setExpiryDate(null);
-    setEstimatedEndDate(null);
+    setPurchaseDate(new Date()); // 구매일 초기화
+    setExpiryDate(null); // 유통기한 초기화
+    setEstimatedEndDate(null); // 예상 소모 완료일 초기화
+    setMemo(''); // 메모 초기화
     
     // 화면 이동 - replace 사용하여 현재 화면을 대체
     if (locationId) {
@@ -414,320 +807,11 @@ const AddProductScreen = () => {
     }
   };
 
-  // 날짜 선택 핸들러 (네이티브)
-  const handleDateChange = (event, selectedDate, dateType) => {
-    // 안드로이드에서는 취소 시 selectedDate가 undefined
-    if (event.type === 'dismissed' || !selectedDate) {
-      setShowPurchaseDatePicker(false);
-      setShowExpiryDatePicker(false);
-      setShowEstimatedEndDatePicker(false);
-      return;
-    }
-    
-    if (Platform.OS === 'android') {
-      setShowPurchaseDatePicker(false);
-      setShowExpiryDatePicker(false);
-      setShowEstimatedEndDatePicker(false);
-    }
-    
-    if (selectedDate) {
-      if (dateType === 'purchase') {
-        setPurchaseDate(selectedDate);
-      } else if (dateType === 'expiry') {
-        setExpiryDate(selectedDate);
-      } else if (dateType === 'estimated') {
-        setEstimatedEndDate(selectedDate);
-      }
-    }
+  // 카테고리 선택 처리 함수 - 스크롤 위치 유지
+  const handleCategorySelect = (category) => {
+    setSelectedCategory(category);
+    // 스크롤 위치는 변경하지 않음 (기존 위치 유지)
   };
-  
-  // 웹용 날짜 선택 핸들러
-  const handleWebDateSelect = (dateType) => {
-    setCurrentDateType(dateType);
-    
-    let initialDate;
-    if (dateType === 'purchase') {
-      initialDate = purchaseDate || new Date();
-    } else if (dateType === 'expiry') {
-      initialDate = expiryDate || new Date();
-    } else if (dateType === 'estimated') {
-      initialDate = estimatedEndDate || new Date();
-    }
-    
-    setTempDate(initialDate);
-    setTempDateString(formatDateForInput(initialDate));
-    setShowWebDateModal(true);
-  };
-  
-  // 웹용 날짜 입력 확인
-  const handleConfirmWebDate = () => {
-    try {
-      // 입력된 문자열에서 날짜 객체 생성
-      const [year, month, day] = tempDateString.split('-').map(Number);
-      
-      // 유효한 날짜 형식인지 확인
-      if (!year || !month || !day || 
-          isNaN(year) || isNaN(month) || isNaN(day) ||
-          month < 1 || month > 12 || day < 1 || day > 31) {
-        throw new Error('유효하지 않은 날짜 형식');
-      }
-      
-      // JavaScript의 월은 0부터 시작하므로 1을 빼줌
-      const date = new Date(year, month - 1, day);
-      
-      if (isNaN(date.getTime())) {
-        throw new Error('유효하지 않은 날짜');
-      }
-      
-      if (currentDateType === 'purchase') {
-        setPurchaseDate(date);
-      } else if (currentDateType === 'expiry') {
-        setExpiryDate(date);
-      } else if (currentDateType === 'estimated') {
-        setEstimatedEndDate(date);
-      }
-      
-      setShowWebDateModal(false);
-    } catch (error) {
-      Alert.alert('오류', '유효한 날짜 형식이 아닙니다. (YYYY-MM-DD)');
-    }
-  };
-  
-  // 날짜 포맷 함수
-  const formatDate = (date) => {
-    if (!date) return '날짜 선택';
-    
-    try {
-      return date.toLocaleDateString();
-    } catch (error) {
-      console.error('날짜 포맷 오류:', error);
-      return '날짜 선택';
-    }
-  };
-  
-  // 입력용 날짜 포맷 함수 (YYYY-MM-DD)
-  const formatDateForInput = (date) => {
-    if (!date) return '';
-    
-    try {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      
-      return `${year}-${month}-${day}`;
-    } catch (error) {
-      console.error('입력용 날짜 포맷 오류:', error);
-      return '';
-    }
-  };
-
-  // 카테고리 선택 컴포넌트
-  const CategorySelector = () => (
-    <View style={styles.categoriesContainer}>
-      <Text style={styles.sectionTitle}>카테고리</Text>
-      {categoriesStatus === 'loading' ? (
-        <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
-      ) : categories.length > 0 ? (
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
-        >
-          {categories.map(category => (
-            <TouchableOpacity
-              key={category.id}
-              style={[
-                styles.categoryChip,
-                selectedCategory?.id === category.id && styles.selectedCategoryChip
-              ]}
-              onPress={() => setSelectedCategory(category)}
-            >
-              <Text
-                style={[
-                  styles.categoryChipText,
-                  selectedCategory?.id === category.id && styles.selectedCategoryChipText
-                ]}
-              >
-                {category.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      ) : (
-        <Text style={styles.emptyText}>등록된 카테고리가 없습니다.</Text>
-      )}
-    </View>
-  );
-
-  // 영역 선택 컴포넌트
-  const LocationSelector = () => (
-    <View 
-      ref={locationSectionRef}
-      style={styles.categoriesContainer}
-    >
-      <View style={styles.labelContainer}>
-        <Text style={styles.sectionTitle}>영역</Text>
-        <Text style={styles.requiredMark}>*</Text>
-      </View>
-      {locationsStatus === 'loading' ? (
-        <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
-      ) : locations.length > 0 ? (
-        <>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-          >
-            {locations.map(location => (
-              <TouchableOpacity
-                key={location.id}
-                style={[
-                  styles.locationChip,
-                  selectedLocation?.id === location.id && styles.selectedLocationChip,
-                  touched.location && errors.location && !selectedLocation ? styles.locationChipError : null
-                ]}
-                onPress={() => handleFieldChange('location', location)}
-              >
-                <Ionicons 
-                  name={location.icon || 'cube-outline'} 
-                  size={16} 
-                  color={selectedLocation?.id === location.id ? '#fff' : '#4CAF50'} 
-                  style={styles.locationChipIcon}
-                />
-                <Text
-                  style={[
-                    styles.locationChipText,
-                    selectedLocation?.id === location.id && styles.selectedLocationChipText
-                  ]}
-                >
-                  {location.title}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          {touched.location && errors.location ? (
-            <Text style={styles.errorText}>{errors.location}</Text>
-          ) : null}
-        </>
-      ) : (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
-          <TouchableOpacity 
-            style={styles.addLocationButton}
-            onPress={() => navigation.navigate('AddLocation')}
-          >
-            <Text style={styles.addLocationButtonText}>영역 추가하기</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
-  
-  // 웹용 날짜 선택 모달
-  const WebDatePickerModal = () => (
-    <Modal
-      visible={showWebDateModal}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => setShowWebDateModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>
-            {currentDateType === 'purchase' ? '구매일 선택' : 
-             currentDateType === 'expiry' ? '유통기한 선택' : '예상 소모 완료일 선택'}
-          </Text>
-          
-          <TextInput
-            style={styles.dateInput}
-            value={tempDateString}
-            onChangeText={setTempDateString}
-            placeholder="YYYY-MM-DD"
-          />
-          
-          <View style={styles.modalButtons}>
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.cancelButton]} 
-              onPress={() => setShowWebDateModal(false)}
-            >
-              <Text style={styles.cancelButtonText}>취소</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.confirmButton]} 
-              onPress={() => {
-                handleConfirmWebDate();
-                if (currentDateType === 'purchase') {
-                  // 필드 터치 표시 및 유효성 검사
-                  setTouched(prev => ({ ...prev, purchaseDate: true }));
-                  const errorMessage = validateField('purchaseDate', tempDate);
-                  setErrors(prev => ({ ...prev, purchaseDate: errorMessage }));
-                }
-              }}
-            >
-              <Text style={styles.confirmButtonText}>확인</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-  
-  // 등록 성공 모달
-  const SuccessModal = () => (
-    <Modal
-      visible={showSuccessModal}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={handleSuccessModalClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.successIconContainer}>
-            <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
-          </View>
-          
-          <Text style={styles.successTitle}>등록 완료!</Text>
-          
-          <Text style={styles.successMessage}>
-            {registeredProduct?.name || '제품'}이(가) 성공적으로 등록되었습니다.
-          </Text>
-          
-          <View style={styles.productInfoContainer}>
-            {selectedLocation && (
-              <View style={styles.productInfoRow}>
-                <Text style={styles.productInfoLabel}>영역:</Text>
-                <Text style={styles.productInfoValue}>
-                  {selectedLocation.title || ''}
-                </Text>
-              </View>
-            )}
-            
-            {brand && (
-              <View style={styles.productInfoRow}>
-                <Text style={styles.productInfoLabel}>브랜드:</Text>
-                <Text style={styles.productInfoValue}>{brand}</Text>
-              </View>
-            )}
-            
-            <View style={styles.productInfoRow}>
-              <Text style={styles.productInfoLabel}>구매일:</Text>
-              <Text style={styles.productInfoValue}>
-                {formatDate(purchaseDate)}
-              </Text>
-            </View>
-          </View>
-          
-          <TouchableOpacity 
-            style={styles.successButton}
-            onPress={handleSuccessModalClose}
-          >
-            <Text style={styles.successButtonText}>확인</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
 
   return (
     <KeyboardAvoidingView 
@@ -737,6 +821,7 @@ const AddProductScreen = () => {
       <ScrollView 
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.title}>제품 등록</Text>
         
@@ -778,7 +863,10 @@ const AddProductScreen = () => {
         
         {/* 영역 선택 */}
         <LocationSelector />
-        
+
+        {/* 카테고리 추가 모달 */}
+        <CategoryModal />
+
         {/* 구매일 선택 */}
         <View 
           ref={purchaseDateSectionRef}
@@ -880,41 +968,6 @@ const AddProductScreen = () => {
           )}
         </View>
         
-        {/* 구매 방법 입력 */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>구매 방법 (선택)</Text>
-          <TextInput
-            style={styles.input}
-            value={purchaseMethod}
-            onChangeText={setPurchaseMethod}
-            placeholder="예: 오프라인 매장, 온라인 쇼핑몰 등"
-          />
-        </View>
-        
-        {/* 구매 링크 입력 */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>구매 링크 (선택)</Text>
-          <TextInput
-            style={styles.input}
-            value={purchaseLink}
-            onChangeText={setPurchaseLink}
-            placeholder="구매한 온라인 스토어 링크"
-            keyboardType="url"
-          />
-        </View>
-        
-        {/* 가격 입력 */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>가격 (선택)</Text>
-          <TextInput
-            style={styles.input}
-            value={price}
-            onChangeText={setPrice}
-            placeholder="가격 입력"
-            keyboardType="numeric"
-          />
-        </View>
-        
         {/* 메모 입력 */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>메모 (선택)</Text>
@@ -933,7 +986,7 @@ const AddProductScreen = () => {
         <View style={styles.notificationSection}>
           <Text style={styles.sectionTitle}>알림 설정</Text>
           
-          {isAnonymous ? (
+          {!isAuthenticated ? (
             <View style={styles.anonymousNotificationContainer}>
               <Ionicons name="lock-closed" size={24} color="#888" style={styles.lockIcon} />
               <Text style={styles.anonymousNotificationText}>
@@ -945,26 +998,14 @@ const AddProductScreen = () => {
               <View style={styles.switchRow}>
                 <Text style={styles.switchLabel}>제품 알림 사용</Text>
                 <Switch
-                  value={enableNotifications}
-                  onValueChange={setEnableNotifications}
+                  value={enableExpiryNotification}
+                  onValueChange={setEnableExpiryNotification}
                   trackColor={{ false: '#767577', true: '#81b0ff' }}
-                  thumbColor={enableNotifications ? '#f5dd4b' : '#f4f3f4'}
+                  thumbColor={enableExpiryNotification ? '#f5dd4b' : '#f4f3f4'}
                 />
               </View>
               
-              {enableNotifications && selectedLocation && (
-                <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>영역 기본 알림 설정 사용</Text>
-                  <Switch
-                    value={useLocationNotifications}
-                    onValueChange={setUseLocationNotifications}
-                    trackColor={{ false: '#767577', true: '#81b0ff' }}
-                    thumbColor={useLocationNotifications ? '#f5dd4b' : '#f4f3f4'}
-                  />
-                </View>
-              )}
-              
-              {enableNotifications && !useLocationNotifications && (
+              {enableExpiryNotification && (
                 <>
                   <View style={styles.notificationTypeContainer}>
                     <TouchableOpacity
@@ -1070,11 +1111,13 @@ const AddProductScreen = () => {
       <SuccessModal />
       
       {/* 회원가입 유도 모달 */}
-      <SignupPromptModal 
-        visible={showSignupPrompt}
-        onClose={() => setShowSignupPrompt(false)}
-        message="비회원은 영역당 최대 5개의 제품만 등록할 수 있습니다. 회원가입하여 무제한으로 제품을 등록하세요!"
-      />
+      {showSignupPrompt && (
+        <SignupPromptModal
+          visible={showSignupPrompt}
+          onClose={() => setShowSignupPrompt(false)}
+          onSignup={() => navigation.navigate('Signup')}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -1144,34 +1187,50 @@ const styles = StyleSheet.create({
   categoriesContainer: {
     marginBottom: 20,
   },
+  categoryListContainer: {
+    height: 70,  // FlatList의 높이 증가
+  },
   sectionTitle: {
     fontSize: 16,
     color: '#333',
     fontWeight: '500',
+    marginBottom: 10,
   },
   categoriesList: {
-    flexDirection: 'row',
     paddingVertical: 8,
+    paddingHorizontal: 2,
   },
   categoryChip: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 25,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    marginRight: 10,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#e0e0e0',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    height: 44,  // 높이 약간 증가
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   selectedCategoryChip: {
     backgroundColor: '#4CAF50',
     borderColor: '#4CAF50',
+    elevation: 3,
+    shadowOpacity: 0.2,
   },
   categoryChipText: {
     fontSize: 14,
-    color: '#333',
+    fontWeight: '500',
+    color: '#555',
   },
   selectedCategoryChipText: {
     color: '#fff',
+    fontWeight: '600',
   },
   locationChip: {
     backgroundColor: '#fff',
@@ -1267,34 +1326,37 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 16,
-    color: '#333',
+    textAlign: 'center',
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 20,
+    justifyContent: 'space-between',
+    marginTop: 16,
   },
   modalButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 4,
-    marginLeft: 8,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    minWidth: 100,
+    alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F5F5',
+    marginRight: 8,
   },
   confirmButton: {
     backgroundColor: '#4CAF50',
   },
   cancelButtonText: {
-    color: '#333',
+    color: '#757575',
+    fontWeight: '600',
   },
   confirmButtonText: {
-    color: '#fff',
-    fontWeight: '500',
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   successIconContainer: {
     alignItems: 'center',
@@ -1432,6 +1494,64 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 14,
     lineHeight: 20,
+  },
+  addCategoryChip: {
+    backgroundColor: '#f0f9f0',
+    borderRadius: 25,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addCategoryIcon: {
+    marginRight: 6,
+  },
+  addCategoryText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  emptyCategories: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 10,
+  },
+  addCategoryButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  addCategoryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalInput: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginBottom: 12,
+  },
+  modalLabel: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+    marginBottom: 8,
   },
 });
 

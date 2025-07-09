@@ -91,6 +91,9 @@ const LocationDetailScreen = () => {
   }, [locationProducts, locationId]);
 
   const handleAddProduct = () => {
+    // 모든 제품 영역에서는 제품 추가 불가
+    if (isAllProducts) return;
+    
     // 비회원인 경우 제품 개수 제한 체크
     if (isAnonymous && products.length >= 5) {
       setShowSignupPrompt(true);
@@ -342,22 +345,24 @@ const LocationDetailScreen = () => {
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
                 <Text style={styles.emptySubText}>
-                  오른쪽 하단의 + 버튼을 눌러 제품을 추가하세요.
+                  {!isAllProducts ? '오른쪽 하단의 + 버튼을 눌러 제품을 추가하세요.' : '특정 영역에서 제품을 추가할 수 있습니다.'}
                 </Text>
               </View>
             }
           />
           
-          <TouchableOpacity 
-            style={[
-              styles.addButton,
-              // 비회원이고 제품이 5개 이상이면 버튼 비활성화 스타일 적용
-              isAnonymous && products.length >= 5 && styles.disabledAddButton
-            ]}
-            onPress={handleAddProduct}
-          >
-            <Ionicons name="add" size={30} color="white" />
-          </TouchableOpacity>
+          {!isAllProducts && (
+            <TouchableOpacity 
+              style={[
+                styles.addButton,
+                // 비회원이고 제품이 5개 이상이면 버튼 비활성화 스타일 적용
+                isAnonymous && products.length >= 5 && styles.disabledAddButton
+              ]}
+              onPress={handleAddProduct}
+            >
+              <Ionicons name="add" size={30} color="white" />
+            </TouchableOpacity>
+          )}
         </>
       ) : (
         <NotificationSettings 

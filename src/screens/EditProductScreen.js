@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -10,13 +10,18 @@ import {
   Platform,
   Alert,
   Modal,
-  ActivityIndicator
+  ActivityIndicator,
+  TouchableWithoutFeedback,
+  Keyboard,
+  FlatList
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { updateProductAsync, fetchProductById } from '../redux/slices/productsSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
+import { fetchCategories } from '../redux/slices/categoriesSlice';
+import CategoryAddModal from '../components/CategoryAddModal';
 
 // 조건부 DateTimePicker 임포트
 let DateTimePicker;
@@ -29,39 +34,69 @@ const EditProductScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const route = useRoute();
-  const { productId } = route.params;
   
-  const { categories } = useSelector(state => state.categories);
+  // 라우트 파라미터에서 제품 ID 가져오기
+  const { productId } = route.params || {};
+  
+  // Redux 상태
+  const { categories, status: categoriesStatus } = useSelector(state => state.categories);
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
-  const { status: productsStatus, currentProduct } = useSelector(state => state.products);
+  const { currentProduct, status: productsStatus } = useSelector(state => state.products);
   
   // 폼 상태
   const [productName, setProductName] = useState('');
+  const [brand, setBrand] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [purchaseDate, setPurchaseDate] = useState(new Date());
   const [expiryDate, setExpiryDate] = useState(null);
   const [estimatedEndDate, setEstimatedEndDate] = useState(null);
-  const [purchaseMethod, setPurchaseMethod] = useState('');
-  const [purchaseLink, setPurchaseLink] = useState('');
-  const [price, setPrice] = useState('');
   const [memo, setMemo] = useState('');
-  const [brand, setBrand] = useState('');
   
-  // 날짜 선택기 표시 상태
+  // 날짜 선택기 상태
   const [showPurchaseDatePicker, setShowPurchaseDatePicker] = useState(false);
   const [showExpiryDatePicker, setShowExpiryDatePicker] = useState(false);
   const [showEstimatedEndDatePicker, setShowEstimatedEndDatePicker] = useState(false);
-  
-  // 웹용 날짜 입력 모달
   const [showWebDateModal, setShowWebDateModal] = useState(false);
-  const [currentDateType, setCurrentDateType] = useState(null);
   const [tempDate, setTempDate] = useState(new Date());
   const [tempDateString, setTempDateString] = useState('');
+  const [currentDateType, setCurrentDateType] = useState('');
   
   // 수정 성공 모달
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [updatedProduct, setUpdatedProduct] = useState(null);
+  
+  // 카테고리 추가 관련 상태
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+
+  // 카테고리 스크롤뷰 참조 추가
+  const categoryScrollViewRef = useRef(null);
+
+  // 카테고리 스크롤 위치 상태 추가
+  const [categoryScrollPosition, setCategoryScrollPosition] = useState(0);
+  const categoryListRef = useRef(null);
+
+  // 카테고리 추가 모달 열기
+  const handleOpenCategoryModal = () => {
+    setShowCategoryModal(true);
+  };
+
+  // 카테고리 추가 처리
+  const handleAddCategory = (newCategory) => {
+    // 새 카테고리 선택
+    setSelectedCategory(newCategory);
+    setShowCategoryModal(false);
+    
+    // 스크롤 위치 유지
+    if (categoryListRef.current) {
+      setTimeout(() => {
+        categoryListRef.current.scrollToOffset({
+          offset: categoryScrollPosition,
+          animated: false
+        });
+      }, 100);
+    }
+  };
   
   // 제품 데이터 로드
   useEffect(() => {
@@ -75,14 +110,16 @@ const EditProductScreen = () => {
     }
   }, [dispatch, locationsStatus]);
   
+  // 카테고리 데이터 로드
+  useEffect(() => {
+    dispatch(fetchCategories());
+  }, [dispatch]);
+  
   // 제품 데이터가 로드되면 폼에 채우기
   useEffect(() => {
     if (currentProduct) {
       setProductName(currentProduct.name || '');
       setBrand(currentProduct.brand || '');
-      setPurchaseMethod(currentProduct.purchaseMethod || '');
-      setPurchaseLink(currentProduct.purchaseLink || '');
-      setPrice(currentProduct.price ? currentProduct.price.toString() : '');
       setMemo(currentProduct.memo || '');
       
       // 날짜 설정
@@ -149,9 +186,6 @@ const EditProductScreen = () => {
       purchaseDate: purchaseDate.toISOString(),
       expiryDate: expiryDate ? expiryDate.toISOString() : null,
       estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
-      purchaseMethod,
-      purchaseLink,
-      price: price ? parseFloat(price) : null,
       memo,
       brand,
       updatedAt: new Date().toISOString(),
@@ -259,35 +293,73 @@ const EditProductScreen = () => {
     return `${year}-${month}-${day}`;
   };
 
+  // 카테고리 선택 처리 함수 - 스크롤 위치 유지
+  const handleCategorySelect = (category) => {
+    setSelectedCategory(category);
+    // 스크롤 위치는 변경하지 않음 (기존 위치 유지)
+  };
+
   // 카테고리 선택 컴포넌트
   const CategorySelector = () => (
     <View style={styles.categoriesContainer}>
       <Text style={styles.sectionTitle}>카테고리</Text>
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesList}
-      >
-        {categories.map(category => (
+      {categories.length > 0 ? (
+        <View style={styles.categoryListContainer}>
+          <FlatList
+            ref={categoryListRef}
+            data={[...categories, { id: 'add-category', isAddButton: true }]}
+            keyExtractor={item => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesList}
+            renderItem={({ item }) => {
+              if (item.isAddButton) {
+                return (
+                  <TouchableOpacity
+                    style={styles.addCategoryChip}
+                    onPress={handleOpenCategoryModal}
+                  >
+                    <Ionicons name="add" size={18} color="#4CAF50" style={styles.addCategoryIcon} />
+                    <Text style={styles.addCategoryText}>카테고리 추가</Text>
+                  </TouchableOpacity>
+                );
+              }
+              
+              return (
+                <TouchableOpacity
+                  style={[
+                    styles.categoryChip,
+                    selectedCategory?.id === item.id && styles.selectedCategoryChip
+                  ]}
+                  onPress={() => setSelectedCategory(item)}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      selectedCategory?.id === item.id && styles.selectedCategoryChipText
+                    ]}
+                  >
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+            onScroll={(e) => {
+              setCategoryScrollPosition(e.nativeEvent.contentOffset.x);
+            }}
+          />
+        </View>
+      ) : (
+        <View style={styles.emptyCategories}>
+          <Text style={styles.emptyText}>등록된 카테고리가 없습니다.</Text>
           <TouchableOpacity
-            key={category.id}
-            style={[
-              styles.categoryChip,
-              selectedCategory?.id === category.id && styles.selectedCategoryChip
-            ]}
-            onPress={() => setSelectedCategory(category)}
+            style={styles.addCategoryButton}
+            onPress={handleOpenCategoryModal}
           >
-            <Text
-              style={[
-                styles.categoryChipText,
-                selectedCategory?.id === category.id && styles.selectedCategoryChipText
-              ]}
-            >
-              {category.name}
-            </Text>
+            <Text style={styles.addCategoryButtonText}>카테고리 추가하기</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+        </View>
+      )}
     </View>
   );
 
@@ -425,6 +497,15 @@ const EditProductScreen = () => {
     </Modal>
   );
   
+  // 카테고리 추가 모달
+  const CategoryModal = () => (
+    <CategoryAddModal
+      visible={showCategoryModal}
+      onClose={() => setShowCategoryModal(false)}
+      onCategoryAdded={handleAddCategory}
+    />
+  );
+  
   // 로딩 중이면 로딩 화면 표시
   if (productsStatus === 'loading' && !currentProduct) {
     return (
@@ -439,7 +520,10 @@ const EditProductScreen = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.title}>제품 수정</Text>
         
         {/* 제품명 입력 */}
@@ -554,41 +638,6 @@ const EditProductScreen = () => {
           )}
         </View>
         
-        {/* 구매 방법 입력 */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>구매 방법 (선택)</Text>
-          <TextInput
-            style={styles.input}
-            value={purchaseMethod}
-            onChangeText={setPurchaseMethod}
-            placeholder="예: 오프라인 매장, 온라인 쇼핑몰 등"
-          />
-        </View>
-        
-        {/* 구매 링크 입력 */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>구매 링크 (선택)</Text>
-          <TextInput
-            style={styles.input}
-            value={purchaseLink}
-            onChangeText={setPurchaseLink}
-            placeholder="구매한 온라인 스토어 링크"
-            keyboardType="url"
-          />
-        </View>
-        
-        {/* 가격 입력 */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>가격 (선택)</Text>
-          <TextInput
-            style={styles.input}
-            value={price}
-            onChangeText={setPrice}
-            placeholder="가격 입력"
-            keyboardType="numeric"
-          />
-        </View>
-        
         {/* 메모 입력 */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>메모 (선택)</Text>
@@ -628,6 +677,9 @@ const EditProductScreen = () => {
       
       {/* 수정 성공 모달 */}
       <SuccessModal />
+
+      {/* 카테고리 추가 모달 */}
+      <CategoryModal />
     </KeyboardAvoidingView>
   );
 };
@@ -684,35 +736,50 @@ const styles = StyleSheet.create({
   categoriesContainer: {
     marginBottom: 20,
   },
+  categoryListContainer: {
+    height: 70,  // FlatList의 높이 증가
+  },
   sectionTitle: {
     fontSize: 16,
-    marginBottom: 8,
     color: '#333',
     fontWeight: '500',
+    marginBottom: 10,
   },
   categoriesList: {
-    flexDirection: 'row',
     paddingVertical: 8,
+    paddingHorizontal: 2,
   },
   categoryChip: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 25,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    marginRight: 10,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#e0e0e0',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    height: 44,  // 높이 약간 증가
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   selectedCategoryChip: {
     backgroundColor: '#4CAF50',
     borderColor: '#4CAF50',
+    elevation: 3,
+    shadowOpacity: 0.2,
   },
   categoryChipText: {
     fontSize: 14,
-    color: '#333',
+    fontWeight: '500',
+    color: '#555',
   },
   selectedCategoryChipText: {
     color: '#fff',
+    fontWeight: '600',
   },
   locationChip: {
     backgroundColor: '#fff',
@@ -776,34 +843,37 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 16,
-    color: '#333',
+    textAlign: 'center',
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 20,
+    justifyContent: 'space-between',
+    marginTop: 16,
   },
   modalButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 4,
-    marginLeft: 8,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    minWidth: 100,
+    alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F5F5',
+    marginRight: 8,
+  },
+  cancelButtonText: {
+    color: '#757575',
+    fontWeight: '600',
   },
   confirmButton: {
     backgroundColor: '#4CAF50',
   },
-  cancelButtonText: {
-    color: '#333',
-  },
   confirmButtonText: {
-    color: '#fff',
-    fontWeight: '500',
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   successIconContainer: {
     alignItems: 'center',
@@ -853,6 +923,72 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  addCategoryChip: {
+    backgroundColor: '#f0f9f0',
+    borderRadius: 25,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addCategoryIcon: {
+    marginRight: 6,
+  },
+  addCategoryText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  modalLabel: {
+    fontSize: 16,
+    marginBottom: 8,
+    color: '#333',
+    fontWeight: '500',
+  },
+  modalInput: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  inputError: {
+    borderColor: '#FF6B6B',
+    borderWidth: 1,
+  },
+  errorText: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  emptyCategories: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 10,
+  },
+  addCategoryButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  addCategoryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Switch, StyleSheet, Platform, Linking, Alert } from 'react-native';
-import messaging from '@react-native-firebase/messaging';
+
+// Firebase 관련 모듈은 웹이 아닌 환경에서만 import
+let messaging;
+if (Platform.OS !== 'web') {
+  try {
+    messaging = require('@react-native-firebase/messaging').default;
+  } catch (error) {
+    console.error('Firebase 모듈 로드 실패:', error);
+  }
+}
+
 import { requestNotificationPermissions } from '../utils/notificationUtils';
 
 const NotificationSettings = () => {
@@ -17,6 +27,13 @@ const NotificationSettings = () => {
 
     try {
       setIsLoading(true);
+      
+      if (!messaging) {
+        console.warn('Firebase Messaging이 초기화되지 않았습니다.');
+        setNotificationsEnabled(false);
+        setIsLoading(false);
+        return;
+      }
       
       if (Platform.OS === 'ios') {
         const authStatus = await messaging().hasPermission();
@@ -110,14 +127,24 @@ const NotificationSettings = () => {
   useEffect(() => {
     checkNotificationPermission();
     
-    // 앱이 포그라운드로 돌아올 때마다 권한 상태 확인
-    const subscription = messaging().onMessage(async () => {
-      checkNotificationPermission();
-    });
+    // 웹 환경이 아니고 messaging이 있을 때만 실행
+    if (Platform.OS !== 'web' && messaging) {
+      try {
+        // 앱이 포그라운드로 돌아올 때마다 권한 상태 확인
+        const subscription = messaging().onMessage(async () => {
+          checkNotificationPermission();
+        });
+        
+        return () => {
+          subscription();
+        };
+      } catch (error) {
+        console.error('메시징 리스너 설정 오류:', error);
+      }
+    }
     
-    return () => {
-      subscription();
-    };
+    // 웹 환경이거나 messaging이 없는 경우 빈 클린업 함수 반환
+    return () => {};
   }, []);
 
   return (

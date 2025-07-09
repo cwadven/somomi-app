@@ -21,9 +21,14 @@ const PushNotificationTest = () => {
 
   // 즉시 알림 테스트
   const handleImmediateNotification = async () => {
+    // 먼저 로딩 상태 설정
     setIsLoading(true);
     
     try {
+      // 알림 카운터 증가 (먼저 처리)
+      const newCount = notificationCount + 1;
+      setNotificationCount(newCount);
+      
       // 알림 데이터 설정
       const title = '테스트 알림';
       const body = '앱 푸시 알림이 정상적으로 작동합니다!';
@@ -31,47 +36,45 @@ const PushNotificationTest = () => {
         type: 'test',
         testData: '테스트 데이터',
         timestamp: new Date().toISOString(),
-        count: notificationCount + 1
+        count: newCount,
+        deepLink: 'somomi://home'
       };
       
-      // 알림 전송
+      // 알림 전송 - 별도의 함수로 분리하여 실행
+      // 이 함수는 성공하든 실패하든 앱이 계속 실행되도록 함
+      sendTestNotification(title, body, data);
+      
+      // 사용자에게 알림이 전송되었다는 메시지 표시
+      Alert.alert(
+        '알림 전송 시작',
+        '알림이 전송 중입니다. 잠시 후 확인해주세요.',
+        [{ text: '확인' }]
+      );
+    } catch (error) {
+      console.error('알림 전송 준비 중 오류:', error);
+      
+      // 오류가 발생해도 앱이 종료되지 않도록 함
+      Alert.alert(
+        '알림 전송 오류',
+        '알림 전송 준비 중 문제가 발생했습니다.',
+        [{ text: '확인' }]
+      );
+    } finally {
+      // 항상 로딩 상태 해제
+      setIsLoading(false);
+    }
+  };
+  
+  // 별도의 함수로 알림 전송 로직 분리
+  const sendTestNotification = async (title, body, data) => {
+    try {
+      // 알림 전송 시도
       const notificationId = await sendImmediateNotification(title, body, data);
       console.log('알림 전송 결과:', notificationId);
-      
-      // 카운터 증가
-      setNotificationCount(prevCount => prevCount + 1);
-      
-      // 성공 메시지 표시 (setTimeout으로 지연시켜 UI 스레드 블로킹 방지)
-      setTimeout(() => {
-        try {
-          Alert.alert(
-            '알림 전송 성공',
-            `알림이 성공적으로 전송되었습니다.${notificationId ? ` (ID: ${notificationId})` : ''}`,
-            [{ text: '확인' }]
-          );
-        } catch (alertError) {
-          console.error('알림 성공 메시지 표시 오류:', alertError);
-        } finally {
-          setIsLoading(false);
-        }
-      }, 300);
+      return notificationId;
     } catch (error) {
-      console.error('즉시 알림 전송 중 오류 발생:', error);
-      
-      // 오류 메시지 표시
-      setTimeout(() => {
-        try {
-          Alert.alert(
-            '알림 전송 실패',
-            `오류가 발생했습니다: ${error?.message || '알 수 없는 오류'}`,
-            [{ text: '확인' }]
-          );
-        } catch (alertError) {
-          console.error('알림 오류 메시지 표시 오류:', alertError);
-        } finally {
-          setIsLoading(false);
-        }
-      }, 300);
+      console.error('알림 전송 실패:', error);
+      return null;
     }
   };
 

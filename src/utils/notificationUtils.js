@@ -136,34 +136,47 @@ export const sendImmediateNotification = async (title, body, data = {}) => {
     return null;
   }
   
+  // 알림 서비스가 초기화되지 않았는지 확인
   if (!pushNotificationService) {
     console.error('알림 서비스가 초기화되지 않았습니다.');
     return null;
   }
   
-  try {
-    // 알림 전송 전 안전 확인
-    if (!title || typeof title !== 'string') {
-      console.error('알림 제목이 유효하지 않습니다:', title);
-      title = '알림';
+  // 안전하게 알림 전송
+  return new Promise((resolve) => {
+    try {
+      // 알림 전송 전 안전 확인
+      if (!title || typeof title !== 'string') {
+        console.error('알림 제목이 유효하지 않습니다:', title);
+        title = '알림';
+      }
+      
+      if (!body || typeof body !== 'string') {
+        console.error('알림 내용이 유효하지 않습니다:', body);
+        body = '새로운 알림이 있습니다.';
+      }
+      
+      if (!data || typeof data !== 'object') {
+        console.error('알림 데이터가 유효하지 않습니다:', data);
+        data = {};
+      }
+      
+      // 비동기 작업을 setTimeout으로 감싸서 메인 스레드 차단 방지
+      setTimeout(async () => {
+        try {
+          // 알림 전송
+          const notificationId = await pushNotificationService.sendLocalNotification(title, body, data, 0);
+          resolve(notificationId);
+        } catch (innerError) {
+          console.error('알림 전송 내부 오류:', innerError);
+          resolve(null); // 오류가 발생해도 Promise는 resolve
+        }
+      }, 0);
+    } catch (outerError) {
+      console.error('즉시 알림 전송 준비 오류:', outerError);
+      resolve(null); // 오류가 발생해도 Promise는 resolve
     }
-    
-    if (!body || typeof body !== 'string') {
-      console.error('알림 내용이 유효하지 않습니다:', body);
-      body = '새로운 알림이 있습니다.';
-    }
-    
-    if (!data || typeof data !== 'object') {
-      console.error('알림 데이터가 유효하지 않습니다:', data);
-      data = {};
-    }
-    
-    // 알림 전송
-    return await pushNotificationService.sendLocalNotification(title, body, data, 0);
-  } catch (error) {
-    console.error('즉시 알림 전송 실패:', error);
-    return null;
-  }
+  });
 };
 
 /**

@@ -322,6 +322,13 @@ class PushNotificationService {
         return null;
       }
       
+      // 알림 채널 생성 확인
+      try {
+        await this.createNotificationChannels();
+      } catch (channelError) {
+        console.error('알림 채널 생성 오류:', channelError);
+      }
+      
       // 알림 채널 ID 결정
       let channelId = 'default';
       if (data && data.type) {
@@ -338,8 +345,8 @@ class PushNotificationService {
       // 알림 설정
       const notificationConfig = {
         id: notificationId,
-        title,
-        body,
+        title: title || '알림',
+        body: body || '새로운 알림이 있습니다.',
         android: {
           channelId,
           smallIcon: 'ic_launcher',
@@ -371,26 +378,21 @@ class PushNotificationService {
         console.log(`${delay}초 후 알림 예약 중...`);
         
         // 타이머를 사용하여 지연 알림 구현
-        setTimeout(async () => {
-          try {
-            // 앱 상태 확인
-            const appState = AppState.currentState;
-            console.log(`알림 전송 시 앱 상태: ${appState}`);
-            
-            // 알림 표시
-            await notifee.displayNotification(notificationConfig);
-            console.log(`${delay}초 후 알림 전송 완료:`, notificationId);
-          } catch (timerError) {
-            console.error('지연 알림 타이머 오류:', timerError);
-          }
+        setTimeout(() => {
+          // 비동기 함수를 별도로 실행하여 앱 크래시 방지
+          this.safeDisplayNotification(notificationConfig)
+            .then(() => console.log(`${delay}초 후 알림 전송 완료:`, notificationId))
+            .catch(err => console.error('지연 알림 표시 오류:', err));
         }, delay * 1000);
         
         console.log(`${delay}초 후 알림 예약 완료:`, notificationId);
       } else {
-        // 즉시 알림 표시
+        // 즉시 알림 표시 - 별도 함수로 분리하여 안전하게 처리
         try {
-          await notifee.displayNotification(notificationConfig);
-          console.log('즉시 알림 전송 완료:', notificationId);
+          // 비동기 함수를 별도로 실행하여 앱 크래시 방지
+          this.safeDisplayNotification(notificationConfig)
+            .then(() => console.log('즉시 알림 전송 완료:', notificationId))
+            .catch(err => console.error('즉시 알림 표시 오류:', err));
         } catch (displayError) {
           console.error('즉시 알림 표시 오류:', displayError);
           // 오류가 발생해도 notificationId는 반환
@@ -402,6 +404,23 @@ class PushNotificationService {
       console.error('알림 전송 실패:', error);
       return null;
     }
+  }
+  
+  // 알림 표시 함수 - 안전하게 분리
+  async safeDisplayNotification(notificationConfig) {
+    return new Promise((resolve, reject) => {
+      // 메인 스레드를 차단하지 않도록 setTimeout 사용
+      setTimeout(async () => {
+        try {
+          // notifee 호출을 try-catch로 감싸서 오류 처리
+          await notifee.displayNotification(notificationConfig);
+          resolve();
+        } catch (error) {
+          console.error('Notifee 알림 표시 오류:', error);
+          reject(error);
+        }
+      }, 0);
+    });
   }
 
   // 알림 취소 함수
