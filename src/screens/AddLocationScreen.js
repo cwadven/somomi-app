@@ -21,6 +21,7 @@ import { addLocation, updateLocation } from '../redux/slices/locationsSlice';
 import { addNotification } from '../redux/slices/notificationsSlice';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
+import IconSelector from '../components/IconSelector';
 import { checkAnonymousLimits } from '../utils/authUtils';
 
 // 조건부 ImagePicker 임포트
@@ -422,42 +423,7 @@ const AddLocationScreen = () => {
     navigation.goBack();
   };
 
-  // 아이콘 선택 컴포넌트
-  const IconSelector = () => (
-    <View style={styles.iconSelectorContainer}>
-      <Text style={styles.sectionTitle}>아이콘 선택</Text>
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.iconsList}
-        keyboardShouldPersistTaps="handled"
-        maintainVisibleContentPosition={{
-          minIndexForVisible: 0,
-          autoscrollToTopThreshold: 10
-        }}
-      >
-        {availableIcons.map((icon, index) => (
-          <TouchableOpacity
-            key={index}
-            style={[
-              styles.iconItem,
-              selectedIcon === icon && styles.selectedIconItem
-            ]}
-            onPress={() => {
-              // 스크롤 위치를 유지하면서 아이콘만 변경
-              setSelectedIcon(icon);
-            }}
-          >
-            <Ionicons 
-              name={icon} 
-              size={24} 
-              color={selectedIcon === icon ? '#fff' : '#4CAF50'} 
-            />
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
-  );
+  // 아이콘 선택 컴포넌트 제거 (외부 컴포넌트로 대체)
   
   // 등록/수정 성공 모달
   const SuccessModal = () => (
@@ -560,7 +526,11 @@ const AddLocationScreen = () => {
         </View>
         
         {/* 아이콘 선택 */}
-        <IconSelector />
+        <IconSelector 
+          icons={availableIcons}
+          selectedIcon={selectedIcon}
+          onSelectIcon={setSelectedIcon}
+        />
         
         {/* 알림 설정 */}
         <View style={styles.notificationSection}>

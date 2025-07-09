@@ -25,6 +25,8 @@ import { fetchLocations } from '../redux/slices/locationsSlice';
 import { addNotification } from '../redux/slices/notificationsSlice';
 import SignupPromptModal from '../components/SignupPromptModal';
 import CategoryAddModal from '../components/CategoryAddModal';
+import CategorySelector from '../components/CategorySelector';
+import LocationSelector from '../components/LocationSelector';
 
 // 조건부 DateTimePicker 임포트
 let DateTimePicker;
@@ -180,135 +182,14 @@ const AddProductScreen = () => {
     }
   };
 
-  // 카테고리 선택 컴포넌트
-  const CategorySelector = () => (
-    <View style={styles.categoriesContainer}>
-      <Text style={styles.sectionTitle}>카테고리</Text>
-      {categoriesStatus === 'loading' ? (
-        <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
-      ) : categories.length > 0 ? (
-        <View style={styles.categoryListContainer}>
-          <FlatList
-            ref={categoryListRef}
-            data={[...categories, { id: 'add-category', isAddButton: true }]}
-            keyExtractor={item => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-            renderItem={({ item }) => {
-              if (item.isAddButton) {
-                return (
-                  <TouchableOpacity
-                    style={styles.addCategoryChip}
-                    onPress={handleOpenCategoryModal}
-                  >
-                    <Ionicons name="add" size={18} color="#4CAF50" style={styles.addCategoryIcon} />
-                    <Text style={styles.addCategoryText}>카테고리 추가</Text>
-                  </TouchableOpacity>
-                );
-              }
-              
-              return (
-                <TouchableOpacity
-                  style={[
-                    styles.categoryChip,
-                    selectedCategory?.id === item.id && styles.selectedCategoryChip
-                  ]}
-                  onPress={() => setSelectedCategory(item)}
-                >
-                  <Text
-                    style={[
-                      styles.categoryChipText,
-                      selectedCategory?.id === item.id && styles.selectedCategoryChipText
-                    ]}
-                  >
-                    {item.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-            onScroll={(e) => {
-              setCategoryScrollPosition(e.nativeEvent.contentOffset.x);
-            }}
-          />
-        </View>
-      ) : (
-        <View style={styles.emptyCategories}>
-          <Text style={styles.emptyText}>등록된 카테고리가 없습니다.</Text>
-          <TouchableOpacity
-            style={styles.addCategoryButton}
-            onPress={handleOpenCategoryModal}
-          >
-            <Text style={styles.addCategoryButtonText}>카테고리 추가하기</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
+  // 카테고리 선택 컴포넌트 제거 (외부 컴포넌트로 대체)
 
-  // 영역 선택 컴포넌트
-  const LocationSelector = () => (
-    <View 
-      ref={locationSectionRef}
-      style={styles.categoriesContainer}
-    >
-      <View style={styles.labelContainer}>
-        <Text style={styles.sectionTitle}>영역</Text>
-        <Text style={styles.requiredMark}>*</Text>
-      </View>
-      {locationsStatus === 'loading' ? (
-        <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
-      ) : locations.length > 0 ? (
-        <>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-          >
-            {locations.map(location => (
-              <TouchableOpacity
-                key={location.id}
-                style={[
-                  styles.locationChip,
-                  selectedLocation?.id === location.id && styles.selectedLocationChip,
-                  touched.location && errors.location && !selectedLocation ? styles.locationChipError : null
-                ]}
-                onPress={() => handleFieldChange('location', location)}
-              >
-                <Ionicons 
-                  name={location.icon || 'cube-outline'} 
-                  size={16} 
-                  color={selectedLocation?.id === location.id ? '#fff' : '#4CAF50'} 
-                  style={styles.locationChipIcon}
-                />
-                <Text
-                  style={[
-                    styles.locationChipText,
-                    selectedLocation?.id === location.id && styles.selectedLocationChipText
-                  ]}
-                >
-                  {location.title}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          {touched.location && errors.location ? (
-            <Text style={styles.errorText}>{errors.location}</Text>
-          ) : null}
-        </>
-      ) : (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
-          <TouchableOpacity 
-            style={styles.addLocationButton}
-            onPress={() => navigation.navigate('AddLocation')}
-          >
-            <Text style={styles.addLocationButtonText}>영역 추가하기</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
+  // 영역 추가 화면으로 이동
+  const handleAddLocation = () => {
+    navigation.navigate('AddLocation');
+  };
+
+  // 영역 선택 컴포넌트 제거 (외부 컴포넌트로 대체)
   
   // 웹용 날짜 선택 모달
   const WebDatePickerModal = () => (
@@ -859,10 +740,26 @@ const AddProductScreen = () => {
         </View>
         
         {/* 카테고리 선택 */}
-        <CategorySelector />
+        <CategorySelector 
+          categories={categories} 
+          selectedCategory={selectedCategory} 
+          onSelectCategory={setSelectedCategory} 
+          onAddCategory={handleOpenCategoryModal}
+          status={categoriesStatus}
+        />
         
         {/* 영역 선택 */}
-        <LocationSelector />
+        <LocationSelector
+          ref={locationSectionRef}
+          locations={locations}
+          selectedLocation={selectedLocation}
+          onSelectLocation={(location) => handleFieldChange('location', location)}
+          onAddLocation={handleAddLocation}
+          status={locationsStatus}
+          isRequired={true}
+          errorMessage={errors.location}
+          showError={touched.location}
+        />
 
         {/* 카테고리 추가 모달 */}
         <CategoryModal />
@@ -1552,6 +1449,10 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
     marginBottom: 8,
+  },
+  categoryFlatList: {
+    minHeight: 80,
+    flexGrow: 0,
   },
 });
 

@@ -22,6 +22,8 @@ import { updateProductAsync, fetchProductById } from '../redux/slices/productsSl
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { fetchCategories } from '../redux/slices/categoriesSlice';
 import CategoryAddModal from '../components/CategoryAddModal';
+import CategorySelector from '../components/CategorySelector';
+import LocationSelector from '../components/LocationSelector';
 
 // 조건부 DateTimePicker 임포트
 let DateTimePicker;
@@ -299,107 +301,14 @@ const EditProductScreen = () => {
     // 스크롤 위치는 변경하지 않음 (기존 위치 유지)
   };
 
-  // 카테고리 선택 컴포넌트
-  const CategorySelector = () => (
-    <View style={styles.categoriesContainer}>
-      <Text style={styles.sectionTitle}>카테고리</Text>
-      {categories.length > 0 ? (
-        <View style={styles.categoryListContainer}>
-          <FlatList
-            ref={categoryListRef}
-            data={[...categories, { id: 'add-category', isAddButton: true }]}
-            keyExtractor={item => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-            renderItem={({ item }) => {
-              if (item.isAddButton) {
-                return (
-                  <TouchableOpacity
-                    style={styles.addCategoryChip}
-                    onPress={handleOpenCategoryModal}
-                  >
-                    <Ionicons name="add" size={18} color="#4CAF50" style={styles.addCategoryIcon} />
-                    <Text style={styles.addCategoryText}>카테고리 추가</Text>
-                  </TouchableOpacity>
-                );
-              }
-              
-              return (
-                <TouchableOpacity
-                  style={[
-                    styles.categoryChip,
-                    selectedCategory?.id === item.id && styles.selectedCategoryChip
-                  ]}
-                  onPress={() => setSelectedCategory(item)}
-                >
-                  <Text
-                    style={[
-                      styles.categoryChipText,
-                      selectedCategory?.id === item.id && styles.selectedCategoryChipText
-                    ]}
-                  >
-                    {item.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-            onScroll={(e) => {
-              setCategoryScrollPosition(e.nativeEvent.contentOffset.x);
-            }}
-          />
-        </View>
-      ) : (
-        <View style={styles.emptyCategories}>
-          <Text style={styles.emptyText}>등록된 카테고리가 없습니다.</Text>
-          <TouchableOpacity
-            style={styles.addCategoryButton}
-            onPress={handleOpenCategoryModal}
-          >
-            <Text style={styles.addCategoryButtonText}>카테고리 추가하기</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
+  // 카테고리 선택 컴포넌트 제거 (외부 컴포넌트로 대체)
 
-  // 영역 선택 컴포넌트
-  const LocationSelector = () => (
-    <View style={styles.categoriesContainer}>
-      <Text style={styles.sectionTitle}>영역 *</Text>
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesList}
-      >
-        {locations.map(location => (
-          <TouchableOpacity
-            key={location.id}
-            style={[
-              styles.locationChip,
-              selectedLocation?.id === location.id && styles.selectedLocationChip
-            ]}
-            onPress={() => setSelectedLocation(location)}
-          >
-            <Ionicons 
-              name={location.icon || 'cube-outline'} 
-              size={16} 
-              color={selectedLocation?.id === location.id ? '#fff' : '#4CAF50'} 
-              style={styles.locationChipIcon}
-            />
-            <Text
-              style={[
-                styles.locationChipText,
-                selectedLocation?.id === location.id && styles.selectedLocationChipText
-              ]}
-            >
-              {location.title}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
-  );
+  // 영역 추가 화면으로 이동
+  const handleAddLocation = () => {
+    navigation.navigate('AddLocation');
+  };
+
+  // 영역 선택 컴포넌트 제거 (외부 컴포넌트로 대체)
   
   // 웹용 날짜 선택 모달
   const WebDatePickerModal = () => (
@@ -549,10 +458,23 @@ const EditProductScreen = () => {
         </View>
         
         {/* 카테고리 선택 */}
-        <CategorySelector />
+        <CategorySelector 
+          categories={categories} 
+          selectedCategory={selectedCategory} 
+          onSelectCategory={setSelectedCategory} 
+          onAddCategory={handleOpenCategoryModal}
+          status={categoriesStatus}
+        />
         
         {/* 영역 선택 */}
-        <LocationSelector />
+        <LocationSelector
+          locations={locations}
+          selectedLocation={selectedLocation}
+          onSelectLocation={setSelectedLocation}
+          onAddLocation={handleAddLocation}
+          status={locationsStatus}
+          isRequired={true}
+        />
         
         {/* 구매일 선택 */}
         <View style={styles.inputGroup}>
@@ -736,6 +658,10 @@ const styles = StyleSheet.create({
   categoriesContainer: {
     marginBottom: 20,
   },
+  categoryFlatList: {
+    minHeight: 80,
+    flexGrow: 0,
+  },
   categoryListContainer: {
     height: 70,  // FlatList의 높이 증가
   },
@@ -748,6 +674,7 @@ const styles = StyleSheet.create({
   categoriesList: {
     paddingVertical: 8,
     paddingHorizontal: 2,
+    alignItems: 'center',
   },
   categoryChip: {
     backgroundColor: '#f5f5f5',
@@ -762,7 +689,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 1,
-    height: 44,  // 높이 약간 증가
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
