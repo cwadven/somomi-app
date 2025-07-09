@@ -89,15 +89,18 @@ const EditProductScreen = () => {
     setSelectedCategory(newCategory);
     setShowCategoryModal(false);
     
-    // 스크롤 위치 유지
-    if (categoryListRef.current) {
+    // 카테고리 선택 후 스크롤 위치 조정
+    // 스크롤 위치 유지 코드는 제거하고 새로운 카테고리가 보이도록 조정
+    if (categoryListRef && categoryListRef.current) {
+      // 약간의 지연 후 새 카테고리가 추가된 위치로 스크롤
       setTimeout(() => {
-        categoryListRef.current.scrollToOffset({
-          offset: categoryScrollPosition,
-          animated: false
-        });
-      }, 100);
+        // categories 배열의 마지막 인덱스로 스크롤
+        categoryListRef.current.scrollToEnd({ animated: true });
+      }, 300);
     }
+    
+    // 성공 메시지 표시
+    Alert.alert('알림', '새 카테고리가 추가되었습니다.');
   };
   
   // 제품 데이터 로드
@@ -459,6 +462,7 @@ const EditProductScreen = () => {
         
         {/* 카테고리 선택 */}
         <CategorySelector 
+          ref={categoryListRef}
           categories={categories} 
           selectedCategory={selectedCategory} 
           onSelectCategory={setSelectedCategory} 

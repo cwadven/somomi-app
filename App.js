@@ -17,6 +17,7 @@ import {
 } from './src/utils/notificationUtils';
 import { initializeData } from './src/api/productsApi';
 import { initializeNotificationsData } from './src/redux/slices/notificationsSlice';
+import { loadCategories } from './src/redux/slices/categoriesSlice';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
@@ -230,6 +231,10 @@ const AppContent = () => {
         // 로컬 데이터 초기화
         await initializeData();
         await initializeNotificationsData();
+        
+        // 카테고리 데이터 로드
+        await dispatch(loadCategories());
+        
         setDataInitialized(true);
         
         // 저장된 토큰 검증
@@ -248,7 +253,11 @@ const AppContent = () => {
       } catch (error) {
         console.error('인증 초기화 실패:', error);
         // 오류 발생 시 익명 토큰 발급
-        await dispatch(getAnonymousToken()).unwrap();
+        try {
+          await dispatch(getAnonymousToken()).unwrap();
+        } catch (anonymousError) {
+          console.error('익명 토큰 발급 실패:', anonymousError);
+        }
       } finally {
         setIsLoading(false);
       }

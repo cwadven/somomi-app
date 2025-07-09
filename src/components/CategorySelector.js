@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { 
   View, 
   Text, 
@@ -16,14 +16,15 @@ import { Ionicons } from '@expo/vector-icons';
  * @param {Function} onSelectCategory - 카테고리 선택 시 호출되는 함수
  * @param {Function} onAddCategory - 카테고리 추가 버튼 클릭 시 호출되는 함수
  * @param {String} status - 카테고리 로딩 상태 ('idle', 'loading', 'succeeded', 'failed')
+ * @param {Object} ref - FlatList에 대한 참조
  */
-const CategorySelector = ({ 
+const CategorySelector = forwardRef(({ 
   categories = [], 
   selectedCategory, 
   onSelectCategory, 
   onAddCategory,
   status = 'idle'
-}) => {
+}, ref) => {
   return (
     <View style={styles.categoriesContainer}>
       <Text style={styles.sectionTitle}>카테고리</Text>
@@ -31,6 +32,7 @@ const CategorySelector = ({
         <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
       ) : categories.length > 0 ? (
         <FlatList
+          ref={ref}
           horizontal
           data={categories}
           keyExtractor={(item) => item.id}
@@ -78,7 +80,7 @@ const CategorySelector = ({
       )}
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   categoriesContainer: {

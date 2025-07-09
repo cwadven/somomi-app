@@ -95,6 +95,9 @@ const AddProductScreen = () => {
   const locationSectionRef = useRef(null);
   const purchaseDateSectionRef = useRef(null);
   
+  // 카테고리 목록 참조 추가
+  const categoryListRef = useRef(null);
+  
   // 폼 유효성 검사 상태
   const [errors, setErrors] = useState({
     productName: '',
@@ -171,15 +174,18 @@ const AddProductScreen = () => {
     setSelectedCategory(newCategory);
     setShowCategoryModal(false);
     
-    // 스크롤 위치 유지
-    if (categoryListRef.current) {
+    // 카테고리 선택 후 스크롤 위치 조정
+    // 스크롤 위치 유지 코드는 제거하고 새로운 카테고리가 보이도록 조정
+    if (categoryListRef && categoryListRef.current) {
+      // 약간의 지연 후 새 카테고리가 추가된 위치로 스크롤
       setTimeout(() => {
-        categoryListRef.current.scrollToOffset({
-          offset: categoryScrollPosition,
-          animated: false
-        });
-      }, 100);
+        // categories 배열의 마지막 인덱스로 스크롤
+        categoryListRef.current.scrollToEnd({ animated: true });
+      }, 300);
     }
+    
+    // 성공 메시지 표시
+    Alert.alert('알림', '새 카테고리가 추가되었습니다.');
   };
 
   // 카테고리 선택 컴포넌트 제거 (외부 컴포넌트로 대체)
@@ -741,6 +747,7 @@ const AddProductScreen = () => {
         
         {/* 카테고리 선택 */}
         <CategorySelector 
+          ref={categoryListRef}
           categories={categories} 
           selectedCategory={selectedCategory} 
           onSelectCategory={setSelectedCategory} 
