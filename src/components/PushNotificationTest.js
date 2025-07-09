@@ -21,35 +21,57 @@ const PushNotificationTest = () => {
 
   // 즉시 알림 테스트
   const handleImmediateNotification = async () => {
+    setIsLoading(true);
+    
     try {
-      setIsLoading(true);
+      // 알림 데이터 설정
+      const title = '테스트 알림';
+      const body = '앱 푸시 알림이 정상적으로 작동합니다!';
+      const data = {
+        type: 'test',
+        testData: '테스트 데이터',
+        timestamp: new Date().toISOString(),
+        count: notificationCount + 1
+      };
       
-      const notificationId = await sendImmediateNotification(
-        '테스트 알림',
-        '앱 푸시 알림이 정상적으로 작동합니다!',
-        {
-          type: 'test',
-          testData: '테스트 데이터',
-          timestamp: new Date().toISOString(),
-          count: notificationCount + 1
+      // 알림 전송
+      const notificationId = await sendImmediateNotification(title, body, data);
+      console.log('알림 전송 결과:', notificationId);
+      
+      // 카운터 증가
+      setNotificationCount(prevCount => prevCount + 1);
+      
+      // 성공 메시지 표시 (setTimeout으로 지연시켜 UI 스레드 블로킹 방지)
+      setTimeout(() => {
+        try {
+          Alert.alert(
+            '알림 전송 성공',
+            `알림이 성공적으로 전송되었습니다.${notificationId ? ` (ID: ${notificationId})` : ''}`,
+            [{ text: '확인' }]
+          );
+        } catch (alertError) {
+          console.error('알림 성공 메시지 표시 오류:', alertError);
+        } finally {
+          setIsLoading(false);
         }
-      );
-      
-      setNotificationCount(prev => prev + 1);
-      
-      Alert.alert(
-        '알림 전송 성공',
-        `알림이 성공적으로 전송되었습니다. (ID: ${notificationId})`,
-        [{ text: '확인' }]
-      );
+      }, 300);
     } catch (error) {
-      Alert.alert(
-        '알림 전송 실패',
-        `오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`,
-        [{ text: '확인' }]
-      );
-    } finally {
-      setIsLoading(false);
+      console.error('즉시 알림 전송 중 오류 발생:', error);
+      
+      // 오류 메시지 표시
+      setTimeout(() => {
+        try {
+          Alert.alert(
+            '알림 전송 실패',
+            `오류가 발생했습니다: ${error?.message || '알 수 없는 오류'}`,
+            [{ text: '확인' }]
+          );
+        } catch (alertError) {
+          console.error('알림 오류 메시지 표시 오류:', alertError);
+        } finally {
+          setIsLoading(false);
+        }
+      }, 300);
     }
   };
 

@@ -139,7 +139,7 @@ const AppContent = () => {
           // 업데이트 자동 적용
           console.log('업데이트 자동 적용 시작...');
           try {
-            await Updates.reloadAsync();
+          await Updates.reloadAsync();
           } catch (reloadError) {
             console.error('업데이트 적용 오류:', reloadError);
             setUpdateError(`업데이트 적용 오류: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`);
@@ -310,9 +310,9 @@ const AppContent = () => {
       };
     } else {
       // 웹 환경에서는 앱 상태 변경 리스너만 정리
-      return () => {
+    return () => {
         subscription.remove();
-      };
+    };
     }
     
     // 업데이트 확인
@@ -328,7 +328,7 @@ const AppContent = () => {
   
   // 데이터 초기화 중이면 로딩 화면 표시
   if (isLoading) {
-    return (
+  return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
         <Text style={styles.loadingText}>데이터를 불러오는 중...</Text>
@@ -342,7 +342,7 @@ const AppContent = () => {
 export default function App() {
   return (
     <Provider store={store}>
-      <AppContent />
+        <AppContent />
     </Provider>
   );
 }

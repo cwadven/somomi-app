@@ -250,11 +250,29 @@ class PushNotificationService {
   handleNotificationAction(data) {
     if (!data) return;
     
-    const deepLink = this.buildDeepLinkFromNotificationData(data);
-    if (deepLink) {
-      Linking.openURL(deepLink).catch(err => {
-        console.error('딥링크 오류:', err);
-      });
+    try {
+      const deepLink = this.buildDeepLinkFromNotificationData(data);
+      if (deepLink) {
+        console.log('알림에서 딥링크 열기:', deepLink);
+        
+        // 딥링크 열기 전에 약간의 지연을 줘서 UI 스레드 블로킹 방지
+        setTimeout(() => {
+          Linking.openURL(deepLink).catch(err => {
+            console.error('딥링크 열기 실패:', err);
+            
+            // 딥링크 실패 시 기본 화면으로 이동 시도
+            try {
+              Linking.openURL('somomi://home').catch(() => {
+                console.error('기본 화면으로 이동 실패');
+              });
+            } catch (fallbackError) {
+              console.error('기본 화면 이동 중 오류:', fallbackError);
+            }
+          });
+        }, 300);
+      }
+    } catch (error) {
+      console.error('알림 액션 처리 중 오류 발생:', error);
     }
   }
 
@@ -286,12 +304,19 @@ class PushNotificationService {
   // 로컬 알림 전송 함수 (Notifee 사용)
   async sendLocalNotification(title, body, data = {}, delay = 0) {
     if (Platform.OS === 'web') {
-      console.log('웹에서는 알림을 지원하지 않습니다.');
+      console.log('웹 환경에서는 알림을 지원하지 않습니다.');
       return null;
     }
     
     try {
-      const hasPermission = await this.requestNotificationPermission();
+      // 알림 권한 확인
+      let hasPermission = false;
+      try {
+        hasPermission = await this.requestNotificationPermission();
+      } catch (permError) {
+        console.error('알림 권한 확인 오류:', permError);
+      }
+      
       if (!hasPermission) {
         console.log('알림 권한이 거부되었습니다.');
         return null;
@@ -363,8 +388,13 @@ class PushNotificationService {
         console.log(`${delay}초 후 알림 예약 완료:`, notificationId);
       } else {
         // 즉시 알림 표시
-        await notifee.displayNotification(notificationConfig);
-        console.log('즉시 알림 전송 완료:', notificationId);
+        try {
+          await notifee.displayNotification(notificationConfig);
+          console.log('즉시 알림 전송 완료:', notificationId);
+        } catch (displayError) {
+          console.error('즉시 알림 표시 오류:', displayError);
+          // 오류가 발생해도 notificationId는 반환
+        }
       }
       
       return notificationId;

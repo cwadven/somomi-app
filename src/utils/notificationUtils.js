@@ -131,12 +131,34 @@ export const scheduleLocationNotification = async (
  * @returns {Promise<string>} - 알림 ID
  */
 export const sendImmediateNotification = async (title, body, data = {}) => {
-  if (Platform.OS === 'web' || !pushNotificationService) {
-    console.log('웹 환경이거나 알림 서비스를 사용할 수 없습니다.');
+  if (Platform.OS === 'web') {
+    console.log('웹 환경에서는 알림을 지원하지 않습니다.');
+    return null;
+  }
+  
+  if (!pushNotificationService) {
+    console.error('알림 서비스가 초기화되지 않았습니다.');
     return null;
   }
   
   try {
+    // 알림 전송 전 안전 확인
+    if (!title || typeof title !== 'string') {
+      console.error('알림 제목이 유효하지 않습니다:', title);
+      title = '알림';
+    }
+    
+    if (!body || typeof body !== 'string') {
+      console.error('알림 내용이 유효하지 않습니다:', body);
+      body = '새로운 알림이 있습니다.';
+    }
+    
+    if (!data || typeof data !== 'object') {
+      console.error('알림 데이터가 유효하지 않습니다:', data);
+      data = {};
+    }
+    
+    // 알림 전송
     return await pushNotificationService.sendLocalNotification(title, body, data, 0);
   } catch (error) {
     console.error('즉시 알림 전송 실패:', error);
@@ -227,13 +249,13 @@ export const initializeNotifications = () => {
   }
   
   try {
-    // Firebase Cloud Messaging 백그라운드 핸들러 설정
-    messaging().setBackgroundMessageHandler(async remoteMessage => {
-      console.log('백그라운드 메시지 처리:', remoteMessage);
-      return Promise.resolve();
-    });
-    
-    pushNotificationService.setupNotificationHandler();
+  // Firebase Cloud Messaging 백그라운드 핸들러 설정
+  messaging().setBackgroundMessageHandler(async remoteMessage => {
+    console.log('백그라운드 메시지 처리:', remoteMessage);
+    return Promise.resolve();
+  });
+  
+  pushNotificationService.setupNotificationHandler();
   } catch (error) {
     console.error('알림 초기화 실패:', error);
   }
@@ -249,7 +271,7 @@ export const cleanupNotifications = () => {
   }
   
   try {
-    pushNotificationService.cleanupNotificationHandler();
+  pushNotificationService.cleanupNotificationHandler();
   } catch (error) {
     console.error('알림 정리 실패:', error);
   }
