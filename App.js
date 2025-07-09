@@ -1,13 +1,14 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useCallback } from 'react';
 import { Provider, useDispatch } from 'react-redux';
-import { Platform, StyleSheet, Linking, AppState, View, ActivityIndicator, Text } from 'react-native';
+import { Platform, StyleSheet, Linking, AppState, View, ActivityIndicator, Text, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, getAnonymousToken } from './src/redux/slices/authSlice';
 import * as Updates from 'expo-updates';
 import Constants from 'expo-constants';
 import CodePushUpdateLoading from './src/components/CodePushUpdateLoading';
+import { Ionicons } from '@expo/vector-icons';
 import { 
   initializeNotifications, 
   cleanupNotifications, 
@@ -69,6 +70,20 @@ const AppContent = () => {
   const [appState, setAppState] = useState(AppState.currentState);
   const [dataInitialized, setDataInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // 디버깅 모달 상태
+  const [showDebugModal, setShowDebugModal] = useState(false);
+  const [updateLogs, setUpdateLogs] = useState([]);
+  const [updateStatus, setUpdateStatus] = useState('idle'); // 'idle', 'checking', 'downloading', 'ready', 'error'
+
+  // 로그 추가 함수
+  const addLog = useCallback((message, type = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    setUpdateLogs(prevLogs => [
+      ...prevLogs,
+      { message, timestamp, type }
+    ]);
+  }, []);
 
   // Firebase 푸시 토큰 등록
   const registerForPushNotificationsAsync = async () => {
@@ -110,6 +125,8 @@ const AppContent = () => {
     
     try {
       console.log('업데이트 확인 시작...');
+      addLog('업데이트 확인 시작...', 'info');
+      setUpdateStatus('checking');
       
       // Updates.isEnabled 확인
       const isEnabled = typeof Updates.isEnabled === 'function' 
@@ -118,47 +135,67 @@ const AppContent = () => {
       
       if (!isEnabled) {
         console.log('expo-updates가 활성화되어 있지 않습니다.');
+        addLog('expo-updates가 활성화되어 있지 않습니다.', 'warning');
+        setUpdateStatus('error');
         return;
       }
       
       setUpdateError(null);
       
       console.log('업데이트 확인 중...');
+      addLog('업데이트 확인 중...', 'info');
       const update = await Updates.checkForUpdateAsync();
       console.log('업데이트 확인 결과:', JSON.stringify(update));
+      addLog(`업데이트 확인 결과: ${JSON.stringify(update)}`, 'info');
       
       if (update.isAvailable) {
         console.log('새 업데이트가 있습니다. 다운로드 시작...');
+        addLog('새 업데이트가 있습니다. 다운로드 시작...', 'success');
+        setUpdateStatus('downloading');
         setIsUpdating(true);
         
         try {
           // 업데이트 다운로드
           const fetchResult = await Updates.fetchUpdateAsync();
           console.log('업데이트 다운로드 완료:', JSON.stringify(fetchResult));
+          addLog(`업데이트 다운로드 완료: ${JSON.stringify(fetchResult)}`, 'success');
+          setUpdateStatus('ready');
           
           // 업데이트 자동 적용
           console.log('업데이트 자동 적용 시작...');
+          addLog('업데이트 자동 적용 시작...', 'info');
           try {
-          await Updates.reloadAsync();
+            await Updates.reloadAsync();
           } catch (reloadError) {
             console.error('업데이트 적용 오류:', reloadError);
-            setUpdateError(`업데이트 적용 오류: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`);
+            const errorMsg = `업데이트 적용 오류: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`;
+            addLog(errorMsg, 'error');
+            setUpdateError(errorMsg);
+            setUpdateStatus('error');
             setIsUpdating(false);
           }
         } catch (fetchError) {
           console.error('Update fetch error:', fetchError);
-          setUpdateError(`업데이트 다운로드 오류: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
+          const errorMsg = `업데이트 다운로드 오류: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`;
+          addLog(errorMsg, 'error');
+          setUpdateError(errorMsg);
+          setUpdateStatus('error');
           setIsUpdating(false);
         }
       } else {
         console.log('사용 가능한 업데이트가 없습니다.');
+        addLog('사용 가능한 업데이트가 없습니다.', 'info');
+        setUpdateStatus('idle');
       }
     } catch (error) {
       console.error('Error checking for updates:', error);
-      setUpdateError(`업데이트 확인 오류: ${error instanceof Error ? error.message : String(error)}`);
+      const errorMsg = `업데이트 확인 오류: ${error instanceof Error ? error.message : String(error)}`;
+      addLog(errorMsg, 'error');
+      setUpdateError(errorMsg);
+      setUpdateStatus('error');
       setIsUpdating(false);
     }
-  }, []);
+  }, [addLog]);
   
   // 앱 상태 변경 핸들러
   const handleAppStateChange = useCallback((nextAppState) => {
@@ -321,22 +358,130 @@ const AppContent = () => {
     }
   }, [dispatch, checkForUpdates, handleAppStateChange]);
   
+  // 업데이트 디버깅 모달
+  const UpdateDebugModal = () => (
+    <Modal
+      visible={showDebugModal}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowDebugModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>업데이트 디버깅</Text>
+            <TouchableOpacity onPress={() => setShowDebugModal(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusLabel}>상태:</Text>
+            <View style={[styles.statusBadge, styles[`status_${updateStatus}`]]}>
+              <Text style={styles.statusText}>
+                {updateStatus === 'idle' && '대기 중'}
+                {updateStatus === 'checking' && '확인 중'}
+                {updateStatus === 'downloading' && '다운로드 중'}
+                {updateStatus === 'ready' && '준비 완료'}
+                {updateStatus === 'error' && '오류 발생'}
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.infoContainer}>
+            <Text style={styles.infoLabel}>Runtime Version:</Text>
+            <Text style={styles.infoValue}>{Constants.expoConfig?.runtimeVersion?.policy || '알 수 없음'}</Text>
+          </View>
+          
+          <View style={styles.infoContainer}>
+            <Text style={styles.infoLabel}>Update URL:</Text>
+            <Text style={styles.infoValue} numberOfLines={1}>
+              {Constants.expoConfig?.updates?.url || '알 수 없음'}
+            </Text>
+          </View>
+          
+          <Text style={styles.logTitle}>업데이트 로그:</Text>
+          
+          <ScrollView style={styles.logContainer}>
+            {updateLogs.length === 0 ? (
+              <Text style={styles.emptyLogText}>로그가 없습니다.</Text>
+            ) : (
+              updateLogs.map((log, index) => (
+                <View key={index} style={styles.logItem}>
+                  <Text style={styles.logTimestamp}>{log.timestamp}</Text>
+                  <Text style={[styles.logMessage, styles[`log_${log.type}`]]}>
+                    {log.message}
+                  </Text>
+                </View>
+              ))
+            )}
+          </ScrollView>
+          
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity 
+              style={[styles.button, styles.checkButton]} 
+              onPress={checkForUpdates}
+            >
+              <Text style={styles.buttonText}>업데이트 확인</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.button, styles.closeButton]} 
+              onPress={() => setShowDebugModal(false)}
+            >
+              <Text style={styles.buttonText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+  
   // 업데이트 로딩 중이거나 데이터 초기화 중이면 로딩 화면 표시
   if (isUpdating) {
-    return <CodePushUpdateLoading error={updateError} />;
+    return (
+      <>
+        <CodePushUpdateLoading error={updateError} />
+        <TouchableOpacity 
+          style={styles.debugButton}
+          onPress={() => setShowDebugModal(true)}
+        >
+          <Ionicons name="bug-outline" size={24} color="#fff" />
+        </TouchableOpacity>
+        <UpdateDebugModal />
+      </>
+    );
   }
   
   // 데이터 초기화 중이면 로딩 화면 표시
   if (isLoading) {
-  return (
+    return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
         <Text style={styles.loadingText}>데이터를 불러오는 중...</Text>
+        <TouchableOpacity 
+          style={styles.debugButton}
+          onPress={() => setShowDebugModal(true)}
+        >
+          <Ionicons name="bug-outline" size={24} color="#fff" />
+        </TouchableOpacity>
+        <UpdateDebugModal />
       </View>
     );
   }
   
-  return <AppNavigator linking={linking} />;
+  return (
+    <>
+      <AppNavigator linking={linking} />
+      <TouchableOpacity 
+        style={styles.debugButton}
+        onPress={() => setShowDebugModal(true)}
+      >
+        <Ionicons name="bug-outline" size={24} color="#fff" />
+      </TouchableOpacity>
+      <UpdateDebugModal />
+    </>
+  );
 };
 
 export default function App() {
@@ -373,5 +518,167 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
+  },
+  debugButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    zIndex: 1000,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxHeight: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  statusLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginRight: 10,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
+  },
+  status_idle: {
+    backgroundColor: '#e0e0e0',
+  },
+  status_checking: {
+    backgroundColor: '#90CAF9',
+  },
+  status_downloading: {
+    backgroundColor: '#FFD54F',
+  },
+  status_ready: {
+    backgroundColor: '#A5D6A7',
+  },
+  status_error: {
+    backgroundColor: '#EF9A9A',
+  },
+  statusText: {
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  infoContainer: {
+    flexDirection: 'row',
+    marginBottom: 5,
+  },
+  infoLabel: {
+    fontWeight: 'bold',
+    width: 120,
+  },
+  infoValue: {
+    flex: 1,
+  },
+  logTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  logContainer: {
+    maxHeight: 300,
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
+  },
+  emptyLogText: {
+    fontStyle: 'italic',
+    color: '#999',
+    textAlign: 'center',
+    padding: 20,
+  },
+  logItem: {
+    marginBottom: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    paddingBottom: 5,
+  },
+  logTimestamp: {
+    fontSize: 12,
+    color: '#999',
+  },
+  logMessage: {
+    fontSize: 14,
+  },
+  log_info: {
+    color: '#2196F3',
+  },
+  log_success: {
+    color: '#4CAF50',
+  },
+  log_warning: {
+    color: '#FF9800',
+  },
+  log_error: {
+    color: '#F44336',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  checkButton: {
+    backgroundColor: '#4CAF50',
+  },
+  closeButton: {
+    backgroundColor: '#9E9E9E',
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
