@@ -54,7 +54,11 @@ export const scheduleProductExpiryNotification = async (
 
     // 알림 내용 설정
     const title = `${productName} 유통기한 알림`;
-    const body = `${productName}의 유통기한이 ${daysBeforeExpiry}일 남았습니다.`;
+    // 0일인 경우 당일 알림 메시지 사용
+    const body = daysBeforeExpiry === 0
+      ? `${productName}의 유통기한이 오늘까지입니다.`
+      : `${productName}의 유통기한이 ${daysBeforeExpiry}일 남았습니다.`;
+    
     const data = {
       type: 'product',
       productId,

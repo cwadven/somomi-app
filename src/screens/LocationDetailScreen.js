@@ -7,7 +7,8 @@ import {
   FlatList,
   Alert,
   Modal,
-  ActivityIndicator
+  ActivityIndicator,
+  ScrollView
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -283,10 +284,12 @@ const LocationDetailScreen = () => {
           )}
         </>
       ) : (
-        <LocationNotificationSettings 
-          locationId={locationId}
-          location={currentLocation}
-        />
+        <ScrollView style={styles.scrollContainer}>
+          <LocationNotificationSettings 
+            locationId={locationId}
+            location={currentLocation}
+          />
+        </ScrollView>
       )}
       
       <DeleteConfirmModal />
@@ -502,6 +505,9 @@ const styles = StyleSheet.create({
   },
   notificationsContainer: {
     padding: 16,
+  },
+  scrollContainer: {
+    flex: 1,
   },
 });
 

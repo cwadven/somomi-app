@@ -13,7 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { 
   fetchLocationNotifications, 
   updateNotification, 
-  addNotification 
+  addNotification,
+  applyLocationNotifications
 } from '../redux/slices/notificationsSlice';
 
 /**
@@ -47,14 +48,24 @@ const LocationNotificationSettings = ({ locationId, location }) => {
       const expiryNotification = currentNotifications.find(n => n.notifyType === 'expiry');
       if (expiryNotification) {
         setExpiryEnabled(expiryNotification.isActive);
-        setExpiryDays(expiryNotification.daysBeforeTarget.toString());
+        // null 체크 추가
+        if (expiryNotification.daysBeforeTarget !== null && expiryNotification.daysBeforeTarget !== undefined) {
+          setExpiryDays(expiryNotification.daysBeforeTarget.toString());
+        } else {
+          setExpiryDays(''); // 빈 값 설정
+        }
       }
       
       // 소진예상 알림 설정 찾기
       const estimatedNotification = currentNotifications.find(n => n.notifyType === 'estimated');
       if (estimatedNotification) {
         setEstimatedEnabled(estimatedNotification.isActive);
-        setEstimatedDays(estimatedNotification.daysBeforeTarget.toString());
+        // null 체크 추가
+        if (estimatedNotification.daysBeforeTarget !== null && estimatedNotification.daysBeforeTarget !== undefined) {
+          setEstimatedDays(estimatedNotification.daysBeforeTarget.toString());
+        } else {
+          setEstimatedDays(''); // 빈 값 설정
+        }
       }
       
       // AI 알림 설정 찾기
@@ -79,13 +90,18 @@ const LocationNotificationSettings = ({ locationId, location }) => {
     try {
       // 유통기한 알림 설정 저장
       const expiryNotification = currentNotifications.find(n => n.notifyType === 'expiry');
+      // 일수 값 처리 - 빈 값이면 null 사용
+      const parsedExpiryDays = expiryDays.trim() === '' ? null : parseInt(expiryDays);
+      // 0 이상인 경우 유효한 값으로 처리
+      const safeExpiryDays = (parsedExpiryDays !== null && !isNaN(parsedExpiryDays) && parsedExpiryDays >= 0) ? parsedExpiryDays : null;
+      
       if (expiryNotification) {
         // 기존 설정 업데이트
         await dispatch(updateNotification({
           id: expiryNotification.id,
           data: {
             isActive: expiryEnabled,
-            daysBeforeTarget: parseInt(expiryDays) || 7
+            daysBeforeTarget: safeExpiryDays
           }
         })).unwrap();
       } else {
@@ -96,7 +112,7 @@ const LocationNotificationSettings = ({ locationId, location }) => {
           title: `${location.title} 유통기한 알림`,
           message: `${location.title} 영역의 제품 유통기한 알림 설정입니다.`,
           notifyType: 'expiry',
-          daysBeforeTarget: parseInt(expiryDays) || 7,
+          daysBeforeTarget: safeExpiryDays,
           isActive: expiryEnabled,
           isRepeating: false
         })).unwrap();
@@ -104,13 +120,18 @@ const LocationNotificationSettings = ({ locationId, location }) => {
       
       // 소진예상 알림 설정 저장
       const estimatedNotification = currentNotifications.find(n => n.notifyType === 'estimated');
+      // 일수 값 처리 - 빈 값이면 null 사용
+      const parsedEstimatedDays = estimatedDays.trim() === '' ? null : parseInt(estimatedDays);
+      // 0 이상인 경우 유효한 값으로 처리
+      const safeEstimatedDays = (parsedEstimatedDays !== null && !isNaN(parsedEstimatedDays) && parsedEstimatedDays >= 0) ? parsedEstimatedDays : null;
+      
       if (estimatedNotification) {
         // 기존 설정 업데이트
         await dispatch(updateNotification({
           id: estimatedNotification.id,
           data: {
             isActive: estimatedEnabled,
-            daysBeforeTarget: parseInt(estimatedDays) || 7
+            daysBeforeTarget: safeEstimatedDays
           }
         })).unwrap();
       } else {
@@ -121,7 +142,7 @@ const LocationNotificationSettings = ({ locationId, location }) => {
           title: `${location.title} 소진예상 알림`,
           message: `${location.title} 영역의 제품 소진예상 알림 설정입니다.`,
           notifyType: 'estimated',
-          daysBeforeTarget: parseInt(estimatedDays) || 7,
+          daysBeforeTarget: safeEstimatedDays,
           isActive: estimatedEnabled,
           isRepeating: false
         })).unwrap();
@@ -151,7 +172,13 @@ const LocationNotificationSettings = ({ locationId, location }) => {
         })).unwrap();
       }
       
-      Alert.alert('성공', '알림 설정이 저장되었습니다.');
+      // 영역의 알림 설정을 해당 영역의 모든 제품에 적용
+      await dispatch(applyLocationNotifications({
+        locationId,
+        applyToExisting: true // 기존 제품 알림도 업데이트
+      })).unwrap();
+      
+      Alert.alert('성공', '알림 설정이 저장되었습니다. 이 영역의 모든 제품에 알림 설정이 적용됩니다.');
     } catch (error) {
       console.error('알림 설정 저장 오류:', error);
       Alert.alert('오류', '알림 설정을 저장하는 중 오류가 발생했습니다.');
@@ -160,9 +187,15 @@ const LocationNotificationSettings = ({ locationId, location }) => {
   
   // 일수 입력 검증
   const validateDays = (text, setter) => {
+    // 빈 문자열이나 null 값 처리
+    if (!text || text.trim() === '') {
+      setter(''); // 빈 값 유지
+      return;
+    }
+    
     const numValue = parseInt(text);
-    if (isNaN(numValue) || numValue < 1) {
-      setter('1');
+    if (isNaN(numValue) || numValue < 0) { // 0 이상으로 변경
+      setter('0'); // 최소값을 0으로 설정
     } else if (numValue > 30) {
       setter('30');
     } else {
@@ -271,6 +304,7 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#fff',
     borderRadius: 8,
+    paddingBottom: 32, // 하단 여백 추가
   },
   title: {
     fontSize: 18,
@@ -339,6 +373,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     marginTop: 16,
+    marginBottom: 24, // 버튼 아래 여백 추가
   },
   saveButtonText: {
     color: '#fff',

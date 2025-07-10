@@ -15,6 +15,10 @@ import {
   updateNotification, 
   addNotification 
 } from '../redux/slices/notificationsSlice';
+import { 
+  scheduleProductExpiryNotification,
+  cancelNotification
+} from '../utils/notificationUtils';
 
 /**
  * 제품별 알림 설정 컴포넌트
@@ -46,14 +50,24 @@ const ProductNotificationSettings = ({ productId, product }) => {
       const expiryNotification = currentNotifications.find(n => n.notifyType === 'expiry');
       if (expiryNotification) {
         setExpiryEnabled(expiryNotification.isActive);
-        setExpiryDays(expiryNotification.daysBeforeTarget.toString());
+        // null 체크 추가
+        if (expiryNotification.daysBeforeTarget !== null && expiryNotification.daysBeforeTarget !== undefined) {
+          setExpiryDays(expiryNotification.daysBeforeTarget.toString());
+        } else {
+          setExpiryDays(''); // 빈 값 설정
+        }
       }
       
       // 소진예상 알림 설정 찾기
       const estimatedNotification = currentNotifications.find(n => n.notifyType === 'estimated');
       if (estimatedNotification) {
         setEstimatedEnabled(estimatedNotification.isActive);
-        setEstimatedDays(estimatedNotification.daysBeforeTarget.toString());
+        // null 체크 추가
+        if (estimatedNotification.daysBeforeTarget !== null && estimatedNotification.daysBeforeTarget !== undefined) {
+          setEstimatedDays(estimatedNotification.daysBeforeTarget.toString());
+        } else {
+          setEstimatedDays(''); // 빈 값 설정
+        }
       }
     }
   }, [currentNotifications]);
@@ -72,55 +86,119 @@ const ProductNotificationSettings = ({ productId, product }) => {
     try {
       // 유통기한 알림 설정 저장
       const expiryNotification = currentNotifications.find(n => n.notifyType === 'expiry');
+      // 일수 값 처리 - 빈 값이면 null 사용
+      const parsedExpiryDays = expiryDays.trim() === '' ? null : parseInt(expiryDays);
+      // 0 이상인 경우 유효한 값으로 처리
+      const safeExpiryDays = (parsedExpiryDays !== null && !isNaN(parsedExpiryDays) && parsedExpiryDays >= 0) ? parsedExpiryDays : null;
+      
       if (expiryNotification) {
+        // 기존 알림 취소
+        await cancelNotification(expiryNotification.id);
+        
         // 기존 설정 업데이트
         await dispatch(updateNotification({
           id: expiryNotification.id,
           data: {
             isActive: expiryEnabled,
-            daysBeforeTarget: parseInt(expiryDays) || 7
+            daysBeforeTarget: safeExpiryDays
           }
         })).unwrap();
+        
+        // 알림이 활성화된 경우 새로 스케줄링 (daysBeforeTarget이 null이 아닌 경우만)
+        if (expiryEnabled && product.expiryDate && safeExpiryDays !== null) {
+          const expiryDate = new Date(product.expiryDate);
+          await scheduleProductExpiryNotification(
+            productId,
+            product.name,
+            expiryDate,
+            safeExpiryDays
+          );
+        }
       } else if (product.expiryDate) {
         // 새 설정 추가 (유통기한이 있는 경우에만)
         await dispatch(addNotification({
           type: 'product',
           targetId: productId,
           title: `${product.name} 유통기한 알림`,
-          message: `${product.name}의 유통기한이 ${expiryDays}일 남았습니다.`,
+          message: safeExpiryDays === 0 
+            ? `${product.name}의 유통기한이 오늘까지입니다.` 
+            : `${product.name}의 유통기한이 ${safeExpiryDays !== null ? safeExpiryDays + '일' : ''} 남았습니다.`,
           notifyType: 'expiry',
-          daysBeforeTarget: parseInt(expiryDays) || 7,
+          daysBeforeTarget: safeExpiryDays,
           isActive: expiryEnabled,
           isRepeating: false
         })).unwrap();
+        
+        // 알림이 활성화된 경우 스케줄링 (daysBeforeTarget이 null이 아닌 경우만)
+        if (expiryEnabled && safeExpiryDays !== null) {
+          const expiryDate = new Date(product.expiryDate);
+          await scheduleProductExpiryNotification(
+            productId,
+            product.name,
+            expiryDate,
+            safeExpiryDays
+          );
+        }
       }
       
       // 소진예상 알림 설정 저장
       const estimatedNotification = currentNotifications.find(n => n.notifyType === 'estimated');
+      // 일수 값 처리 - 빈 값이면 null 사용
+      const parsedEstimatedDays = estimatedDays.trim() === '' ? null : parseInt(estimatedDays);
+      // 0 이상인 경우 유효한 값으로 처리
+      const safeEstimatedDays = (parsedEstimatedDays !== null && !isNaN(parsedEstimatedDays) && parsedEstimatedDays >= 0) ? parsedEstimatedDays : null;
+      
       if (estimatedNotification) {
+        // 기존 알림 취소
+        await cancelNotification(estimatedNotification.id);
+        
         // 기존 설정 업데이트
         await dispatch(updateNotification({
           id: estimatedNotification.id,
           data: {
             isActive: estimatedEnabled,
-            daysBeforeTarget: parseInt(estimatedDays) || 7
+            daysBeforeTarget: safeEstimatedDays
           }
         })).unwrap();
+        
+        // 알림이 활성화된 경우 새로 스케줄링 (daysBeforeTarget이 null이 아닌 경우만)
+        if (estimatedEnabled && product.estimatedEndDate && safeEstimatedDays !== null) {
+          const estimatedEndDate = new Date(product.estimatedEndDate);
+          await scheduleProductExpiryNotification(
+            productId,
+            product.name,
+            estimatedEndDate,
+            safeEstimatedDays
+          );
+        }
       } else if (product.estimatedEndDate) {
         // 새 설정 추가 (소진예상일이 있는 경우에만)
         await dispatch(addNotification({
           type: 'product',
           targetId: productId,
           title: `${product.name} 소진예상 알림`,
-          message: `${product.name}의 소진예상일이 ${estimatedDays}일 남았습니다.`,
+          message: safeEstimatedDays === 0 
+            ? `${product.name}이(가) 오늘 소진될 예정입니다.` 
+            : `${product.name}이(가) ${safeEstimatedDays !== null ? safeEstimatedDays + '일' : ''} 후에 소진될 예정입니다.`,
           notifyType: 'estimated',
-          daysBeforeTarget: parseInt(estimatedDays) || 7,
+          daysBeforeTarget: safeEstimatedDays,
           isActive: estimatedEnabled,
           isRepeating: false
         })).unwrap();
+        
+        // 알림이 활성화된 경우 스케줄링 (daysBeforeTarget이 null이 아닌 경우만)
+        if (estimatedEnabled && safeEstimatedDays !== null) {
+          const estimatedEndDate = new Date(product.estimatedEndDate);
+          await scheduleProductExpiryNotification(
+            productId,
+            product.name,
+            estimatedEndDate,
+            safeEstimatedDays
+          );
+        }
       }
       
-      Alert.alert('성공', '알림 설정이 저장되었습니다.');
+      Alert.alert('성공', '알림 설정이 저장되었습니다. 설정한 날짜에 알림을 받게 됩니다.');
     } catch (error) {
       console.error('알림 설정 저장 오류:', error);
       Alert.alert('오류', '알림 설정을 저장하는 중 오류가 발생했습니다.');
@@ -129,9 +207,15 @@ const ProductNotificationSettings = ({ productId, product }) => {
   
   // 일수 입력 검증
   const validateDays = (text, setter) => {
+    // 빈 문자열이나 null 값 처리
+    if (!text || text.trim() === '') {
+      setter(''); // 빈 값 유지
+      return;
+    }
+    
     const numValue = parseInt(text);
-    if (isNaN(numValue) || numValue < 1) {
-      setter('1');
+    if (isNaN(numValue) || numValue < 0) { // 0 이상으로 변경
+      setter('0'); // 최소값을 0으로 설정
     } else if (numValue > 30) {
       setter('30');
     } else {

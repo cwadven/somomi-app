@@ -292,51 +292,178 @@ export const applyLocationNotifications = createAsyncThunk(
       const { products } = getState().products;
       const locationProducts = products.filter(p => p.locationId === locationId);
       
+      if (locationProducts.length === 0) {
+        console.log('해당 영역에 제품이 없습니다.');
+        return [];
+      }
+      
+      console.log(`영역 ${locationId}에 속한 제품 ${locationProducts.length}개에 알림 설정 적용 중...`);
+      
       // 각 제품에 영역 알림 설정 적용
       const newNotifications = [];
       
       for (const product of locationProducts) {
-        // 기존 제품 알림 필터링 (applyToExisting이 false인 경우 기존 알림 유지)
-        if (!applyToExisting) {
+        // 기존 제품 알림 취소 (applyToExisting이 true인 경우)
+        if (applyToExisting) {
+          const existingProductNotifications = sampleNotifications.filter(
+            n => n.type === 'product' && n.targetId === product.id
+          );
+          
+          // 기존 알림 취소
+          for (const notification of existingProductNotifications) {
+            try {
+              await cancelNotification(notification.id);
+              
+              // 메모리에서 제거
+              const index = sampleNotifications.findIndex(n => n.id === notification.id);
+              if (index !== -1) {
+                sampleNotifications.splice(index, 1);
+              }
+            } catch (cancelError) {
+              console.error(`알림 취소 오류(ID: ${notification.id}):`, cancelError);
+            }
+          }
+        } else {
+          // applyToExisting이 false인 경우, 기존 알림이 있으면 건너뜀
           const existingProductNotifications = sampleNotifications.filter(
             n => n.type === 'product' && n.targetId === product.id
           );
           
           if (existingProductNotifications.length > 0) {
+            console.log(`제품 ${product.id}에 이미 알림이 설정되어 있어 건너뜁니다.`);
             continue;
           }
         }
         
         // 영역 알림 설정을 제품에 적용
         for (const locationNotification of locationNotifications) {
-          const maxId = sampleNotifications.length > 0 
-            ? Math.max(...sampleNotifications.map(n => parseInt(n.id) || 0))
-            : 0;
-          const newId = (maxId + 1).toString();
+          // AI 알림은 제품별로 적용하지 않음
+          if (locationNotification.notifyType === 'ai') {
+            continue;
+          }
           
-          const newNotification = {
-            id: newId,
-            type: 'product',
-            targetId: product.id,
-            title: `${product.name} ${locationNotification.notifyType === 'expiry' ? '유통기한' : '소진 예상'} 알림`,
-            message: `${product.name}의 ${locationNotification.notifyType === 'expiry' ? '유통기한' : '소진 예상일'}이 ${locationNotification.daysBeforeTarget}일 남았습니다.`,
-            notifyType: locationNotification.notifyType,
-            daysBeforeTarget: locationNotification.daysBeforeTarget,
-            isActive: locationNotification.isActive,
-            isRepeating: locationNotification.isRepeating,
-            createdAt: new Date().toISOString(),
-          };
+          // 알림 ID 생성
+          const notificationId = `notification_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
           
-          sampleNotifications.push(newNotification);
-          newNotifications.push(newNotification);
+          // 알림 타입에 따라 다르게 처리
+          if (locationNotification.notifyType === 'expiry') {
+            // 유통기한 알림
+            if (product.expiryDate) {
+              const expiryDate = new Date(product.expiryDate);
+              
+              // 알림 예약
+              try {
+                // daysBeforeTarget 값 확인
+                if (locationNotification.daysBeforeTarget === null || 
+                    locationNotification.daysBeforeTarget === undefined || 
+                    isNaN(locationNotification.daysBeforeTarget)) {
+                  console.log(`제품 ${product.id}의 유통기한 알림 일수가 설정되지 않았습니다.`);
+                  continue; // 알림 생성하지 않고 건너뜀
+                }
+                
+                const daysBeforeTarget = locationNotification.daysBeforeTarget;
+                const title = `${product.name} 유통기한 알림`;
+                const message = daysBeforeTarget === 0
+                  ? `${product.name}의 유통기한이 오늘까지입니다.`
+                  : `${product.name}의 유통기한이 ${daysBeforeTarget}일 남았습니다.`;
+                
+                // 알림 스케줄링
+                if (locationNotification.isActive) {
+                  await scheduleProductExpiryNotification(
+                    product.id,
+                    product.name,
+                    expiryDate,
+                    daysBeforeTarget
+                  );
+                }
+                
+                // 알림 객체 생성
+                const newNotification = {
+                  id: notificationId,
+                  type: 'product',
+                  targetId: product.id,
+                  title,
+                  message,
+                  notifyType: 'expiry',
+                  daysBeforeTarget,
+                  isActive: locationNotification.isActive,
+                  isRepeating: locationNotification.isRepeating,
+                  createdAt: new Date().toISOString(),
+                };
+                
+                sampleNotifications.push(newNotification);
+                newNotifications.push(newNotification);
+              } catch (error) {
+                console.error(`제품 ${product.id} 유통기한 알림 설정 오류:`, error);
+              }
+            } else {
+              console.log(`제품 ${product.id}에 유통기한이 설정되어 있지 않아 알림을 생성하지 않습니다.`);
+            }
+          } else if (locationNotification.notifyType === 'estimated') {
+            // 소진예상 알림
+            if (product.estimatedEndDate) {
+              const estimatedEndDate = new Date(product.estimatedEndDate);
+              
+              // 알림 예약
+              try {
+                // daysBeforeTarget 값 확인
+                if (locationNotification.daysBeforeTarget === null || 
+                    locationNotification.daysBeforeTarget === undefined || 
+                    isNaN(locationNotification.daysBeforeTarget)) {
+                  console.log(`제품 ${product.id}의 소진예상 알림 일수가 설정되지 않았습니다.`);
+                  continue; // 알림 생성하지 않고 건너뜀
+                }
+                
+                const daysBeforeTarget = locationNotification.daysBeforeTarget;
+                const title = `${product.name} 소진예상 알림`;
+                const message = daysBeforeTarget === 0
+                  ? `${product.name}이(가) 오늘 소진될 예정입니다.`
+                  : `${product.name}이(가) ${daysBeforeTarget}일 후에 소진될 예정입니다.`;
+                
+                // 알림 스케줄링
+                if (locationNotification.isActive) {
+                  // 소진예상일을 유통기한처럼 처리
+                  await scheduleProductExpiryNotification(
+                    product.id,
+                    product.name,
+                    estimatedEndDate,
+                    daysBeforeTarget
+                  );
+                }
+                
+                // 알림 객체 생성
+                const newNotification = {
+                  id: notificationId,
+                  type: 'product',
+                  targetId: product.id,
+                  title,
+                  message,
+                  notifyType: 'estimated',
+                  daysBeforeTarget,
+                  isActive: locationNotification.isActive,
+                  isRepeating: locationNotification.isRepeating,
+                  createdAt: new Date().toISOString(),
+                };
+                
+                sampleNotifications.push(newNotification);
+                newNotifications.push(newNotification);
+              } catch (error) {
+                console.error(`제품 ${product.id} 소진예상 알림 설정 오류:`, error);
+              }
+            } else {
+              console.log(`제품 ${product.id}에 소진예상일이 설정되어 있지 않아 알림을 생성하지 않습니다.`);
+            }
+          }
         }
       }
       
       // AsyncStorage에 저장
       await saveData(STORAGE_KEYS.NOTIFICATIONS, sampleNotifications);
       
+      console.log(`총 ${newNotifications.length}개의 알림이 생성되었습니다.`);
       return newNotifications;
     } catch (error) {
+      console.error('영역 알림 적용 오류:', error);
       return rejectWithValue(error.message);
     }
   }
