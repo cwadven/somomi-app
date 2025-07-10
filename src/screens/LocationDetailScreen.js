@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { fetchProducts, deleteProductAsync } from '../redux/slices/productsSlice';
 import { deleteLocation, fetchLocationById } from '../redux/slices/locationsSlice';
-import NotificationSettings from '../components/NotificationSettings';
+import LocationNotificationSettings from '../components/LocationNotificationSettings';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
 import ProductCard from '../components/ProductCard';
@@ -283,10 +283,9 @@ const LocationDetailScreen = () => {
           )}
         </>
       ) : (
-        <NotificationSettings 
-          type="location"
-          targetId={locationId}
-          isLocation={true}
+        <LocationNotificationSettings 
+          locationId={locationId}
+          location={currentLocation}
         />
       )}
       
@@ -500,6 +499,9 @@ const styles = StyleSheet.create({
   activeTabButtonText: {
     color: '#4CAF50',
     fontWeight: 'bold',
+  },
+  notificationsContainer: {
+    padding: 16,
   },
 });
 

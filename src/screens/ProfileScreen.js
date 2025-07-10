@@ -8,7 +8,8 @@ import {
   ScrollView,
   Alert,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Modal
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -16,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { logout } from '../redux/slices/authSlice';
 import KakaoLoginButton from '../components/KakaoLoginButton';
 import PushNotificationTest from '../components/PushNotificationTest';
+import NotificationSettings from '../components/NotificationSettings';
 
 const ProfileScreen = () => {
   const dispatch = useDispatch();
@@ -62,6 +64,9 @@ const ProfileScreen = () => {
   const handleLoginError = (errorMsg) => {
     Alert.alert('로그인 실패', errorMsg);
   };
+
+  // 알림 설정 모달 상태
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
 
   // 설정 메뉴 아이템 컴포넌트
   const SettingItem = ({ icon, title, onPress, showBadge = false }) => (
@@ -187,7 +192,7 @@ const ProfileScreen = () => {
             <SettingItem 
               icon="notifications-outline" 
               title="알림 설정" 
-              onPress={() => Alert.alert('알림', '알림 설정 기능은 아직 구현되지 않았습니다.')}
+              onPress={() => setShowNotificationModal(true)}
             />
           </View>
         </>
@@ -225,11 +230,44 @@ const ProfileScreen = () => {
     </ScrollView>
   );
 
+  // 알림 설정 모달
+  const NotificationSettingsModal = () => (
+    <Modal
+      visible={showNotificationModal}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowNotificationModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>알림 설정</Text>
+            <TouchableOpacity onPress={() => setShowNotificationModal(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.modalBody}>
+            <Text style={styles.modalDescription}>
+              앱 전체 알림 설정을 관리합니다. 이 설정을 비활성화하면 모든 알림이 중지됩니다.
+            </Text>
+            <NotificationSettings />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   // 현재 모드에 따라 다른 화면 렌더링
   if (mode === 'login') {
     return renderLoginScreen();
   } else {
-    return renderProfileScreen();
+    return (
+      <>
+        {renderProfileScreen()}
+        <NotificationSettingsModal />
+      </>
+    );
   }
 };
 
@@ -386,6 +424,42 @@ const styles = StyleSheet.create({
   },
   pushTestSection: {
     marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  // 모달 관련 스타일 추가
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    width: '100%',
+    maxWidth: 500,
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  modalBody: {
+    padding: 16,
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 16,
   },
 });

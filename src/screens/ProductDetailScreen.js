@@ -16,7 +16,7 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchProductById, deleteProductAsync, markProductAsConsumedAsync } from '../redux/slices/productsSlice';
 import AlertModal from '../components/AlertModal';
-import NotificationSettings from '../components/NotificationSettings';
+import ProductNotificationSettings from '../components/ProductNotificationSettings';
 
 // HP 바 컴포넌트
 const HPBar = ({ percentage, type }) => {
@@ -452,6 +452,16 @@ const ProductDetailScreen = () => {
     );
   };
   
+  // 알림 설정 탭 내용 렌더링
+  const renderNotificationsTab = () => (
+    <View style={styles.notificationsContainer}>
+      <ProductNotificationSettings 
+        productId={productId}
+        product={currentProduct}
+      />
+    </View>
+  );
+
   return (
     <View style={styles.mainContainer}>
       {/* 탭 메뉴 */}
@@ -491,12 +501,7 @@ const ProductDetailScreen = () => {
       {activeTab === 'details' ? (
         renderProductDetails()
       ) : (
-        <NotificationSettings 
-          type="product"
-          targetId={productId}
-          isLocation={false}
-          locationId={currentProduct?.locationId}
-        />
+        renderNotificationsTab()
       )}
       
       {/* 하단 액션 버튼 */}
@@ -961,6 +966,11 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 8,
     textAlign: 'center',
+  },
+  // 알림 설정 컨테이너 스타일 추가
+  notificationsContainer: {
+    flex: 1,
+    padding: 16,
   },
 });
 
