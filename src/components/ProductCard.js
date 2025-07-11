@@ -31,7 +31,7 @@ const HPBar = ({ percentage, type }) => {
   );
 };
 
-const ProductCard = ({ product, onPress }) => {
+const ProductCard = ({ product, onPress, locationName, showLocation = false }) => {
   // 유통기한 남은 수명 계산 (%)
   const calculateExpiryPercentage = () => {
     if (!product.expiryDate) return null;
@@ -172,6 +172,19 @@ const ProductCard = ({ product, onPress }) => {
             </Text>
             )}
           </View>
+
+          {/* 영역 정보 표시 (showLocation이 true일 때만) */}
+          {showLocation && locationName && (
+            <View style={styles.locationContainer}>
+              <Ionicons name="location-outline" size={14} color={isZeroHP ? "#888" : "#4CAF50"} />
+              <Text style={[
+                styles.locationText,
+                isZeroHP && styles.zeroHPSubText
+              ]}>
+                {locationName}
+              </Text>
+            </View>
+          )}
           
           {/* 유통기한 정보가 있는 경우에만 HP 바 표시 */}
           {product.expiryDate && expiryPercentage !== null && (
@@ -252,90 +265,69 @@ const ProductCard = ({ product, onPress }) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
-    borderRadius: 12,
-    overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    width: '100%',
+    marginBottom: 10,
   },
   card: {
-    backgroundColor: '#fff',
     flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
     padding: 12,
-    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  // HP가 0%인 카드의 스타일
   zeroHPCard: {
-    backgroundColor: '#f0f0f0',
-    borderWidth: 1,
+    backgroundColor: '#f5f5f5',
     borderColor: '#ddd',
+    borderWidth: 1,
   },
   characterImageContainer: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 80,
+    height: 80,
+    borderRadius: 10,
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
     position: 'relative',
   },
-  // HP가 0%인 이미지 컨테이너 스타일
   zeroHPImageContainer: {
     backgroundColor: '#e0e0e0',
   },
-  // 경고 아이콘 컨테이너
   warningIconContainer: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#F44336',
+    bottom: -5,
+    right: -5,
     width: 24,
     height: 24,
     borderRadius: 12,
+    backgroundColor: '#F44336',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  // D-day 뱃지 스타일
-  dDayBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'white',
-  },
-  dDayText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
   },
   infoContainer: {
     flex: 1,
+    justifyContent: 'space-between',
   },
   productName: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 4,
+    color: '#333',
   },
-  // HP가 0%인 텍스트 스타일
   zeroHPText: {
     color: '#888',
   },
   zeroHPSubText: {
-    color: '#999',
+    color: '#aaa',
   },
   brandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   brand: {
     fontSize: 14,
@@ -346,12 +338,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#fff',
     backgroundColor: '#4CAF50',
-    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    paddingHorizontal: 6,
+    borderRadius: 10,
   },
   zeroHPCategory: {
-    backgroundColor: '#9E9E9E',
+    backgroundColor: '#aaa',
   },
   hpSection: {
     marginBottom: 6,
@@ -359,7 +351,24 @@ const styles = StyleSheet.create({
   hpLabelContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 2,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    backgroundColor: '#f5f5f5',
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  locationText: {
+    marginLeft: 4,
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
   },
   hpLabel: {
     fontSize: 12,
@@ -368,6 +377,7 @@ const styles = StyleSheet.create({
   hpPercentage: {
     fontSize: 12,
     color: '#666',
+    fontWeight: 'bold',
   },
   hpBarContainer: {
     height: 6,
@@ -377,21 +387,34 @@ const styles = StyleSheet.create({
   },
   hpBar: {
     height: '100%',
+    borderRadius: 3,
   },
   dateInfo: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginTop: 4,
   },
   dateTextContainer: {
-    flex: 1,
-    flexDirection: 'column',
     marginLeft: 4,
   },
   dateText: {
     fontSize: 12,
     color: '#666',
     marginBottom: 2,
+  },
+  dDayBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dDayText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });
 

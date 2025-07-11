@@ -120,12 +120,21 @@ const LocationDetailScreen = () => {
     setAlertModalVisible(true);
   };
   
-  const renderItem = ({ item }) => (
-    <ProductCard 
-      product={item} 
-      onPress={() => handleProductPress(item.id)}
-    />
-  );
+  const renderItem = ({ item }) => {
+    // 모든 제품 화면에서는 영역 이름을 표시
+    const locationItem = isAllProducts ? 
+      locations.find(loc => loc.id === item.locationId) : null;
+    const locationName = locationItem ? locationItem.title : '미지정 영역';
+    
+    return (
+      <ProductCard 
+        product={item} 
+        onPress={() => handleProductPress(item.id)}
+        locationName={locationName}
+        showLocation={isAllProducts} // 모든 제품 화면에서만 영역 표시
+      />
+    );
+  };
   
   const DeleteConfirmModal = () => (
     <Modal

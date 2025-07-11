@@ -59,33 +59,16 @@ const ProductNotificationSettings = ({ productId, product }) => {
         setEstimatedDays(estimatedNotification.daysBeforeTarget !== null ? estimatedNotification.daysBeforeTarget.toString() : '');
       }
     } else {
-      // 기본 설정 적용
-      // 비회원 사용자는 알림 비활성화
-      if (!isAuthenticated) {
-        setExpiryEnabled(false);
-        setEstimatedEnabled(false);
-      } else {
-        // 회원은 기본값 적용
-        setExpiryEnabled(true);
-        setEstimatedEnabled(true);
-      }
-      
+      // 기본 설정 적용 (비회원도 알림 활성화 가능)
+      setExpiryEnabled(true);
+      setEstimatedEnabled(true);
       setExpiryDays('7');
       setEstimatedDays('7');
     }
-  }, [currentNotifications, isAuthenticated]);
+  }, [currentNotifications]);
   
   // 알림 설정 저장
   const saveNotificationSettings = async () => {
-    if (!isAuthenticated) {
-      Alert.alert(
-        '알림',
-        '알림 설정을 저장하려면 로그인이 필요합니다.',
-        [{ text: '확인', style: 'default' }]
-      );
-      return;
-    }
-    
     try {
       // 유통기한 알림 설정 저장
       const expiryNotification = currentNotifications.find(n => n.notifyType === 'expiry');
@@ -249,24 +232,23 @@ const ProductNotificationSettings = ({ productId, product }) => {
             disabled={!product.expiryDate}
           />
         </View>
+        <View style={[styles.settingItem, styles.daysSettingItem]}>
+          <Text style={styles.settingText}>유통기한 D-</Text>
+          <TextInput
+            style={styles.daysInput}
+            value={expiryDays}
+            onChangeText={(text) => validateDays(text, setExpiryDays)}
+            keyboardType="number-pad"
+            placeholder="7"
+            maxLength={2}
+            editable={expiryEnabled && !!product.expiryDate}
+          />
+          <Text style={styles.daysText}>일 전에 알림</Text>
+        </View>
         {!product.expiryDate && (
           <Text style={styles.warningText}>
-            유통기한이 설정되지 않았습니다. 제품 정보를 수정하여 유통기한을 설정해주세요.
+            유통기한이 설정되지 않았습니다. 유통기한을 먼저 설정해주세요.
           </Text>
-        )}
-        {product.expiryDate && (
-          <View style={[styles.settingItem, styles.daysSettingItem]}>
-            <Text style={styles.settingText}>유통기한 D-</Text>
-            <TextInput
-              style={styles.daysInput}
-              value={expiryDays}
-              onChangeText={(text) => validateDays(text, setExpiryDays)}
-              keyboardType="number-pad"
-              maxLength={2}
-              editable={expiryEnabled}
-            />
-            <Text style={styles.daysText}>일 전에 알림</Text>
-          </View>
         )}
       </View>
       
@@ -286,24 +268,23 @@ const ProductNotificationSettings = ({ productId, product }) => {
             disabled={!product.estimatedEndDate}
           />
         </View>
+        <View style={[styles.settingItem, styles.daysSettingItem]}>
+          <Text style={styles.settingText}>소진예상일 D-</Text>
+          <TextInput
+            style={styles.daysInput}
+            value={estimatedDays}
+            onChangeText={(text) => validateDays(text, setEstimatedDays)}
+            keyboardType="number-pad"
+            placeholder="7"
+            maxLength={2}
+            editable={estimatedEnabled && !!product.estimatedEndDate}
+          />
+          <Text style={styles.daysText}>일 전에 알림</Text>
+        </View>
         {!product.estimatedEndDate && (
           <Text style={styles.warningText}>
-            소진예상일이 설정되지 않았습니다. 제품 정보를 수정하여 소진예상일을 설정해주세요.
+            소진예상일이 설정되지 않았습니다. 소진예상일을 먼저 설정해주세요.
           </Text>
-        )}
-        {product.estimatedEndDate && (
-          <View style={[styles.settingItem, styles.daysSettingItem]}>
-            <Text style={styles.settingText}>소진예상 D-</Text>
-            <TextInput
-              style={styles.daysInput}
-              value={estimatedDays}
-              onChangeText={(text) => validateDays(text, setEstimatedDays)}
-              keyboardType="number-pad"
-              maxLength={2}
-              editable={estimatedEnabled}
-            />
-            <Text style={styles.daysText}>일 전에 알림</Text>
-          </View>
         )}
       </View>
       
@@ -328,6 +309,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 8,
+    color: '#333',
   },
   description: {
     fontSize: 14,
@@ -336,14 +318,15 @@ const styles = StyleSheet.create({
   },
   settingSection: {
     marginBottom: 20,
-    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
     borderRadius: 8,
     padding: 12,
   },
   settingHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   settingIcon: {
     marginRight: 8,
@@ -365,39 +348,46 @@ const styles = StyleSheet.create({
   settingText: {
     fontSize: 15,
     color: '#333',
-  },
-  warningText: {
-    fontSize: 13,
-    color: '#FF6B6B',
-    marginTop: 4,
-    marginBottom: 8,
-    fontStyle: 'italic',
+    flex: 1,
   },
   daysInput: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#E0E0E0',
     borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    width: 40,
-    textAlign: 'center',
+    width: 50,
     marginHorizontal: 8,
+    textAlign: 'center',
   },
   daysText: {
     fontSize: 15,
     color: '#333',
   },
+  warningText: {
+    fontSize: 13,
+    color: '#F44336',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
   saveButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 8,
-    paddingVertical: 12,
+    padding: 12,
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 8,
   },
   saveButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  settingDescription: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 4,
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
 });
 

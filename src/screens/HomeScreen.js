@@ -25,18 +25,10 @@ const HomeScreen = ({ navigation }) => {
   const flatListRef = useRef(null);
 
   // 배너 데이터
-  const banners = [
-    { id: '1', title: '소모품 관리의 시작', description: '소모미와 함께 체계적으로 관리해보세요.' },
-    { id: '2', title: '유통기한 알림', description: '유통기한이 다가오면 알려드립니다.' },
-    { id: '3', title: '소모품 위치 관리', description: '어디에 보관했는지 잊지 마세요.' },
-  ];
+  const banners = [];
 
   // 팁 데이터
-  const tips = [
-    { id: '1', title: '유통기한 관리', text: '제품 구매 시 유통기한을 확인하고 등록하세요.' },
-    { id: '2', title: '보관 장소', text: '같은 종류의 제품은 같은 장소에 보관하는 것이 좋습니다.' },
-    { id: '3', title: '재고 확인', text: '주기적으로 재고를 확인하여 부족한 물품을 미리 준비하세요.' },
-  ];
+  const tips = [];
 
   useEffect(() => {
     loadPopularProducts();

@@ -43,6 +43,7 @@ export const initializeData = async () => {
       sampleLocations = storedLocations;
     } else {
       await saveData(STORAGE_KEYS.LOCATIONS, initialSampleLocations);
+      sampleLocations = [...initialSampleLocations]; // 메모리에도 초기 데이터 설정
     }
 
     // 카테고리 데이터 로드
@@ -275,6 +276,10 @@ export const fetchLocationsApi = async () => {
     const storedLocations = await loadData(STORAGE_KEYS.LOCATIONS);
     if (storedLocations) {
       sampleLocations = storedLocations;
+    } else {
+      // 저장된 데이터가 없으면 초기 데이터 저장
+      await saveData(STORAGE_KEYS.LOCATIONS, initialSampleLocations);
+      sampleLocations = [...initialSampleLocations];
     }
     
     return [...sampleLocations]; // 배열 복사본 반환

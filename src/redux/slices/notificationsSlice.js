@@ -7,43 +7,7 @@ import {
 import { loadData, saveData, STORAGE_KEYS } from '../../utils/storageUtils';
 
 // 샘플 데이터 - 실제 구현 시 API 연동 필요
-const initialSampleNotifications = [
-  {
-    id: '1',
-    type: 'product', // 'product' 또는 'location'
-    targetId: '1', // 제품 ID 또는 영역 ID
-    title: '바디워시 유통기한 임박',
-    message: '바디워시의 유통기한이 3일 남았습니다.',
-    notifyDate: '2023-07-12T09:00:00', // 알림 예정 시간
-    notifyType: 'expiry', // 'expiry' (유통기한), 'estimated' (소진 예상), 'ai' (AI 알림)
-    daysBeforeTarget: 3, // 목표일 기준 며칠 전 알림
-    isActive: true,
-    isRepeating: false, // 연속 알림 여부 (D-day까지 매일 알림)
-  },
-  {
-    id: '2',
-    type: 'product',
-    targetId: '2',
-    title: '세탁세제 소진 예상',
-    message: '세탁세제가 곧 소진될 예정입니다.',
-    notifyDate: '2023-06-25T10:00:00',
-    notifyType: 'estimated',
-    daysBeforeTarget: 5,
-    isActive: true,
-    isRepeating: false,
-  },
-  {
-    id: '3',
-    type: 'location',
-    targetId: '1',
-    title: '주방 영역 기본 알림 설정',
-    message: '주방 영역의 기본 알림 설정입니다.',
-    notifyType: 'expiry',
-    daysBeforeTarget: 7,
-    isActive: true,
-    isRepeating: false,
-  }
-];
+const initialSampleNotifications = [];
 
 // 메모리 내 데이터 (AsyncStorage에서 로드될 예정)
 let sampleNotifications = [...initialSampleNotifications];
@@ -293,11 +257,8 @@ export const applyLocationNotifications = createAsyncThunk(
       const locationProducts = products.filter(p => p.locationId === locationId);
       
       if (locationProducts.length === 0) {
-        console.log('해당 영역에 제품이 없습니다.');
         return [];
       }
-      
-      console.log(`영역 ${locationId}에 속한 제품 ${locationProducts.length}개에 알림 설정 적용 중...`);
       
       // 각 제품에 영역 알림 설정 적용
       const newNotifications = [];
@@ -330,7 +291,6 @@ export const applyLocationNotifications = createAsyncThunk(
           );
           
           if (existingProductNotifications.length > 0) {
-            console.log(`제품 ${product.id}에 이미 알림이 설정되어 있어 건너뜁니다.`);
             continue;
           }
         }
@@ -357,7 +317,6 @@ export const applyLocationNotifications = createAsyncThunk(
                 if (locationNotification.daysBeforeTarget === null || 
                     locationNotification.daysBeforeTarget === undefined || 
                     isNaN(locationNotification.daysBeforeTarget)) {
-                  console.log(`제품 ${product.id}의 유통기한 알림 일수가 설정되지 않았습니다.`);
                   continue; // 알림 생성하지 않고 건너뜀
                 }
                 
@@ -396,8 +355,6 @@ export const applyLocationNotifications = createAsyncThunk(
               } catch (error) {
                 console.error(`제품 ${product.id} 유통기한 알림 설정 오류:`, error);
               }
-            } else {
-              console.log(`제품 ${product.id}에 유통기한이 설정되어 있지 않아 알림을 생성하지 않습니다.`);
             }
           } else if (locationNotification.notifyType === 'estimated') {
             // 소진예상 알림
@@ -410,7 +367,6 @@ export const applyLocationNotifications = createAsyncThunk(
                 if (locationNotification.daysBeforeTarget === null || 
                     locationNotification.daysBeforeTarget === undefined || 
                     isNaN(locationNotification.daysBeforeTarget)) {
-                  console.log(`제품 ${product.id}의 소진예상 알림 일수가 설정되지 않았습니다.`);
                   continue; // 알림 생성하지 않고 건너뜀
                 }
                 
@@ -450,8 +406,6 @@ export const applyLocationNotifications = createAsyncThunk(
               } catch (error) {
                 console.error(`제품 ${product.id} 소진예상 알림 설정 오류:`, error);
               }
-            } else {
-              console.log(`제품 ${product.id}에 소진예상일이 설정되어 있지 않아 알림을 생성하지 않습니다.`);
             }
           }
         }
@@ -460,10 +414,8 @@ export const applyLocationNotifications = createAsyncThunk(
       // AsyncStorage에 저장
       await saveData(STORAGE_KEYS.NOTIFICATIONS, sampleNotifications);
       
-      console.log(`총 ${newNotifications.length}개의 알림이 생성되었습니다.`);
       return newNotifications;
     } catch (error) {
-      console.error('영역 알림 적용 오류:', error);
       return rejectWithValue(error.message);
     }
   }

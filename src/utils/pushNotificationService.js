@@ -141,7 +141,6 @@ class PushNotificationService {
 
   setupNotificationHandler() {
     if (Platform.OS === 'web') {
-      console.log('웹에서는 푸시 알림 핸들러를 지원하지 않습니다.');
       return;
     }
     
@@ -150,15 +149,12 @@ class PushNotificationService {
 
     // Firebase 메시징 포그라운드 핸들러
     this.notificationReceivedListener = messaging().onMessage(async (remoteMessage) => {
-      console.log('포그라운드 메시지 수신:', remoteMessage);
-      
       // Notifee를 사용하여 포그라운드 알림 표시
       await this.displayNotification(remoteMessage);
     });
 
     // Firebase 메시징 백그라운드 핸들러 (앱이 백그라운드에서 알림 클릭 시)
     this.notificationResponseListener = messaging().onNotificationOpenedApp((remoteMessage) => {
-      console.log('백그라운드 알림 클릭:', remoteMessage);
       if (remoteMessage.data) {
         this.handleNotificationAction(remoteMessage.data);
       }
@@ -169,7 +165,6 @@ class PushNotificationService {
       .getInitialNotification()
       .then(remoteMessage => {
         if (remoteMessage) {
-          console.log('종료 상태에서 알림으로 열림:', remoteMessage);
           if (remoteMessage.data) {
             this.handleNotificationAction(remoteMessage.data);
           }
@@ -179,7 +174,6 @@ class PushNotificationService {
     // Notifee 이벤트 리스너 (알림 클릭 이벤트)
     notifee.onForegroundEvent(({ type, detail }) => {
       if (type === EventType.PRESS && detail.notification) {
-        console.log('Notifee 알림 클릭:', detail.notification);
         if (detail.notification.data) {
           this.handleNotificationAction(detail.notification.data);
         }
@@ -191,7 +185,6 @@ class PushNotificationService {
       const eventEmitter = new NativeEventEmitter(NativeModules.RCTDeviceEventEmitter);
       this.nativeNotificationListener = eventEmitter.addListener('notificationOpened', (notification) => {
         if (notification) {
-          console.log('네이티브 알림 이벤트:', notification);
           this.handleNotificationAction(notification);
         }
       });
@@ -253,8 +246,6 @@ class PushNotificationService {
     try {
       const deepLink = this.buildDeepLinkFromNotificationData(data);
       if (deepLink) {
-        console.log('알림에서 딥링크 열기:', deepLink);
-        
         // 딥링크 열기 전에 약간의 지연을 줘서 UI 스레드 블로킹 방지
         setTimeout(() => {
           Linking.openURL(deepLink).catch(err => {
@@ -279,7 +270,6 @@ class PushNotificationService {
   // 알림 핸들러 정리
   cleanupNotificationHandler() {
     if (Platform.OS === 'web') {
-      console.log('웹에서는 푸시 알림 핸들러 정리를 지원하지 않습니다.');
       return;
     }
     
@@ -304,7 +294,6 @@ class PushNotificationService {
   // 로컬 알림 전송 함수 (Notifee 사용)
   async sendLocalNotification(title, body, data = {}, delay = 0) {
     if (Platform.OS === 'web') {
-      console.log('웹 환경에서는 알림을 지원하지 않습니다.');
       return null;
     }
     
@@ -318,7 +307,6 @@ class PushNotificationService {
       }
       
       if (!hasPermission) {
-        console.log('알림 권한이 거부되었습니다.');
         return null;
       }
       

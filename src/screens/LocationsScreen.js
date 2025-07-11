@@ -30,7 +30,7 @@ const LocationsScreen = () => {
       dispatch(fetchLocations());
     }, [dispatch])
   );
-  
+
   const handleAddLocation = () => {
     // 비회원인 경우 영역 개수 제한 체크
     if (isAnonymous && locations.length >= 1) {

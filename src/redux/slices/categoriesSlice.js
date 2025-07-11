@@ -3,13 +3,7 @@ import { fetchCategoriesApi } from '../../api/productsApi';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // 기본 카테고리 정의
-const defaultCategories = [
-  { id: '1', name: '식품', description: '먹을 수 있는 음식 및 식재료' },
-  { id: '2', name: '화장품', description: '피부, 헤어 등 미용 관련 제품' },
-  { id: '3', name: '세제', description: '세탁, 청소 등에 사용되는 세정제' },
-  { id: '4', name: '샴푸', description: '머리를 감는 헤어 케어 제품' },
-  { id: '5', name: '휴지', description: '화장지, 키친타올 등 종이 제품' },
-];
+const defaultCategories = [];
 
 // 카테고리 로드
 export const loadCategories = createAsyncThunk(

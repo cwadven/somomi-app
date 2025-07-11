@@ -22,10 +22,13 @@ import {
  * @param {string} locationId - 영역 ID
  * @param {object} location - 영역 정보
  */
-const LocationNotificationSettings = ({ locationId, location }) => {
+const LocationNotificationSettings = ({ locationId, location = {} }) => {
   const dispatch = useDispatch();
   const { currentNotifications, status } = useSelector(state => state.notifications);
   const { isAuthenticated } = useSelector(state => state.auth);
+  
+  // 영역 이름 안전하게 가져오기
+  const locationTitle = location?.title || '영역';
   
   // 알림 설정 상태
   const [expiryEnabled, setExpiryEnabled] = useState(true);
@@ -57,33 +60,16 @@ const LocationNotificationSettings = ({ locationId, location }) => {
         setEstimatedDays(estimatedNotification.daysBeforeTarget !== null ? estimatedNotification.daysBeforeTarget.toString() : '');
       }
     } else {
-      // 기본 설정 적용
-      // 비회원 사용자는 알림 비활성화
-      if (!isAuthenticated) {
-        setExpiryEnabled(false);
-        setEstimatedEnabled(false);
-      } else {
-        // 회원은 기본값 적용
-        setExpiryEnabled(true);
-        setEstimatedEnabled(true);
-      }
-      
+      // 기본 설정 적용 (비회원도 알림 활성화 가능)
+      setExpiryEnabled(true);
+      setEstimatedEnabled(true);
       setExpiryDays('7');
       setEstimatedDays('7');
     }
-  }, [currentNotifications, isAuthenticated]);
+  }, [currentNotifications]);
   
   // 알림 설정 저장
   const saveNotificationSettings = async () => {
-    if (!isAuthenticated) {
-      Alert.alert(
-        '알림',
-        '알림 설정을 저장하려면 로그인이 필요합니다.',
-        [{ text: '확인', style: 'default' }]
-      );
-      return;
-    }
-    
     try {
       // 유통기한 알림 설정 저장
       const expiryNotification = currentNotifications.find(n => n.notifyType === 'expiry');
@@ -106,8 +92,8 @@ const LocationNotificationSettings = ({ locationId, location }) => {
         await dispatch(addNotification({
           type: 'location',
           targetId: locationId,
-          title: `${location.title} 유통기한 알림`,
-          message: `${location.title} 영역의 제품 유통기한 알림 설정입니다.`,
+          title: `${locationTitle} 유통기한 알림`,
+          message: `${locationTitle} 영역의 제품 유통기한 알림 설정입니다.`,
           notifyType: 'expiry',
           daysBeforeTarget: safeExpiryDays,
           isActive: expiryEnabled,
@@ -136,8 +122,8 @@ const LocationNotificationSettings = ({ locationId, location }) => {
         await dispatch(addNotification({
           type: 'location',
           targetId: locationId,
-          title: `${location.title} 소진예상 알림`,
-          message: `${location.title} 영역의 제품 소진예상 알림 설정입니다.`,
+          title: `${locationTitle} 소진예상 알림`,
+          message: `${locationTitle} 영역의 제품 소진예상 알림 설정입니다.`,
           notifyType: 'estimated',
           daysBeforeTarget: safeEstimatedDays,
           isActive: estimatedEnabled,
@@ -160,8 +146,8 @@ const LocationNotificationSettings = ({ locationId, location }) => {
         await dispatch(addNotification({
           type: 'location',
           targetId: locationId,
-          title: `${location.title} AI 알림`,
-          message: `${location.title} 영역의 AI 추천 알림 설정입니다.`,
+          title: `${locationTitle} AI 알림`,
+          message: `${locationTitle} 영역의 AI 추천 알림 설정입니다.`,
           notifyType: 'ai',
           daysBeforeTarget: 7, // 기본값
           isActive: aiEnabled,
@@ -249,11 +235,15 @@ const LocationNotificationSettings = ({ locationId, location }) => {
             value={expiryDays}
             onChangeText={(text) => validateDays(text, setExpiryDays)}
             keyboardType="number-pad"
+            placeholder="7"
             maxLength={2}
             editable={expiryEnabled}
           />
           <Text style={styles.daysText}>일 전에 알림</Text>
         </View>
+        <Text style={styles.settingDescription}>
+          이 영역의 모든 제품에 대해 유통기한 알림을 설정합니다.
+        </Text>
       </View>
       
       {/* 소진예상 알림 설정 */}
@@ -272,17 +262,21 @@ const LocationNotificationSettings = ({ locationId, location }) => {
           />
         </View>
         <View style={[styles.settingItem, styles.daysSettingItem]}>
-          <Text style={styles.settingText}>소진예상 D-</Text>
+          <Text style={styles.settingText}>소진예상일 D-</Text>
           <TextInput
             style={styles.daysInput}
             value={estimatedDays}
             onChangeText={(text) => validateDays(text, setEstimatedDays)}
             keyboardType="number-pad"
+            placeholder="7"
             maxLength={2}
             editable={estimatedEnabled}
           />
           <Text style={styles.daysText}>일 전에 알림</Text>
         </View>
+        <Text style={styles.settingDescription}>
+          이 영역의 모든 제품에 대해 소진예상 알림을 설정합니다.
+        </Text>
       </View>
       
       {/* 저장 버튼 */}
@@ -301,12 +295,12 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#fff',
     borderRadius: 8,
-    paddingBottom: 32, // 하단 여백 추가
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 8,
+    color: '#333',
   },
   description: {
     fontSize: 14,
@@ -315,14 +309,15 @@ const styles = StyleSheet.create({
   },
   settingSection: {
     marginBottom: 20,
-    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
     borderRadius: 8,
     padding: 12,
   },
   settingHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   settingIcon: {
     marginRight: 8,
@@ -344,21 +339,17 @@ const styles = StyleSheet.create({
   settingText: {
     fontSize: 15,
     color: '#333',
-  },
-  settingDescription: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 4,
+    flex: 1,
   },
   daysInput: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#E0E0E0',
     borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    width: 40,
-    textAlign: 'center',
+    width: 50,
     marginHorizontal: 8,
+    textAlign: 'center',
   },
   daysText: {
     fontSize: 15,
@@ -367,15 +358,20 @@ const styles = StyleSheet.create({
   saveButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 8,
-    paddingVertical: 12,
+    padding: 12,
     alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 24, // 버튼 아래 여백 추가
+    marginTop: 8,
   },
   saveButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  settingDescription: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });
 

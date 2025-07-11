@@ -70,7 +70,6 @@ const PushNotificationTest = () => {
     try {
       // 알림 전송 시도
       const notificationId = await sendImmediateNotification(title, body, data);
-      console.log('알림 전송 결과:', notificationId);
       return notificationId;
     } catch (error) {
       console.error('알림 전송 실패:', error);
@@ -88,7 +87,6 @@ const PushNotificationTest = () => {
       
       // 현재 앱 상태 확인
       const currentAppState = AppState.currentState;
-      console.log('현재 앱 상태:', currentAppState);
       
       // 알림 데이터 설정
       const title = '지연 알림 테스트';
@@ -116,7 +114,6 @@ const PushNotificationTest = () => {
                 delaySeconds
               );
               
-              console.log(`${delaySeconds}초 후 알림 예약 완료, ID:`, notificationId);
               setNotificationCount(prev => prev + 1);
               
               // 사용자에게 백그라운드로 전환하라는 메시지 표시

@@ -9,7 +9,8 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Modal
+  Modal,
+  Linking
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -18,6 +19,9 @@ import { logout } from '../redux/slices/authSlice';
 import KakaoLoginButton from '../components/KakaoLoginButton';
 import PushNotificationTest from '../components/PushNotificationTest';
 import NotificationSettings from '../components/NotificationSettings';
+import { clearAllData } from '../utils/storageUtils';
+import { initializeData } from '../api/productsApi';
+import { fetchLocations } from '../redux/slices/locationsSlice';
 
 const ProfileScreen = () => {
   const dispatch = useDispatch();
@@ -35,6 +39,33 @@ const ProfileScreen = () => {
     }
   }, [route.params]);
   
+  // 안드로이드 시스템 알림 설정으로 이동하는 함수
+  const openAndroidNotificationSettings = () => {
+    if (Platform.OS === 'android') {
+      try {
+        // 안드로이드 앱 정보 설정 화면으로 이동
+        const appId = Platform.constants.Package || 'com.somomi.app';
+        
+        // 안드로이드 버전에 따라 다른 인텐트 사용
+        if (Platform.Version >= 26) { // Android 8.0 (Oreo) 이상
+          Linking.openSettings();
+        } else if (Platform.Version >= 21) { // Android 5.0 (Lollipop) 이상
+          Linking.openURL(`app-settings://notification/${appId}`);
+        } else {
+          // 이전 버전에서는 앱 정보 화면으로 이동
+          Linking.openURL(`app-settings://${appId}`);
+        }
+      } catch (error) {
+        console.error('알림 설정 화면 열기 실패:', error);
+        Alert.alert(
+          '알림 설정',
+          '알림 설정 화면을 열 수 없습니다. 설정 앱에서 수동으로 앱의 알림 설정을 변경해주세요.',
+          [{ text: '확인', style: 'default' }]
+        );
+      }
+    }
+  };
+
   // 로그아웃 처리
   const handleLogout = () => {
     Alert.alert(
@@ -194,6 +225,14 @@ const ProfileScreen = () => {
               title="알림 설정" 
               onPress={() => setShowNotificationModal(true)}
             />
+            
+            {Platform.OS === 'android' && (
+              <SettingItem 
+                icon="phone-portrait-outline" 
+                title="안드로이드 앱 푸시 설정" 
+                onPress={() => openAndroidNotificationSettings()}
+              />
+            )}
           </View>
         </>
       )}
