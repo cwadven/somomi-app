@@ -5,8 +5,7 @@ import {
   StyleSheet, 
   Switch, 
   TouchableOpacity, 
-  TextInput,
-  Alert
+  TextInput
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +18,7 @@ import {
   scheduleProductExpiryNotification,
   cancelNotification
 } from '../utils/notificationUtils';
+import AlertModal from './AlertModal';
 
 /**
  * 제품별 알림 설정 컴포넌트
@@ -35,6 +35,16 @@ const ProductNotificationSettings = ({ productId, product }) => {
   const [expiryDays, setExpiryDays] = useState('7');
   const [estimatedEnabled, setEstimatedEnabled] = useState(true);
   const [estimatedDays, setEstimatedDays] = useState('7');
+  
+  // 알림 모달 상태
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertModalConfig, setAlertModalConfig] = useState({
+    title: '',
+    message: '',
+    buttons: [],
+    icon: '',
+    iconColor: ''
+  });
   
   // 컴포넌트 마운트 시 제품 알림 설정 로드
   useEffect(() => {
@@ -66,6 +76,30 @@ const ProductNotificationSettings = ({ productId, product }) => {
       setEstimatedDays('7');
     }
   }, [currentNotifications]);
+  
+  // 성공 모달 표시
+  const showSuccessModal = () => {
+    setAlertModalConfig({
+      title: '성공',
+      message: '알림 설정이 저장되었습니다. 설정한 날짜에 알림을 받게 됩니다.',
+      buttons: [{ text: '확인', style: 'default' }],
+      icon: 'checkmark-circle-outline',
+      iconColor: '#4CAF50'
+    });
+    setAlertModalVisible(true);
+  };
+  
+  // 오류 모달 표시
+  const showErrorModal = (errorMessage) => {
+    setAlertModalConfig({
+      title: '오류',
+      message: errorMessage || '알림 설정을 저장하는 중 오류가 발생했습니다.',
+      buttons: [{ text: '확인', style: 'default' }],
+      icon: 'alert-circle-outline',
+      iconColor: '#F44336'
+    });
+    setAlertModalVisible(true);
+  };
   
   // 알림 설정 저장
   const saveNotificationSettings = async () => {
@@ -184,10 +218,11 @@ const ProductNotificationSettings = ({ productId, product }) => {
         }
       }
       
-      Alert.alert('성공', '알림 설정이 저장되었습니다. 설정한 날짜에 알림을 받게 됩니다.');
+      // 성공 모달 표시
+      showSuccessModal();
     } catch (error) {
       console.error('알림 설정 저장 오류:', error);
-      Alert.alert('오류', '알림 설정을 저장하는 중 오류가 발생했습니다.');
+      showErrorModal('알림 설정을 저장하는 중 오류가 발생했습니다.');
     }
   };
   
@@ -295,6 +330,17 @@ const ProductNotificationSettings = ({ productId, product }) => {
       >
         <Text style={styles.saveButtonText}>설정 저장</Text>
       </TouchableOpacity>
+      
+      {/* 알림 모달 */}
+      <AlertModal
+        visible={alertModalVisible}
+        title={alertModalConfig.title}
+        message={alertModalConfig.message}
+        buttons={alertModalConfig.buttons}
+        onClose={() => setAlertModalVisible(false)}
+        icon={alertModalConfig.icon}
+        iconColor={alertModalConfig.iconColor}
+      />
     </View>
   );
 };
