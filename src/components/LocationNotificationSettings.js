@@ -41,40 +41,37 @@ const LocationNotificationSettings = ({ locationId, location }) => {
     }
   }, [dispatch, locationId]);
   
-  // 알림 설정 데이터 로드
+  // 알림 설정 초기화
   useEffect(() => {
     if (currentNotifications.length > 0) {
-      // 유통기한 알림 설정 찾기
+      // 기존 알림 설정 불러오기
       const expiryNotification = currentNotifications.find(n => n.notifyType === 'expiry');
       if (expiryNotification) {
         setExpiryEnabled(expiryNotification.isActive);
-        // null 체크 추가
-        if (expiryNotification.daysBeforeTarget !== null && expiryNotification.daysBeforeTarget !== undefined) {
-          setExpiryDays(expiryNotification.daysBeforeTarget.toString());
-        } else {
-          setExpiryDays(''); // 빈 값 설정
-        }
+        setExpiryDays(expiryNotification.daysBeforeTarget !== null ? expiryNotification.daysBeforeTarget.toString() : '');
       }
       
-      // 소진예상 알림 설정 찾기
       const estimatedNotification = currentNotifications.find(n => n.notifyType === 'estimated');
       if (estimatedNotification) {
         setEstimatedEnabled(estimatedNotification.isActive);
-        // null 체크 추가
-        if (estimatedNotification.daysBeforeTarget !== null && estimatedNotification.daysBeforeTarget !== undefined) {
-          setEstimatedDays(estimatedNotification.daysBeforeTarget.toString());
-        } else {
-          setEstimatedDays(''); // 빈 값 설정
-        }
+        setEstimatedDays(estimatedNotification.daysBeforeTarget !== null ? estimatedNotification.daysBeforeTarget.toString() : '');
+      }
+    } else {
+      // 기본 설정 적용
+      // 비회원 사용자는 알림 비활성화
+      if (!isAuthenticated) {
+        setExpiryEnabled(false);
+        setEstimatedEnabled(false);
+      } else {
+        // 회원은 기본값 적용
+        setExpiryEnabled(true);
+        setEstimatedEnabled(true);
       }
       
-      // AI 알림 설정 찾기
-      const aiNotification = currentNotifications.find(n => n.notifyType === 'ai');
-      if (aiNotification) {
-        setAiEnabled(aiNotification.isActive);
-      }
+      setExpiryDays('7');
+      setEstimatedDays('7');
     }
-  }, [currentNotifications]);
+  }, [currentNotifications, isAuthenticated]);
   
   // 알림 설정 저장
   const saveNotificationSettings = async () => {

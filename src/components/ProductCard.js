@@ -173,7 +173,8 @@ const ProductCard = ({ product, onPress }) => {
             )}
           </View>
           
-          {expiryPercentage !== null && (
+          {/* 유통기한 정보가 있는 경우에만 HP 바 표시 */}
+          {product.expiryDate && expiryPercentage !== null && (
             <View style={styles.hpSection}>
               <View style={styles.hpLabelContainer}>
                 <Text style={[
@@ -193,7 +194,8 @@ const ProductCard = ({ product, onPress }) => {
             </View>
           )}
           
-          {consumptionPercentage !== null && (
+          {/* 소진예상일 정보가 있는 경우에만 HP 바 표시 */}
+          {product.estimatedEndDate && consumptionPercentage !== null && (
             <View style={styles.hpSection}>
               <View style={styles.hpLabelContainer}>
                 <Text style={[
@@ -215,16 +217,32 @@ const ProductCard = ({ product, onPress }) => {
           
           <View style={styles.dateInfo}>
             <Ionicons name="calendar-outline" size={14} color={isZeroHP ? "#888" : "#666"} />
-            <Text style={[
-              styles.dateText,
-              isZeroHP && styles.zeroHPSubText
-            ]}>
-              {product.expiryDate 
-                ? `유통기한: ${new Date(product.expiryDate).toLocaleDateString()}`
-                : product.estimatedEndDate 
-                  ? `예상 소진일: ${new Date(product.estimatedEndDate).toLocaleDateString()}`
-                  : '날짜 정보 없음'}
-            </Text>
+            <View style={styles.dateTextContainer}>
+              {product.expiryDate && (
+                <Text style={[
+                  styles.dateText,
+                  isZeroHP && styles.zeroHPSubText
+                ]}>
+                  유통기한: {new Date(product.expiryDate).toLocaleDateString()}
+                </Text>
+              )}
+              {product.estimatedEndDate && (
+                <Text style={[
+                  styles.dateText,
+                  isZeroHP && styles.zeroHPSubText
+                ]}>
+                  소진예상: {new Date(product.estimatedEndDate).toLocaleDateString()}
+                </Text>
+              )}
+              {!product.expiryDate && !product.estimatedEndDate && (
+                <Text style={[
+                  styles.dateText,
+                  isZeroHP && styles.zeroHPSubText
+                ]}>
+                  날짜 정보 없음
+                </Text>
+              )}
+            </View>
           </View>
         </View>
       </View>
@@ -362,13 +380,18 @@ const styles = StyleSheet.create({
   },
   dateInfo: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginTop: 4,
+  },
+  dateTextContainer: {
+    flex: 1,
+    flexDirection: 'column',
+    marginLeft: 4,
   },
   dateText: {
     fontSize: 12,
     color: '#666',
-    marginLeft: 4,
+    marginBottom: 2,
   },
 });
 

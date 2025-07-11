@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // 스크린 임포트
 import HomeScreen from '../screens/HomeScreen';
@@ -138,7 +139,33 @@ const ProfileStack = () => {
 };
 
 // 메인 탭 네비게이터
-const AppNavigator = () => {
+const AppNavigator = ({ linking }) => {
+  const [isReady, setIsReady] = useState(false);
+  const [initialState, setInitialState] = useState();
+
+  useEffect(() => {
+    const restoreState = async () => {
+      try {
+        const savedStateString = await AsyncStorage.getItem('navigation-state');
+        
+        if (savedStateString) {
+          const state = JSON.parse(savedStateString);
+          setInitialState(state);
+        }
+      } finally {
+        setIsReady(true);
+      }
+    };
+
+    if (!isReady) {
+      restoreState();
+    }
+  }, [isReady]);
+
+  if (!isReady) {
+    return null;
+  }
+
   return (
     <SafeAreaProvider>
       <StatusBar 
@@ -147,44 +174,50 @@ const AppNavigator = () => {
         translucent={true} 
       />
       <SafeAreaView style={{ flex: 1 }}>
-    <NavigationContainer>
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ focused, color, size }) => {
-            let iconName;
+        <NavigationContainer
+          linking={linking}
+          initialState={initialState}
+          onStateChange={(state) => {
+            AsyncStorage.setItem('navigation-state', JSON.stringify(state));
+          }}
+        >
+          <Tab.Navigator
+            screenOptions={({ route }) => ({
+              tabBarIcon: ({ focused, color, size }) => {
+                let iconName;
 
-            if (route.name === 'Home') {
-              iconName = focused ? 'home' : 'home-outline';
-            } else if (route.name === 'Locations') {
-              iconName = focused ? 'grid' : 'grid-outline';
-            } else if (route.name === 'Profile') {
-              iconName = focused ? 'person' : 'person-outline';
-            }
+                if (route.name === 'Home') {
+                  iconName = focused ? 'home' : 'home-outline';
+                } else if (route.name === 'Locations') {
+                  iconName = focused ? 'grid' : 'grid-outline';
+                } else if (route.name === 'Profile') {
+                  iconName = focused ? 'person' : 'person-outline';
+                }
 
-            return <Ionicons name={iconName} size={size} color={color} />;
-          },
-          tabBarActiveTintColor: '#4CAF50',
-          tabBarInactiveTintColor: 'gray',
-          headerShown: false
-        })}
-      >
-        <Tab.Screen 
-          name="Home" 
-          component={HomeStack} 
-          options={{ title: '홈' }}
-        />
-        <Tab.Screen 
-          name="Locations" 
-          component={LocationsStack} 
-          options={{ title: '내 영역' }}
-        />
-        <Tab.Screen 
-          name="Profile" 
-          component={ProfileStack} 
-          options={{ title: '프로필' }}
-        />
-      </Tab.Navigator>
-    </NavigationContainer>
+                return <Ionicons name={iconName} size={size} color={color} />;
+              },
+              tabBarActiveTintColor: '#4CAF50',
+              tabBarInactiveTintColor: 'gray',
+              headerShown: false
+            })}
+          >
+            <Tab.Screen 
+              name="Home" 
+              component={HomeStack} 
+              options={{ title: '홈' }}
+            />
+            <Tab.Screen 
+              name="Locations" 
+              component={LocationsStack} 
+              options={{ title: '내 영역' }}
+            />
+            <Tab.Screen 
+              name="Profile" 
+              component={ProfileStack} 
+              options={{ title: '프로필' }}
+            />
+          </Tab.Navigator>
+        </NavigationContainer>
       </SafeAreaView>
     </SafeAreaProvider>
   );
