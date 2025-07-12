@@ -108,6 +108,14 @@ const NotificationDebugger = () => {
     return `${year}년 ${month}월 ${day}일`;
   };
   
+  // 알림 유형에 따른 배경색 반환
+  const getNotificationTypeStyle = (type) => {
+    if (type === '유통기한') {
+      return styles.expiryNotificationType;
+    }
+    return styles.consumptionNotificationType;
+  };
+  
   // 알림 정보 모달
   const renderNotificationModal = () => (
     <Modal
@@ -200,7 +208,10 @@ const NotificationDebugger = () => {
                   {notificationsToSend.map((notification, index) => (
                     <View key={index} style={styles.notificationItem}>
                       <View style={styles.notificationHeader}>
-                        <Text style={styles.notificationType}>
+                        <Text style={[
+                          styles.notificationType,
+                          getNotificationTypeStyle(notification.notification_type)
+                        ]}>
                           {notification.notification_type}
                         </Text>
                         <Text style={styles.productName}>
@@ -450,13 +461,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   notificationType: {
-    backgroundColor: '#4CAF50',
     color: '#fff',
     paddingVertical: 2,
     paddingHorizontal: 8,
     borderRadius: 4,
     fontSize: 12,
     marginRight: 8,
+  },
+  expiryNotificationType: {
+    backgroundColor: '#2196F3', // 파란색 계열 (유통기한)
+  },
+  consumptionNotificationType: {
+    backgroundColor: '#4CAF50', // 초록색 계열 (소진예상)
   },
   productName: {
     fontWeight: '600',

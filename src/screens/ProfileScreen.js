@@ -7,7 +7,6 @@ import {
   Image, 
   ScrollView,
   Alert,
-  KeyboardAvoidingView,
   Platform,
   Modal,
   Linking
@@ -30,13 +29,10 @@ const ProfileScreen = () => {
   const route = useRoute();
   const { user, isLoggedIn, isAnonymous, loading, error } = useSelector(state => state.auth);
   
-  // 로그인/회원가입 모드 상태
-  const [mode, setMode] = useState('profile'); // 'profile', 'login'
-
   // route.params로 전달된 initialMode가 있으면 해당 모드로 설정
   useEffect(() => {
     if (route.params?.initialMode) {
-      setMode(route.params.initialMode);
+      // 모드 관련 처리가 필요한 경우 여기에 구현
     }
   }, [route.params]);
   
@@ -90,7 +86,6 @@ const ProfileScreen = () => {
   
   const handleLoginComplete = () => {
     console.log('카카오 로그인 완료');
-    setMode('profile');
   };
   
   const handleLoginError = (errorMsg) => {
@@ -112,37 +107,6 @@ const ProfileScreen = () => {
         <Ionicons name="chevron-forward" size={20} color="#999" />
       </View>
     </TouchableOpacity>
-  );
-
-  // 로그인 화면
-  const renderLoginScreen = () => (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.formContainer}
-    >
-      <View style={styles.formHeader}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => setMode('profile')}
-        >
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.formTitle}>로그인</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      <View style={styles.kakaoLoginContainer}>
-        <Text style={styles.loginGuideText}>
-          카카오 계정으로 간편하게 로그인하세요
-        </Text>
-        
-        <KakaoLoginButton 
-          onLoginStart={handleLoginStart}
-          onLoginComplete={handleLoginComplete}
-          onLoginError={handleLoginError}
-        />
-      </View>
-    </KeyboardAvoidingView>
   );
 
   // 프로필 화면
@@ -308,17 +272,12 @@ const ProfileScreen = () => {
     </Modal>
   );
 
-  // 현재 모드에 따라 다른 화면 렌더링
-  if (mode === 'login') {
-    return renderLoginScreen();
-  } else {
-    return (
-      <>
-        {renderProfileScreen()}
-        <NotificationSettingsModal />
-      </>
-    );
-  }
+  return (
+    <>
+      {renderProfileScreen()}
+      <NotificationSettingsModal />
+    </>
+  );
 };
 
 const styles = StyleSheet.create({
@@ -439,38 +398,6 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     color: '#999',
-  },
-  // 로그인 폼 스타일
-  formContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 20,
-  },
-  formHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 30,
-  },
-  backButton: {
-    padding: 5,
-  },
-  formTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  kakaoLoginContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  loginGuideText: {
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 32,
   },
   pushTestSection: {
     marginHorizontal: 16,

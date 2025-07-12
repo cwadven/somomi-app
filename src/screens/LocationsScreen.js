@@ -7,11 +7,12 @@ import {
   TouchableOpacity, 
   ActivityIndicator,
   Alert,
-  Image
+  Image,
+  BackHandler
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useIsFocused } from '@react-navigation/native';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import SignupPromptModal from '../components/SignupPromptModal';
 import { checkAnonymousLimits } from '../utils/authUtils';
@@ -19,16 +20,55 @@ import { checkAnonymousLimits } from '../utils/authUtils';
 const LocationsScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
   
   const { locations, status, error } = useSelector(state => state.locations);
   const { isAnonymous } = useSelector(state => state.auth);
   
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   
+  // 화면이 포커스될 때마다 영역 데이터 로드
   useFocusEffect(
     useCallback(() => {
       dispatch(fetchLocations());
     }, [dispatch])
+  );
+
+  // 뒤로가기 버튼 처리
+  useEffect(() => {
+    const handleBackPress = () => {
+      // LocationsScreen이 포커스 상태일 때만 처리
+      if (isFocused) {
+        // 탭 네비게이터의 홈 탭으로 이동
+        navigation.navigate('Home');
+        return true; // 기본 뒤로가기 동작 방지
+      }
+      return false; // 다른 화면에서는 기본 뒤로가기 동작 수행
+    };
+
+    // 뒤로가기 이벤트 리스너 등록
+    BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+
+    // 컴포넌트 언마운트 시 리스너 제거
+    return () => {
+      BackHandler.removeEventListener('hardwareBackPress', handleBackPress);
+    };
+  }, [isFocused, navigation]);
+
+  // 네비게이션 상태 초기화
+  useFocusEffect(
+    useCallback(() => {
+      // 이 화면이 포커스될 때 네비게이션 스택 초기화
+      const unsubscribe = navigation.addListener('focus', () => {
+        // 현재 스크린이 스택의 첫 번째 스크린이 되도록 설정
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'LocationsScreen' }],
+        });
+      });
+
+      return unsubscribe;
+    }, [navigation])
   );
 
   const handleAddLocation = () => {

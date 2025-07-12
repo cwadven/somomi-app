@@ -62,6 +62,7 @@ const HomeStack = () => {
 const LocationsStack = () => {
   return (
     <Stack.Navigator
+      initialRouteName="LocationsScreen"
       screenOptions={{
         headerStyle: {
           elevation: 0,
@@ -79,8 +80,7 @@ const LocationsStack = () => {
         name="LocationDetail" 
         component={LocationDetailScreen} 
         options={({ route }) => ({ 
-          title: route.params.locationId === 'all' ? '모든 제품' : '영역 상세',
-          headerBackVisible: false // 기본 뒤로가기 버튼 숨김 (v6 문법)
+          title: route.params.locationId === 'all' ? '모든 제품' : '영역 상세'
         })}
       />
       <Stack.Screen 
@@ -199,6 +199,46 @@ const AppNavigator = ({ linking }) => {
               tabBarActiveTintColor: '#4CAF50',
               tabBarInactiveTintColor: 'gray',
               headerShown: false
+            })}
+            screenListeners={({ navigation, route }) => ({
+              tabPress: (e) => {
+                // 내 영역 탭을 클릭했을 때 LocationsScreen으로 이동하고 내비게이션 스택 초기화
+                if (route.name === 'Locations') {
+                  e.preventDefault(); // 기본 동작 방지
+                  navigation.navigate('Locations', {
+                    screen: 'LocationsScreen'
+                  });
+                  // 내 영역 스택을 초기화하여 LocationsScreen만 남도록 설정
+                  navigation.dispatch(state => {
+                    // 현재 라우트 찾기
+                    const routes = state.routes.map(r => {
+                      if (r.name === 'Locations') {
+                        // Locations 스택의 라우트를 LocationsScreen 하나만 남도록 수정
+                        return {
+                          ...r,
+                          state: {
+                            ...r.state,
+                            routes: [
+                              {
+                                name: 'LocationsScreen',
+                                params: {},
+                              },
+                            ],
+                            index: 0,
+                          },
+                        };
+                      }
+                      return r;
+                    });
+                    
+                    return {
+                      ...state,
+                      routes,
+                      index: state.index,
+                    };
+                  });
+                }
+              },
             })}
           >
             <Tab.Screen 

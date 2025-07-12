@@ -60,6 +60,11 @@ const LocationDetailScreen = () => {
       }
     }, [dispatch, locationId, isAllProducts])
   );
+
+  // 영역 목록으로 돌아가기
+  const handleBackToLocations = () => {
+    navigation.navigate('LocationsScreen');
+  };
   
   const handleAddProduct = () => {
     // 비회원 제한 확인
@@ -182,6 +187,13 @@ const LocationDetailScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleBackToLocations}
+          >
+            <Ionicons name="arrow-back" size={24} color="#4CAF50" />
+          </TouchableOpacity>
+          
           {!isAllProducts && currentLocation && (
             <View style={styles.locationIconContainer}>
               <Ionicons 
@@ -337,6 +349,10 @@ const styles = StyleSheet.create({
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 8,
   },
   locationIconContainer: {
     width: 60,
