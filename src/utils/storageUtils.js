@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   CATEGORIES: 'somomi_categories',
   NOTIFICATIONS: 'somomi_notifications',
   CONSUMED_PRODUCTS: 'somomi_consumed_products',
+  PROCESSED_NOTIFICATIONS: 'somomi_processed_notifications',
 };
 
 // 데이터 저장 함수

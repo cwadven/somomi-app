@@ -19,6 +19,7 @@ import { logout } from '../redux/slices/authSlice';
 import KakaoLoginButton from '../components/KakaoLoginButton';
 import PushNotificationTest from '../components/PushNotificationTest';
 import NotificationSettings from '../components/NotificationSettings';
+import NotificationDebugger from '../components/NotificationDebugger';
 import { clearAllData } from '../utils/storageUtils';
 import { initializeData } from '../api/productsApi';
 import { fetchLocations } from '../redux/slices/locationsSlice';
@@ -235,6 +236,16 @@ const ProfileScreen = () => {
             )}
           </View>
         </>
+      )}
+      
+      {/* 알림 테스트 섹션 - 모든 사용자에게 표시 */}
+      {Platform.OS !== 'web' && (
+        <View style={styles.settingsSection}>
+          <Text style={styles.sectionTitle}>알림 테스트</Text>
+          <View style={styles.notificationDebuggerContainer}>
+            <NotificationDebugger />
+          </View>
+        </View>
       )}
       
       {/* 정보 섹션은 항상 표시 */}
@@ -464,6 +475,9 @@ const styles = StyleSheet.create({
   pushTestSection: {
     marginHorizontal: 16,
     marginBottom: 16,
+  },
+  notificationDebuggerContainer: {
+    padding: 16,
   },
   // 모달 관련 스타일 추가
   modalOverlay: {
