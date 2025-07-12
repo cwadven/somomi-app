@@ -68,23 +68,19 @@ const AddLocationScreen = () => {
   const isEditing = route.params?.isEditing || false;
   const locationToEdit = route.params?.location || null;
   
-  // 폼 상태
+  // 상태
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('cube-outline');
-  const [image, setImage] = useState(null);
+  const [selectedColor, setSelectedColor] = useState('#4CAF50');
+  const [showIconPicker, setShowIconPicker] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
   
   // 폼 유효성 검사 상태
-  const [errors, setErrors] = useState({
-    title: ''
-  });
+  const [touched, setTouched] = useState({ title: false });
+  const [errors, setErrors] = useState({ title: '' });
   
-  // 필드 터치 상태
-  const [touched, setTouched] = useState({
-    title: false
-  });
-  
-  // 등록/수정 성공 모달
+  // 모달 상태
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [registeredLocation, setRegisteredLocation] = useState(null);
   
@@ -103,25 +99,15 @@ const AddLocationScreen = () => {
   const [signupPromptMessage, setSignupPromptMessage] = useState('');
   const [limitInfo, setLimitInfo] = useState({ currentCount: 0, maxCount: 1 });
 
-  // 알림 설정 상태
-  const [enableNotifications, setEnableNotifications] = useState(true);
-  const [notificationType, setNotificationType] = useState('expiry'); // 'expiry' 또는 'estimated'
-  const [daysBeforeTarget, setDaysBeforeTarget] = useState(3);
-  const [isRepeating, setIsRepeating] = useState(false);
-
   // 수정 모드일 경우 기존 데이터 로드
   useEffect(() => {
     if (isEditing && locationToEdit) {
       setTitle(locationToEdit.title || '');
       setDescription(locationToEdit.description || '');
       setSelectedIcon(locationToEdit.icon || 'cube-outline');
-      setImage(locationToEdit.image || null);
+      setSelectedColor(locationToEdit.color || '#4CAF50');
       
-      // 알림 설정 데이터 로드 (실제 구현 시 API에서 가져오기)
-      setEnableNotifications(locationToEdit.enableNotifications !== false);
-      setNotificationType(locationToEdit.notificationType || 'expiry');
-      setDaysBeforeTarget(locationToEdit.daysBeforeTarget || 3);
-      setIsRepeating(locationToEdit.isRepeating || false);
+      // 알림 설정 관련 코드 제거 (알림 설정은 별도 화면에서 관리)
     }
   }, [isEditing, locationToEdit]);
 
@@ -135,9 +121,9 @@ const AddLocationScreen = () => {
   // 비회원 영역 제한 확인
   const checkLocationLimits = async () => {
     if (isAnonymous) {
-      const limitResult = await checkAnonymousLimits('location');
+      const limitResult = await checkAnonymousLimits('locations');
       
-      if (limitResult.limited) {
+      if (limitResult.isLimited) {
         setSignupPromptMessage(limitResult.message);
         setLimitInfo({
           currentCount: limitResult.currentCount,
@@ -254,18 +240,11 @@ const AddLocationScreen = () => {
     setAlertModalVisible(true);
   };
   
-  // 오류 알림 표시 함수
+  // 오류 알림 표시
   const showErrorAlert = (message) => {
-    setAlertModalConfig({
-      title: '오류',
-      message,
-      buttons: [{ text: '확인', style: 'default' }],
-      icon: 'alert-circle',
-      iconColor: '#F44336'
-    });
-    setAlertModalVisible(true);
+    Alert.alert('오류', message, [{ text: '확인', style: 'default' }]);
   };
-
+  
   // 이미지 선택 핸들러 (네이티브)
   const pickImageNative = async () => {
     if (!ImagePicker) return;
@@ -285,28 +264,14 @@ const AddLocationScreen = () => {
     });
     
     if (!result.cancelled && result.assets && result.assets[0]) {
-      setImage(result.assets[0].uri);
+      // 현재 이미지 처리 기능은 구현되지 않았음
+      showAlert('알림', '현재 버전에서는 이미지 업로드가 지원되지 않습니다.');
     }
   };
   
   // 이미지 선택 핸들러 (웹)
   const pickImageWeb = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    
-    input.onchange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          setImage(event.target.result);
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-    
-    input.click();
+    showAlert('알림', '현재 버전에서는 이미지 업로드가 지원되지 않습니다.');
   };
   
   // 플랫폼에 따른 이미지 선택 함수
@@ -318,37 +283,32 @@ const AddLocationScreen = () => {
     }
   };
 
-  // 영역 등록/수정 처리
+  // 제출 처리
   const handleSubmit = async () => {
-    if (!isFormValid()) return;
+    // 폼 유효성 검사
+    if (!isFormValid()) {
+      return;
+    }
     
-    // 비회원 제한 확인 (수정 모드가 아닐 때만)
-    if (!isEditing && isAnonymous) {
-      const limitResult = await checkAnonymousLimits('location');
-      
-      if (limitResult.limited) {
-        setSignupPromptMessage(limitResult.message);
-        setLimitInfo({
-          currentCount: limitResult.currentCount,
-          maxCount: limitResult.maxCount
-        });
+    // 비회원 사용자의 영역 개수 제한 확인
+    if (isAnonymous && !isEditing) {
+      const limitResult = await checkAnonymousLimits('locations');
+      if (limitResult.isLimited) {
+        setLimitInfo({ currentCount: limitResult.currentCount, maxCount: limitResult.maxCount });
+        setSignupPromptMessage(`무료 영역 등록은 ${limitResult.maxCount}개까지 가능합니다. 더 많은 영역을 등록하려면 회원가입이 필요합니다.`);
         setSignupPromptVisible(true);
         return;
       }
     }
     
-    // 비회원인 경우 알림 설정 비활성화
-    const notificationEnabled = isAnonymous ? false : enableNotifications;
-    
+    // 영역 데이터 구성
     const locationData = {
       title,
       description,
       icon: selectedIcon,
-      image,
-      enableNotifications: notificationEnabled,
-      notificationType,
-      daysBeforeTarget,
-      isRepeating
+      color: selectedColor,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
     
     if (isEditing) {
@@ -361,11 +321,6 @@ const AddLocationScreen = () => {
       dispatch(updateLocation(updatedLocation))
         .unwrap()
         .then((result) => {
-          // 알림 설정이 활성화되어 있고 비회원이 아닌 경우에만 알림 설정 추가/수정
-          if (notificationEnabled && !isAnonymous) {
-            saveNotificationSettings(result.id);
-          }
-          
           setRegisteredLocation(result);
           setShowSuccessModal(true);
         })
@@ -377,11 +332,6 @@ const AddLocationScreen = () => {
       dispatch(addLocation(locationData))
         .unwrap()
         .then((result) => {
-          // 알림 설정이 활성화되어 있고 비회원이 아닌 경우에만 알림 설정 추가
-          if (notificationEnabled && !isAnonymous) {
-            saveNotificationSettings(result.id);
-          }
-          
           setRegisteredLocation(result);
           setShowSuccessModal(true);
         })
@@ -389,26 +339,6 @@ const AddLocationScreen = () => {
           showErrorAlert(`영역 등록에 실패했습니다: ${error.message}`);
         });
     }
-  };
-  
-  // 알림 설정 저장
-  const saveNotificationSettings = (locationId) => {
-    const notificationData = {
-      type: 'location',
-      targetId: locationId,
-      title: `${title} ${notificationType === 'expiry' ? '유통기한' : '소진 예상'} 알림`,
-      message: `${title}의 ${notificationType === 'expiry' ? '유통기한' : '소진 예상일'}이 ${daysBeforeTarget}일 남았습니다.`,
-      notifyType: notificationType,
-      daysBeforeTarget: daysBeforeTarget,
-      isActive: true,
-      isRepeating: isRepeating,
-    };
-    
-    dispatch(addNotification(notificationData))
-      .unwrap()
-      .catch((error) => {
-        console.error('알림 설정 저장 실패:', error);
-      });
   };
   
   // 성공 모달 닫기 및 화면 이동
@@ -531,112 +461,6 @@ const AddLocationScreen = () => {
           selectedIcon={selectedIcon}
           onSelectIcon={setSelectedIcon}
         />
-        
-        {/* 알림 설정 */}
-        <View style={styles.notificationSection}>
-          <Text style={styles.sectionTitle}>기본 알림 설정</Text>
-          
-          {isAnonymous ? (
-            <View style={styles.anonymousNotificationContainer}>
-              <Ionicons name="lock-closed" size={24} color="#888" style={styles.lockIcon} />
-              <Text style={styles.anonymousNotificationText}>
-                알림 설정은 회원 전용 기능입니다. 회원가입 후 이용해주세요.
-              </Text>
-            </View>
-          ) : (
-            <>
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>영역 알림 사용</Text>
-            <Switch
-              value={enableNotifications}
-              onValueChange={setEnableNotifications}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={enableNotifications ? '#f5dd4b' : '#f4f3f4'}
-            />
-          </View>
-          
-          {enableNotifications && (
-            <>
-              <Text style={styles.notificationHelp}>
-                이 영역에 추가되는 모든 제품에 기본 알림 설정이 적용됩니다.
-              </Text>
-              
-              <View style={styles.notificationTypeContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.notificationTypeButton,
-                    notificationType === 'expiry' && styles.selectedNotificationType
-                  ]}
-                  onPress={() => setNotificationType('expiry')}
-                >
-                  <Text style={[
-                    styles.notificationTypeText,
-                    notificationType === 'expiry' && styles.selectedNotificationTypeText
-                  ]}>
-                    유통기한 기준
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.notificationTypeButton,
-                    notificationType === 'estimated' && styles.selectedNotificationType
-                  ]}
-                  onPress={() => setNotificationType('estimated')}
-                >
-                  <Text style={[
-                    styles.notificationTypeText,
-                    notificationType === 'estimated' && styles.selectedNotificationTypeText
-                  ]}>
-                    소진 예상 기준
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <Text style={styles.daysBeforeLabel}>
-                {notificationType === 'expiry' ? '유통기한' : '소진 예상일'}까지 며칠 전에 알림을 받을까요?
-              </Text>
-              
-              <View style={styles.daysBeforeContainer}>
-                {[1, 3, 5, 7, 14, 30].map(days => (
-                  <TouchableOpacity
-                    key={days}
-                    style={[
-                      styles.daysBeforeButton,
-                      daysBeforeTarget === days && styles.selectedDaysBeforeButton
-                    ]}
-                    onPress={() => setDaysBeforeTarget(days)}
-                  >
-                    <Text style={[
-                      styles.daysBeforeText,
-                      daysBeforeTarget === days && styles.selectedDaysBeforeText
-                    ]}>
-                      {days}일 전
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>연속 알림</Text>
-                <Switch
-                  value={isRepeating}
-                  onValueChange={setIsRepeating}
-                  trackColor={{ false: '#767577', true: '#81b0ff' }}
-                  thumbColor={isRepeating ? '#f5dd4b' : '#f4f3f4'}
-                />
-              </View>
-              
-              {isRepeating && (
-                <Text style={styles.repeatDescription}>
-                  D-{daysBeforeTarget}일부터 D-day까지 매일 알림을 받습니다.
-                </Text>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </View>
         
         {/* 이미지 선택 (향후 구현) */}
         <View style={styles.imageSection}>

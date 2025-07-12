@@ -130,14 +130,14 @@ const NotificationSettings = () => {
     // 웹 환경이 아니고 messaging이 있을 때만 실행
     if (Platform.OS !== 'web' && messaging) {
       try {
-        // 앱이 포그라운드로 돌아올 때마다 권한 상태 확인
-        const subscription = messaging().onMessage(async () => {
-          checkNotificationPermission();
-        });
-        
-        return () => {
-          subscription();
-        };
+    // 앱이 포그라운드로 돌아올 때마다 권한 상태 확인
+    const subscription = messaging().onMessage(async () => {
+      checkNotificationPermission();
+    });
+    
+    return () => {
+      subscription();
+    };
       } catch (error) {
         console.error('메시징 리스너 설정 오류:', error);
       }

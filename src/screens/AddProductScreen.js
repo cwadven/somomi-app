@@ -72,12 +72,6 @@ const AddProductScreen = () => {
   const [tempDateString, setTempDateString] = useState('');
   const [currentDateType, setCurrentDateType] = useState('');
   
-  // 알림 설정
-  const [enableExpiryNotification, setEnableExpiryNotification] = useState(true);
-  const [expiryNotificationDays, setExpiryNotificationDays] = useState(7);
-  const [enableEstimatedNotification, setEnableEstimatedNotification] = useState(true);
-  const [estimatedNotificationDays, setEstimatedNotificationDays] = useState(7);
-  
   // 모달
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -112,10 +106,6 @@ const AddProductScreen = () => {
     purchaseDate: false
   });
   
-  // 날짜 선택기 표시 상태
-  const [notificationType, setNotificationType] = useState('expiry'); // 'expiry' 또는 'estimated'
-  const [isRepeating, setIsRepeating] = useState(false);
-
   // 상태 추가
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryDescription, setNewCategoryDescription] = useState('');
@@ -146,18 +136,6 @@ const AddProductScreen = () => {
         // 비회원이고 제품이 5개 이상인 경우 회원가입 유도 모달 표시
         if (!isAuthenticated && productsInLocation.length >= 5) {
           setShowSignupPrompt(true);
-        }
-        
-        // 영역의 알림 설정 적용 (실제로는 API에서 가져와야 함)
-        if (location.enableNotifications !== false) {
-          setEnableExpiryNotification(true);
-          setExpiryNotificationDays(location.daysBeforeTarget || 7);
-          setEnableEstimatedNotification(true);
-          setEstimatedNotificationDays(location.daysBeforeTarget || 7);
-          setIsRepeating(location.isRepeating || false);
-        } else {
-          setEnableExpiryNotification(false);
-          setEnableEstimatedNotification(false);
         }
       }
     }
@@ -602,11 +580,6 @@ const AddProductScreen = () => {
       // 제품 등록 요청
       const result = await dispatch(addProductAsync(productData)).unwrap();
       
-      // 알림 설정 저장
-      if (enableExpiryNotification) {
-        await saveNotificationSettings(result.id);
-      }
-      
       // 성공 시 처리
       setCreatedProduct(result);
       setShowSuccessModal(true);
@@ -625,40 +598,6 @@ const AddProductScreen = () => {
         '제품 등록 중 오류가 발생했습니다. 다시 시도해주세요.',
         [{ text: '확인', style: 'default' }]
       );
-    }
-  };
-  
-  // 알림 설정 저장 함수
-  const saveNotificationSettings = async (productId) => {
-    try {
-      if (enableExpiryNotification) {
-        // 알림 활성화된 경우에만 저장
-        const targetDate = notificationType === 'expiry' ? productData.expiryDate : productData.estimatedEndDate;
-        
-        if (targetDate) {
-          await dispatch(addNotification({
-            type: 'product',
-            targetId: productId,
-            title: `${productName} ${notificationType === 'expiry' ? '유통기한' : '소진예상'} 알림`,
-            message: `${productName}의 ${notificationType === 'expiry' ? '유통기한' : '소진 예상일'}이 ${daysBeforeTarget}일 남았습니다.`,
-            notifyType: notificationType,
-            daysBeforeTarget: daysBeforeTarget,
-            isActive: true,
-            isRepeating: isRepeating
-          })).unwrap();
-          
-          // 알림 예약
-          const notifyDate = new Date(targetDate);
-          await scheduleProductExpiryNotification(
-            productId,
-            productName,
-            notifyDate,
-            daysBeforeTarget
-          );
-        }
-      }
-    } catch (error) {
-      console.error('알림 설정 저장 오류:', error);
     }
   };
   
@@ -879,121 +818,18 @@ const AddProductScreen = () => {
             style={[styles.input, styles.textArea]}
             value={memo}
             onChangeText={setMemo}
-            placeholder="추가 정보 입력"
-            multiline
+            placeholder="메모를 입력하세요"
+            multiline={true}
             numberOfLines={4}
-            textAlignVertical="top"
           />
-        </View>
-        
-        {/* 알림 설정 */}
-        <View style={styles.notificationSection}>
-          <Text style={styles.sectionTitle}>알림 설정</Text>
-          
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>제품 알림 사용</Text>
-            <Switch
-              value={enableExpiryNotification}
-              onValueChange={setEnableExpiryNotification}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={enableExpiryNotification ? '#f5dd4b' : '#f4f3f4'}
-            />
-          </View>
-          
-          {enableExpiryNotification && (
-            <>
-              <View style={styles.notificationTypeContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.notificationTypeButton,
-                    notificationType === 'expiry' && styles.selectedNotificationType
-                  ]}
-                  onPress={() => setNotificationType('expiry')}
-                >
-                  <Text style={[
-                    styles.notificationTypeText,
-                    notificationType === 'expiry' && styles.selectedNotificationTypeText
-                  ]}>
-                    유통기한 기준
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.notificationTypeButton,
-                    notificationType === 'estimated' && styles.selectedNotificationType
-                  ]}
-                  onPress={() => setNotificationType('estimated')}
-                >
-                  <Text style={[
-                    styles.notificationTypeText,
-                    notificationType === 'estimated' && styles.selectedNotificationTypeText
-                  ]}>
-                    소진 예상 기준
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <Text style={styles.daysBeforeLabel}>
-                {notificationType === 'expiry' ? '유통기한' : '소진 예상일'}까지 며칠 전에 알림을 받을까요?
-              </Text>
-              
-              <View style={styles.daysBeforeContainer}>
-                {[1, 3, 5, 7, 14, 30].map(days => (
-                  <TouchableOpacity
-                    key={days}
-                    style={[
-                      styles.daysBeforeButton,
-                      daysBeforeTarget === days && styles.selectedDaysBeforeButton
-                    ]}
-                    onPress={() => setDaysBeforeTarget(days)}
-                  >
-                    <Text style={[
-                      styles.daysBeforeText,
-                      daysBeforeTarget === days && styles.selectedDaysBeforeText
-                    ]}>
-                      {days}일 전
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>연속 알림</Text>
-                <Switch
-                  value={isRepeating}
-                  onValueChange={setIsRepeating}
-                  trackColor={{ false: '#767577', true: '#81b0ff' }}
-                  thumbColor={isRepeating ? '#f5dd4b' : '#f4f3f4'}
-                />
-              </View>
-              
-              {isRepeating && (
-                <Text style={styles.repeatDescription}>
-                  D-{daysBeforeTarget}일부터 D-day까지 매일 알림을 받습니다.
-                </Text>
-              )}
-            </>
-          )}
         </View>
         
         {/* 등록 버튼 */}
         <TouchableOpacity 
-          style={[
-            styles.submitButton,
-            productsStatus === 'loading' && styles.disabledButton
-          ]} 
+          style={styles.submitButton}
           onPress={handleSubmit}
-          disabled={productsStatus === 'loading'}
         >
-          {productsStatus === 'loading' ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#ffffff" />
-              <Text style={[styles.submitButtonText, styles.loadingText]}>등록 중...</Text>
-            </View>
-          ) : (
-            <Text style={styles.submitButtonText}>제품 등록</Text>
-          )}
+          <Text style={styles.submitButtonText}>제품 등록</Text>
         </TouchableOpacity>
       </ScrollView>
       

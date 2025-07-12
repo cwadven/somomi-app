@@ -273,6 +273,11 @@ export const applyLocationNotifications = createAsyncThunk(
           // 기존 알림 취소
           for (const notification of existingProductNotifications) {
             try {
+              // 영역 알림 무시 설정이 활성화된 제품은 건너뜀
+              if (notification.ignoreLocationNotification) {
+                continue;
+              }
+              
               await cancelNotification(notification.id);
               
               // 메모리에서 제거
@@ -290,7 +295,12 @@ export const applyLocationNotifications = createAsyncThunk(
             n => n.type === 'product' && n.targetId === product.id
           );
           
-          if (existingProductNotifications.length > 0) {
+          // 영역 알림 무시 설정이 활성화된 제품은 건너뜀
+          const hasIgnoreLocationSetting = existingProductNotifications.some(
+            n => n.ignoreLocationNotification
+          );
+          
+          if (hasIgnoreLocationSetting || existingProductNotifications.length > 0) {
             continue;
           }
         }
@@ -336,24 +346,26 @@ export const applyLocationNotifications = createAsyncThunk(
                   );
                 }
                 
-                // 알림 객체 생성
+                // 새 알림 생성
                 const newNotification = {
                   id: notificationId,
                   type: 'product',
                   targetId: product.id,
-                  title,
-                  message,
                   notifyType: 'expiry',
-                  daysBeforeTarget,
+                  title: title,
+                  message: message,
+                  daysBeforeTarget: daysBeforeTarget,
                   isActive: locationNotification.isActive,
-                  isRepeating: locationNotification.isRepeating,
-                  createdAt: new Date().toISOString(),
+                  isRepeating: locationNotification.isRepeating || false, // 연속 알림 설정 복사
+                  ignoreLocationNotification: false, // 기본값은 false
+                  createdAt: new Date().toISOString()
                 };
                 
+                // 메모리에 추가
                 sampleNotifications.push(newNotification);
                 newNotifications.push(newNotification);
               } catch (error) {
-                console.error(`제품 ${product.id} 유통기한 알림 설정 오류:`, error);
+                console.error(`유통기한 알림 생성 오류(제품: ${product.id}):`, error);
               }
             }
           } else if (locationNotification.notifyType === 'estimated') {
@@ -378,7 +390,6 @@ export const applyLocationNotifications = createAsyncThunk(
                 
                 // 알림 스케줄링
                 if (locationNotification.isActive) {
-                  // 소진예상일을 유통기한처럼 처리
                   await scheduleProductExpiryNotification(
                     product.id,
                     product.name,
@@ -387,24 +398,26 @@ export const applyLocationNotifications = createAsyncThunk(
                   );
                 }
                 
-                // 알림 객체 생성
+                // 새 알림 생성
                 const newNotification = {
                   id: notificationId,
                   type: 'product',
                   targetId: product.id,
-                  title,
-                  message,
                   notifyType: 'estimated',
-                  daysBeforeTarget,
+                  title: title,
+                  message: message,
+                  daysBeforeTarget: daysBeforeTarget,
                   isActive: locationNotification.isActive,
-                  isRepeating: locationNotification.isRepeating,
-                  createdAt: new Date().toISOString(),
+                  isRepeating: locationNotification.isRepeating || false, // 연속 알림 설정 복사
+                  ignoreLocationNotification: false, // 기본값은 false
+                  createdAt: new Date().toISOString()
                 };
                 
+                // 메모리에 추가
                 sampleNotifications.push(newNotification);
                 newNotifications.push(newNotification);
               } catch (error) {
-                console.error(`제품 ${product.id} 소진예상 알림 설정 오류:`, error);
+                console.error(`소진예상 알림 생성 오류(제품: ${product.id}):`, error);
               }
             }
           }

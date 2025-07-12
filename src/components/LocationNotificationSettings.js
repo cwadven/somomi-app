@@ -35,6 +35,8 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
   const [estimatedEnabled, setEstimatedEnabled] = useState(true);
   const [estimatedDays, setEstimatedDays] = useState('7');
   const [aiEnabled, setAiEnabled] = useState(false);
+  const [isExpiryRepeating, setIsExpiryRepeating] = useState(false); // 유통기한 연속 알림
+  const [isEstimatedRepeating, setIsEstimatedRepeating] = useState(false); // 소진예상 연속 알림
   
   // 알림 모달 상태
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -61,12 +63,14 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
       if (expiryNotification) {
         setExpiryEnabled(expiryNotification.isActive);
         setExpiryDays(expiryNotification.daysBeforeTarget !== null ? expiryNotification.daysBeforeTarget.toString() : '');
+        setIsExpiryRepeating(expiryNotification.isRepeating || false); // 유통기한 연속 알림 설정 불러오기
       }
       
       const estimatedNotification = currentNotifications.find(n => n.notifyType === 'estimated');
       if (estimatedNotification) {
         setEstimatedEnabled(estimatedNotification.isActive);
         setEstimatedDays(estimatedNotification.daysBeforeTarget !== null ? estimatedNotification.daysBeforeTarget.toString() : '');
+        setIsEstimatedRepeating(estimatedNotification.isRepeating || false); // 소진예상 연속 알림 설정 불러오기
       }
     } else {
       // 기본 설정 적용 (비회원도 알림 활성화 가능)
@@ -74,6 +78,8 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
       setEstimatedEnabled(true);
       setExpiryDays('7');
       setEstimatedDays('7');
+      setIsExpiryRepeating(false); // 유통기한 연속 알림 기본값 false
+      setIsEstimatedRepeating(false); // 소진예상 연속 알림 기본값 false
     }
   }, [currentNotifications]);
   
@@ -117,7 +123,8 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
           id: expiryNotification.id,
           data: {
             isActive: expiryEnabled,
-            daysBeforeTarget: safeExpiryDays
+            daysBeforeTarget: safeExpiryDays,
+            isRepeating: isExpiryRepeating // 유통기한 연속 알림 설정
           }
         })).unwrap();
       } else {
@@ -130,7 +137,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
           notifyType: 'expiry',
           daysBeforeTarget: safeExpiryDays,
           isActive: expiryEnabled,
-          isRepeating: false
+          isRepeating: isExpiryRepeating // 유통기한 연속 알림 설정
         })).unwrap();
       }
       
@@ -147,7 +154,8 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
           id: estimatedNotification.id,
           data: {
             isActive: estimatedEnabled,
-            daysBeforeTarget: safeEstimatedDays
+            daysBeforeTarget: safeEstimatedDays,
+            isRepeating: isEstimatedRepeating // 소진예상 연속 알림 설정
           }
         })).unwrap();
       } else {
@@ -160,7 +168,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
           notifyType: 'estimated',
           daysBeforeTarget: safeEstimatedDays,
           isActive: estimatedEnabled,
-          isRepeating: false
+          isRepeating: isEstimatedRepeating // 소진예상 연속 알림 설정
         })).unwrap();
       }
       
@@ -271,6 +279,24 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
           />
           <Text style={styles.daysText}>일 전에 알림</Text>
         </View>
+        
+        {/* 연속 알림 설정 추가 */}
+        <View style={styles.settingItem}>
+          <Text style={styles.settingText}>연속 알림</Text>
+          <Switch
+            value={isExpiryRepeating}
+            onValueChange={setIsExpiryRepeating}
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={isExpiryRepeating ? '#4630EB' : '#f4f3f4'}
+            disabled={!expiryEnabled}
+          />
+        </View>
+        {isExpiryRepeating && (
+          <Text style={styles.settingDescription}>
+            D-{expiryDays}일부터 D-day까지 매일 알림을 받습니다.
+          </Text>
+        )}
+        
         <Text style={styles.settingDescription}>
           이 영역의 모든 제품에 대해 유통기한 알림을 설정합니다.
         </Text>
@@ -304,6 +330,24 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
           />
           <Text style={styles.daysText}>일 전에 알림</Text>
         </View>
+        
+        {/* 연속 알림 설정 추가 */}
+        <View style={styles.settingItem}>
+          <Text style={styles.settingText}>연속 알림</Text>
+          <Switch
+            value={isEstimatedRepeating}
+            onValueChange={setIsEstimatedRepeating}
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={isEstimatedRepeating ? '#4630EB' : '#f4f3f4'}
+            disabled={!estimatedEnabled}
+          />
+        </View>
+        {isEstimatedRepeating && (
+          <Text style={styles.settingDescription}>
+            D-{estimatedDays}일부터 D-day까지 매일 알림을 받습니다.
+          </Text>
+        )}
+        
         <Text style={styles.settingDescription}>
           이 영역의 모든 제품에 대해 소진예상 알림을 설정합니다.
         </Text>

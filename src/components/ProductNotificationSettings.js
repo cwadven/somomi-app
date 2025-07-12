@@ -35,6 +35,10 @@ const ProductNotificationSettings = ({ productId, product }) => {
   const [expiryDays, setExpiryDays] = useState('7');
   const [estimatedEnabled, setEstimatedEnabled] = useState(true);
   const [estimatedDays, setEstimatedDays] = useState('7');
+  const [isExpiryRepeating, setIsExpiryRepeating] = useState(false); // 유통기한 연속 알림
+  const [isEstimatedRepeating, setIsEstimatedRepeating] = useState(false); // 소진예상 연속 알림
+  const [ignoreLocationExpiryNotification, setIgnoreLocationExpiryNotification] = useState(false); // 유통기한 영역 알림 무시
+  const [ignoreLocationEstimatedNotification, setIgnoreLocationEstimatedNotification] = useState(false); // 소진예상 영역 알림 무시
   
   // 알림 모달 상태
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -61,12 +65,16 @@ const ProductNotificationSettings = ({ productId, product }) => {
       if (expiryNotification) {
         setExpiryEnabled(expiryNotification.isActive);
         setExpiryDays(expiryNotification.daysBeforeTarget !== null ? expiryNotification.daysBeforeTarget.toString() : '');
+        setIsExpiryRepeating(expiryNotification.isRepeating || false); // 유통기한 연속 알림 설정 불러오기
+        setIgnoreLocationExpiryNotification(expiryNotification.ignoreLocationNotification || false); // 유통기한 영역 알림 무시 설정 불러오기
       }
       
       const estimatedNotification = currentNotifications.find(n => n.notifyType === 'estimated');
       if (estimatedNotification) {
         setEstimatedEnabled(estimatedNotification.isActive);
         setEstimatedDays(estimatedNotification.daysBeforeTarget !== null ? estimatedNotification.daysBeforeTarget.toString() : '');
+        setIsEstimatedRepeating(estimatedNotification.isRepeating || false); // 소진예상 연속 알림 설정 불러오기
+        setIgnoreLocationEstimatedNotification(estimatedNotification.ignoreLocationNotification || false); // 소진예상 영역 알림 무시 설정 불러오기
       }
     } else {
       // 기본 설정 적용 (비회원도 알림 활성화 가능)
@@ -74,6 +82,10 @@ const ProductNotificationSettings = ({ productId, product }) => {
       setEstimatedEnabled(true);
       setExpiryDays('7');
       setEstimatedDays('7');
+      setIsExpiryRepeating(false); // 유통기한 연속 알림 기본값 false
+      setIsEstimatedRepeating(false); // 소진예상 연속 알림 기본값 false
+      setIgnoreLocationExpiryNotification(false); // 유통기한 영역 알림 무시 기본값 false
+      setIgnoreLocationEstimatedNotification(false); // 소진예상 영역 알림 무시 기본값 false
     }
   }, [currentNotifications]);
   
@@ -90,10 +102,10 @@ const ProductNotificationSettings = ({ productId, product }) => {
   };
   
   // 오류 모달 표시
-  const showErrorModal = (errorMessage) => {
+  const showErrorModal = (message) => {
     setAlertModalConfig({
       title: '오류',
-      message: errorMessage || '알림 설정을 저장하는 중 오류가 발생했습니다.',
+      message: message || '알림 설정 저장 중 오류가 발생했습니다.',
       buttons: [{ text: '확인', style: 'default' }],
       icon: 'alert-circle-outline',
       iconColor: '#F44336'
@@ -101,146 +113,80 @@ const ProductNotificationSettings = ({ productId, product }) => {
     setAlertModalVisible(true);
   };
   
+  // 숫자만 입력 가능하도록 검증
+  const validateDays = (text, setter) => {
+    const numericValue = text.replace(/[^0-9]/g, '');
+    setter(numericValue);
+  };
+  
   // 알림 설정 저장
   const saveNotificationSettings = async () => {
+    if (!isAuthenticated && !productId) {
+      showErrorModal('로그인 후 이용 가능합니다.');
+      return;
+    }
+    
     try {
       // 유통기한 알림 설정 저장
-      const expiryNotification = currentNotifications.find(n => n.notifyType === 'expiry');
-      // 일수 값 처리 - 빈 값이면 null 사용
-      const parsedExpiryDays = expiryDays.trim() === '' ? null : parseInt(expiryDays);
-      // 0 이상인 경우 유효한 값으로 처리
-      const safeExpiryDays = (parsedExpiryDays !== null && !isNaN(parsedExpiryDays) && parsedExpiryDays >= 0) ? parsedExpiryDays : null;
-      
-      if (expiryNotification) {
-        // 기존 알림 취소
-        await cancelNotification(expiryNotification.id);
+      if (product.expiryDate) {
+        const expiryNotification = currentNotifications.find(n => n.notifyType === 'expiry');
+        const expiryDaysNum = parseInt(expiryDays, 10) || 7;
         
-        // 기존 설정 업데이트
-        await dispatch(updateNotification({
-          id: expiryNotification.id,
-          data: {
+        if (expiryNotification) {
+          // 기존 알림 업데이트
+          dispatch(updateNotification({
+            id: expiryNotification.id,
             isActive: expiryEnabled,
-            daysBeforeTarget: safeExpiryDays
-          }
-        })).unwrap();
-        
-        // 알림이 활성화된 경우 새로 스케줄링 (daysBeforeTarget이 null이 아닌 경우만)
-        if (expiryEnabled && product.expiryDate && safeExpiryDays !== null) {
-          const expiryDate = new Date(product.expiryDate);
-          await scheduleProductExpiryNotification(
-            productId,
-            product.name,
-            expiryDate,
-            safeExpiryDays
-          );
-        }
-      } else if (product.expiryDate) {
-        // 새 설정 추가 (유통기한이 있는 경우에만)
-        await dispatch(addNotification({
-          type: 'product',
-          targetId: productId,
-          title: `${product.name} 유통기한 알림`,
-          message: safeExpiryDays === 0 
-            ? `${product.name}의 유통기한이 오늘까지입니다.` 
-            : `${product.name}의 유통기한이 ${safeExpiryDays !== null ? safeExpiryDays + '일' : ''} 남았습니다.`,
-          notifyType: 'expiry',
-          daysBeforeTarget: safeExpiryDays,
-          isActive: expiryEnabled,
-          isRepeating: false
-        })).unwrap();
-        
-        // 알림이 활성화된 경우 스케줄링 (daysBeforeTarget이 null이 아닌 경우만)
-        if (expiryEnabled && safeExpiryDays !== null) {
-          const expiryDate = new Date(product.expiryDate);
-          await scheduleProductExpiryNotification(
-            productId,
-            product.name,
-            expiryDate,
-            safeExpiryDays
-          );
+            daysBeforeTarget: expiryDaysNum,
+            isRepeating: isExpiryRepeating, // 연속 알림 설정 추가
+            ignoreLocationNotification: ignoreLocationExpiryNotification, // 영역 알림 무시 설정 추가
+          }));
+        } else {
+          // 새 알림 추가
+          dispatch(addNotification({
+            type: 'product',
+            targetId: productId,
+            notifyType: 'expiry',
+            isActive: expiryEnabled,
+            daysBeforeTarget: expiryDaysNum,
+            isRepeating: isExpiryRepeating, // 연속 알림 설정 추가
+            ignoreLocationNotification: ignoreLocationExpiryNotification, // 영역 알림 무시 설정 추가
+          }));
         }
       }
       
       // 소진예상 알림 설정 저장
-      const estimatedNotification = currentNotifications.find(n => n.notifyType === 'estimated');
-      // 일수 값 처리 - 빈 값이면 null 사용
-      const parsedEstimatedDays = estimatedDays.trim() === '' ? null : parseInt(estimatedDays);
-      // 0 이상인 경우 유효한 값으로 처리
-      const safeEstimatedDays = (parsedEstimatedDays !== null && !isNaN(parsedEstimatedDays) && parsedEstimatedDays >= 0) ? parsedEstimatedDays : null;
-      
-      if (estimatedNotification) {
-        // 기존 알림 취소
-        await cancelNotification(estimatedNotification.id);
+      if (product.estimatedEndDate) {
+        const estimatedNotification = currentNotifications.find(n => n.notifyType === 'estimated');
+        const estimatedDaysNum = parseInt(estimatedDays, 10) || 7;
         
-        // 기존 설정 업데이트
-        await dispatch(updateNotification({
-          id: estimatedNotification.id,
-          data: {
+        if (estimatedNotification) {
+          // 기존 알림 업데이트
+          dispatch(updateNotification({
+            id: estimatedNotification.id,
             isActive: estimatedEnabled,
-            daysBeforeTarget: safeEstimatedDays
-          }
-        })).unwrap();
-        
-        // 알림이 활성화된 경우 새로 스케줄링 (daysBeforeTarget이 null이 아닌 경우만)
-        if (estimatedEnabled && product.estimatedEndDate && safeEstimatedDays !== null) {
-          const estimatedEndDate = new Date(product.estimatedEndDate);
-          await scheduleProductExpiryNotification(
-            productId,
-            product.name,
-            estimatedEndDate,
-            safeEstimatedDays
-          );
-        }
-      } else if (product.estimatedEndDate) {
-        // 새 설정 추가 (소진예상일이 있는 경우에만)
-        await dispatch(addNotification({
-          type: 'product',
-          targetId: productId,
-          title: `${product.name} 소진예상 알림`,
-          message: safeEstimatedDays === 0 
-            ? `${product.name}이(가) 오늘 소진될 예정입니다.` 
-            : `${product.name}이(가) ${safeEstimatedDays !== null ? safeEstimatedDays + '일' : ''} 후에 소진될 예정입니다.`,
-          notifyType: 'estimated',
-          daysBeforeTarget: safeEstimatedDays,
-          isActive: estimatedEnabled,
-          isRepeating: false
-        })).unwrap();
-        
-        // 알림이 활성화된 경우 스케줄링 (daysBeforeTarget이 null이 아닌 경우만)
-        if (estimatedEnabled && safeEstimatedDays !== null) {
-          const estimatedEndDate = new Date(product.estimatedEndDate);
-          await scheduleProductExpiryNotification(
-            productId,
-            product.name,
-            estimatedEndDate,
-            safeEstimatedDays
-          );
+            daysBeforeTarget: estimatedDaysNum,
+            isRepeating: isEstimatedRepeating, // 연속 알림 설정 추가
+            ignoreLocationNotification: ignoreLocationEstimatedNotification, // 영역 알림 무시 설정 추가
+          }));
+        } else {
+          // 새 알림 추가
+          dispatch(addNotification({
+            type: 'product',
+            targetId: productId,
+            notifyType: 'estimated',
+            isActive: estimatedEnabled,
+            daysBeforeTarget: estimatedDaysNum,
+            isRepeating: isEstimatedRepeating, // 연속 알림 설정 추가
+            ignoreLocationNotification: ignoreLocationEstimatedNotification, // 영역 알림 무시 설정 추가
+          }));
         }
       }
       
-      // 성공 모달 표시
       showSuccessModal();
     } catch (error) {
-      console.error('알림 설정 저장 오류:', error);
-      showErrorModal('알림 설정을 저장하는 중 오류가 발생했습니다.');
-    }
-  };
-  
-  // 일수 입력 검증
-  const validateDays = (text, setter) => {
-    // 빈 문자열이나 null 값 처리
-    if (!text || text.trim() === '') {
-      setter(''); // 빈 값 유지
-      return;
-    }
-    
-    const numValue = parseInt(text);
-    if (isNaN(numValue) || numValue < 0) { // 0 이상으로 변경
-      setter('0'); // 최소값을 0으로 설정
-    } else if (numValue > 30) {
-      setter('30');
-    } else {
-      setter(text);
+      console.error('알림 설정 저장 중 오류 발생:', error);
+      showErrorModal();
     }
   };
 
@@ -280,6 +226,41 @@ const ProductNotificationSettings = ({ productId, product }) => {
           />
           <Text style={styles.daysText}>일 전에 알림</Text>
         </View>
+        
+        {/* 연속 알림 설정 추가 */}
+        <View style={styles.settingItem}>
+          <Text style={styles.settingText}>연속 알림</Text>
+          <Switch
+            value={isExpiryRepeating}
+            onValueChange={setIsExpiryRepeating}
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={isExpiryRepeating ? '#4630EB' : '#f4f3f4'}
+            disabled={!expiryEnabled || !product.expiryDate}
+          />
+        </View>
+        {isExpiryRepeating && (
+          <Text style={styles.settingDescription}>
+            D-{expiryDays}일부터 D-day까지 매일 알림을 받습니다.
+          </Text>
+        )}
+        
+        {/* 영역 알림 무시 설정 추가 */}
+        <View style={styles.settingItem}>
+          <Text style={styles.settingText}>영역 상세 알림 무시</Text>
+          <Switch
+            value={ignoreLocationExpiryNotification}
+            onValueChange={setIgnoreLocationExpiryNotification}
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={ignoreLocationExpiryNotification ? '#4630EB' : '#f4f3f4'}
+            disabled={!expiryEnabled || !product.expiryDate}
+          />
+        </View>
+        {ignoreLocationExpiryNotification && (
+          <Text style={styles.settingDescription}>
+            이 제품은 영역의 유통기한 알림 설정을 무시하고 개별 설정을 따릅니다.
+          </Text>
+        )}
+        
         {!product.expiryDate && (
           <Text style={styles.warningText}>
             유통기한이 설정되지 않았습니다. 유통기한을 먼저 설정해주세요.
@@ -316,6 +297,41 @@ const ProductNotificationSettings = ({ productId, product }) => {
           />
           <Text style={styles.daysText}>일 전에 알림</Text>
         </View>
+        
+        {/* 연속 알림 설정 추가 */}
+        <View style={styles.settingItem}>
+          <Text style={styles.settingText}>연속 알림</Text>
+          <Switch
+            value={isEstimatedRepeating}
+            onValueChange={setIsEstimatedRepeating}
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={isEstimatedRepeating ? '#4630EB' : '#f4f3f4'}
+            disabled={!estimatedEnabled || !product.estimatedEndDate}
+          />
+        </View>
+        {isEstimatedRepeating && (
+          <Text style={styles.settingDescription}>
+            D-{estimatedDays}일부터 D-day까지 매일 알림을 받습니다.
+          </Text>
+        )}
+        
+        {/* 영역 알림 무시 설정 추가 */}
+        <View style={styles.settingItem}>
+          <Text style={styles.settingText}>영역 상세 알림 무시</Text>
+          <Switch
+            value={ignoreLocationEstimatedNotification}
+            onValueChange={setIgnoreLocationEstimatedNotification}
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={ignoreLocationEstimatedNotification ? '#4630EB' : '#f4f3f4'}
+            disabled={!estimatedEnabled || !product.estimatedEndDate}
+          />
+        </View>
+        {ignoreLocationEstimatedNotification && (
+          <Text style={styles.settingDescription}>
+            이 제품은 영역의 소진예상 알림 설정을 무시하고 개별 설정을 따릅니다.
+          </Text>
+        )}
+        
         {!product.estimatedEndDate && (
           <Text style={styles.warningText}>
             소진예상일이 설정되지 않았습니다. 소진예상일을 먼저 설정해주세요.

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { 
   View, 
   Text, 
@@ -19,8 +19,9 @@ import { Ionicons } from '@expo/vector-icons';
  * @param {Boolean} isRequired - 필수 필드 여부
  * @param {String} errorMessage - 에러 메시지
  * @param {Boolean} showError - 에러 표시 여부
+ * @param {Object} ref - FlatList에 대한 참조
  */
-const LocationSelector = ({ 
+const LocationSelector = forwardRef(({ 
   locations = [], 
   selectedLocation, 
   onSelectLocation, 
@@ -29,7 +30,7 @@ const LocationSelector = ({
   isRequired = false,
   errorMessage = '',
   showError = false
-}) => {
+}, ref) => {
   return (
     <View style={styles.locationsContainer}>
       <View style={styles.labelContainer}>
@@ -42,6 +43,7 @@ const LocationSelector = ({
       ) : locations.length > 0 ? (
         <>
           <FlatList
+            ref={ref}
             horizontal
             data={locations}
             keyExtractor={(item) => item.id}
@@ -100,7 +102,10 @@ const LocationSelector = ({
       )}
     </View>
   );
-};
+});
+
+// 표시 이름 설정
+LocationSelector.displayName = 'LocationSelector';
 
 const styles = StyleSheet.create({
   locationsContainer: {
