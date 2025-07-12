@@ -4,6 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 
 // HP 바 컴포넌트
 const HPBar = ({ percentage, type }) => {
+  // percentage가 NaN이면 0으로 처리
+  const safePercentage = isNaN(percentage) ? 0 : percentage;
+  
   // HP 바 색상 계산
   const getHPColor = (value, type) => {
     if (type === 'expiry') {
@@ -24,7 +27,7 @@ const HPBar = ({ percentage, type }) => {
       <View 
         style={[
           styles.hpBar, 
-          { width: `${percentage}%`, backgroundColor: getHPColor(percentage, type) }
+          { width: `${safePercentage}%`, backgroundColor: getHPColor(safePercentage, type) }
         ]} 
       />
     </View>
@@ -38,9 +41,28 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
     
     const today = new Date();
     const expiryDate = new Date(product.expiryDate);
-    const purchaseDate = new Date(product.purchaseDate);
+    
+    // purchaseDate가 없는 경우 오늘 날짜를 기준으로 계산
+    const purchaseDate = product.purchaseDate ? new Date(product.purchaseDate) : new Date();
+    
+    // 날짜가 유효한지 확인
+    if (isNaN(expiryDate.getTime()) || isNaN(purchaseDate.getTime())) {
+      return {
+        percentage: 100,
+        remainingDays: 0
+      };
+    }
     
     const totalDays = (expiryDate - purchaseDate) / (1000 * 60 * 60 * 24);
+    
+    // totalDays가 0이거나 음수인 경우 처리
+    if (totalDays <= 0) {
+      return {
+        percentage: 0,
+        remainingDays: 0
+      };
+    }
+    
     const remainingDays = (expiryDate - today) / (1000 * 60 * 60 * 24);
     
     // 유통기한이 가까워질수록 HP바가 줄어들도록 변경
@@ -58,9 +80,28 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
     
     const today = new Date();
     const endDate = new Date(product.estimatedEndDate);
-    const purchaseDate = new Date(product.purchaseDate);
+    
+    // purchaseDate가 없는 경우 오늘 날짜를 기준으로 계산
+    const purchaseDate = product.purchaseDate ? new Date(product.purchaseDate) : new Date();
+    
+    // 날짜가 유효한지 확인
+    if (isNaN(endDate.getTime()) || isNaN(purchaseDate.getTime())) {
+      return {
+        percentage: 100,
+        remainingDays: 0
+      };
+    }
     
     const totalDays = (endDate - purchaseDate) / (1000 * 60 * 60 * 24);
+    
+    // totalDays가 0이거나 음수인 경우 처리
+    if (totalDays <= 0) {
+      return {
+        percentage: 0,
+        remainingDays: 0
+      };
+    }
+    
     const remainingDays = (endDate - today) / (1000 * 60 * 60 * 24);
     
     // 소진예상일이 가까워질수록 HP바가 줄어들도록 변경
@@ -82,7 +123,9 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
       '주방용품': 'restaurant',
     };
     
-    return categoryIcons[product.category] || 'cube-outline';
+    // category가 객체인 경우 name 속성 사용
+    const categoryName = product.category?.name || product.category;
+    return categoryIcons[categoryName] || 'cube-outline';
   };
 
   const expiryResult = calculateExpiryPercentage();
@@ -168,7 +211,8 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
               styles.category,
               isZeroHP && styles.zeroHPCategory
             ]}>
-              {product.category}
+              {/* category가 객체인 경우 name 속성 사용 */}
+              {product.category?.name || product.category}
             </Text>
             )}
           </View>
@@ -200,7 +244,7 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
                   styles.hpPercentage,
                   isZeroHP && styles.zeroHPSubText
                 ]}>
-                  {expiryPercentage}%
+                  {isNaN(expiryPercentage) ? '0' : expiryPercentage}%
                 </Text>
               </View>
               <HPBar percentage={expiryPercentage} type="expiry" />
@@ -221,7 +265,7 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
                   styles.hpPercentage,
                   isZeroHP && styles.zeroHPSubText
                 ]}>
-                  {consumptionPercentage}%
+                  {isNaN(consumptionPercentage) ? '0' : consumptionPercentage}%
                 </Text>
               </View>
               <HPBar percentage={consumptionPercentage} type="consumption" />

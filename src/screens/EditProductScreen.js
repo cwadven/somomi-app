@@ -185,14 +185,14 @@ const EditProductScreen = () => {
     const updatedProductData = {
       id: productId,
       name: productName,
+      brand: brand,
       categoryId: selectedCategory ? selectedCategory.id : null,
-      category: selectedCategory ? selectedCategory.name : '미분류',
+      category: selectedCategory,
       locationId: selectedLocation.id,
       purchaseDate: purchaseDate.toISOString(),
       expiryDate: expiryDate ? expiryDate.toISOString() : null,
       estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
       memo,
-      brand,
       updatedAt: new Date().toISOString(),
       // 기존 데이터 유지
       image: currentProduct.image,
@@ -325,7 +325,7 @@ const EditProductScreen = () => {
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>
             {currentDateType === 'purchase' ? '구매일 선택' : 
-             currentDateType === 'expiry' ? '유통기한 선택' : '예상 소모 완료일 선택'}
+             currentDateType === 'expiry' ? '유통기한 선택' : '소진 예상일 선택'}
           </Text>
           
           <TextInput
@@ -440,7 +440,10 @@ const EditProductScreen = () => {
         
         {/* 제품명 입력 */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>제품명 *</Text>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>제품명</Text>
+            <Text style={styles.requiredMark}>*</Text>
+          </View>
           <TextInput
             style={styles.input}
             value={productName}
@@ -482,7 +485,10 @@ const EditProductScreen = () => {
         
         {/* 구매일 선택 */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>구매일 *</Text>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>구매일</Text>
+            <Text style={styles.requiredMark}>*</Text>
+          </View>
           <TouchableOpacity 
             style={styles.dateInput}
             onPress={() => {
@@ -536,9 +542,9 @@ const EditProductScreen = () => {
           )}
         </View>
         
-        {/* 예상 소모 완료일 선택 */}
+        {/* 소진 예상일 선택 */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>예상 소모 완료일 (선택)</Text>
+          <Text style={styles.label}>소진 예상일 (선택)</Text>
           <TouchableOpacity 
             style={styles.dateInput}
             onPress={() => {
@@ -627,11 +633,21 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 20,
   },
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   label: {
     fontSize: 16,
-    marginBottom: 8,
     color: '#333',
     fontWeight: '500',
+  },
+  requiredMark: {
+    color: 'red',
+    fontWeight: 'bold',
+    marginLeft: 4,
+    fontSize: 16,
   },
   input: {
     backgroundColor: '#fff',

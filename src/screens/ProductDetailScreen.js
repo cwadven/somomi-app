@@ -20,6 +20,9 @@ import ProductNotificationSettings from '../components/ProductNotificationSettin
 
 // HP 바 컴포넌트
 const HPBar = ({ percentage, type }) => {
+  // percentage가 NaN이면 0으로 처리
+  const safePercentage = isNaN(percentage) ? 0 : percentage;
+  
   // HP 바 색상 계산
   const getHPColor = (value, type) => {
     if (type === 'expiry') {
@@ -40,7 +43,7 @@ const HPBar = ({ percentage, type }) => {
       <View 
         style={[
           styles.hpBar, 
-          { width: `${percentage}%`, backgroundColor: getHPColor(percentage, type) }
+          { width: `${safePercentage}%`, backgroundColor: getHPColor(safePercentage, type) }
         ]} 
       />
     </View>
@@ -115,9 +118,22 @@ const ProductDetailScreen = () => {
     
     const today = new Date();
     const expiryDate = new Date(currentProduct.expiryDate);
-    const purchaseDate = new Date(currentProduct.purchaseDate);
+    
+    // purchaseDate가 없는 경우 오늘 날짜를 기준으로 계산
+    const purchaseDate = currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate) : new Date();
+    
+    // 날짜가 유효한지 확인
+    if (isNaN(expiryDate.getTime()) || isNaN(purchaseDate.getTime())) {
+      return 100;
+    }
     
     const totalDays = (expiryDate - purchaseDate) / (1000 * 60 * 60 * 24);
+    
+    // totalDays가 0이거나 음수인 경우 처리
+    if (totalDays <= 0) {
+      return 0;
+    }
+    
     const remainingDays = (expiryDate - today) / (1000 * 60 * 60 * 24);
     
     // 유통기한이 가까워질수록 HP바가 줄어들도록 계산
@@ -132,9 +148,22 @@ const ProductDetailScreen = () => {
     
     const today = new Date();
     const endDate = new Date(currentProduct.estimatedEndDate);
-    const purchaseDate = new Date(currentProduct.purchaseDate);
+    
+    // purchaseDate가 없는 경우 오늘 날짜를 기준으로 계산
+    const purchaseDate = currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate) : new Date();
+    
+    // 날짜가 유효한지 확인
+    if (isNaN(endDate.getTime()) || isNaN(purchaseDate.getTime())) {
+      return 100;
+    }
     
     const totalDays = (endDate - purchaseDate) / (1000 * 60 * 60 * 24);
+    
+    // totalDays가 0이거나 음수인 경우 처리
+    if (totalDays <= 0) {
+      return 0;
+    }
+    
     const remainingDays = (endDate - today) / (1000 * 60 * 60 * 24);
     
     // 소진예상일이 가까워질수록 HP바가 줄어들도록 계산
@@ -175,7 +204,9 @@ const ProductDetailScreen = () => {
       '주방용품': 'restaurant',
     };
     
-    return categoryIcons[currentProduct.category] || 'cube-outline';
+    // category가 객체인 경우 name 속성 사용
+    const categoryName = currentProduct.category?.name || currentProduct.category;
+    return categoryIcons[categoryName] || 'cube-outline';
   };
   
   // 제품 삭제 처리
@@ -289,7 +320,8 @@ const ProductDetailScreen = () => {
   
   // 정보 항목 컴포넌트
   const InfoItem = ({ label, value, icon }) => {
-    if (!value) return null;
+    // value가 없어도 항목을 표시하고 '정보 없음'으로 표시
+    const displayValue = value || '정보 없음';
     
     return (
       <View style={styles.infoItem}>
@@ -297,7 +329,7 @@ const ProductDetailScreen = () => {
           <Ionicons name={icon} size={20} color="#4CAF50" style={styles.infoIcon} />
           <Text style={styles.infoLabel}>{label}</Text>
         </View>
-        <Text style={styles.infoValue}>{value}</Text>
+        <Text style={styles.infoValue}>{displayValue}</Text>
       </View>
     );
   };
@@ -337,13 +369,19 @@ const ProductDetailScreen = () => {
           <View style={styles.productInfo}>
             <Text style={styles.productName}>{currentProduct.name}</Text>
             {currentProduct.category && (
-            <Text style={styles.productCategory}>{currentProduct.category}</Text>
+            <Text style={styles.productCategory}>
+              {/* category가 객체인 경우 name 속성 사용 */}
+              {currentProduct.category?.name || currentProduct.category}
+            </Text>
             )}
             
             {currentProduct.location && (
               <View style={styles.locationBadge}>
                 <Ionicons name="location-outline" size={12} color="#4CAF50" />
-                <Text style={styles.locationText}>{currentProduct.location}</Text>
+                <Text style={styles.locationText}>
+                  {/* location이 객체인 경우 title 속성 사용 */}
+                  {currentProduct.location?.title || currentProduct.location}
+                </Text>
               </View>
             )}
           </View>
@@ -368,8 +406,8 @@ const ProductDetailScreen = () => {
               />
               
               <Text style={styles.hpText}>
-                {calculateExpiryDays() > 0 
-                  ? `유통기한까지 ${calculateExpiryDays()}일 남았습니다.`
+                {expiryDays > 0 
+                  ? `유통기한까지 ${expiryDays}일 남았습니다.`
                   : '유통기한이 지났습니다!'
                 }
               </Text>
@@ -393,8 +431,8 @@ const ProductDetailScreen = () => {
               />
               
               <Text style={styles.hpText}>
-                {calculateConsumptionDays() > 0 
-                  ? `소진 예상일까지 ${calculateConsumptionDays()}일 남았습니다.`
+                {consumptionDays > 0 
+                  ? `소진 예상일까지 ${consumptionDays}일 남았습니다.`
                   : '소진 예상일이 지났습니다!'
                 }
               </Text>
@@ -408,7 +446,7 @@ const ProductDetailScreen = () => {
           
           <InfoItem 
             label="구매일" 
-            value={currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate).toLocaleDateString() : '정보 없음'} 
+            value={currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate).toLocaleDateString() : null} 
             icon="calendar-outline" 
           />
           

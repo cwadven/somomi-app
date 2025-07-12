@@ -563,27 +563,31 @@ const AddProductScreen = () => {
       // 폼 유효성 검증
       if (!isFormValid()) {
         return;
-      }
-      
+    }
+    
       // 제품 데이터 구성
-      const productData = {
-        name: productName,
-        category: selectedCategory,
-        locationId: selectedLocation,
-        expiryDate: expiryDate ? expiryDate.toISOString() : null,
-        estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
-        memo: memo,
-      };
+    const productData = {
+      name: productName,
+      brand: brand,
+      category: selectedCategory,
+      categoryId: selectedCategory?.id || null,
+      locationId: selectedLocation?.id || null, // null 체크 추가
+      purchaseDate: purchaseDate ? purchaseDate.toISOString() : new Date().toISOString(), // 구매일 추가
+      expiryDate: expiryDate ? expiryDate.toISOString() : null,
+      estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
+      memo: memo,
+      createdAt: new Date().toISOString()
+    };
       
       // 제품 등록 요청
       const result = await dispatch(addProductAsync(productData)).unwrap();
       
       // 성공 시 처리
       setCreatedProduct(result);
-      setShowSuccessModal(true);
+        setShowSuccessModal(true);
       
       // 비회원 사용자인 경우 회원가입 유도 모달 표시 (제품 3개 이상 등록 시)
-      const { products } = await dispatch(fetchProducts()).unwrap();
+      const products = await dispatch(fetchProducts()).unwrap();
       if (!isAuthenticated && products.length >= 3) {
         setTimeout(() => {
           setShowSignupPrompt(true);
@@ -707,7 +711,7 @@ const AddProductScreen = () => {
 
         {/* 카테고리 추가 모달 */}
         <CategoryModal />
-
+        
         {/* 구매일 선택 */}
         <View 
           ref={purchaseDateSectionRef}
@@ -827,7 +831,7 @@ const AddProductScreen = () => {
           style={styles.submitButton}
           onPress={handleSubmit}
         >
-          <Text style={styles.submitButtonText}>제품 등록</Text>
+            <Text style={styles.submitButtonText}>제품 등록</Text>
         </TouchableOpacity>
       </ScrollView>
       
@@ -839,11 +843,11 @@ const AddProductScreen = () => {
       
       {/* 회원가입 유도 모달 */}
       {showSignupPrompt && (
-        <SignupPromptModal
-          visible={showSignupPrompt}
-          onClose={() => setShowSignupPrompt(false)}
+      <SignupPromptModal 
+        visible={showSignupPrompt}
+        onClose={() => setShowSignupPrompt(false)}
           onSignup={() => navigation.navigate('Signup')}
-        />
+      />
       )}
     </KeyboardAvoidingView>
   );
