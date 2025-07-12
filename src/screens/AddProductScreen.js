@@ -19,7 +19,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { addProductAsync } from '../redux/slices/productsSlice';
+import { addProductAsync, fetchProducts } from '../redux/slices/productsSlice';
 import { fetchCategories } from '../redux/slices/categoriesSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { addNotification } from '../redux/slices/notificationsSlice';
@@ -187,7 +187,8 @@ const AddProductScreen = () => {
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>
             {currentDateType === 'purchase' ? '구매일 선택' : 
-             currentDateType === 'expiry' ? '유통기한 선택' : '예상 소모 완료일 선택'}
+             currentDateType === 'expiry' ? '유통기한 선택' : 
+             '소진 예상일 선택'}
           </Text>
           
           <TextInput
@@ -290,10 +291,9 @@ const AddProductScreen = () => {
     />
   );
 
-  // 날짜 선택 핸들러 (네이티브)
+  // 날짜 변경 핸들러
   const handleDateChange = (event, selectedDate, dateType) => {
-    // 안드로이드에서는 취소 시 selectedDate가 undefined
-    if (event.type === 'dismissed' || !selectedDate) {
+    if (event.type === 'dismissed') {
       setShowPurchaseDatePicker(false);
       setShowExpiryDatePicker(false);
       setShowEstimatedEndDatePicker(false);
@@ -571,10 +571,8 @@ const AddProductScreen = () => {
         category: selectedCategory,
         locationId: selectedLocation,
         expiryDate: expiryDate ? expiryDate.toISOString() : null,
-        openedDate: openedDate ? openedDate.toISOString() : null,
         estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
         memo: memo,
-        imageUrl: imageUrl,
       };
       
       // 제품 등록 요청
@@ -785,7 +783,7 @@ const AddProductScreen = () => {
         
         {/* 예상 소모 완료일 선택 */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>예상 소모 완료일 (선택)</Text>
+          <Text style={styles.label}>소진 예상일 (선택)</Text>
           <TouchableOpacity 
             style={styles.dateInput}
             onPress={() => {

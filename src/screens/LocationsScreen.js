@@ -55,22 +55,6 @@ const LocationsScreen = () => {
     };
   }, [isFocused, navigation]);
 
-  // 네비게이션 상태 초기화
-  useFocusEffect(
-    useCallback(() => {
-      // 이 화면이 포커스될 때 네비게이션 스택 초기화
-      const unsubscribe = navigation.addListener('focus', () => {
-        // 현재 스크린이 스택의 첫 번째 스크린이 되도록 설정
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'LocationsScreen' }],
-        });
-      });
-
-      return unsubscribe;
-    }, [navigation])
-  );
-
   const handleAddLocation = () => {
     // 비회원인 경우 영역 개수 제한 체크
     if (isAnonymous && locations.length >= 1) {
