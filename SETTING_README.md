@@ -248,28 +248,49 @@ class MainActivity : ReactActivity() {
   }
 
   private fun handleIntent(intent: Intent) {
-    // 푸시 알림 데이터 처리
-    val extras = intent.extras
-    if (extras != null) {
+  // 푸시 알림 데이터 처리
+  val extras = intent.extras
+  if (extras != null) {
+    try {
       // Bundle을 WritableMap으로 변환
-      val params = Arguments.createMap().apply {
-        extras.keySet().forEach { key ->
-          when (val value = extras.get(key)) {
-            is String -> putString(key, value)
-            is Int -> putInt(key, value)
-            is Boolean -> putBoolean(key, value)
-            is Double -> putDouble(key, value)
-            // 필요한 경우 다른 타입도 추가
-          }
-        }
-      }
+      val params =
+              Arguments.createMap().apply {
+                extras.keySet().forEach { key ->
+                  try {
+                    when (val value = extras.get(key)) {
+                      is String -> putString(key, value)
+                      is Int -> putInt(key, value)
+                      is Boolean -> putBoolean(key, value)
+                      is Double -> putDouble(key, value)
+                      // null이나 지원되지 않는 타입은 건너뜁니다
+                      else -> {
+                        if (value != null) {
+                          putString(key, value.toString())
+                        }
+                      }
+                    }
+                  } catch (e: Exception) {
+                    // 개별 키 처리 중 오류가 발생해도 계속 진행
+                    Log.e("MainActivity", "Error processing key: $key", e)
+                  }
+                }
+              }
 
-      // React Native에 알림 데이터 전달
-      reactInstanceManager?.currentReactContext
-          ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-          ?.emit("notificationOpened", params)
+      // 안전하게 이벤트 발송
+      try {
+        reactInstanceManager
+                ?.currentReactContext
+                ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                ?.emit("notificationOpened", params)
+      } catch (e: Exception) {
+        Log.e("MainActivity", "Error emitting notification event", e)
+      }
+    } catch (e: Exception) {
+      Log.e("MainActivity", "Error handling intent", e)
     }
   }
+}
+
 
   /**
    * Returns the name of the main component registered from JavaScript. This is used to schedule
