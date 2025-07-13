@@ -19,12 +19,9 @@ import { pushNotificationService } from './src/utils/pushNotificationService';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
-let notifee;
 if (Platform.OS !== 'web') {
   try {
     messaging = require('@react-native-firebase/messaging').default;
-    notifee = require('@notifee/react-native').default;
-    console.log('Firebase 및 Notifee 모듈 로드 성공');
     
     // 백그라운드 메시지 핸들러 설정 (앱이 로드되기 전에 설정해야 함)
     messaging().setBackgroundMessageHandler(async remoteMessage => {
@@ -213,7 +210,7 @@ const AppContent = () => {
         }
         
         // 웹이 아닌 환경에서만 알림 관련 코드 실행
-        if (Platform.OS !== 'web' && messaging && notifee) {
+        if (Platform.OS !== 'web' && messaging) {
           // 알림 초기화 및 권한 요청
           pushNotificationService.setupNotificationHandler();
           const token = await pushNotificationService.registerForPushNotifications();
@@ -261,11 +258,7 @@ const AppContent = () => {
       return () => {
         // 앱 상태 변경 리스너 정리
         subscription.remove();
-        
-        // 알림 설정 정리
-        if (notifee) {
-          pushNotificationService.cleanupNotificationHandler();
-        }
+        pushNotificationService.cleanupNotificationHandler();
         
         // 이벤트 리스너 정리
         if (unsubscribe) unsubscribe();
