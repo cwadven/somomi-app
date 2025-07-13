@@ -225,16 +225,6 @@ const AppContent = () => {
       let unsubscribe;
       let messagingUnsubscribe;
 
-      // Firebase 메시징 이벤트 리스너
-      if (messaging) {
-        messagingUnsubscribe = messaging().onMessage(async remoteMessage => {
-          // pushNotificationService를 사용하여 포그라운드 알림 표시
-          if (remoteMessage.notification) {
-            await pushNotificationService.displayNotification(remoteMessage);
-          }
-        });
-      }
-      
       return () => {
         // 앱 상태 변경 리스너 정리
         subscription.remove();
