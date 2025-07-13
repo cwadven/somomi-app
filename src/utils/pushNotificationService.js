@@ -20,6 +20,19 @@ if (Platform.OS === 'android') {
   }
 }
 
+// 앱 시작 시 Notifee 초기화
+if (Platform.OS !== 'web') {
+  try {
+    // Notifee 초기화 및 기본 설정
+    notifee.onBackgroundEvent(async ({ type, detail }) => {
+      console.log('Notifee 백그라운드 이벤트:', type, detail);
+      return Promise.resolve();
+    });
+  } catch (error) {
+    console.error('Notifee 초기화 오류:', error);
+  }
+}
+
 // 알림 처리 중인지 확인하는 플래그
 let isHandlingNotification = false;
 
@@ -126,81 +139,69 @@ class PushNotificationService {
       // 알림 ID 생성
       const notificationId = `notification_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
       
+      // 알림 설정 - 최소한의 필수 속성만 설정
+      const notificationConfig = {
+        id: notificationId,
+        title: title || '알림',
+        body: body || '',
+        data: data || {},
+      };
+      
+      // 안드로이드 설정 추가
+      if (Platform.OS === 'android') {
+        notificationConfig.android = {
+          channelId,
+          smallIcon: 'ic_launcher',
+          pressAction: {
+            id: 'default',
+          },
+        };
+      }
+      
+      // iOS 설정 추가
+      if (Platform.OS === 'ios') {
+        notificationConfig.ios = {
+          sound: 'default',
+        };
+      }
+      
       // 지연 알림인 경우
       if (delayInSeconds > 0) {
         addDebugLog(`${delayInSeconds}초 후 알림 예약: ${title}`, 'info');
         
-        // 알림 설정
-        const notification = {
-          id: notificationId,
-          title: title,
-          body: body,
-          data: data,
-          android: {
-            channelId,
-            smallIcon: 'ic_launcher',
-            pressAction: {
-              id: 'default',
-            },
-            importance: AndroidImportance.HIGH,
-          },
-          ios: {
-            sound: 'default',
-          },
-        };
+        let trigger = null;
         
         // 플랫폼별 트리거 설정
         if (Platform.OS === 'android') {
           // 안드로이드는 timestamp 트리거 사용
           const timestamp = Date.now() + (delayInSeconds * 1000);
-          const trigger = {
+          trigger = {
             type: TriggerType.TIMESTAMP,
             timestamp: timestamp,
           };
-          
-          // 알림 예약
-          await notifee.createTriggerNotification(notification, trigger);
         } else if (Platform.OS === 'ios') {
           // iOS는 interval 트리거 사용
-          const trigger = {
+          trigger = {
             type: TriggerType.INTERVAL,
             interval: delayInSeconds,
             timeUnit: TimeUnit.SECONDS,
           };
-          
-          // 알림 예약
-          await notifee.createTriggerNotification(notification, trigger);
-        } else {
-          // 다른 플랫폼은 즉시 알림으로 대체
-          addDebugLog(`지연 알림을 지원하지 않는 플랫폼이므로 즉시 알림으로 대체합니다.`, 'warning');
-          await notifee.displayNotification(notification);
         }
         
-        addDebugLog(`알림 예약 완료: ID=${notificationId}`, 'success');
+        if (trigger) {
+          // 알림 예약
+          await notifee.createTriggerNotification(notificationConfig, trigger);
+          addDebugLog(`알림 예약 완료: ID=${notificationId}`, 'success');
+        } else {
+          // 트리거를 지원하지 않는 경우 즉시 알림으로 대체
+          addDebugLog(`지연 알림을 지원하지 않는 플랫폼이므로 즉시 알림으로 대체합니다.`, 'warning');
+          await notifee.displayNotification(notificationConfig);
+          addDebugLog(`즉시 알림으로 대체 완료: ID=${notificationId}`, 'success');
+        }
       } else {
         // 즉시 알림
         addDebugLog(`즉시 알림 전송: ${title}`, 'info');
-        
-        // 알림 표시
-        await notifee.displayNotification({
-          id: notificationId,
-          title: title,
-          body: body,
-          data: data,
-          android: {
-            channelId,
-            smallIcon: 'ic_launcher',
-            pressAction: {
-              id: 'default',
-            },
-            importance: AndroidImportance.HIGH,
-            sound: 'default',
-          },
-          ios: {
-            sound: 'default',
-          },
-        });
-        
+        await notifee.displayNotification(notificationConfig);
         addDebugLog(`알림 전송 완료: ID=${notificationId}`, 'success');
       }
       
@@ -213,48 +214,42 @@ class PushNotificationService {
 
   // 알림 채널 생성
   async createNotificationChannels() {
-    if (Platform.OS === 'web' || channelsCreated) return; // 웹이거나 이미 생성된 경우 건너뜀
+    if (Platform.OS === 'web') return; // 웹은 지원 안함
+    if (Platform.OS !== 'android') return; // 안드로이드만 채널 필요
+    if (channelsCreated) return; // 이미 생성된 경우 건너뜀
     
-    if (Platform.OS === 'android') {
-      try {
-        // 기본 채널
-        await notifee.createChannel({
-          id: 'default',
-          name: '일반 알림',
-          description: '일반적인 알림 메시지',
-          importance: AndroidImportance.HIGH,
-          sound: 'default',
-          vibration: true,
-          lights: true,
-        });
+    try {
+      // 기본 채널 - 단순화된 설정
+      await notifee.createChannel({
+        id: 'default',
+        name: '일반 알림',
+        lights: true,
+        vibration: true,
+        importance: AndroidImportance.DEFAULT
+      });
 
-        // 제품 알림 채널
-        await notifee.createChannel({
-          id: 'product_alerts',
-          name: '제품 알림',
-          description: '제품 유통기한 및 소진 관련 알림',
-          importance: AndroidImportance.HIGH,
-          sound: 'default',
-          vibration: true,
-          lights: true,
-        });
+      // 제품 알림 채널
+      await notifee.createChannel({
+        id: 'product_alerts',
+        name: '제품 알림',
+        lights: true,
+        vibration: true,
+        importance: AndroidImportance.HIGH
+      });
 
-        // 위치 알림 채널
-        await notifee.createChannel({
-          id: 'location_alerts',
-          name: '위치 알림',
-          description: '위치 관련 알림',
-          importance: AndroidImportance.HIGH,
-          sound: 'default',
-          vibration: true,
-          lights: true,
-        });
-        
-        channelsCreated = true;
-        addDebugLog('알림 채널 생성 완료', 'success');
-      } catch (error) {
-        addDebugLog(`알림 채널 생성 오류: ${error.message}`, 'error');
-      }
+      // 위치 알림 채널
+      await notifee.createChannel({
+        id: 'location_alerts',
+        name: '위치 알림',
+        lights: true,
+        vibration: true,
+        importance: AndroidImportance.DEFAULT
+      });
+      
+      channelsCreated = true;
+      addDebugLog('알림 채널 생성 완료', 'success');
+    } catch (error) {
+      addDebugLog(`알림 채널 생성 오류: ${error.message}`, 'error');
     }
   }
 
@@ -422,21 +417,37 @@ class PushNotificationService {
         }
       }
       
-      // 알림 표시
-      await notifee.displayNotification({
-        title: notification.title,
-        body: notification.body,
-        android: {
+      // 알림 ID 생성
+      const notificationId = `notification_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      
+      // 알림 설정 - 최소한의 필수 속성만 설정
+      const notificationConfig = {
+        id: notificationId,
+        title: notification.title || '알림',
+        body: notification.body || '',
+        data: data || {},
+      };
+      
+      // 안드로이드 설정 추가
+      if (Platform.OS === 'android') {
+        notificationConfig.android = {
           channelId,
-          smallIcon: 'ic_launcher', // 앱 아이콘을 기본 아이콘으로 사용
+          smallIcon: 'ic_launcher',
           pressAction: {
             id: 'default',
           },
-          importance: AndroidImportance.HIGH,
+        };
+      }
+      
+      // iOS 설정 추가
+      if (Platform.OS === 'ios') {
+        notificationConfig.ios = {
           sound: 'default',
-        },
-        data: data || {},
-      });
+        };
+      }
+      
+      // 알림 표시
+      await notifee.displayNotification(notificationConfig);
       addDebugLog('알림 표시 완료', 'success');
     } catch (error) {
       addDebugLog(`알림 표시 오류: ${error.message}`, 'error');
