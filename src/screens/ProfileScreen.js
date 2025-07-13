@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Image, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
   ScrollView,
-  Alert,
   Platform,
   Modal,
   Linking
@@ -22,6 +21,7 @@ import NotificationDebugger from '../components/NotificationDebugger';
 import { clearAllData } from '../utils/storageUtils';
 import { initializeData } from '../api/productsApi';
 import { fetchLocations } from '../redux/slices/locationsSlice';
+import AlertModal from '../components/AlertModal';
 
 const ProfileScreen = () => {
   const dispatch = useDispatch();
@@ -35,14 +35,14 @@ const ProfileScreen = () => {
       // 모드 관련 처리가 필요한 경우 여기에 구현
     }
   }, [route.params]);
-  
+
   // 안드로이드 시스템 알림 설정으로 이동하는 함수
   const openAndroidNotificationSettings = () => {
     if (Platform.OS === 'android') {
       try {
         // 안드로이드 앱 정보 설정 화면으로 이동
         const appId = Platform.constants.Package || 'com.somomi.app';
-        
+
         // 안드로이드 버전에 따라 다른 인텐트 사용
         if (Platform.Version >= 26) { // Android 8.0 (Oreo) 이상
           Linking.openSettings();
@@ -54,46 +54,77 @@ const ProfileScreen = () => {
         }
       } catch (error) {
         console.error('알림 설정 화면 열기 실패:', error);
-        Alert.alert(
-          '알림 설정',
-          '알림 설정 화면을 열 수 없습니다. 설정 앱에서 수동으로 앱의 알림 설정을 변경해주세요.',
-          [{ text: '확인', style: 'default' }]
-        );
+        setModalTitle('알림 설정');
+        setModalMessage('알림 설정 화면을 열 수 없습니다. 설정 앱에서 수동으로 앱의 알림 설정을 변경해주세요.');
+        setModalAction(null);
+        setModalVisible(true);
       }
     }
   };
-  
+
   // 로그아웃 처리
   const handleLogout = () => {
-    Alert.alert(
-      '로그아웃',
-      '정말 로그아웃 하시겠습니까?',
-      [
-        { text: '취소', style: 'cancel' },
-        { 
-          text: '로그아웃', 
-          style: 'destructive',
-          onPress: () => dispatch(logout())
-        }
-      ]
-    );
+    setModalTitle('로그아웃');
+    setModalMessage('정말 로그아웃 하시겠습니까?');
+    setModalAction(() => dispatch(logout()));
+    setModalVisible(true);
   };
-  
+
   // 카카오 로그인 관련 콜백
   const handleLoginStart = () => {
     console.log('카카오 로그인 시작');
   };
-  
+
   const handleLoginComplete = () => {
     console.log('카카오 로그인 완료');
   };
-  
+
+  // 로그인 오류 처리
   const handleLoginError = (errorMsg) => {
-    Alert.alert('로그인 실패', errorMsg);
+    setModalTitle('로그인 실패');
+    setModalMessage(errorMsg);
+    setModalAction(null);
+    setModalVisible(true);
   };
 
   // 알림 설정 모달 상태
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalAction, setModalAction] = useState(null);
+
+  // 모달 닫기 핸들러
+  const handleModalClose = () => {
+    setModalVisible(false);
+    if (modalAction) {
+      modalAction();
+    }
+  };
+
+  // 앱 정보 표시
+  const showAppInfo = () => {
+    setModalTitle('앱 정보');
+    setModalMessage('소모미 (SoMoMi) v1.0.0\n생활용품 리마인드 알림 앱');
+    setModalAction(null);
+    setModalVisible(true);
+  };
+
+  // 도움말 표시
+  const showHelp = () => {
+    setModalTitle('알림');
+    setModalMessage('도움말 기능은 아직 구현되지 않았습니다.');
+    setModalAction(null);
+    setModalVisible(true);
+  };
+
+  // 문의하기 표시
+  const showContact = () => {
+    setModalTitle('알림');
+    setModalMessage('문의하기 기능은 아직 구현되지 않았습니다.');
+    setModalAction(null);
+    setModalVisible(true);
+  };
 
   // 설정 메뉴 아이템 컴포넌트
   const SettingItem = ({ icon, title, onPress, showBadge = false }) => (
@@ -116,9 +147,9 @@ const ProfileScreen = () => {
       <View style={styles.profileHeader}>
         {isLoggedIn && user ? (
           <>
-            <Image 
-              source={{ uri: user.profileImage || 'https://via.placeholder.com/150' }} 
-              style={styles.profileImage} 
+            <Image
+              source={{ uri: user.profileImage || 'https://via.placeholder.com/150' }}
+              style={styles.profileImage}
             />
             <View style={styles.profileInfo}>
               <Text style={styles.userName}>{user.username || user.name}</Text>
@@ -136,7 +167,7 @@ const ProfileScreen = () => {
               {'\n'}(영역 무제한 생성, 상품 무제한 등록)
             </Text>
             <View style={styles.authButtonsContainer}>
-              <KakaoLoginButton 
+              <KakaoLoginButton
                 onLoginStart={handleLoginStart}
                 onLoginComplete={handleLoginComplete}
                 onLoginError={handleLoginError}
@@ -150,7 +181,7 @@ const ProfileScreen = () => {
               제품 정보를 클라우드에 저장하고 여러 기기에서 동기화하려면 로그인하세요.
             </Text>
             <View style={styles.authButtonsContainer}>
-              <KakaoLoginButton 
+              <KakaoLoginButton
                 onLoginStart={handleLoginStart}
                 onLoginComplete={handleLoginComplete}
                 onLoginError={handleLoginError}
@@ -159,49 +190,49 @@ const ProfileScreen = () => {
           </View>
         )}
       </View>
-      
+
       {/* 앱푸시 테스트 섹션 - 모든 사용자에게 표시 */}
       {Platform.OS !== 'web' && (
         <View style={styles.pushTestSection}>
           <PushNotificationTest />
         </View>
       )}
-      
+
       {/* 로그인 한 경우에만 제품 관리와 앱 설정 표시 */}
       {isLoggedIn && user && (
         <>
           {/* 제품 관리 섹션 */}
           <View style={styles.settingsSection}>
             <Text style={styles.sectionTitle}>제품 관리</Text>
-            
-            <SettingItem 
-              icon="checkmark-done-circle-outline" 
-              title="소진 처리한 상품 보기" 
+
+            <SettingItem
+              icon="checkmark-done-circle-outline"
+              title="소진 처리한 상품 보기"
               onPress={() => navigation.navigate('ConsumedProducts')}
             />
           </View>
-          
+
           {/* 설정 섹션 */}
           <View style={styles.settingsSection}>
             <Text style={styles.sectionTitle}>앱 설정</Text>
-            
-            <SettingItem 
-              icon="notifications-outline" 
-              title="알림 설정" 
+
+            <SettingItem
+              icon="notifications-outline"
+              title="알림 설정"
               onPress={() => setShowNotificationModal(true)}
             />
-            
+
             {Platform.OS === 'android' && (
-              <SettingItem 
-                icon="phone-portrait-outline" 
-                title="안드로이드 앱 푸시 설정" 
+              <SettingItem
+                icon="phone-portrait-outline"
+                title="안드로이드 앱 푸시 설정"
                 onPress={() => openAndroidNotificationSettings()}
             />
             )}
           </View>
         </>
       )}
-      
+
       {/* 알림 테스트 섹션 - 모든 사용자에게 표시 */}
       {Platform.OS !== 'web' && (
         <View style={styles.settingsSection}>
@@ -211,33 +242,33 @@ const ProfileScreen = () => {
           </View>
         </View>
       )}
-      
+
       {/* 정보 섹션은 항상 표시 */}
       <View style={styles.settingsSection}>
         <Text style={styles.sectionTitle}>정보</Text>
-        
-        <SettingItem 
-          icon="information-circle-outline" 
-          title="앱 정보" 
-          onPress={() => Alert.alert('앱 정보', '소모미 (SoMoMi) v1.0.0\n생활용품 리마인드 알림 앱')}
+
+        <SettingItem
+          icon="information-circle-outline"
+          title="앱 정보"
+          onPress={showAppInfo}
         />
-        
-        <SettingItem 
-          icon="help-circle-outline" 
-          title="도움말" 
-          onPress={() => Alert.alert('알림', '도움말 기능은 아직 구현되지 않았습니다.')}
+
+        <SettingItem
+          icon="help-circle-outline"
+          title="도움말"
+          onPress={showHelp}
         />
-        
+
         {/* 문의하기는 로그인한 사용자에게만 표시 */}
         {isLoggedIn && (
-          <SettingItem 
-            icon="mail-outline" 
-            title="문의하기" 
-            onPress={() => Alert.alert('알림', '문의하기 기능은 아직 구현되지 않았습니다.')}
+          <SettingItem
+            icon="mail-outline"
+            title="문의하기"
+            onPress={showContact}
           />
         )}
       </View>
-      
+
       <View style={styles.footer}>
         <Text style={styles.footerText}>소모미 (SoMoMi) v1.0.0</Text>
       </View>
@@ -260,7 +291,7 @@ const ProfileScreen = () => {
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.modalBody}>
             <Text style={styles.modalDescription}>
               앱 전체 알림 설정을 관리합니다. 이 설정을 비활성화하면 모든 알림이 중지됩니다.
@@ -276,6 +307,12 @@ const ProfileScreen = () => {
     <>
       {renderProfileScreen()}
       <NotificationSettingsModal />
+      <AlertModal
+        visible={modalVisible}
+        title={modalTitle}
+        message={modalMessage}
+        onClose={handleModalClose}
+      />
     </>
   );
 };

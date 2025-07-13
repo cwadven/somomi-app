@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Switch, StyleSheet, Platform, Linking, Alert } from 'react-native';
+import { View, Text, Switch, StyleSheet, Platform, Linking } from 'react-native';
+import AlertModal from './AlertModal';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
@@ -16,6 +17,10 @@ import { requestNotificationPermissions } from '../utils/notificationUtils';
 const NotificationSettings = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalAction, setModalAction] = useState(null);
 
   // 알림 권한 상태 확인
   const checkNotificationPermission = async () => {
@@ -64,33 +69,33 @@ const NotificationSettings = () => {
     }
   };
 
+  // 설정으로 이동하는 함수
+  const openSettings = () => {
+    if (Platform.OS === 'ios') {
+      Linking.openURL('app-settings:');
+    } else {
+      Linking.openSettings();
+    }
+    setModalVisible(false);
+  };
+
   // 알림 권한 요청
   const toggleNotifications = async () => {
     if (Platform.OS === 'web') {
-      Alert.alert('알림 설정', '웹에서는 알림 설정을 지원하지 않습니다.');
+      setModalTitle('알림 설정');
+      setModalMessage('웹에서는 알림 설정을 지원하지 않습니다.');
+      setModalAction(null);
+      setModalVisible(true);
       return;
     }
 
     try {
       if (notificationsEnabled) {
         // 이미 활성화된 경우 설정으로 이동
-        Alert.alert(
-          '알림 비활성화',
-          '알림을 비활성화하려면 기기의 설정에서 변경해야 합니다.',
-          [
-            { text: '취소', style: 'cancel' },
-            {
-              text: '설정으로 이동',
-              onPress: () => {
-                if (Platform.OS === 'ios') {
-                  Linking.openURL('app-settings:');
-                } else {
-                  Linking.openSettings();
-                }
-              },
-            },
-          ]
-        );
+        setModalTitle('알림 비활성화');
+        setModalMessage('알림을 비활성화하려면 기기의 설정에서 변경해야 합니다.');
+        setModalAction(openSettings);
+        setModalVisible(true);
       } else {
         // 권한 요청
         const granted = await requestNotificationPermissions();
@@ -98,28 +103,18 @@ const NotificationSettings = () => {
         
         if (!granted) {
           // 권한 거부된 경우 설정으로 이동 안내
-          Alert.alert(
-            '알림 권한 거부됨',
-            '알림을 활성화하려면 기기의 설정에서 권한을 허용해주세요.',
-            [
-              { text: '취소', style: 'cancel' },
-              {
-                text: '설정으로 이동',
-                onPress: () => {
-                  if (Platform.OS === 'ios') {
-                    Linking.openURL('app-settings:');
-                  } else {
-                    Linking.openSettings();
-                  }
-                },
-              },
-            ]
-          );
+          setModalTitle('알림 권한 거부됨');
+          setModalMessage('알림을 활성화하려면 기기의 설정에서 권한을 허용해주세요.');
+          setModalAction(openSettings);
+          setModalVisible(true);
         }
       }
     } catch (error) {
       console.error('알림 설정 변경 오류:', error);
-      Alert.alert('오류', '알림 설정을 변경하는 중 오류가 발생했습니다.');
+      setModalTitle('오류');
+      setModalMessage('알림 설정을 변경하는 중 오류가 발생했습니다.');
+      setModalAction(null);
+      setModalVisible(true);
     }
   };
 
@@ -147,6 +142,13 @@ const NotificationSettings = () => {
     return () => {};
   }, []);
 
+  const handleModalClose = () => {
+    setModalVisible(false);
+    if (modalAction) {
+      modalAction();
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.settingItem}>
@@ -164,6 +166,13 @@ const NotificationSettings = () => {
           ? '알림이 활성화되어 있습니다. 제품 유통기한 알림 및 기타 중요 정보를 받을 수 있습니다.'
           : '알림이 비활성화되어 있습니다. 제품 유통기한 알림 및 기타 중요 정보를 받으려면 알림을 활성화하세요.'}
       </Text>
+      
+      <AlertModal
+        visible={modalVisible}
+        title={modalTitle}
+        message={modalMessage}
+        onClose={handleModalClose}
+      />
     </View>
   );
 };

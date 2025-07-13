@@ -5,7 +5,6 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   ActivityIndicator, 
-  Alert,
   AppState,
   Platform
 } from 'react-native';
@@ -16,10 +15,23 @@ import {
 } from '../utils/notificationUtils';
 // pushNotificationService 추가
 import { pushNotificationService } from '../utils/pushNotificationService';
+import AlertModal from './AlertModal';
 
 const PushNotificationTest = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalAction, setModalAction] = useState(null);
+
+  // 모달 닫기 핸들러
+  const handleModalClose = () => {
+    setModalVisible(false);
+    if (modalAction) {
+      modalAction();
+    }
+  };
 
   // 즉시 알림 테스트
   const handleImmediateNotification = async () => {
@@ -47,20 +59,18 @@ const PushNotificationTest = () => {
       sendTestNotification(title, body, data);
       
       // 사용자에게 알림이 전송되었다는 메시지 표시
-      Alert.alert(
-        '알림 전송 시작',
-        '알림이 전송 중입니다. 잠시 후 확인해주세요.',
-        [{ text: '확인' }]
-      );
+      setModalTitle('알림 전송 시작');
+      setModalMessage('알림이 전송 중입니다. 잠시 후 확인해주세요.');
+      setModalAction(null);
+      setModalVisible(true);
     } catch (error) {
       console.error('알림 전송 준비 중 오류:', error);
       
       // 오류가 발생해도 앱이 종료되지 않도록 함
-      Alert.alert(
-        '알림 전송 오류',
-        '알림 전송 준비 중 문제가 발생했습니다.',
-        [{ text: '확인' }]
-      );
+      setModalTitle('알림 전송 오류');
+      setModalMessage('알림 전송 준비 중 문제가 발생했습니다.');
+      setModalAction(null);
+      setModalVisible(true);
     } finally {
       // 항상 로딩 상태 해제
       setIsLoading(false);
@@ -113,63 +123,57 @@ const PushNotificationTest = () => {
         appStateAtSend: currentAppState
       };
       
-      Alert.alert(
-        '지연 알림 테스트',
-        `${delaySeconds}초 후에 알림이 발송됩니다.\n\n알림을 백그라운드에서 받으려면:\n1. '확인' 버튼을 누른 후\n2. 즉시 홈 버튼을 눌러 앱을 백그라운드로 전환하세요.\n\n${Platform.OS === 'ios' ? '(iOS에서는 앱을 완전히 종료하지 마세요)' : ''}`,
-        [{ 
-          text: '확인', 
-          onPress: async () => {
-            try {
-              // 디버그 로그에 알림 시도 기록
-              pushNotificationService && pushNotificationService.addDebugLog(`지연 알림 테스트 시도: ${title} (${delaySeconds}초 후)`, 'info');
-              
-              // 지연 알림 예약
-              const notificationId = await sendBackgroundNotification(
-                title,
-                body,
-                data,
-                delaySeconds
-              );
-              
-              // 디버그 로그에 결과 기록
-              if (notificationId) {
-                pushNotificationService && pushNotificationService.addDebugLog(`지연 알림 예약 성공: ID=${notificationId}`, 'success');
-              } else {
-                pushNotificationService && pushNotificationService.addDebugLog('지연 알림 예약 실패: 알림 ID가 없음', 'error');
-              }
-              
-              setNotificationCount(prev => prev + 1);
-              
-              // 사용자에게 백그라운드로 전환하라는 메시지 표시
-              setTimeout(() => {
-                if (AppState.currentState === 'active') {
-                  Alert.alert(
-                    '앱이 아직 활성 상태입니다',
-                    '백그라운드 알림을 테스트하려면 홈 버튼을 눌러 앱을 백그라운드로 전환하세요.',
-                    [{ text: '확인' }]
-                  );
-                }
-              }, 2000); // 2초 후 확인
-              
-            } catch (error) {
-              console.error('지연 알림 예약 실패:', error);
-              pushNotificationService && pushNotificationService.addDebugLog(`지연 알림 예약 실패: ${error.message}`, 'error');
-              Alert.alert(
-                '알림 예약 실패',
-                `오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`
-              );
-            } finally {
-              setIsLoading(false);
-            }
+      setModalTitle('지연 알림 테스트');
+      setModalMessage(`${delaySeconds}초 후에 알림이 발송됩니다.\n\n알림을 백그라운드에서 받으려면:\n1. '확인' 버튼을 누른 후\n2. 즉시 홈 버튼을 눌러 앱을 백그라운드로 전환하세요.\n\n${Platform.OS === 'ios' ? '(iOS에서는 앱을 완전히 종료하지 마세요)' : ''}`);
+      setModalAction(async () => {
+        try {
+          // 디버그 로그에 알림 시도 기록
+          pushNotificationService && pushNotificationService.addDebugLog(`지연 알림 테스트 시도: ${title} (${delaySeconds}초 후)`, 'info');
+          
+          // 지연 알림 예약
+          const notificationId = await sendBackgroundNotification(
+            title,
+            body,
+            data,
+            delaySeconds
+          );
+          
+          // 디버그 로그에 결과 기록
+          if (notificationId) {
+            pushNotificationService && pushNotificationService.addDebugLog(`지연 알림 예약 성공: ID=${notificationId}`, 'success');
+          } else {
+            pushNotificationService && pushNotificationService.addDebugLog('지연 알림 예약 실패: 알림 ID가 없음', 'error');
           }
-        }]
-      );
+          
+          setNotificationCount(prev => prev + 1);
+          
+          // 사용자에게 백그라운드로 전환하라는 메시지 표시
+          setTimeout(() => {
+            if (AppState.currentState === 'active') {
+              setModalTitle('앱이 아직 활성 상태입니다');
+              setModalMessage('백그라운드 알림을 테스트하려면 홈 버튼을 눌러 앱을 백그라운드로 전환하세요.');
+              setModalAction(null);
+              setModalVisible(true);
+            }
+          }, 2000); // 2초 후 확인
+          
+        } catch (error) {
+          console.error('지연 알림 예약 실패:', error);
+          pushNotificationService && pushNotificationService.addDebugLog(`지연 알림 예약 실패: ${error.message}`, 'error');
+          setModalTitle('알림 예약 실패');
+          setModalMessage(`오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`);
+          setModalAction(null);
+          setModalVisible(true);
+        } finally {
+          setIsLoading(false);
+        }
+      });
+      setModalVisible(true);
     } catch (error) {
-      Alert.alert(
-        '알림 예약 실패',
-        `오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`,
-        [{ text: '확인' }]
-      );
+      setModalTitle('알림 예약 실패');
+      setModalMessage(`오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`);
+      setModalAction(null);
+      setModalVisible(true);
       setIsLoading(false);
     }
   };
@@ -212,6 +216,13 @@ const PushNotificationTest = () => {
       )}
       
       <Text style={styles.counter}>테스트 횟수: {notificationCount}</Text>
+      
+      <AlertModal
+        visible={modalVisible}
+        title={modalTitle}
+        message={modalMessage}
+        onClose={handleModalClose}
+      />
     </View>
   );
 };

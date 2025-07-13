@@ -1,4 +1,4 @@
-import { Platform, Alert, AppState } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import messaging from '@react-native-firebase/messaging';
 // import { apiClient } from '../api/client'; // 일단 무시하고 주석처리
 import { Linking, NativeEventEmitter, NativeModules } from 'react-native';
