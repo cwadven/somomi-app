@@ -12,8 +12,7 @@ import HomeScreen from '../screens/HomeScreen';
 import LocationsScreen from '../screens/LocationsScreen';
 import LocationDetailScreen from '../screens/LocationDetailScreen';
 import AddLocationScreen from '../screens/AddLocationScreen';
-import AddProductScreen from '../screens/AddProductScreen';
-import EditProductScreen from '../screens/EditProductScreen';
+import ProductFormScreen from '../screens/ProductFormScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import CategoryScreen from '../screens/CategoryScreen';
@@ -45,9 +44,11 @@ const HomeStack = () => {
         options={{ title: '제품 상세' }}
       />
       <Stack.Screen 
-        name="EditProduct" 
-        component={EditProductScreen} 
-        options={{ title: '제품 수정' }}
+        name="ProductForm" 
+        component={ProductFormScreen} 
+        options={({ route }) => ({ 
+          title: route.params?.mode === 'edit' ? '제품 수정' : '제품 등록' 
+        })}
       />
       <Stack.Screen 
         name="Category" 
@@ -90,14 +91,11 @@ const LocationsStack = () => {
         options={{ title: '영역 추가' }}
       />
       <Stack.Screen 
-        name="AddProduct" 
-        component={AddProductScreen} 
-        options={{ title: '제품 등록' }}
-      />
-      <Stack.Screen 
-        name="EditProduct" 
-        component={EditProductScreen} 
-        options={{ title: '제품 수정' }}
+        name="ProductForm" 
+        component={ProductFormScreen} 
+        options={({ route }) => ({ 
+          title: route.params?.mode === 'edit' ? '제품 수정' : '제품 등록' 
+        })}
       />
       <Stack.Screen 
         name="ProductDetail" 

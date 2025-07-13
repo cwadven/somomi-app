@@ -18,32 +18,39 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { updateProductAsync, fetchProductById } from '../redux/slices/productsSlice';
+import { addProductAsync, updateProductAsync, fetchProducts, fetchProductById } from '../redux/slices/productsSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { fetchCategories } from '../redux/slices/categoriesSlice';
+import { addNotification } from '../redux/slices/notificationsSlice';
 import CategoryAddModal from '../components/CategoryAddModal';
 import CategorySelector from '../components/CategorySelector';
 import LocationSelector from '../components/LocationSelector';
+import SignupPromptModal from '../components/SignupPromptModal';
 
 // 조건부 DateTimePicker 임포트
 let DateTimePicker;
 if (Platform.OS !== 'web') {
-  // 네이티브 환경에서만 임포트
-  DateTimePicker = require('@react-native-community/datetimepicker').default;
+  try {
+    DateTimePicker = require('@react-native-community/datetimepicker').default;
+  } catch (error) {
+    console.error('DateTimePicker 임포트 실패:', error);
+  }
 }
 
-const EditProductScreen = () => {
+const ProductFormScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const route = useRoute();
   
-  // 라우트 파라미터에서 제품 ID 가져오기
-  const { productId } = route.params || {};
+  // 라우트 파라미터에서 모드와 관련 정보 가져오기
+  const { mode = 'add', productId, locationId } = route.params || {};
+  const isEditMode = mode === 'edit';
   
   // Redux 상태
   const { categories, status: categoriesStatus } = useSelector(state => state.categories);
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
-  const { currentProduct, status: productsStatus } = useSelector(state => state.products);
+  const { allProducts, currentProduct, status: productsStatus } = useSelector(state => state.products);
+  const { isAuthenticated } = useSelector(state => state.auth);
   
   // 폼 상태
   const [productName, setProductName] = useState('');
@@ -64,65 +71,57 @@ const EditProductScreen = () => {
   const [tempDateString, setTempDateString] = useState('');
   const [currentDateType, setCurrentDateType] = useState('');
   
-  // 수정 성공 모달
+  // 모달 상태
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [updatedProduct, setUpdatedProduct] = useState(null);
-  
-  // 카테고리 추가 관련 상태
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-
-  // 카테고리 스크롤뷰 참조 추가
-  const categoryScrollViewRef = useRef(null);
-
-  // 카테고리 스크롤 위치 상태 추가
-  const [categoryScrollPosition, setCategoryScrollPosition] = useState(0);
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [createdProduct, setCreatedProduct] = useState(null);
+  
+  // 추가 모드 전용 상태
+  const [currentLocationProducts, setCurrentLocationProducts] = useState([]);
+  
+  // 스크롤 뷰 참조
+  const scrollViewRef = useRef(null);
+  const productNameInputRef = useRef(null);
+  const locationSectionRef = useRef(null);
+  const purchaseDateSectionRef = useRef(null);
   const categoryListRef = useRef(null);
+  
+  // 폼 유효성 검사 상태
+  const [errors, setErrors] = useState({
+    productName: '',
+    location: '',
+    purchaseDate: ''
+  });
+  
+  // 필드 터치 상태
+  const [touched, setTouched] = useState({
+    productName: false,
+    location: false,
+    purchaseDate: false
+  });
 
-  // 카테고리 추가 모달 열기
-  const handleOpenCategoryModal = () => {
-    setShowCategoryModal(true);
-  };
-
-  // 카테고리 추가 처리
-  const handleAddCategory = (newCategory) => {
-    // 새 카테고리 선택
-    setSelectedCategory(newCategory);
-    setShowCategoryModal(false);
-    
-    // 카테고리 선택 후 스크롤 위치 조정
-    // 스크롤 위치 유지 코드는 제거하고 새로운 카테고리가 보이도록 조정
-    if (categoryListRef && categoryListRef.current) {
-      // 약간의 지연 후 새 카테고리가 추가된 위치로 스크롤
-      setTimeout(() => {
-        // categories 배열의 마지막 인덱스로 스크롤
-        categoryListRef.current.scrollToEnd({ animated: true });
-      }, 300);
+  // 카테고리 및 영역 데이터 로드
+  useEffect(() => {
+    if (categoriesStatus === 'idle') {
+      dispatch(fetchCategories());
     }
     
-    // 성공 메시지 표시
-    Alert.alert('알림', '새 카테고리가 추가되었습니다.');
-  };
-  
-  // 제품 데이터 로드
-  useEffect(() => {
-    dispatch(fetchProductById(productId));
-  }, [dispatch, productId]);
-  
-  // 영역 데이터 로드
-  useEffect(() => {
     if (locationsStatus === 'idle') {
       dispatch(fetchLocations());
     }
-  }, [dispatch, locationsStatus]);
-  
-  // 카테고리 데이터 로드
+  }, [dispatch, categoriesStatus, locationsStatus]);
+
+  // 수정 모드인 경우 제품 데이터 로드
   useEffect(() => {
-    dispatch(fetchCategories());
-  }, [dispatch]);
-  
-  // 제품 데이터가 로드되면 폼에 채우기
+    if (isEditMode && productId) {
+      dispatch(fetchProductById(productId));
+    }
+  }, [dispatch, isEditMode, productId]);
+
+  // 제품 데이터가 로드되면 폼에 채우기 (수정 모드)
   useEffect(() => {
-    if (currentProduct) {
+    if (isEditMode && currentProduct) {
       setProductName(currentProduct.name || '');
       setBrand(currentProduct.brand || '');
       setMemo(currentProduct.memo || '');
@@ -156,70 +155,60 @@ const EditProductScreen = () => {
         }
       }
     }
-  }, [currentProduct, categories, locations]);
+  }, [isEditMode, currentProduct, categories, locations]);
 
-  // 폼 유효성 검사
-  const isFormValid = () => {
-    if (!productName.trim()) {
-      Alert.alert('알림', '제품명을 입력해주세요.');
-      return false;
+  // 초기 선택된 영역 설정 및 해당 영역의 제품 개수 확인 (추가 모드)
+  useEffect(() => {
+    if (!isEditMode && locationId && locations.length > 0) {
+      const location = locations.find(loc => loc.id === locationId);
+      if (location) {
+        setSelectedLocation(location);
+        
+        // 해당 영역의 제품 목록 필터링
+        const productsInLocation = allProducts && allProducts.filter(p => p.locationId === locationId) || [];
+        setCurrentLocationProducts(productsInLocation);
+        
+        // 비회원이고 제품이 5개 이상인 경우 회원가입 유도 모달 표시
+        if (!isAuthenticated && productsInLocation.length >= 5) {
+          setShowSignupPrompt(true);
+        }
+      }
     }
-    
-    if (!purchaseDate) {
-      Alert.alert('알림', '구매일을 선택해주세요.');
-      return false;
-    }
-    
-    if (!selectedLocation) {
-      Alert.alert('알림', '영역을 선택해주세요.');
-      return false;
-    }
-    
-    return true;
+  }, [isEditMode, locationId, locations, allProducts, isAuthenticated]);
+
+  // 카테고리 추가 모달 열기
+  const handleOpenCategoryModal = () => {
+    setShowCategoryModal(true);
   };
 
-  // 제품 수정 처리
-  const handleSubmit = () => {
-    if (!isFormValid()) return;
+  // 카테고리 추가 처리
+  const handleAddCategory = (newCategory) => {
+    setSelectedCategory(newCategory);
+    setShowCategoryModal(false);
     
-    const updatedProductData = {
-      id: productId,
-      name: productName,
-      brand: brand,
-      categoryId: selectedCategory ? selectedCategory.id : null,
-      category: selectedCategory,
-      locationId: selectedLocation.id,
-      purchaseDate: purchaseDate.toISOString(),
-      expiryDate: expiryDate ? expiryDate.toISOString() : null,
-      estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
-      memo,
-      updatedAt: new Date().toISOString(),
-      // 기존 데이터 유지
-      image: currentProduct.image,
-      remainingPercentage: currentProduct.remainingPercentage,
-      createdAt: currentProduct.createdAt || currentProduct.purchaseDate,
-    };
+    if (categoryListRef && categoryListRef.current) {
+      setTimeout(() => {
+        categoryListRef.current.scrollToEnd({ animated: true });
+      }, 300);
+    }
     
-    dispatch(updateProductAsync(updatedProductData))
-      .unwrap()
-      .then((result) => {
-        // 수정된 제품 정보 저장 및 성공 모달 표시
-        setUpdatedProduct(result);
-        setShowSuccessModal(true);
-      })
-      .catch((error) => {
-        Alert.alert('오류', `제품 수정에 실패했습니다: ${error.message}`);
-      });
+    Alert.alert('알림', '새 카테고리가 추가되었습니다.');
   };
-  
-  // 성공 모달 닫기 및 화면 이동
-  const handleSuccessModalClose = () => {
-    setShowSuccessModal(false);
-    navigation.goBack();
+
+  // 영역 추가 화면으로 이동
+  const handleAddLocation = () => {
+    navigation.navigate('AddLocation');
   };
 
   // 날짜 선택 핸들러 (네이티브)
   const handleDateChange = (event, selectedDate, dateType) => {
+    if (event.type === 'dismissed') {
+      setShowPurchaseDatePicker(false);
+      setShowExpiryDatePicker(false);
+      setShowEstimatedEndDatePicker(false);
+      return;
+    }
+    
     if (Platform.OS === 'android') {
       setShowPurchaseDatePicker(false);
       setShowExpiryDatePicker(false);
@@ -257,13 +246,24 @@ const EditProductScreen = () => {
   
   // 웹용 날짜 입력 확인
   const handleConfirmWebDate = () => {
-    let date;
     try {
-      // 입력된 문자열에서 날짜 객체 생성
-      date = new Date(tempDateString);
+      let date;
+      if (tempDateString.includes('-')) {
+        const [year, month, day] = tempDateString.split('-').map(Number);
+        
+        if (!year || !month || !day || 
+            isNaN(year) || isNaN(month) || isNaN(day) ||
+            month < 1 || month > 12 || day < 1 || day > 31) {
+          throw new Error('유효하지 않은 날짜 형식');
+        }
+        
+        date = new Date(year, month - 1, day);
+      } else {
+        date = new Date(tempDateString);
+      }
       
       if (isNaN(date.getTime())) {
-        throw new Error('Invalid date');
+        throw new Error('유효하지 않은 날짜');
       }
       
       if (currentDateType === 'purchase') {
@@ -284,35 +284,281 @@ const EditProductScreen = () => {
   const formatDate = (date) => {
     if (!date) return '날짜 선택';
     
-    return date.toLocaleDateString();
+    try {
+      return date.toLocaleDateString();
+    } catch (error) {
+      console.error('날짜 포맷 오류:', error);
+      return '날짜 선택';
+    }
   };
   
   // 입력용 날짜 포맷 함수 (YYYY-MM-DD)
   const formatDateForInput = (date) => {
     if (!date) return '';
     
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    try {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      
+      return `${year}-${month}-${day}`;
+    } catch (error) {
+      console.error('입력용 날짜 포맷 오류:', error);
+      return '';
+    }
+  };
+
+  // 필드 유효성 검사 함수
+  const validateField = (name, value) => {
+    let errorMessage = '';
     
-    return `${year}-${month}-${day}`;
+    switch (name) {
+      case 'productName':
+        if (!value.trim()) {
+          errorMessage = '제품명을 입력해주세요';
+        }
+        break;
+      case 'location':
+        if (!value) {
+          errorMessage = '영역을 선택해주세요';
+        }
+        break;
+      case 'purchaseDate':
+        if (!value) {
+          errorMessage = '구매일을 선택해주세요';
+        }
+        break;
+      default:
+        break;
+    }
+    
+    return errorMessage;
   };
-
-  // 카테고리 선택 처리 함수 - 스크롤 위치 유지
-  const handleCategorySelect = (category) => {
-    setSelectedCategory(category);
-    // 스크롤 위치는 변경하지 않음 (기존 위치 유지)
-  };
-
-  // 카테고리 선택 컴포넌트 제거 (외부 컴포넌트로 대체)
-
-  // 영역 추가 화면으로 이동
-  const handleAddLocation = () => {
-    navigation.navigate('AddLocation');
-  };
-
-  // 영역 선택 컴포넌트 제거 (외부 컴포넌트로 대체)
   
+  // 필드 변경 핸들러
+  const handleFieldChange = (name, value) => {
+    switch (name) {
+      case 'productName':
+        setProductName(value);
+        break;
+      case 'location':
+        setSelectedLocation(value);
+        break;
+      case 'purchaseDate':
+        setPurchaseDate(value);
+        break;
+      default:
+        break;
+    }
+    
+    setTouched(prev => ({ ...prev, [name]: true }));
+    
+    const errorMessage = validateField(name, value);
+    setErrors(prev => ({ ...prev, [name]: errorMessage }));
+  };
+  
+  // 필드 블러 핸들러
+  const handleFieldBlur = (name, value) => {
+    setTouched(prev => ({ ...prev, [name]: true }));
+    
+    const errorMessage = validateField(name, value);
+    setErrors(prev => ({ ...prev, [name]: errorMessage }));
+  };
+
+  // 특정 필드로 스크롤하는 함수
+  const scrollToField = (fieldName) => {
+    if (scrollViewRef.current) {
+      switch (fieldName) {
+        case 'productName':
+          if (productNameInputRef.current) {
+            productNameInputRef.current.measure((fx, fy, width, height, px, py) => {
+              scrollViewRef.current.scrollTo({
+                y: py - 50,
+                animated: true
+              });
+            });
+          }
+          break;
+        case 'location':
+          if (locationSectionRef.current) {
+            locationSectionRef.current.measure((fx, fy, width, height, px, py) => {
+              scrollViewRef.current.scrollTo({
+                y: py - 50,
+                animated: true
+              });
+            });
+          }
+          break;
+        case 'purchaseDate':
+          if (purchaseDateSectionRef.current) {
+            purchaseDateSectionRef.current.measure((fx, fy, width, height, px, py) => {
+              scrollViewRef.current.scrollTo({
+                y: py - 50,
+                animated: true
+              });
+            });
+          }
+          break;
+        default:
+          break;
+      }
+    }
+  };
+
+  // 폼 전체 유효성 검사
+  const isFormValid = () => {
+    const newErrors = {
+      productName: validateField('productName', productName),
+      location: validateField('location', selectedLocation),
+      purchaseDate: validateField('purchaseDate', purchaseDate)
+    };
+    
+    setErrors(newErrors);
+    
+    setTouched({
+      productName: true,
+      location: true,
+      purchaseDate: true
+    });
+    
+    const hasErrors = Object.values(newErrors).some(error => error !== '');
+    
+    if (hasErrors) {
+      if (newErrors.productName) {
+        scrollToField('productName');
+      } else if (newErrors.location) {
+        scrollToField('location');
+      } else if (newErrors.purchaseDate) {
+        scrollToField('purchaseDate');
+      }
+    }
+    
+    // 영역이 존재하는지 확인
+    if (locations.length === 0) {
+      Alert.alert(
+        '알림',
+        '등록된 영역이 없습니다. 영역을 먼저 등록해주세요.',
+        [
+          { text: '취소', style: 'cancel' },
+          { 
+            text: '영역 등록하기', 
+            onPress: () => navigation.navigate('AddLocation')
+          }
+        ]
+      );
+      return false;
+    }
+    
+    // 비회원인 경우 제품 개수 제한 확인 (추가 모드만)
+    if (!isEditMode && !isAuthenticated && currentLocationProducts.length >= 5) {
+      setShowSignupPrompt(true);
+      return false;
+    }
+    
+    return !hasErrors;
+  };
+
+  // 제품 등록/수정 처리
+  const handleSubmit = async () => {
+    try {
+      if (!isFormValid()) {
+        return;
+      }
+      
+      if (isEditMode) {
+        // 수정 모드
+        const updatedProductData = {
+          id: productId,
+          name: productName,
+          brand: brand,
+          categoryId: selectedCategory ? selectedCategory.id : null,
+          category: selectedCategory,
+          locationId: selectedLocation.id,
+          purchaseDate: purchaseDate.toISOString(),
+          expiryDate: expiryDate ? expiryDate.toISOString() : null,
+          estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
+          memo,
+          updatedAt: new Date().toISOString(),
+          // 기존 데이터 유지
+          image: currentProduct.image,
+          remainingPercentage: currentProduct.remainingPercentage,
+          createdAt: currentProduct.createdAt || currentProduct.purchaseDate,
+        };
+        
+        const result = await dispatch(updateProductAsync(updatedProductData)).unwrap();
+        setCreatedProduct(result);
+        setShowSuccessModal(true);
+      } else {
+        // 추가 모드
+        const productData = {
+          name: productName,
+          brand: brand,
+          category: selectedCategory,
+          categoryId: selectedCategory?.id || null,
+          locationId: selectedLocation?.id || null,
+          purchaseDate: purchaseDate ? purchaseDate.toISOString() : new Date().toISOString(),
+          expiryDate: expiryDate ? expiryDate.toISOString() : null,
+          estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
+          memo: memo,
+          createdAt: new Date().toISOString()
+        };
+        
+        const result = await dispatch(addProductAsync(productData)).unwrap();
+        setCreatedProduct(result);
+        setShowSuccessModal(true);
+        
+        // 비회원 사용자인 경우 회원가입 유도 모달 표시 (제품 3개 이상 등록 시)
+        const products = await dispatch(fetchProducts()).unwrap();
+        if (!isAuthenticated && products.length >= 3) {
+          setTimeout(() => {
+            setShowSignupPrompt(true);
+          }, 1000);
+        }
+      }
+    } catch (error) {
+      console.error('제품 처리 오류:', error);
+      Alert.alert(
+        '오류',
+        `제품 ${isEditMode ? '수정' : '등록'} 중 오류가 발생했습니다. 다시 시도해주세요.`,
+        [{ text: '확인', style: 'default' }]
+      );
+    }
+  };
+  
+  // 성공 모달 닫기 및 화면 이동
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    
+    if (isEditMode) {
+      // 수정 모드: 이전 화면으로 돌아가기
+      navigation.goBack();
+    } else {
+      // 추가 모드: 폼 초기화 및 화면 이동
+      setProductName('');
+      setSelectedCategory(null);
+      setBrand('');
+      setPurchaseDate(new Date());
+      setExpiryDate(null);
+      setEstimatedEndDate(null);
+      setMemo('');
+      
+      if (locationId) {
+        navigation.reset({
+          index: 1,
+          routes: [
+            { name: 'LocationsScreen' },
+            { name: 'LocationDetail', params: { locationId } }
+          ],
+        });
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'LocationsScreen' }],
+        });
+      }
+    }
+  };
+
   // 웹용 날짜 선택 모달
   const WebDatePickerModal = () => (
     <Modal
@@ -345,7 +591,14 @@ const EditProductScreen = () => {
             
             <TouchableOpacity 
               style={[styles.modalButton, styles.confirmButton]} 
-              onPress={handleConfirmWebDate}
+              onPress={() => {
+                handleConfirmWebDate();
+                if (currentDateType === 'purchase') {
+                  setTouched(prev => ({ ...prev, purchaseDate: true }));
+                  const errorMessage = validateField('purchaseDate', tempDate);
+                  setErrors(prev => ({ ...prev, purchaseDate: errorMessage }));
+                }
+              }}
             >
               <Text style={styles.confirmButtonText}>확인</Text>
             </TouchableOpacity>
@@ -355,7 +608,7 @@ const EditProductScreen = () => {
     </Modal>
   );
   
-  // 수정 성공 모달
+  // 성공 모달
   const SuccessModal = () => (
     <Modal
       visible={showSuccessModal}
@@ -369,31 +622,39 @@ const EditProductScreen = () => {
             <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
           </View>
           
-          <Text style={styles.successTitle}>수정 완료!</Text>
+          <Text style={styles.successTitle}>
+            {isEditMode ? '수정 완료!' : '등록 완료!'}
+          </Text>
           
           <Text style={styles.successMessage}>
-            {updatedProduct?.name} 제품이 성공적으로 수정되었습니다.
+            {createdProduct?.name || '제품'}이(가) 성공적으로 {isEditMode ? '수정' : '등록'}되었습니다.
           </Text>
           
           <View style={styles.productInfoContainer}>
             <View style={styles.productInfoRow}>
               <Text style={styles.productInfoLabel}>영역:</Text>
               <Text style={styles.productInfoValue}>
-                {locations.find(l => l.id === updatedProduct?.locationId)?.title || ''}
+                {isEditMode 
+                  ? (locations.find(l => l.id === createdProduct?.locationId)?.title || selectedLocation?.title || '')
+                  : (selectedLocation?.title || '')
+                }
               </Text>
             </View>
             
-            {updatedProduct?.brand && (
+            {brand && (
               <View style={styles.productInfoRow}>
                 <Text style={styles.productInfoLabel}>브랜드:</Text>
-                <Text style={styles.productInfoValue}>{updatedProduct.brand}</Text>
+                <Text style={styles.productInfoValue}>{brand}</Text>
               </View>
             )}
             
             <View style={styles.productInfoRow}>
               <Text style={styles.productInfoLabel}>구매일:</Text>
               <Text style={styles.productInfoValue}>
-                {updatedProduct ? new Date(updatedProduct.purchaseDate).toLocaleDateString() : ''}
+                {isEditMode 
+                  ? (createdProduct ? new Date(createdProduct.purchaseDate).toLocaleDateString() : '')
+                  : formatDate(purchaseDate)
+                }
               </Text>
             </View>
           </View>
@@ -408,7 +669,7 @@ const EditProductScreen = () => {
       </View>
     </Modal>
   );
-  
+
   // 카테고리 추가 모달
   const CategoryModal = () => (
     <CategoryAddModal
@@ -418,8 +679,8 @@ const EditProductScreen = () => {
     />
   );
   
-  // 로딩 중이면 로딩 화면 표시
-  if (productsStatus === 'loading' && !currentProduct) {
+  // 로딩 중이면 로딩 화면 표시 (수정 모드만)
+  if (isEditMode && productsStatus === 'loading' && !currentProduct) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
@@ -433,10 +694,13 @@ const EditProductScreen = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView 
+        ref={scrollViewRef}
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>제품 수정</Text>
+        <Text style={styles.title}>
+          {isEditMode ? '제품 수정' : '제품 등록'}
+        </Text>
         
         {/* 제품명 입력 */}
         <View style={styles.inputGroup}>
@@ -445,11 +709,19 @@ const EditProductScreen = () => {
             <Text style={styles.requiredMark}>*</Text>
           </View>
           <TextInput
-            style={styles.input}
+            ref={productNameInputRef}
+            style={[
+              styles.input,
+              touched.productName && errors.productName ? styles.inputError : null
+            ]}
             value={productName}
-            onChangeText={setProductName}
+            onChangeText={(text) => handleFieldChange('productName', text)}
+            onBlur={() => handleFieldBlur('productName', productName)}
             placeholder="제품명을 입력하세요"
           />
+          {touched.productName && errors.productName ? (
+            <Text style={styles.errorText}>{errors.productName}</Text>
+          ) : null}
         </View>
         
         {/* 브랜드 입력 */}
@@ -475,28 +747,38 @@ const EditProductScreen = () => {
         
         {/* 영역 선택 */}
         <LocationSelector
+          ref={locationSectionRef}
           locations={locations}
           selectedLocation={selectedLocation}
-          onSelectLocation={setSelectedLocation}
+          onSelectLocation={(location) => handleFieldChange('location', location)}
           onAddLocation={handleAddLocation}
           status={locationsStatus}
           isRequired={true}
+          errorMessage={errors.location}
+          showError={touched.location}
         />
         
         {/* 구매일 선택 */}
-        <View style={styles.inputGroup}>
+        <View 
+          ref={purchaseDateSectionRef}
+          style={styles.inputGroup}
+        >
           <View style={styles.labelContainer}>
             <Text style={styles.label}>구매일</Text>
             <Text style={styles.requiredMark}>*</Text>
           </View>
           <TouchableOpacity 
-            style={styles.dateInput}
+            style={[
+              styles.dateInput,
+              touched.purchaseDate && errors.purchaseDate ? styles.inputError : null
+            ]}
             onPress={() => {
               if (Platform.OS === 'web') {
                 handleWebDateSelect('purchase');
               } else {
                 setShowPurchaseDatePicker(true);
               }
+              setTouched(prev => ({ ...prev, purchaseDate: true }));
             }}
           >
             <Text style={styles.dateText}>
@@ -504,12 +786,18 @@ const EditProductScreen = () => {
             </Text>
             <Ionicons name="calendar-outline" size={20} color="#666" />
           </TouchableOpacity>
+          {touched.purchaseDate && errors.purchaseDate ? (
+            <Text style={styles.errorText}>{errors.purchaseDate}</Text>
+          ) : null}
           {Platform.OS !== 'web' && showPurchaseDatePicker && (
             <DateTimePicker
               value={purchaseDate || new Date()}
               mode="date"
               display="default"
-              onChange={(event, date) => handleDateChange(event, date, 'purchase')}
+              onChange={(event, date) => {
+                handleDateChange(event, date, 'purchase');
+                handleFieldChange('purchaseDate', date);
+              }}
             />
           )}
         </View>
@@ -577,29 +865,32 @@ const EditProductScreen = () => {
             style={[styles.input, styles.textArea]}
             value={memo}
             onChangeText={setMemo}
-            placeholder="추가 정보 입력"
-            multiline
+            placeholder="메모를 입력하세요"
+            multiline={true}
             numberOfLines={4}
-            textAlignVertical="top"
           />
         </View>
         
-        {/* 수정 버튼 */}
+        {/* 등록/수정 버튼 */}
         <TouchableOpacity 
           style={[
             styles.submitButton,
             productsStatus === 'loading' && styles.disabledButton
-          ]} 
+          ]}
           onPress={handleSubmit}
           disabled={productsStatus === 'loading'}
         >
           {productsStatus === 'loading' ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#ffffff" />
-              <Text style={[styles.submitButtonText, styles.loadingText]}>수정 중...</Text>
+              <Text style={[styles.submitButtonText, styles.loadingText]}>
+                {isEditMode ? '수정 중...' : '등록 중...'}
+              </Text>
             </View>
           ) : (
-            <Text style={styles.submitButtonText}>제품 수정</Text>
+            <Text style={styles.submitButtonText}>
+              {isEditMode ? '제품 수정' : '제품 등록'}
+            </Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -607,11 +898,20 @@ const EditProductScreen = () => {
       {/* 웹용 날짜 선택 모달 */}
       {Platform.OS === 'web' && <WebDatePickerModal />}
       
-      {/* 수정 성공 모달 */}
+      {/* 성공 모달 */}
       <SuccessModal />
-
+      
       {/* 카테고리 추가 모달 */}
       <CategoryModal />
+      
+      {/* 회원가입 유도 모달 (추가 모드만) */}
+      {!isEditMode && showSignupPrompt && (
+        <SignupPromptModal 
+          visible={showSignupPrompt}
+          onClose={() => setShowSignupPrompt(false)}
+          onSignup={() => navigation.navigate('Signup')}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -657,6 +957,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
+  inputError: {
+    borderColor: 'red',
+  },
   textArea: {
     height: 100,
   },
@@ -674,84 +977,6 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 16,
     color: '#333',
-  },
-  categoriesContainer: {
-    marginBottom: 20,
-  },
-  categoryFlatList: {
-    minHeight: 80,
-    flexGrow: 0,
-  },
-  categoryListContainer: {
-    height: 70,  // FlatList의 높이 증가
-  },
-  sectionTitle: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-    marginBottom: 10,
-  },
-  categoriesList: {
-    paddingVertical: 8,
-    paddingHorizontal: 2,
-    alignItems: 'center',
-  },
-  categoryChip: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 25,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selectedCategoryChip: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
-    elevation: 3,
-    shadowOpacity: 0.2,
-  },
-  categoryChipText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#555',
-  },
-  selectedCategoryChipText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  locationChip: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  selectedLocationChip: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
-  },
-  locationChipIcon: {
-    marginRight: 4,
-  },
-  locationChipText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  selectedLocationChipText: {
-    color: '#fff',
   },
   submitButton: {
     backgroundColor: '#4CAF50',
@@ -775,6 +1000,11 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginLeft: 8,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginTop: 4,
   },
   modalOverlay: {
     flex: 1,
@@ -811,12 +1041,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     marginRight: 8,
   },
+  confirmButton: {
+    backgroundColor: '#4CAF50',
+  },
   cancelButtonText: {
     color: '#757575',
     fontWeight: '600',
-  },
-  confirmButton: {
-    backgroundColor: '#4CAF50',
   },
   confirmButtonText: {
     color: '#FFFFFF',
@@ -871,72 +1101,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  addCategoryChip: {
-    backgroundColor: '#f0f9f0',
-    borderRadius: 25,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#c8e6c9',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addCategoryIcon: {
-    marginRight: 6,
-  },
-  addCategoryText: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontWeight: '500',
-  },
-  modalLabel: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: '#333',
-    fontWeight: '500',
-  },
-  modalInput: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  inputError: {
-    borderColor: '#FF6B6B',
-    borderWidth: 1,
-  },
-  errorText: {
-    color: '#FF6B6B',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  emptyCategories: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 10,
-  },
-  addCategoryButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  addCategoryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
 });
 
-export default EditProductScreen; 
+export default ProductFormScreen; 

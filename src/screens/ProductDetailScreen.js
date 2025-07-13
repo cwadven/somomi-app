@@ -239,7 +239,7 @@ const ProductDetailScreen = () => {
   
   // 제품 수정 화면으로 이동
   const handleEdit = () => {
-    navigation.navigate('EditProduct', { productId: currentProduct.id });
+            navigation.navigate('ProductForm', { mode: 'edit', productId: currentProduct.id });
   };
   
   // 알림 설정 탭으로 전환
@@ -492,12 +492,14 @@ const ProductDetailScreen = () => {
   
   // 알림 설정 탭 내용 렌더링
   const renderNotificationsTab = () => (
-    <View style={styles.notificationsContainer}>
-      <ProductNotificationSettings 
-        productId={productId}
-        product={currentProduct}
-      />
-    </View>
+    <ScrollView style={styles.notificationsScrollContainer}>
+      <View style={styles.notificationsContainer}>
+        <ProductNotificationSettings 
+          productId={productId}
+          product={currentProduct}
+        />
+      </View>
+    </ScrollView>
   );
 
   return (
@@ -1007,8 +1009,11 @@ const styles = StyleSheet.create({
   },
   // 알림 설정 컨테이너 스타일 추가
   notificationsContainer: {
-    flex: 1,
     padding: 16,
+    paddingBottom: 80, // 하단 여백 추가
+  },
+  notificationsScrollContainer: {
+    flex: 1,
   },
 });
 

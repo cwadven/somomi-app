@@ -59,7 +59,7 @@ const MyProductsScreen = ({ navigation }) => {
       
       <TouchableOpacity 
         style={styles.addButton}
-        onPress={() => navigation.navigate('AddProduct')}
+                  onPress={() => navigation.navigate('ProductForm', { mode: 'add' })}
       >
         <Ionicons name="add" size={30} color="white" />
       </TouchableOpacity>

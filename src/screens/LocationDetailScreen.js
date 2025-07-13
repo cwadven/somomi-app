@@ -73,7 +73,7 @@ const LocationDetailScreen = () => {
       return;
     }
     
-    navigation.navigate('AddProduct', { locationId });
+            navigation.navigate('ProductForm', { mode: 'add', locationId });
   };
   
   const handleProductPress = (productId) => {
