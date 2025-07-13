@@ -126,15 +126,8 @@ class PushNotificationService {
       // 알림 채널 생성 확인
       await this.createNotificationChannels();
       
-      // 알림 채널 ID 결정
-      let channelId = 'default';
-      if (data && data.type) {
-        if (data.type === 'product') {
-          channelId = 'product_alerts';
-        } else if (data.type === 'location') {
-          channelId = 'location_alerts';
-        }
-      }
+      // 알림 채널 ID 설정
+      const channelId = 'default';
       
       // 알림 ID 생성
       const notificationId = `notification_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
@@ -155,6 +148,7 @@ class PushNotificationService {
           pressAction: {
             id: 'default',
           },
+          importance: AndroidImportance.HIGH,
         };
       }
       
@@ -225,25 +219,7 @@ class PushNotificationService {
         name: '일반 알림',
         lights: true,
         vibration: true,
-        importance: AndroidImportance.DEFAULT
-      });
-
-      // 제품 알림 채널
-      await notifee.createChannel({
-        id: 'product_alerts',
-        name: '제품 알림',
-        lights: true,
-        vibration: true,
         importance: AndroidImportance.HIGH
-      });
-
-      // 위치 알림 채널
-      await notifee.createChannel({
-        id: 'location_alerts',
-        name: '위치 알림',
-        lights: true,
-        vibration: true,
-        importance: AndroidImportance.DEFAULT
       });
       
       channelsCreated = true;
@@ -407,15 +383,8 @@ class PushNotificationService {
       
       if (!notification) return;
       
-      // 알림 채널 ID 결정
-      let channelId = 'default';
-      if (data && data.type) {
-        if (data.type === 'product') {
-          channelId = 'product_alerts';
-        } else if (data.type === 'location') {
-          channelId = 'location_alerts';
-        }
-      }
+      // 알림 채널 ID 설정
+      const channelId = 'default';
       
       // 알림 ID 생성
       const notificationId = `notification_${Date.now()}_${Math.floor(Math.random() * 10000)}`;

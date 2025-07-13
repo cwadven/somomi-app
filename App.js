@@ -19,6 +19,7 @@ import { initializeData } from './src/api/productsApi';
 import { initializeNotificationsData } from './src/redux/slices/notificationsSlice';
 import { loadCategories } from './src/redux/slices/categoriesSlice';
 import PushNotificationDebugger from './src/components/PushNotificationDebugger';
+import AlertModal from './src/components/AlertModal';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
@@ -280,57 +281,10 @@ const AppContent = () => {
     
     // 웹이 아닌 환경에서만 알림 관련 코드 실행
     if (Platform.OS !== 'web') {
-      // 알림 설정 초기화
-      if (notifee) {
-        initializeNotifications();
-      }
-      
       // Firebase 관련 이벤트 리스너 등록
       let unsubscribe;
       let messagingUnsubscribe;
-      
-      // Notifee 이벤트 리스너 (알림 클릭 이벤트)
-      if (notifee) {
-        unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
-          if (type === notifee.EventType.PRESS && detail.notification) {
-            console.log('Notifee 알림 클릭:', detail.notification);
-            
-            // 알림 데이터 처리
-            const data = detail.notification.data;
-            console.log('알림 데이터:', data);
-            
-            // 딥링크 처리
-            if (data && data.deepLink) {
-              Linking.openURL(data.deepLink).catch(err => {
-                console.error('딥링크 오류:', err);
-              });
-            }
-          }
-        });
-        
-        // Notifee 백그라운드 이벤트 리스너 설정
-        notifee.onBackgroundEvent(async ({ type, detail }) => {
-          console.log('Notifee 백그라운드 이벤트:', type, detail);
-          
-          try {
-            if (type === notifee.EventType.PRESS && detail.notification) {
-              // 알림 데이터 처리
-              const data = detail.notification.data;
-              console.log('백그라운드 알림 데이터:', data);
-              
-              // 백그라운드에서는 어떤 처리도 하지 않음
-              // 단순히 앱을 열기만 함
-              console.log('백그라운드 알림 클릭 - 앱 시작만 수행');
-            }
-          } catch (error) {
-            console.error('백그라운드 이벤트 처리 오류:', error);
-          }
-          
-          // 명시적으로 Promise 반환
-          return Promise.resolve();
-        });
-      }
-      
+
       // Firebase 메시징 이벤트 리스너
       if (messaging) {
         messagingUnsubscribe = messaging().onMessage(async remoteMessage => {
