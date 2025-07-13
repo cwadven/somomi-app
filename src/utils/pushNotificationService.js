@@ -336,16 +336,6 @@ class PushNotificationService {
           }
         });
 
-      // Notifee 이벤트 리스너 (알림 클릭 이벤트)
-      notifee.onForegroundEvent(({ type, detail }) => {
-        if (type === EventType.PRESS && detail.notification) {
-          addDebugLog(`Notifee 포그라운드 알림 클릭: ${JSON.stringify(detail.notification)}`, 'info');
-          if (detail.notification.data) {
-            this.handleNotificationAction(detail.notification.data);
-          }
-        }
-      });
-
       // Android 네이티브에서 전달되는 알림 데이터 처리
       if (Platform.OS === 'android') {
         const eventEmitter = new NativeEventEmitter(NativeModules.RCTDeviceEventEmitter);

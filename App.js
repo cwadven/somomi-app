@@ -25,13 +25,10 @@ if (Platform.OS !== 'web') {
     
     // 백그라운드 메시지 핸들러 설정 (앱이 로드되기 전에 설정해야 함)
     messaging().setBackgroundMessageHandler(async remoteMessage => {
-      console.log('백그라운드 메시지 수신:', remoteMessage);
-      
       try {
         // pushNotificationService를 사용하여 알림 표시
         if (remoteMessage.notification) {
           await pushNotificationService.displayNotification(remoteMessage);
-          console.log('백그라운드 알림 표시 완료');
         }
       } catch (error) {
         console.error('백그라운드 알림 표시 오류:', error);
@@ -39,7 +36,6 @@ if (Platform.OS !== 'web') {
       
       return Promise.resolve();
     });
-    console.log('백그라운드 메시지 핸들러 설정 완료');
   } catch (error) {
     console.error('Firebase 모듈 로드 실패:', error);
   }
@@ -80,16 +76,12 @@ const AppContent = () => {
     ]);
   }, []);
 
-  // 로그 함수 끝
-
   const checkForUpdates = useCallback(async () => {
     if (__DEV__ || Platform.OS === 'web') {
-      console.log('개발 모드 또는 웹 환경에서는 업데이트를 확인하지 않습니다.');
       return;
     }
     
     try {
-      console.log('업데이트 확인 시작...');
       addLog('업데이트 확인 시작...', 'info');
       setUpdateStatus('checking');
       
@@ -99,7 +91,6 @@ const AppContent = () => {
         : Updates.isEnabled;
       
       if (!isEnabled) {
-        console.log('expo-updates가 활성화되어 있지 않습니다.');
         addLog('expo-updates가 활성화되어 있지 않습니다.', 'warning');
         setUpdateStatus('error');
         return;
@@ -107,14 +98,11 @@ const AppContent = () => {
       
       setUpdateError(null);
       
-      console.log('업데이트 확인 중...');
       addLog('업데이트 확인 중...', 'info');
       const update = await Updates.checkForUpdateAsync();
-      console.log('업데이트 확인 결과:', JSON.stringify(update));
       addLog(`업데이트 확인 결과: ${JSON.stringify(update)}`, 'info');
       
       if (update.isAvailable) {
-        console.log('새 업데이트가 있습니다. 다운로드 시작...');
         addLog('새 업데이트가 있습니다. 다운로드 시작...', 'success');
         setUpdateStatus('downloading');
         setIsUpdating(true);
@@ -122,12 +110,10 @@ const AppContent = () => {
         try {
           // 업데이트 다운로드
           const fetchResult = await Updates.fetchUpdateAsync();
-          console.log('업데이트 다운로드 완료:', JSON.stringify(fetchResult));
           addLog(`업데이트 다운로드 완료: ${JSON.stringify(fetchResult)}`, 'success');
           setUpdateStatus('ready');
           
           // 업데이트 자동 적용
-          console.log('업데이트 자동 적용 시작...');
           addLog('업데이트 자동 적용 시작...', 'info');
           try {
             await Updates.reloadAsync();
@@ -148,7 +134,6 @@ const AppContent = () => {
           setIsUpdating(false);
         }
       } else {
-        console.log('사용 가능한 업데이트가 없습니다.');
         addLog('사용 가능한 업데이트가 없습니다.', 'info');
         setUpdateStatus('idle');
       }
@@ -164,12 +149,10 @@ const AppContent = () => {
   
   // 앱 상태 변경 핸들러
   const handleAppStateChange = useCallback((nextAppState) => {
-    console.log('App state changed:', nextAppState);
     setAppState(nextAppState);
     
     // 앱이 백그라운드에서 포그라운드로 돌아올 때 알림 권한 확인
     if (appState.match(/inactive|background/) && nextAppState === 'active' && Platform.OS !== 'web') {
-      console.log('앱이 포그라운드로 돌아왔습니다. 알림 권한 확인...');
       pushNotificationService.requestNotificationPermission();
     }
   }, [appState]);
@@ -215,7 +198,6 @@ const AppContent = () => {
           pushNotificationService.setupNotificationHandler();
           const token = await pushNotificationService.registerForPushNotifications();
           if (token) {
-            console.log('Firebase 푸시 토큰:', token);
             setPushToken(token);
           }
         }
@@ -246,8 +228,6 @@ const AppContent = () => {
       // Firebase 메시징 이벤트 리스너
       if (messaging) {
         messagingUnsubscribe = messaging().onMessage(async remoteMessage => {
-          console.log('포그라운드 메시지 수신:', remoteMessage);
-          
           // pushNotificationService를 사용하여 포그라운드 알림 표시
           if (remoteMessage.notification) {
             await pushNotificationService.displayNotification(remoteMessage);
