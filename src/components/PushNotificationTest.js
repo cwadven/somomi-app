@@ -14,6 +14,8 @@ import {
   sendImmediateNotification, 
   sendBackgroundNotification 
 } from '../utils/notificationUtils';
+// pushNotificationService 추가
+import { pushNotificationService } from '../utils/pushNotificationService';
 
 const PushNotificationTest = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -68,11 +70,23 @@ const PushNotificationTest = () => {
   // 별도의 함수로 알림 전송 로직 분리
   const sendTestNotification = async (title, body, data) => {
     try {
+      // 디버그 로그에 알림 시도 기록
+      pushNotificationService && pushNotificationService.addDebugLog(`즉시 알림 테스트 시도: ${title}`, 'info');
+      
       // 알림 전송 시도
       const notificationId = await sendImmediateNotification(title, body, data);
+      
+      // 디버그 로그에 결과 기록
+      if (notificationId) {
+        pushNotificationService && pushNotificationService.addDebugLog(`즉시 알림 전송 성공: ID=${notificationId}`, 'success');
+      } else {
+        pushNotificationService && pushNotificationService.addDebugLog('즉시 알림 전송 실패: 알림 ID가 없음', 'error');
+      }
+      
       return notificationId;
     } catch (error) {
       console.error('알림 전송 실패:', error);
+      pushNotificationService && pushNotificationService.addDebugLog(`즉시 알림 전송 실패: ${error.message}`, 'error');
       return null;
     }
   };
@@ -106,6 +120,9 @@ const PushNotificationTest = () => {
           text: '확인', 
           onPress: async () => {
             try {
+              // 디버그 로그에 알림 시도 기록
+              pushNotificationService && pushNotificationService.addDebugLog(`지연 알림 테스트 시도: ${title} (${delaySeconds}초 후)`, 'info');
+              
               // 지연 알림 예약
               const notificationId = await sendBackgroundNotification(
                 title,
@@ -113,6 +130,13 @@ const PushNotificationTest = () => {
                 data,
                 delaySeconds
               );
+              
+              // 디버그 로그에 결과 기록
+              if (notificationId) {
+                pushNotificationService && pushNotificationService.addDebugLog(`지연 알림 예약 성공: ID=${notificationId}`, 'success');
+              } else {
+                pushNotificationService && pushNotificationService.addDebugLog('지연 알림 예약 실패: 알림 ID가 없음', 'error');
+              }
               
               setNotificationCount(prev => prev + 1);
               
@@ -129,6 +153,7 @@ const PushNotificationTest = () => {
               
             } catch (error) {
               console.error('지연 알림 예약 실패:', error);
+              pushNotificationService && pushNotificationService.addDebugLog(`지연 알림 예약 실패: ${error.message}`, 'error');
               Alert.alert(
                 '알림 예약 실패',
                 `오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`

@@ -611,8 +611,20 @@ export const initializeNotifications = () => {
   }
   
   try {
-    // 백그라운드 핸들러 설정 제거 (App.js에서만 설정)
-    // 중복 설정 방지를 위해 여기서는 제거
+    // 알림 채널 생성
+    if (Platform.OS === 'android' && notifee) {
+      notifee.createChannel({
+        id: 'default',
+        name: '일반 알림',
+        importance: notifee.AndroidImportance.HIGH,
+        sound: 'default',
+        vibration: true,
+      }).then(() => {
+        console.log('기본 알림 채널 생성 완료');
+      }).catch(err => {
+        console.error('알림 채널 생성 오류:', err);
+      });
+    }
     
     // null 체크 후 호출
     if (pushNotificationService && typeof pushNotificationService.setupNotificationHandler === 'function') {
@@ -620,6 +632,8 @@ export const initializeNotifications = () => {
     } else {
       console.log('알림 서비스 초기화 실패: 서비스 객체 또는 메서드가 없음');
     }
+    
+    console.log('알림 초기화 완료');
   } catch (error) {
     console.error('알림 초기화 실패:', error);
   }

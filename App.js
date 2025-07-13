@@ -18,13 +18,47 @@ import {
 import { initializeData } from './src/api/productsApi';
 import { initializeNotificationsData } from './src/redux/slices/notificationsSlice';
 import { loadCategories } from './src/redux/slices/categoriesSlice';
+import PushNotificationDebugger from './src/components/PushNotificationDebugger';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
 let notifee;
 if (Platform.OS !== 'web') {
-  messaging = require('@react-native-firebase/messaging').default;
-  notifee = require('@notifee/react-native').default;
+  try {
+    messaging = require('@react-native-firebase/messaging').default;
+    notifee = require('@notifee/react-native').default;
+    console.log('Firebase 및 Notifee 모듈 로드 성공');
+    
+    // 백그라운드 메시지 핸들러 설정 (앱이 로드되기 전에 설정해야 함)
+    messaging().setBackgroundMessageHandler(async remoteMessage => {
+      console.log('백그라운드 메시지 수신:', remoteMessage);
+      
+      try {
+        // 백그라운드에서도 알림 표시
+        if (remoteMessage.notification && notifee) {
+          await notifee.displayNotification({
+            title: remoteMessage.notification.title || '새 알림',
+            body: remoteMessage.notification.body || '새로운 알림이 도착했습니다.',
+            android: {
+              channelId: 'default',
+              smallIcon: 'ic_launcher',
+              importance: notifee.AndroidImportance.HIGH,
+              sound: 'default',
+            },
+            data: remoteMessage.data || {},
+          });
+          console.log('백그라운드 알림 표시 완료');
+        }
+      } catch (error) {
+        console.error('백그라운드 알림 표시 오류:', error);
+      }
+      
+      return Promise.resolve();
+    });
+    console.log('백그라운드 메시지 핸들러 설정 완료');
+  } catch (error) {
+    console.error('Firebase 모듈 로드 실패:', error);
+  }
 }
 
 // localStorage 폴리필
@@ -36,17 +70,6 @@ if (typeof localStorage === 'undefined') {
     removeItem(id) { return delete this._data[id]; },
     clear() { return this._data = {}; }
   };
-}
-
-// 백그라운드 메시지 핸들러 설정 (앱이 로드되기 전에 설정해야 함)
-if (Platform.OS !== 'web' && messaging) {
-  messaging().setBackgroundMessageHandler(async remoteMessage => {
-    console.log('백그라운드 메시지 수신:', remoteMessage);
-    
-    // 단순히 로그만 남기고 아무것도 하지 않음
-    // 실제 알림 표시는 Firebase 자동 처리에 맡김
-    return Promise.resolve();
-  });
 }
 
 // 앱 내부 컴포넌트 - 토큰 검증 및 초기화 로직을 포함
@@ -471,13 +494,16 @@ const AppContent = () => {
   return (
     <>
       <AppNavigator linking={linking} />
-      <TouchableOpacity 
-        style={styles.debugButton}
-        onPress={() => setShowDebugModal(true)}
-      >
-        <Ionicons name="bug-outline" size={24} color="#fff" />
-      </TouchableOpacity>
+      <View style={styles.debugButtonsContainer}>
+        <TouchableOpacity 
+          style={[styles.debugButton, styles.updateDebugButton]}
+          onPress={() => setShowDebugModal(true)}
+        >
+          <Ionicons name="bug-outline" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
       <UpdateDebugModal />
+      <PushNotificationDebugger />
     </>
   );
 };
@@ -518,9 +544,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   debugButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
     width: 50,
     height: 50,
     borderRadius: 25,
@@ -532,6 +555,15 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
+    zIndex: 1000,
+  },
+  updateDebugButton: {
+    backgroundColor: '#4CAF50', // 업데이트 디버그 버튼 색상
+  },
+  debugButtonsContainer: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
     zIndex: 1000,
   },
   modalOverlay: {
