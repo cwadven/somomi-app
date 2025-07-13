@@ -42,26 +42,9 @@ if (typeof localStorage === 'undefined') {
 if (Platform.OS !== 'web' && messaging) {
   messaging().setBackgroundMessageHandler(async remoteMessage => {
     console.log('백그라운드 메시지 수신:', remoteMessage);
-
-    try {
-      // Notifee를 사용하여 알림 표시
-      if (remoteMessage.notification && notifee) {
-        await notifee.displayNotification({
-          title: remoteMessage.notification.title || '알림',
-          body: remoteMessage.notification.body || '새 알림이 있습니다',
-          android: {
-            channelId: 'default',
-            smallIcon: 'ic_launcher',
-            importance: notifee.AndroidImportance.HIGH,
-            sound: 'default',
-          },
-          data: remoteMessage.data || {},
-        });
-      }
-    } catch (error) {
-      console.error('백그라운드 알림 처리 오류:', error);
-    }
-
+    
+    // 단순히 로그만 남기고 아무것도 하지 않음
+    // 실제 알림 표시는 Firebase 자동 처리에 맡김
     return Promise.resolve();
   });
 }
@@ -306,19 +289,21 @@ const AppContent = () => {
         notifee.onBackgroundEvent(async ({ type, detail }) => {
           console.log('Notifee 백그라운드 이벤트:', type, detail);
           
-          if (type === notifee.EventType.PRESS && detail.notification) {
-            // 알림 데이터 처리
-            const data = detail.notification.data;
-            console.log('백그라운드 알림 데이터:', data);
-            
-            // 딥링크 처리
-            if (data && data.deepLink) {
-              Linking.openURL(data.deepLink).catch(err => {
-                console.error('딥링크 오류:', err);
-              });
+          try {
+            if (type === notifee.EventType.PRESS && detail.notification) {
+              // 알림 데이터 처리
+              const data = detail.notification.data;
+              console.log('백그라운드 알림 데이터:', data);
+              
+              // 백그라운드에서는 어떤 처리도 하지 않음
+              // 단순히 앱을 열기만 함
+              console.log('백그라운드 알림 클릭 - 앱 시작만 수행');
             }
+          } catch (error) {
+            console.error('백그라운드 이벤트 처리 오류:', error);
           }
           
+          // 명시적으로 Promise 반환
           return Promise.resolve();
         });
       }

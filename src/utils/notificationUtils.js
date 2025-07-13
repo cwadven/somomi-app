@@ -611,13 +611,15 @@ export const initializeNotifications = () => {
   }
   
   try {
-  // Firebase Cloud Messaging 백그라운드 핸들러 설정
-  messaging().setBackgroundMessageHandler(async remoteMessage => {
-    console.log('백그라운드 메시지 처리:', remoteMessage);
-    return Promise.resolve();
-  });
-  
-  pushNotificationService.setupNotificationHandler();
+    // 백그라운드 핸들러 설정 제거 (App.js에서만 설정)
+    // 중복 설정 방지를 위해 여기서는 제거
+    
+    // null 체크 후 호출
+    if (pushNotificationService && typeof pushNotificationService.setupNotificationHandler === 'function') {
+      pushNotificationService.setupNotificationHandler();
+    } else {
+      console.log('알림 서비스 초기화 실패: 서비스 객체 또는 메서드가 없음');
+    }
   } catch (error) {
     console.error('알림 초기화 실패:', error);
   }
@@ -633,7 +635,12 @@ export const cleanupNotifications = () => {
   }
   
   try {
-  pushNotificationService.cleanupNotificationHandler();
+    // null 체크 후 호출
+    if (pushNotificationService && typeof pushNotificationService.cleanupNotificationHandler === 'function') {
+      pushNotificationService.cleanupNotificationHandler();
+    } else {
+      console.log('알림 서비스 정리 실패: 서비스 객체 또는 메서드가 없음');
+    }
   } catch (error) {
     console.error('알림 정리 실패:', error);
   }

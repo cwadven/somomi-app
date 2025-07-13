@@ -216,7 +216,7 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
             </Text>
             )}
           </View>
-
+          
           {/* 영역 정보 표시 (showLocation이 true일 때만) */}
           {showLocation && locationName && (
             <View style={styles.locationContainer}>
@@ -292,12 +292,12 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
                 </Text>
               )}
               {!product.expiryDate && !product.estimatedEndDate && (
-                <Text style={[
-                  styles.dateText,
-                  isZeroHP && styles.zeroHPSubText
-                ]}>
+            <Text style={[
+              styles.dateText,
+              isZeroHP && styles.zeroHPSubText
+            ]}>
                   날짜 정보 없음
-                </Text>
+            </Text>
               )}
             </View>
           </View>

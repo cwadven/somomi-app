@@ -33,9 +33,9 @@ const PushNotificationTest = () => {
       const title = '테스트 알림';
       const body = '앱 푸시 알림이 정상적으로 작동합니다!';
       const data = {
-        type: 'test',
-        testData: '테스트 데이터',
-        timestamp: new Date().toISOString(),
+          type: 'test',
+          testData: '테스트 데이터',
+          timestamp: new Date().toISOString(),
         count: newCount,
         deepLink: 'somomi://home'
       };

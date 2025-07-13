@@ -64,20 +64,20 @@ export const initializeData = async () => {
 // API 서비스 함수
 // 실제 API 구현 시 이 함수들만 수정하면 됩니다.
 export const fetchProductsApi = async () => {
-  try {
+      try {
     // 저장된 최신 데이터 로드
     const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
     if (storedProducts) {
       sampleProducts = storedProducts;
     }
     
-    // 소진 처리된 제품 제외
-    const activeProducts = sampleProducts.filter(p => !p.isConsumed);
+        // 소진 처리된 제품 제외
+        const activeProducts = sampleProducts.filter(p => !p.isConsumed);
     return [...activeProducts]; // 배열 복사본 반환
-  } catch (error) {
+      } catch (error) {
     console.error('제품 조회 중 오류 발생:', error);
     throw new Error('Failed to fetch products');
-  }
+      }
 };
 
 export const fetchProductByIdApi = async (id) => {
@@ -88,12 +88,12 @@ export const fetchProductByIdApi = async (id) => {
       sampleProducts = storedProducts;
     }
     
-    const product = sampleProducts.find(product => product.id === id);
-    if (product) {
+      const product = sampleProducts.find(product => product.id === id);
+      if (product) {
       return {...product}; // 객체 복사본 반환
-    } else {
+      } else {
       throw new Error('Product not found');
-    }
+      }
   } catch (error) {
     console.error('제품 상세 조회 중 오류 발생:', error);
     throw error;
@@ -108,15 +108,15 @@ export const addProductApi = async (product) => {
       sampleProducts = storedProducts;
     }
     
-    // 실제 API에서는 서버에서 ID를 생성합니다
+      // 실제 API에서는 서버에서 ID를 생성합니다
     const newId = (Math.max(...sampleProducts.map(p => parseInt(p.id)), 0) + 1).toString();
-    const newProduct = {
-      ...product,
-      id: newId,
-      remainingPercentage: 100, // 새 제품은 100% 남음
-    };
-    
-    // 데이터베이스에 추가
+      const newProduct = {
+        ...product,
+        id: newId,
+        remainingPercentage: 100, // 새 제품은 100% 남음
+      };
+      
+      // 데이터베이스에 추가
     const updatedProducts = [...sampleProducts, newProduct];
     sampleProducts = updatedProducts;
     
@@ -138,23 +138,23 @@ export const updateProductApi = async (product) => {
       sampleProducts = storedProducts;
     }
     
-    const index = sampleProducts.findIndex(p => p.id === product.id);
-    if (index !== -1) {
-      // 데이터베이스 업데이트
+      const index = sampleProducts.findIndex(p => p.id === product.id);
+      if (index !== -1) {
+        // 데이터베이스 업데이트
       const updatedProducts = [
-        ...sampleProducts.slice(0, index),
-        {...product},
-        ...sampleProducts.slice(index + 1)
-      ];
+          ...sampleProducts.slice(0, index),
+          {...product},
+          ...sampleProducts.slice(index + 1)
+        ];
       sampleProducts = updatedProducts;
       
       // AsyncStorage에 저장
       await saveData(STORAGE_KEYS.PRODUCTS, updatedProducts);
       
       return {...product}; // 객체 복사본 반환
-    } else {
+      } else {
       throw new Error('Product not found');
-    }
+      }
   } catch (error) {
     console.error('제품 업데이트 중 오류 발생:', error);
     throw error;
@@ -169,22 +169,22 @@ export const deleteProductApi = async (id) => {
       sampleProducts = storedProducts;
     }
     
-    const index = sampleProducts.findIndex(p => p.id === id);
-    if (index !== -1) {
-      // 데이터베이스에서 삭제
+      const index = sampleProducts.findIndex(p => p.id === id);
+      if (index !== -1) {
+        // 데이터베이스에서 삭제
       const updatedProducts = [
-        ...sampleProducts.slice(0, index),
-        ...sampleProducts.slice(index + 1)
-      ];
+          ...sampleProducts.slice(0, index),
+          ...sampleProducts.slice(index + 1)
+        ];
       sampleProducts = updatedProducts;
       
       // AsyncStorage에 저장
       await saveData(STORAGE_KEYS.PRODUCTS, updatedProducts);
       
       return { success: true, id };
-    } else {
+      } else {
       throw new Error('Product not found');
-    }
+      }
   } catch (error) {
     console.error('제품 삭제 중 오류 발생:', error);
     throw error;
@@ -205,23 +205,23 @@ export const markProductAsConsumedApi = async (id) => {
       consumedProducts = storedConsumedProducts;
     }
     
-    const index = sampleProducts.findIndex(p => p.id === id);
-    if (index !== -1) {
-      // 제품 복사
-      const product = { ...sampleProducts[index] };
-      
-      // 소진 처리 정보 추가
-      product.consumedAt = new Date().toISOString();
-      product.isConsumed = true;
-      
-      // 일반 제품 목록에서 제거
+      const index = sampleProducts.findIndex(p => p.id === id);
+      if (index !== -1) {
+        // 제품 복사
+        const product = { ...sampleProducts[index] };
+        
+        // 소진 처리 정보 추가
+        product.consumedAt = new Date().toISOString();
+        product.isConsumed = true;
+        
+        // 일반 제품 목록에서 제거
       const updatedProducts = [
-        ...sampleProducts.slice(0, index),
-        ...sampleProducts.slice(index + 1)
-      ];
+          ...sampleProducts.slice(0, index),
+          ...sampleProducts.slice(index + 1)
+        ];
       sampleProducts = updatedProducts;
-      
-      // 소진 처리된 제품 목록에 추가
+        
+        // 소진 처리된 제품 목록에 추가
       const updatedConsumedProducts = [...consumedProducts, product];
       consumedProducts = updatedConsumedProducts;
       
@@ -230,9 +230,9 @@ export const markProductAsConsumedApi = async (id) => {
       await saveData(STORAGE_KEYS.CONSUMED_PRODUCTS, updatedConsumedProducts);
       
       return product;
-    } else {
+      } else {
       throw new Error('Product not found');
-    }
+      }
   } catch (error) {
     console.error('제품 소진 처리 중 오류 발생:', error);
     throw error;
@@ -297,12 +297,12 @@ export const fetchLocationByIdApi = async (id) => {
       sampleLocations = storedLocations;
     }
     
-    const location = sampleLocations.find(location => location.id === id);
-    if (location) {
+      const location = sampleLocations.find(location => location.id === id);
+      if (location) {
       return {...location}; // 객체 복사본 반환
-    } else {
+      } else {
       throw new Error('Location not found');
-    }
+      }
   } catch (error) {
     console.error('영역 상세 조회 중 오류 발생:', error);
     throw error;
@@ -317,14 +317,14 @@ export const addLocationApi = async (location) => {
       sampleLocations = storedLocations;
     }
     
-    // 실제 API에서는 서버에서 ID를 생성합니다
+      // 실제 API에서는 서버에서 ID를 생성합니다
     const newId = (Math.max(...sampleLocations.map(l => parseInt(l.id)), 0) + 1).toString();
-    const newLocation = {
-      ...location,
-      id: newId,
-    };
-    
-    // 데이터베이스에 추가
+      const newLocation = {
+        ...location,
+        id: newId,
+      };
+      
+      // 데이터베이스에 추가
     const updatedLocations = [...sampleLocations, newLocation];
     sampleLocations = updatedLocations;
     
@@ -346,23 +346,23 @@ export const updateLocationApi = async (location) => {
       sampleLocations = storedLocations;
     }
     
-    const index = sampleLocations.findIndex(l => l.id === location.id);
-    if (index !== -1) {
-      // 데이터베이스 업데이트
+      const index = sampleLocations.findIndex(l => l.id === location.id);
+      if (index !== -1) {
+        // 데이터베이스 업데이트
       const updatedLocations = [
-        ...sampleLocations.slice(0, index),
-        {...location},
-        ...sampleLocations.slice(index + 1)
-      ];
+          ...sampleLocations.slice(0, index),
+          {...location},
+          ...sampleLocations.slice(index + 1)
+        ];
       sampleLocations = updatedLocations;
       
       // AsyncStorage에 저장
       await saveData(STORAGE_KEYS.LOCATIONS, updatedLocations);
       
       return {...location}; // 객체 복사본 반환
-    } else {
+      } else {
       throw new Error('Location not found');
-    }
+      }
   } catch (error) {
     console.error('영역 업데이트 중 오류 발생:', error);
     throw error;
@@ -377,22 +377,22 @@ export const deleteLocationApi = async (id) => {
       sampleLocations = storedLocations;
     }
     
-    const index = sampleLocations.findIndex(l => l.id === id);
-    if (index !== -1) {
-      // 데이터베이스에서 삭제
+      const index = sampleLocations.findIndex(l => l.id === id);
+      if (index !== -1) {
+        // 데이터베이스에서 삭제
       const updatedLocations = [
-        ...sampleLocations.slice(0, index),
-        ...sampleLocations.slice(index + 1)
-      ];
+          ...sampleLocations.slice(0, index),
+          ...sampleLocations.slice(index + 1)
+        ];
       sampleLocations = updatedLocations;
       
       // AsyncStorage에 저장
       await saveData(STORAGE_KEYS.LOCATIONS, updatedLocations);
       
       return id;
-    } else {
+      } else {
       throw new Error('Location not found');
-    }
+      }
   } catch (error) {
     console.error('영역 삭제 중 오류 발생:', error);
     throw error;
@@ -410,10 +410,10 @@ export const fetchProductsByLocationApi = async (locationId) => {
     // 해당 영역의 제품만 필터링
     const locationProducts = sampleProducts.filter(
       product => product.locationId === locationId && !product.isConsumed
-    );
+          );
     
     return [...locationProducts]; // 배열 복사본 반환
-  } catch (error) {
+      } catch (error) {
     console.error('영역별 제품 조회 중 오류 발생:', error);
     throw new Error(`Failed to fetch products for location ${locationId}`);
   }

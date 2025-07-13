@@ -26,7 +26,7 @@ const LocationsScreen = () => {
   const { isAnonymous } = useSelector(state => state.auth);
   
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
-  
+
   // 화면이 포커스될 때마다 영역 데이터 로드
   useFocusEffect(
     useCallback(() => {
@@ -64,18 +64,18 @@ const LocationsScreen = () => {
     
     navigation.navigate('AddLocation');
   };
-  
+
   const handleLocationPress = (location) => {
     navigation.navigate('LocationDetail', { locationId: location.id });
   };
-  
+
   const handleAllProductsPress = () => {
     navigation.navigate('LocationDetail', { 
       locationId: 'all',
       isAllProducts: true 
     });
   };
-  
+
   const renderItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.locationCard}
@@ -87,15 +87,15 @@ const LocationsScreen = () => {
       <View style={styles.locationInfo}>
         <Text style={styles.locationTitle}>{item.title}</Text>
         {item.description && (
-          <Text style={styles.locationDescription} numberOfLines={1}>
-            {item.description}
-          </Text>
+        <Text style={styles.locationDescription} numberOfLines={1}>
+          {item.description}
+        </Text>
         )}
       </View>
       <Ionicons name="chevron-forward" size={24} color="#999" />
     </TouchableOpacity>
   );
-  
+
   if (status === 'loading' && !locations.length) {
     return (
       <View style={styles.centered}>
@@ -103,7 +103,7 @@ const LocationsScreen = () => {
       </View>
     );
   }
-  
+
   if (error) {
     return (
       <View style={styles.centered}>
@@ -117,7 +117,7 @@ const LocationsScreen = () => {
       </View>
     );
   }
-  
+
   return (
     <View style={styles.container}>
       {/* 모든 제품 버튼 */}
@@ -148,7 +148,7 @@ const LocationsScreen = () => {
           </Text>
         </View>
       )}
-      
+
       <FlatList
         data={locations}
         renderItem={renderItem}
@@ -163,7 +163,7 @@ const LocationsScreen = () => {
           </View>
         }
       />
-      
+
       <TouchableOpacity 
         style={[
           styles.addButton,

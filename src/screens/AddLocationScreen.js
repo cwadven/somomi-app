@@ -244,7 +244,7 @@ const AddLocationScreen = () => {
   const showErrorAlert = (message) => {
     Alert.alert('오류', message, [{ text: '확인', style: 'default' }]);
   };
-  
+
   // 이미지 선택 핸들러 (네이티브)
   const pickImageNative = async () => {
     if (!ImagePicker) return;
@@ -460,7 +460,7 @@ const AddLocationScreen = () => {
           icons={availableIcons}
           selectedIcon={selectedIcon}
           onSelectIcon={setSelectedIcon}
-        />
+                />
         
         {/* 이미지 선택 (향후 구현) */}
         <View style={styles.imageSection}>

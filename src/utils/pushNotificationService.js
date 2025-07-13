@@ -23,10 +23,30 @@ class PushNotificationService {
   notificationReceivedListener = null;
   notificationResponseListener = null;
   nativeNotificationListener = null;
+  
+  constructor() {
+    // 모듈이 제대로 로드되었는지 확인
+    this.isInitialized = Platform.OS !== 'web' && messaging !== null && notifee !== null;
+    
+    if (!this.isInitialized) {
+      console.log('PushNotificationService 초기화 실패: 필요한 모듈이 로드되지 않음');
+    } else {
+      console.log('PushNotificationService 초기화 성공');
+    }
+  }
 
   // 알림 채널 생성
   async createNotificationChannels() {
-    if (Platform.OS === 'web' || channelsCreated) return; // 웹이거나 이미 생성된 경우 건너뜀
+    // 웹이거나 이미 생성된 경우 건너뜀
+    if (Platform.OS === 'web' || channelsCreated) {
+      return;
+    }
+    
+    // notifee가 없으면 실행하지 않음
+    if (!notifee) {
+      console.log('Notifee가 초기화되지 않았습니다.');
+      return;
+    }
     
     if (Platform.OS === 'android') {
       try {
@@ -245,51 +265,33 @@ class PushNotificationService {
       console.log('알림 데이터가 없습니다.');
       return;
     }
-
+    
     try {
       console.log('알림 액션 처리 시작:', JSON.stringify(data));
-
-      // 딥링크 생성 시도
-      let deepLink = null;
-      try {
-        deepLink = this.buildDeepLinkFromNotificationData(data);
-        console.log('생성된 딥링크:', deepLink);
-      } catch (deepLinkError) {
-        console.error('딥링크 생성 중 오류:', deepLinkError);
-        deepLink = 'somomi://home';
-      }
-
-      if (deepLink) {
-        // 딥링크 열기 전에 지연 시간 증가
-        console.log('딥링크 열기 시도:', deepLink);
-
-        // 더 긴 지연 시간 사용 (1000ms)
-        setTimeout(() => {
-          try {
-            Linking.canOpenURL(deepLink).then(supported => {
-              if (supported) {
-                return Linking.openURL(deepLink);
-              } else {
-                console.log('딥링크를 열 수 없음:', deepLink);
-                return Linking.openURL('somomi://home');
-              }
-            }).catch(err => {
-              console.error('딥링크 열기 실패:', err);
-              // 오류 발생 시 기본 화면으로 이동 시도
-              setTimeout(() => {
-                Linking.openURL('somomi://home').catch(() => {
-                  console.error('기본 화면 이동 실패');
-                });
-              }, 500);
-            });
-          } catch (linkingError) {
-            console.error('Linking.openURL 호출 중 오류:', linkingError);
-          }
-        }, 1000); // 지연 시간을 1000ms로 증가
+      
+      // 앱 상태에 관계없이 안전 모드로 시작
+      // 딥링크 처리는 시도하지 않고 MainActivity에서 처리하도록 함
+      console.log('안전 모드로 앱 시작 - 딥링크 처리는 MainActivity에서 수행');
+      
+      // 딥링크 정보만 로그로 남김
+      if (data.deepLink) {
+        console.log('알림에 포함된 딥링크 정보:', data.deepLink);
       }
     } catch (error) {
       console.error('알림 액션 처리 중 오류 발생:', error);
     }
+  }
+
+  // 안전한 네비게이션 처리를 위한 새 함수
+  handleSafeNavigation() {
+    // 아무 작업도 수행하지 않음 - 앱이 자체적으로 시작되도록 함
+    console.log('안전 모드로 앱 시작');
+  }
+
+  // 딥링크 처리를 위한 새 함수 - 사용하지 않음
+  handleDeepLink(data) {
+    // 딥링크 처리는 시도하지 않음
+    console.log('딥링크 처리는 MainActivity에서 수행');
   }
 
   // 알림 핸들러 정리

@@ -28,7 +28,7 @@ const ProfileScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user, isLoggedIn, isAnonymous, loading, error } = useSelector(state => state.auth);
-  
+
   // route.params로 전달된 initialMode가 있으면 해당 모드로 설정
   useEffect(() => {
     if (route.params?.initialMode) {
@@ -62,7 +62,7 @@ const ProfileScreen = () => {
       }
     }
   };
-
+  
   // 로그아웃 처리
   const handleLogout = () => {
     Alert.alert(
@@ -196,7 +196,7 @@ const ProfileScreen = () => {
                 icon="phone-portrait-outline" 
                 title="안드로이드 앱 푸시 설정" 
                 onPress={() => openAndroidNotificationSettings()}
-              />
+            />
             )}
           </View>
         </>
