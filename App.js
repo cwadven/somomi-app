@@ -9,17 +9,13 @@ import * as Updates from 'expo-updates';
 import Constants from 'expo-constants';
 import CodePushUpdateLoading from './src/components/CodePushUpdateLoading';
 import { Ionicons } from '@expo/vector-icons';
-import { 
-  initializeNotifications, 
-  cleanupNotifications, 
-  requestNotificationPermissions, 
-  registerForPushNotifications
-} from './src/utils/notificationUtils';
+// 알림 관련 코드는 pushNotificationService로 통합
 import { initializeData } from './src/api/productsApi';
 import { initializeNotificationsData } from './src/redux/slices/notificationsSlice';
 import { loadCategories } from './src/redux/slices/categoriesSlice';
 import PushNotificationDebugger from './src/components/PushNotificationDebugger';
 import AlertModal from './src/components/AlertModal';
+import { pushNotificationService } from './src/utils/pushNotificationService';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
@@ -35,19 +31,9 @@ if (Platform.OS !== 'web') {
       console.log('백그라운드 메시지 수신:', remoteMessage);
       
       try {
-        // 백그라운드에서도 알림 표시
-        if (remoteMessage.notification && notifee) {
-          await notifee.displayNotification({
-            title: remoteMessage.notification.title || '새 알림',
-            body: remoteMessage.notification.body || '새로운 알림이 도착했습니다.',
-            android: {
-              channelId: 'default',
-              smallIcon: 'ic_launcher',
-              importance: notifee.AndroidImportance.HIGH,
-              sound: 'default',
-            },
-            data: remoteMessage.data || {},
-          });
+        // pushNotificationService를 사용하여 알림 표시
+        if (remoteMessage.notification) {
+          await pushNotificationService.displayNotification(remoteMessage);
           console.log('백그라운드 알림 표시 완료');
         }
       } catch (error) {
@@ -97,37 +83,7 @@ const AppContent = () => {
     ]);
   }, []);
 
-  // Firebase 푸시 토큰 등록
-  const registerForPushNotificationsAsync = async () => {
-    if (Platform.OS === 'web') {
-      console.log('웹에서는 푸시 알림을 지원하지 않습니다.');
-      return;
-    }
-
-    // Firebase가 초기화되지 않았으면 실행하지 않음
-    if (!messaging || !notifee) {
-      console.log('Firebase가 초기화되지 않았습니다.');
-      return;
-    }
-
-    try {
-      // 권한 확인
-      const hasPermission = await requestNotificationPermissions();
-      if (!hasPermission) {
-        console.log('알림 권한이 거부되었습니다!');
-        return;
-      }
-      
-      // Firebase 푸시 토큰 가져오기
-      const token = await registerForPushNotifications();
-      if (token) {
-        console.log('Firebase 푸시 토큰:', token);
-        setPushToken(token);
-      }
-    } catch (error) {
-      console.error('푸시 토큰 등록 오류:', error);
-    }
-  };
+  // 로그 함수 끝
 
   const checkForUpdates = useCallback(async () => {
     if (__DEV__ || Platform.OS === 'web') {
@@ -217,7 +173,7 @@ const AppContent = () => {
     // 앱이 백그라운드에서 포그라운드로 돌아올 때 알림 권한 확인
     if (appState.match(/inactive|background/) && nextAppState === 'active' && Platform.OS !== 'web') {
       console.log('앱이 포그라운드로 돌아왔습니다. 알림 권한 확인...');
-      requestNotificationPermissions();
+      pushNotificationService.requestNotificationPermission();
     }
   }, [appState]);
   
@@ -258,8 +214,13 @@ const AppContent = () => {
         
         // 웹이 아닌 환경에서만 알림 관련 코드 실행
         if (Platform.OS !== 'web' && messaging && notifee) {
-          // 알림 권한 요청 및 초기화
-          await registerForPushNotificationsAsync();
+          // 알림 초기화 및 권한 요청
+          pushNotificationService.setupNotificationHandler();
+          const token = await pushNotificationService.registerForPushNotifications();
+          if (token) {
+            console.log('Firebase 푸시 토큰:', token);
+            setPushToken(token);
+          }
         }
       } catch (error) {
         console.error('인증 초기화 실패:', error);
@@ -290,19 +251,9 @@ const AppContent = () => {
         messagingUnsubscribe = messaging().onMessage(async remoteMessage => {
           console.log('포그라운드 메시지 수신:', remoteMessage);
           
-          // Notifee를 사용하여 포그라운드 알림 표시
-          if (remoteMessage.notification && notifee) {
-            await notifee.displayNotification({
-              title: remoteMessage.notification.title,
-              body: remoteMessage.notification.body,
-              android: {
-                channelId: 'default',
-                smallIcon: 'ic_launcher',
-                importance: notifee.AndroidImportance.HIGH,
-                sound: 'default',
-              },
-              data: remoteMessage.data,
-            });
+          // pushNotificationService를 사용하여 포그라운드 알림 표시
+          if (remoteMessage.notification) {
+            await pushNotificationService.displayNotification(remoteMessage);
           }
         });
       }
@@ -313,7 +264,7 @@ const AppContent = () => {
         
         // 알림 설정 정리
         if (notifee) {
-          cleanupNotifications();
+          pushNotificationService.cleanupNotificationHandler();
         }
         
         // 이벤트 리스너 정리
