@@ -245,10 +245,10 @@ class PushNotificationService {
       console.log('알림 데이터가 없습니다.');
       return;
     }
-    
+
     try {
       console.log('알림 액션 처리 시작:', JSON.stringify(data));
-      
+
       // 딥링크 생성 시도
       let deepLink = null;
       try {
@@ -256,51 +256,39 @@ class PushNotificationService {
         console.log('생성된 딥링크:', deepLink);
       } catch (deepLinkError) {
         console.error('딥링크 생성 중 오류:', deepLinkError);
-        // 딥링크 생성에 실패해도 계속 진행
         deepLink = 'somomi://home';
       }
-      
+
       if (deepLink) {
-        // 딥링크 열기 전에 약간의 지연을 줘서 UI 스레드 블로킹 방지
+        // 딥링크 열기 전에 지연 시간 증가
         console.log('딥링크 열기 시도:', deepLink);
-        
-        // setTimeout을 Promise로 감싸서 안전하게 처리
+
+        // 더 긴 지연 시간 사용 (1000ms)
         setTimeout(() => {
           try {
-            Linking.openURL(deepLink).catch(err => {
-              console.error('딥링크 열기 실패:', err);
-              
-              // 딥링크 실패 시 기본 화면으로 이동 시도
-              try {
-                console.log('기본 화면으로 이동 시도');
-                Linking.openURL('somomi://home').catch((fallbackErr) => {
-                  console.error('기본 화면으로 이동 실패:', fallbackErr);
-                });
-              } catch (fallbackError) {
-                console.error('기본 화면 이동 중 오류:', fallbackError);
+            Linking.canOpenURL(deepLink).then(supported => {
+              if (supported) {
+                return Linking.openURL(deepLink);
+              } else {
+                console.log('딥링크를 열 수 없음:', deepLink);
+                return Linking.openURL('somomi://home');
               }
+            }).catch(err => {
+              console.error('딥링크 열기 실패:', err);
+              // 오류 발생 시 기본 화면으로 이동 시도
+              setTimeout(() => {
+                Linking.openURL('somomi://home').catch(() => {
+                  console.error('기본 화면 이동 실패');
+                });
+              }, 500);
             });
           } catch (linkingError) {
             console.error('Linking.openURL 호출 중 오류:', linkingError);
           }
-        }, 500); // 지연 시간을 300ms에서 500ms로 증가
-      } else {
-        console.log('유효한 딥링크가 생성되지 않았습니다.');
+        }, 1000); // 지연 시간을 1000ms로 증가
       }
     } catch (error) {
       console.error('알림 액션 처리 중 오류 발생:', error);
-      
-      // 오류 발생 시 기본 화면으로 이동 시도
-      try {
-        console.log('오류 발생 후 기본 화면으로 이동 시도');
-        setTimeout(() => {
-          Linking.openURL('somomi://home').catch(() => {
-            console.error('오류 후 기본 화면 이동 실패');
-          });
-        }, 500);
-      } catch (recoveryError) {
-        console.error('오류 복구 시도 중 추가 오류:', recoveryError);
-      }
     }
   }
 

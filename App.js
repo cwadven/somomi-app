@@ -42,22 +42,26 @@ if (typeof localStorage === 'undefined') {
 if (Platform.OS !== 'web' && messaging) {
   messaging().setBackgroundMessageHandler(async remoteMessage => {
     console.log('백그라운드 메시지 수신:', remoteMessage);
-    
-    // Notifee를 사용하여 알림 표시
-    if (remoteMessage.notification && notifee) {
-      await notifee.displayNotification({
-        title: remoteMessage.notification.title,
-        body: remoteMessage.notification.body,
-        android: {
-          channelId: 'default',
-          smallIcon: 'ic_launcher',
-          importance: notifee.AndroidImportance.HIGH,
-          sound: 'default',
-        },
-        data: remoteMessage.data,
-      });
+
+    try {
+      // Notifee를 사용하여 알림 표시
+      if (remoteMessage.notification && notifee) {
+        await notifee.displayNotification({
+          title: remoteMessage.notification.title || '알림',
+          body: remoteMessage.notification.body || '새 알림이 있습니다',
+          android: {
+            channelId: 'default',
+            smallIcon: 'ic_launcher',
+            importance: notifee.AndroidImportance.HIGH,
+            sound: 'default',
+          },
+          data: remoteMessage.data || {},
+        });
+      }
+    } catch (error) {
+      console.error('백그라운드 알림 처리 오류:', error);
     }
-    
+
     return Promise.resolve();
   });
 }
