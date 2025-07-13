@@ -271,7 +271,6 @@ class MainActivity : ReactActivity() {
                     }
                   } catch (e: Exception) {
                     // 개별 키 처리 중 오류가 발생해도 계속 진행
-                    Log.e("MainActivity", "Error processing key: $key", e)
                   }
                 }
               }
@@ -283,10 +282,10 @@ class MainActivity : ReactActivity() {
                 ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                 ?.emit("notificationOpened", params)
       } catch (e: Exception) {
-        Log.e("MainActivity", "Error emitting notification event", e)
+        // 이벤트 발송 중 오류가 발생해도 계속 진행
       }
     } catch (e: Exception) {
-      Log.e("MainActivity", "Error handling intent", e)
+      // 인텐트 처리 중 오류가 발생해도 계속 진행
     }
   }
 }
