@@ -17,6 +17,8 @@ import ProfileScreen from '../screens/ProfileScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import CategoryScreen from '../screens/CategoryScreen';
 import ConsumedProductsScreen from '../screens/ConsumedProductsScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import NotificationDetailScreen from '../screens/NotificationDetailScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -132,6 +134,16 @@ const ProfileStack = () => {
         name="ConsumedProducts" 
         component={ConsumedProductsScreen} 
         options={{ title: '소진 처리된 상품' }}
+      />
+      <Stack.Screen 
+        name="Notifications" 
+        component={NotificationsScreen} 
+        options={{ title: '알림 목록', headerShown: false }}
+      />
+      <Stack.Screen 
+        name="NotificationDetail" 
+        component={NotificationDetailScreen} 
+        options={{ title: '알림 상세', headerShown: false }}
       />
     </Stack.Navigator>
   );

@@ -248,6 +248,12 @@ const ProfileScreen = () => {
         <Text style={styles.sectionTitle}>정보</Text>
 
         <SettingItem
+          icon="notifications-outline"
+          title="알림 목록"
+          onPress={() => navigation.navigate('Notifications')}
+        />
+
+        <SettingItem
           icon="information-circle-outline"
           title="앱 정보"
           onPress={showAppInfo}

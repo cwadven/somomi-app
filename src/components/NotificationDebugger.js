@@ -9,6 +9,7 @@ import {
   Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { 
   processAllNotifications, 
   sendNotifications, 
@@ -17,6 +18,7 @@ import {
 } from '../utils/notificationUtils';
 
 const NotificationDebugger = () => {
+  const navigation = useNavigation();
   const [loading, setLoading] = useState(false);
   const [notificationsToSend, setNotificationsToSend] = useState([]);
   const [results, setResults] = useState([]);
@@ -322,6 +324,15 @@ const NotificationDebugger = () => {
           </>
         )}
       </TouchableOpacity>
+      
+      <TouchableOpacity 
+        style={styles.notificationsButton}
+        onPress={() => navigation.navigate('Notifications')}
+      >
+        <Ionicons name="list" size={20} color="#fff" style={styles.buttonIcon} />
+        <Text style={styles.buttonText}>알림 목록 보기</Text>
+      </TouchableOpacity>
+      
       {renderNotificationModal()}
     </View>
   );
@@ -333,6 +344,16 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  notificationsButton: {
+    backgroundColor: '#2196F3',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
