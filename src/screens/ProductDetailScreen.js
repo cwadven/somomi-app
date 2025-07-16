@@ -12,7 +12,7 @@ import {
   Platform
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchProductById, deleteProductAsync, markProductAsConsumedAsync } from '../redux/slices/productsSlice';
 import AlertModal from '../components/AlertModal';
@@ -59,8 +59,12 @@ const ProductDetailScreen = () => {
   const { currentProduct, status, error } = useSelector(state => state.products);
   
   // 소진 처리 성공 모달 상태
-  const [showConsumedModal, setShowConsumedModal] = useState(false);
-  const [consumedProduct, setConsumedProduct] = useState(null);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [successModalConfig, setSuccessModalConfig] = useState({
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
   
   // 커스텀 알림 모달 상태
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -259,30 +263,27 @@ const ProductDetailScreen = () => {
           style: 'default',
           onPress: () => {
             // 소진 처리 전에 필요한 정보 저장
-            const locationId = currentProduct.locationId;
+            const productName = currentProduct.name;
             
             dispatch(markProductAsConsumedAsync(currentProduct.id))
               .unwrap()
-              .then((result) => {
-                // 소진 처리 성공 후 바로 이전 화면으로 이동
-                navigation.goBack();
+              .then(() => {
+                // 알림 모달 닫기
+                setAlertModalVisible(false);
                 
-                // 약간의 딜레이 후 영역 상세 화면으로 이동
-                setTimeout(() => {
-                  if (locationId) {
-                    // 특정 영역이 있는 경우 해당 영역 상세로 이동
-                    navigation.navigate('Locations', { 
-                      screen: 'LocationDetail',
-                      params: { locationId }
-                    });
-                  } else {
-                    // 영역이 없는 경우 전체 제품 목록으로 이동
-                    navigation.navigate('Locations', { 
-                      screen: 'LocationDetail',
-                      params: { locationId: 'all' }
-                    });
+                // 성공 모달 설정 및 표시
+                setSuccessModalConfig({
+                  title: '소진 처리 완료',
+                  message: `${productName} 제품이 소진 처리되었습니다.`,
+                  onConfirm: () => {
+                    // 먼저 모달을 닫고
+                    setSuccessModalVisible(false);
+                    
+                    // 탭 네비게이터에서 Locations 탭으로 이동
+                    navigation.navigate('Locations');
                   }
-                }, 100);
+                });
+                setSuccessModalVisible(true);
               })
               .catch((err) => {
                 showErrorAlert(`소진 처리 중 오류가 발생했습니다: ${err.message}`);
@@ -580,6 +581,30 @@ const ProductDetailScreen = () => {
         icon={alertModalConfig.icon}
         iconColor={alertModalConfig.iconColor}
       />
+      
+      {/* 소진 처리 성공 모달 */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={successModalVisible}
+        onRequestClose={() => setSuccessModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.successIconContainer}>
+              <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
+            </View>
+            <Text style={styles.successTitle}>{successModalConfig.title}</Text>
+            <Text style={styles.successMessage}>{successModalConfig.message}</Text>
+            <TouchableOpacity
+              style={styles.successButton}
+              onPress={successModalConfig.onConfirm}
+            >
+              <Text style={styles.successButtonText}>확인</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

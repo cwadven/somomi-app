@@ -18,6 +18,8 @@ const NotificationsScreen = () => {
   const [notifications, setNotifications] = useState([]);
   const [dates, setDates] = useState([]);
   const [selectedDate, setSelectedDate] = useState('');
+  const [showDateList, setShowDateList] = useState(true);
+  const [selectedDateNotifications, setSelectedDateNotifications] = useState([]);
 
   // 컴포넌트 마운트 시 알림 데이터 로드
   useEffect(() => {
@@ -32,36 +34,34 @@ const NotificationsScreen = () => {
       
       // 날짜 목록 추출 및 내림차순 정렬
       const datesList = Object.keys(allNotifications).sort((a, b) => b.localeCompare(a));
-      setDates(datesList);
       
-      // 가장 최근 날짜 선택
-      if (datesList.length > 0) {
-        const latestDate = datesList[0];
-        setSelectedDate(latestDate);
-        
-        // 선택된 날짜의 알림 로드
-        const dateNotifications = await loadProcessedNotifications(latestDate);
-        setNotifications(dateNotifications);
-      }
+      // 날짜별 알림 개수 정보와 함께 저장
+      const datesWithCount = datesList.map(date => ({
+        date,
+        count: allNotifications[date]?.length || 0,
+        notifications: allNotifications[date] || []
+      }));
+      
+      setDates(datesWithCount);
+      setLoading(false);
     } catch (error) {
       console.error('알림 데이터 로드 중 오류 발생:', error);
-    } finally {
       setLoading(false);
     }
   };
 
   // 날짜 선택 처리
-  const handleDateSelect = async (date) => {
-    try {
-      setLoading(true);
-      setSelectedDate(date);
-      const dateNotifications = await loadProcessedNotifications(date);
-      setNotifications(dateNotifications);
-    } catch (error) {
-      console.error(`${date} 날짜의 알림 로드 중 오류 발생:`, error);
-    } finally {
-      setLoading(false);
-    }
+  const handleDateSelect = (date, notifications) => {
+    setSelectedDate(date);
+    setSelectedDateNotifications(notifications);
+    setShowDateList(false);
+  };
+
+  // 날짜 목록으로 돌아가기
+  const goBackToDateList = () => {
+    setShowDateList(true);
+    setSelectedDate('');
+    setSelectedDateNotifications([]);
   };
 
   // 알림 상세 화면으로 이동
@@ -91,33 +91,28 @@ const NotificationsScreen = () => {
     return '#4CAF50';
   };
 
-  // 날짜 탭 렌더링
-  const renderDateTabs = () => (
-    <FlatList
-      horizontal
-      data={dates}
-      keyExtractor={(item) => item}
-      showsHorizontalScrollIndicator={false}
-      style={styles.dateTabsContainer}
-      renderItem={({ item }) => (
-        <TouchableOpacity
-          style={[
-            styles.dateTab,
-            selectedDate === item && styles.selectedDateTab
-          ]}
-          onPress={() => handleDateSelect(item)}
-        >
-          <Text
-            style={[
-              styles.dateTabText,
-              selectedDate === item && styles.selectedDateTabText
-            ]}
-          >
-            {formatDateString(item)}
-          </Text>
-        </TouchableOpacity>
-      )}
-    />
+  // 날짜 카드 렌더링
+  const renderDateCard = ({ item }) => (
+    <TouchableOpacity
+      style={styles.dateCard}
+      onPress={() => handleDateSelect(item.date, item.notifications)}
+    >
+      <View style={styles.dateCardContent}>
+        <View style={styles.dateCardHeader}>
+          <Text style={styles.dateCardTitle}>{formatDateString(item.date)}</Text>
+          <View style={styles.countBadge}>
+            <Text style={styles.countBadgeText}>{item.count}</Text>
+          </View>
+        </View>
+        <Text style={styles.dateCardSubtitle}>
+          {item.count > 0 
+            ? `${item.count}개의 알림이 있습니다.`
+            : '알림이 없습니다.'
+          }
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={24} color="#999" />
+    </TouchableOpacity>
   );
 
   // 알림 항목 렌더링
@@ -145,6 +140,38 @@ const NotificationsScreen = () => {
     </TouchableOpacity>
   );
 
+  // 날짜별 알림 목록 화면
+  const renderDateNotifications = () => (
+    <>
+      <View style={styles.dateHeader}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={goBackToDateList}
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.dateHeaderTitle}>{formatDateString(selectedDate)}</Text>
+        <View style={styles.headerRight} />
+      </View>
+
+      {selectedDateNotifications.length > 0 ? (
+        <FlatList
+          data={selectedDateNotifications}
+          keyExtractor={(item, index) => `notification-${index}`}
+          renderItem={renderNotificationItem}
+          contentContainerStyle={styles.notificationsList}
+        />
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="notifications-off-outline" size={64} color="#ccc" />
+          <Text style={styles.emptyText}>
+            {`${formatDateString(selectedDate)}에 알림이 없습니다.`}
+          </Text>
+        </View>
+      )}
+    </>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -158,26 +185,26 @@ const NotificationsScreen = () => {
         <View style={styles.headerRight} />
       </View>
 
-      {renderDateTabs()}
-
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4CAF50" />
         </View>
-      ) : notifications.length > 0 ? (
-        <FlatList
-          data={notifications}
-          keyExtractor={(item, index) => `notification-${index}`}
-          renderItem={renderNotificationItem}
-          contentContainerStyle={styles.notificationsList}
-        />
+      ) : showDateList ? (
+        dates.length > 0 ? (
+          <FlatList
+            data={dates}
+            keyExtractor={(item) => item.date}
+            renderItem={renderDateCard}
+            contentContainerStyle={styles.datesList}
+          />
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="notifications-off-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>알림 기록이 없습니다.</Text>
+          </View>
+        )
       ) : (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="notifications-off-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>
-            {selectedDate ? `${formatDateString(selectedDate)}에 알림이 없습니다.` : '알림이 없습니다.'}
-          </Text>
-        </View>
+        renderDateNotifications()
       )}
     </SafeAreaView>
   );
@@ -208,35 +235,70 @@ const styles = StyleSheet.create({
   headerRight: {
     width: 32,
   },
-  dateTabsContainer: {
-    backgroundColor: '#fff',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  dateTab: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  selectedDateTab: {
-    backgroundColor: '#4CAF50',
-  },
-  dateTabText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  selectedDateTabText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  datesList: {
+    padding: 16,
+  },
+  dateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  dateCardContent: {
+    flex: 1,
+  },
+  dateCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  dateCardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginRight: 8,
+  },
+  countBadge: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  countBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  dateCardSubtitle: {
+    fontSize: 14,
+    color: '#666',
+  },
+  dateHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  dateHeaderTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   notificationsList: {
     padding: 16,

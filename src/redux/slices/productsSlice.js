@@ -196,8 +196,10 @@ export const productsSlice = createSlice({
         state.status = 'succeeded';
         // 일반 제품 목록에서 제거
         state.products = state.products.filter(product => product.id !== action.payload.id);
-        // 소진 처리된 제품 목록에 추가
-        state.consumedProducts.push(action.payload);
+        // 소진 처리된 제품 목록에 추가 (이미 있는 경우 중복 방지)
+        if (!state.consumedProducts.some(p => p.id === action.payload.id)) {
+          state.consumedProducts.push(action.payload);
+        }
         // 현재 제품이 소진 처리된 제품이면 초기화
         if (state.currentProduct && state.currentProduct.id === action.payload.id) {
           state.currentProduct = null;

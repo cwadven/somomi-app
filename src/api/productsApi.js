@@ -196,43 +196,42 @@ export const markProductAsConsumedApi = async (id) => {
   try {
     // 저장된 최신 데이터 로드
     const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
-    const storedConsumedProducts = await loadData(STORAGE_KEYS.CONSUMED_PRODUCTS);
+    const storedConsumedProducts = await loadData(STORAGE_KEYS.CONSUMED_PRODUCTS) || [];
     
     if (storedProducts) {
       sampleProducts = storedProducts;
     }
-    if (storedConsumedProducts) {
-      consumedProducts = storedConsumedProducts;
-    }
     
-      const index = sampleProducts.findIndex(p => p.id === id);
-      if (index !== -1) {
-        // 제품 복사
-        const product = { ...sampleProducts[index] };
-        
-        // 소진 처리 정보 추가
-        product.consumedAt = new Date().toISOString();
-        product.isConsumed = true;
-        
-        // 일반 제품 목록에서 제거
+    const index = sampleProducts.findIndex(p => p.id === id);
+    if (index !== -1) {
+      // 제품 복사
+      const product = { ...sampleProducts[index] };
+      
+      // 소진 처리 정보 추가
+      product.consumedAt = new Date().toISOString();
+      product.isConsumed = true;
+      
+      // 일반 제품 목록에서 제거
       const updatedProducts = [
-          ...sampleProducts.slice(0, index),
-          ...sampleProducts.slice(index + 1)
-        ];
-      sampleProducts = updatedProducts;
-        
-        // 소진 처리된 제품 목록에 추가
-      const updatedConsumedProducts = [...consumedProducts, product];
-      consumedProducts = updatedConsumedProducts;
+        ...sampleProducts.slice(0, index),
+        ...sampleProducts.slice(index + 1)
+      ];
+      
+      // 소진 처리된 제품 목록에 추가
+      const updatedConsumedProducts = [...storedConsumedProducts, product];
       
       // AsyncStorage에 저장
       await saveData(STORAGE_KEYS.PRODUCTS, updatedProducts);
       await saveData(STORAGE_KEYS.CONSUMED_PRODUCTS, updatedConsumedProducts);
       
+      // 메모리 상태 업데이트
+      sampleProducts = updatedProducts;
+      consumedProducts = updatedConsumedProducts;
+      
       return product;
-      } else {
+    } else {
       throw new Error('Product not found');
-      }
+    }
   } catch (error) {
     console.error('제품 소진 처리 중 오류 발생:', error);
     throw error;
