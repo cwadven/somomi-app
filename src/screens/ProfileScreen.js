@@ -198,20 +198,9 @@ const ProfileScreen = () => {
         </View>
       )}
 
-      {/* 로그인 한 경우에만 제품 관리와 앱 설정 표시 */}
+      {/* 로그인 한 경우에만 앱 설정 표시 */}
       {isLoggedIn && user && (
         <>
-          {/* 제품 관리 섹션 */}
-          <View style={styles.settingsSection}>
-            <Text style={styles.sectionTitle}>제품 관리</Text>
-
-            <SettingItem
-              icon="checkmark-done-circle-outline"
-              title="소진 처리한 상품 보기"
-              onPress={() => navigation.navigate('ConsumedProducts')}
-            />
-          </View>
-
           {/* 설정 섹션 */}
           <View style={styles.settingsSection}>
             <Text style={styles.sectionTitle}>앱 설정</Text>
@@ -247,6 +236,12 @@ const ProfileScreen = () => {
       <View style={styles.settingsSection}>
         <Text style={styles.sectionTitle}>정보</Text>
 
+        <SettingItem
+          icon="checkmark-done-circle-outline"
+          title="소진 처리한 상품 목록"
+          onPress={() => navigation.navigate('ConsumedProducts')}
+        />
+        
         <SettingItem
           icon="notifications-outline"
           title="알림 목록"

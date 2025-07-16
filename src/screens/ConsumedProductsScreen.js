@@ -5,7 +5,8 @@ import {
   StyleSheet, 
   FlatList, 
   TouchableOpacity, 
-  ActivityIndicator 
+  ActivityIndicator,
+  SafeAreaView
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
@@ -39,12 +40,22 @@ const ConsumedProductsScreen = () => {
       '주방용품': 'restaurant',
     };
     
-    return categoryIcons[category] || 'cube-outline';
+    // category가 null이나 undefined인 경우 기본값 사용
+    if (!category) {
+      return 'cube-outline';
+    }
+    
+    // category가 객체인 경우 name 속성 사용
+    const categoryName = typeof category === 'object' ? category.name : category;
+    return categoryIcons[categoryName] || 'cube-outline';
   };
   
   // 목록 아이템 렌더링
   const renderItem = ({ item }) => (
-    <View style={styles.productItem}>
+    <TouchableOpacity 
+      style={styles.productItem}
+      onPress={() => navigation.navigate('ConsumedProductDetail', { productId: item.id })}
+    >
       <View style={styles.iconContainer}>
         <Ionicons name={getCategoryIcon(item.category)} size={30} color="#9E9E9E" />
       </View>
@@ -54,13 +65,18 @@ const ConsumedProductsScreen = () => {
           {item.brand && (
             <Text style={styles.brandText}>{item.brand}</Text>
           )}
-          <Text style={styles.categoryText}>{item.category}</Text>
+          <Text style={styles.categoryText}>
+            {item.category 
+              ? (typeof item.category === 'object' ? item.category.name : item.category)
+              : '미분류'
+            }
+          </Text>
         </View>
         <Text style={styles.consumedDate}>
           소진일: {formatConsumedDate(item.consumedAt)}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
   
   // 빈 목록 표시
@@ -97,30 +113,62 @@ const ConsumedProductsScreen = () => {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>소진 처리된 상품 목록</Text>
-      <FlatList
-        data={consumedProducts}
-        renderItem={renderItem}
-        keyExtractor={item => item.id}
-        ListEmptyComponent={renderEmptyList}
-        contentContainerStyle={styles.listContent}
-      />
-    </View>
+    <SafeAreaView style={styles.safeArea}>
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>소진 처리된 상품</Text>
+        <View style={styles.headerRight} />
+      </View>
+      
+      <View style={styles.container}>
+        <FlatList
+          data={consumedProducts}
+          renderItem={renderItem}
+          keyExtractor={item => `consumed-${item.id}-${item.consumedAt || Date.now()}`}
+          ListEmptyComponent={renderEmptyList}
+          contentContainerStyle={styles.listContent}
+        />
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  headerRight: {
+    width: 32,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
     padding: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#333',
   },
   loadingContainer: {
     flex: 1,

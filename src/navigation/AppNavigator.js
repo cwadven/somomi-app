@@ -17,6 +17,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import CategoryScreen from '../screens/CategoryScreen';
 import ConsumedProductsScreen from '../screens/ConsumedProductsScreen';
+import ConsumedProductDetailScreen from '../screens/ConsumedProductDetailScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import NotificationDetailScreen from '../screens/NotificationDetailScreen';
 
@@ -133,7 +134,12 @@ const ProfileStack = () => {
       <Stack.Screen 
         name="ConsumedProducts" 
         component={ConsumedProductsScreen} 
-        options={{ title: '소진 처리된 상품' }}
+        options={{ title: '소진 처리된 상품', headerShown: false }}
+      />
+      <Stack.Screen 
+        name="ConsumedProductDetail" 
+        component={ConsumedProductDetailScreen} 
+        options={{ title: '소진 상품 상세', headerShown: false }}
       />
       <Stack.Screen 
         name="Notifications" 

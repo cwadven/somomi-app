@@ -276,11 +276,8 @@ const ProductDetailScreen = () => {
                   title: '소진 처리 완료',
                   message: `${productName} 제품이 소진 처리되었습니다.`,
                   onConfirm: () => {
-                    // 먼저 모달을 닫고
+                    // 모달 닫기만 수행 (화면 이동 없음)
                     setSuccessModalVisible(false);
-                    
-                    // 탭 네비게이터에서 Locations 탭으로 이동
-                    navigation.navigate('Locations');
                   }
                 });
                 setSuccessModalVisible(true);
