@@ -143,32 +143,32 @@ const NotificationsScreen = () => {
   // 날짜별 알림 목록 화면
   const renderDateNotifications = () => (
     <>
-      <View style={styles.dateHeader}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={goBackToDateList}
-        >
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.dateHeaderTitle}>{formatDateString(selectedDate)}</Text>
-        <View style={styles.headerRight} />
-      </View>
-
-      {selectedDateNotifications.length > 0 ? (
-        <FlatList
-          data={selectedDateNotifications}
-          keyExtractor={(item, index) => `notification-${index}`}
-          renderItem={renderNotificationItem}
-          contentContainerStyle={styles.notificationsList}
-        />
-      ) : (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="notifications-off-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>
-            {`${formatDateString(selectedDate)}에 알림이 없습니다.`}
-          </Text>
-        </View>
-      )}
+      <FlatList
+        data={selectedDateNotifications}
+        keyExtractor={(item, index) => `notification-${index}`}
+        renderItem={renderNotificationItem}
+        contentContainerStyle={styles.notificationsList}
+        ListHeaderComponent={
+          <View style={styles.dateHeader}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={goBackToDateList}
+            >
+              <Ionicons name="arrow-back" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.dateHeaderTitle}>{formatDateString(selectedDate)}</Text>
+            <View style={styles.headerRight} />
+          </View>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="notifications-off-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>
+              {`${formatDateString(selectedDate)}에 알림이 없습니다.`}
+            </Text>
+          </View>
+        }
+      />
     </>
   );
 
@@ -295,13 +295,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    marginBottom: 8,
   },
   dateHeaderTitle: {
     fontSize: 18,
     fontWeight: 'bold',
   },
   notificationsList: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 0,
   },
   notificationItem: {
     flexDirection: 'row',

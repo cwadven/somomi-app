@@ -52,18 +52,18 @@ const NotificationDetailScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>알림 상세</Text>
-        <View style={styles.headerRight} />
-      </View>
-
       <ScrollView style={styles.content}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>알림 상세</Text>
+          <View style={styles.headerRight} />
+        </View>
+
         <View style={styles.notificationHeader}>
           <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(notification.notification_type) }]}>
             <Ionicons name={getNotificationIcon(notification.notification_type)} size={32} color="#fff" />
