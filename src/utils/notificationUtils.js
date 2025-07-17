@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 let messaging;
 let pushNotificationService;
 
+// 웹 환경이 아닌 경우에만 Firebase 모듈 로드
 if (Platform.OS !== 'web') {
   try {
     messaging = require('@react-native-firebase/messaging').default;
@@ -242,6 +243,11 @@ export const processAllNotifications = async () => {
     // 4. 처리된 알림을 오늘 날짜 기준으로 저장
     if (notificationsToSend.length > 0) {
       await saveProcessedNotifications(notificationsToSend);
+      
+      // 웹 환경이 아닌 경우에만 알림 전송
+      if (Platform.OS !== 'web') {
+        await sendNotifications(notificationsToSend);
+      }
     }
     
     return notificationsToSend;
@@ -319,9 +325,21 @@ export const loadAllProcessedNotifications = async () => {
  * @returns {Promise<Array>} 전송 결과 배열
  */
 export const sendNotifications = async (notifications) => {
+  // 웹 환경이거나 알림 서비스를 사용할 수 없는 경우
   if (Platform.OS === 'web' || !pushNotificationService) {
     console.log('웹 환경이거나 알림 서비스를 사용할 수 없습니다.');
-    return [];
+    
+    // 알림 데이터는 저장
+    if (notifications.length > 0) {
+      await saveProcessedNotifications(notifications);
+    }
+    
+    // 알림 전송은 건너뛰고 성공으로 처리
+    return notifications.map(notification => ({
+      success: true,
+      notification,
+      notificationId: 'web-' + Date.now()
+    }));
   }
   
   const results = [];

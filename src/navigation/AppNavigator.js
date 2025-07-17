@@ -20,6 +20,7 @@ import ConsumedProductsScreen from '../screens/ConsumedProductsScreen';
 import ConsumedProductDetailScreen from '../screens/ConsumedProductDetailScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import NotificationDetailScreen from '../screens/NotificationDetailScreen';
+import NotificationDateScreen from '../screens/NotificationDateScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -44,7 +45,10 @@ const HomeStack = () => {
       <Stack.Screen 
         name="ProductDetail" 
         component={ProductDetailScreen} 
-        options={{ title: '제품 상세' }}
+        options={({ route }) => ({
+          title: '제품 상세',
+          headerShown: route.params?.hideHeader === true ? false : true
+        })}
       />
       <Stack.Screen 
         name="ProductForm" 
@@ -103,7 +107,10 @@ const LocationsStack = () => {
       <Stack.Screen 
         name="ProductDetail" 
         component={ProductDetailScreen} 
-        options={{ title: '제품 상세' }}
+        options={({ route }) => ({
+          title: '제품 상세',
+          headerShown: route.params?.hideHeader === true ? false : true
+        })}
       />
       <Stack.Screen 
         name="Category" 
@@ -147,9 +154,25 @@ const ProfileStack = () => {
         options={{ title: '알림 목록', headerShown: false }}
       />
       <Stack.Screen 
+        name="NotificationDate" 
+        component={NotificationDateScreen} 
+        options={{ title: '날짜별 알림', headerShown: false }}
+      />
+      <Stack.Screen 
         name="NotificationDetail" 
         component={NotificationDetailScreen} 
-        options={{ title: '알림 상세', headerShown: false }}
+        options={({ route }) => ({
+          title: '알림 상세',
+          headerShown: false
+        })}
+      />
+      <Stack.Screen 
+        name="ProductDetail" 
+        component={ProductDetailScreen} 
+        options={({ route }) => ({
+          title: '제품 상세',
+          headerShown: route.params?.hideHeader === true ? false : true
+        })}
       />
     </Stack.Navigator>
   );

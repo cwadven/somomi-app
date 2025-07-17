@@ -45,25 +45,34 @@ const NotificationDetailScreen = () => {
 
   // 제품 상세 페이지로 이동
   const navigateToProductDetail = () => {
+    console.log('제품 상세 보기 버튼 클릭', notification);
+    console.log('제품 ID:', notification.product_id);
+    
     if (notification.product_id) {
-      navigation.navigate('ProductDetail', { productId: notification.product_id });
+      console.log('제품 상세 페이지로 이동 시도:', notification.product_id);
+      navigation.push('ProductDetail', { 
+        productId: notification.product_id,
+        hideHeader: true
+      });
+    } else {
+      console.log('제품 ID가 없어 이동할 수 없습니다.');
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>알림 상세</Text>
-          <View style={styles.headerRight} />
-        </View>
-
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>알림 상세</Text>
+        <View style={styles.headerRight} />
+      </View>
+      
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <View style={styles.notificationHeader}>
           <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(notification.notification_type) }]}>
             <Ionicons name={getNotificationIcon(notification.notification_type)} size={32} color="#fff" />
@@ -142,9 +151,12 @@ const styles = StyleSheet.create({
   headerRight: {
     width: 32,
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  content: {
     padding: 16,
+    paddingBottom: 32,
   },
   notificationHeader: {
     flexDirection: 'row',
@@ -234,7 +246,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 32,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
