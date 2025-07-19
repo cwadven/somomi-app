@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -9,9 +9,14 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
-  Dimensions
+  Dimensions,
+  BackHandler,
+  ToastAndroid,
+  Platform,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import ProductCard from '../components/ProductCard';
 import { fetchPopularProductsApi } from '../api/productsApi';
 
@@ -22,6 +27,7 @@ const HomeScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [exitApp, setExitApp] = useState(false);
   const flatListRef = useRef(null);
 
   // 배너 데이터
@@ -33,6 +39,45 @@ const HomeScreen = ({ navigation }) => {
   useEffect(() => {
     loadPopularProducts();
   }, []);
+
+  // 뒤로가기 버튼 처리
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (exitApp) {
+          // 두 번째 뒤로가기: 앱 종료
+          BackHandler.exitApp();
+          return true;
+        } else {
+          // 첫 번째 뒤로가기: 토스트 메시지 표시
+          setExitApp(true);
+          
+          // 플랫폼에 따른 메시지 표시
+          if (Platform.OS === 'android') {
+            ToastAndroid.show('뒤로가기 하면 앱이 종료됩니다', ToastAndroid.SHORT);
+          } else {
+            // iOS에서는 Alert 사용
+            Alert.alert('알림', '뒤로가기 하면 앱이 종료됩니다', [], { cancelable: true });
+          }
+          
+          // 2초 후 exitApp 상태 초기화
+          setTimeout(() => {
+            setExitApp(false);
+          }, 2000);
+          
+          return true;
+        }
+      };
+      
+      // 뒤로가기 이벤트 리스너 등록
+      BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      
+      return () => {
+        // 컴포넌트 언마운트 시 이벤트 리스너 제거
+        BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+      };
+    }, [exitApp])
+  );
 
   const loadPopularProducts = async () => {
     try {
