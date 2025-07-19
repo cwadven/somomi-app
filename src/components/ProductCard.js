@@ -40,10 +40,14 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
     if (!product.expiryDate) return null;
     
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // 오늘 날짜의 시작(자정)으로 설정
+    
     const expiryDate = new Date(product.expiryDate);
+    expiryDate.setHours(23, 59, 59, 999); // 만료일의 끝(23:59:59.999)으로 설정
     
     // purchaseDate가 없는 경우 오늘 날짜를 기준으로 계산
     const purchaseDate = product.purchaseDate ? new Date(product.purchaseDate) : new Date();
+    purchaseDate.setHours(0, 0, 0, 0); // 구매일의 시작(자정)으로 설정
     
     // 날짜가 유효한지 확인
     if (isNaN(expiryDate.getTime()) || isNaN(purchaseDate.getTime())) {
@@ -79,10 +83,14 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
     if (!product.estimatedEndDate) return null;
     
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // 오늘 날짜의 시작(자정)으로 설정
+    
     const endDate = new Date(product.estimatedEndDate);
+    endDate.setHours(23, 59, 59, 999); // 소진 예상일의 끝(23:59:59.999)으로 설정
     
     // purchaseDate가 없는 경우 오늘 날짜를 기준으로 계산
     const purchaseDate = product.purchaseDate ? new Date(product.purchaseDate) : new Date();
+    purchaseDate.setHours(0, 0, 0, 0); // 구매일의 시작(자정)으로 설정
     
     // 날짜가 유효한지 확인
     if (isNaN(endDate.getTime()) || isNaN(purchaseDate.getTime())) {
@@ -137,8 +145,10 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
   const consumptionPercentage = consumptionResult?.percentage;
   const consumptionDaysLeft = consumptionResult?.remainingDays;
   
-  // HP가 0%인지 확인
-  const isZeroHP = (expiryPercentage === 0 || consumptionPercentage === 0);
+  // 남은 일수가 0일 이하인지 확인
+  const isZeroHP = 
+    (expiryDaysLeft !== undefined && expiryDaysLeft <= 0) || 
+    (consumptionDaysLeft !== undefined && consumptionDaysLeft <= 0);
   
   // 유통기한 또는 소진 예상일이 3일 이하로 남았는지 확인
   const showExpiryBadge = expiryDaysLeft !== undefined && expiryDaysLeft <= 3 && expiryDaysLeft > 0;
