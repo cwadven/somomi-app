@@ -14,18 +14,9 @@ const NotificationDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { notification } = route.params;
-
-  // 날짜 포맷팅 함수
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    
-    return `${year}년 ${month}월 ${day}일 ${hours}:${minutes}`;
-  };
+  
+  // 결합된 알림인지 확인
+  const isCombined = notification.combined && notification.allNotifications;
 
   // 알림 유형에 따른 아이콘 반환
   const getNotificationIcon = (type) => {
@@ -43,26 +34,60 @@ const NotificationDetailScreen = () => {
     return '#4CAF50';
   };
 
-  // 제품 상세 페이지로 이동
+  // 제품 상세 화면으로 이동
   const navigateToProductDetail = () => {
-    console.log('제품 상세 보기 버튼 클릭', notification);
-    console.log('제품 ID:', notification.product_id);
-    
-    if (notification.product_id) {
-      console.log('제품 상세 페이지로 이동 시도:', notification.product_id);
-      navigation.push('ProductDetail', { 
-        productId: notification.product_id,
-        hideHeader: true
-      });
-    } else {
-      console.log('제품 ID가 없어 이동할 수 없습니다.');
-    }
+    navigation.push('ProductDetail', { 
+      productId: notification.product_id,
+      hideHeader: true
+    });
+  };
+
+  // 결합된 알림 렌더링
+  const renderCombinedNotifications = () => {
+    return (
+      <View style={styles.combinedContainer}>
+        <Text style={styles.combinedTitle}>알림 목록</Text>
+        
+        {notification.allNotifications.map((item, index) => (
+          <View key={`combined-${index}`} style={styles.combinedItem}>
+            <View style={[styles.combinedIconContainer, { backgroundColor: getNotificationColor(item.notification_type) }]}>
+              <Ionicons name={getNotificationIcon(item.notification_type)} size={20} color="#fff" />
+            </View>
+            <View style={styles.combinedContent}>
+              <Text style={styles.combinedType}>{item.notification_type}</Text>
+              <Text style={styles.combinedMessage}>{item.message}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  // 제품 정보 렌더링
+  const renderProductInfo = () => {
+    return (
+      <View style={styles.productSection}>
+        <Text style={styles.sectionTitle}>제품 정보</Text>
+        <View style={styles.productInfoItem}>
+          <Text style={styles.infoLabel}>제품명</Text>
+          <Text style={styles.infoValue}>{notification.product_name}</Text>
+        </View>
+        
+        {notification.location_name && (
+          <View style={styles.productInfoItem}>
+            <Text style={styles.infoLabel}>위치</Text>
+            <Text style={styles.infoValue}>{notification.location_name}</Text>
+          </View>
+        )}
+      </View>
+    );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+      {/* 헤더 */}
       <View style={styles.header}>
-        <TouchableOpacity
+        <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
@@ -72,54 +97,51 @@ const NotificationDetailScreen = () => {
         <View style={styles.headerRight} />
       </View>
       
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.container}>
+        {/* 알림 헤더 */}
         <View style={styles.notificationHeader}>
-          <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(notification.notification_type) }]}>
-            <Ionicons name={getNotificationIcon(notification.notification_type)} size={32} color="#fff" />
+          <View style={[
+            styles.iconContainer, 
+            { backgroundColor: isCombined ? '#9C27B0' : getNotificationColor(notification.notification_type) }
+          ]}>
+            <Ionicons 
+              name={isCombined ? 'notifications' : getNotificationIcon(notification.notification_type)} 
+              size={32} 
+              color="#fff" 
+            />
           </View>
-          <View style={styles.notificationTitleContainer}>
-            <Text style={styles.notificationType}>{notification.notification_type} 알림</Text>
+          <View style={styles.headerInfo}>
             <Text style={styles.productName}>{notification.product_name}</Text>
-          </View>
-        </View>
-
-        <View style={styles.messageContainer}>
-          <Text style={styles.messageLabel}>알림 내용</Text>
-          <Text style={styles.messageText}>{notification.message}</Text>
-        </View>
-
-        <View style={styles.infoContainer}>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>알림 발생 원인</Text>
-            <Text style={styles.infoValue}>
-              {notification.source_type === 'location' ? '영역 알림 설정' : '제품 알림 설정'}
+            <Text style={styles.notificationType}>
+              {isCombined ? '복합 알림' : notification.notification_type}
             </Text>
           </View>
-
-          {notification.source_type === 'location' && notification.source_name && (
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>발생 영역</Text>
-              <Text style={styles.infoValue}>{notification.source_name}</Text>
-            </View>
-          )}
-
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>제품 위치</Text>
-            <Text style={styles.infoValue}>{notification.location_name || '위치 정보 없음'}</Text>
-          </View>
-
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>만료 일시</Text>
-            <Text style={styles.infoValue}>{formatDate(notification.expire_at)}</Text>
-          </View>
         </View>
-
+        
+        {/* 알림 내용 */}
+        <View style={styles.contentSection}>
+          <Text style={styles.contentTitle}>알림 내용</Text>
+          <Text style={styles.contentText}>
+            {isCombined 
+              ? `${notification.product_name}의 유통기한과 소진 예상 알림이 있습니다.` 
+              : notification.message
+            }
+          </Text>
+        </View>
+        
+        {/* 결합된 알림 목록 */}
+        {isCombined && renderCombinedNotifications()}
+        
+        {/* 제품 정보 */}
+        {renderProductInfo()}
+        
+        {/* 제품 상세 버튼 */}
         <TouchableOpacity 
-          style={styles.productButton}
+          style={styles.productDetailButton}
           onPress={navigateToProductDetail}
         >
-          <Ionicons name="cube-outline" size={20} color="#fff" style={styles.productButtonIcon} />
-          <Text style={styles.productButtonText}>제품 상세 보기</Text>
+          <Text style={styles.productDetailButtonText}>제품 상세 보기</Text>
+          <Ionicons name="chevron-forward" size={20} color="#fff" />
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -127,9 +149,9 @@ const NotificationDetailScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
@@ -151,115 +173,132 @@ const styles = StyleSheet.create({
   headerRight: {
     width: 32,
   },
-  scrollView: {
+  container: {
     flex: 1,
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 32,
+    backgroundColor: '#f5f5f5',
   },
   notificationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 20,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
-  notificationTitleContainer: {
+  headerInfo: {
     flex: 1,
+  },
+  productName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
   },
   notificationType: {
     fontSize: 14,
-    fontWeight: '600',
     color: '#666',
-    marginBottom: 4,
   },
-  productName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  messageContainer: {
+  contentSection: {
+    padding: 20,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    marginTop: 10,
   },
-  messageLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 8,
-  },
-  messageText: {
+  contentTitle: {
     fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
     color: '#333',
+  },
+  contentText: {
+    fontSize: 16,
     lineHeight: 24,
+    color: '#333',
   },
-  infoContainer: {
+  productSection: {
+    padding: 20,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    marginTop: 10,
   },
-  infoItem: {
-    marginBottom: 12,
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    color: '#333',
+  },
+  productInfoItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   infoLabel: {
     fontSize: 14,
-    fontWeight: '600',
     color: '#666',
-    marginBottom: 4,
   },
   infoValue: {
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '500',
     color: '#333',
   },
-  productButton: {
+  productDetailButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#4CAF50',
-    borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
+    borderRadius: 8,
+    margin: 20,
   },
-  productButtonIcon: {
+  productDetailButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
     marginRight: 8,
   },
-  productButtonText: {
+  combinedContainer: {
+    padding: 20,
+    backgroundColor: '#fff',
+    marginTop: 10,
+  },
+  combinedTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: 'bold',
+    marginBottom: 16,
+    color: '#333',
+  },
+  combinedItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  combinedIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  combinedContent: {
+    flex: 1,
+  },
+  combinedType: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  combinedMessage: {
+    fontSize: 14,
+    color: '#666',
   },
 });
 

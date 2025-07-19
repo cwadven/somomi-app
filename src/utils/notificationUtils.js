@@ -210,7 +210,7 @@ export const createEstimatedNotification = (product, location, daysBeforeTarget,
     return {
       location_name: location ? location.title : null,
       product_name: product.name,
-      notification_type: '소진예상',
+      notification_type: '소진 예상',
       message: `${product.name}의 소진예상일이 ${daysLeft}일 남았습니다.`,
       expire_at: expireAt.toISOString(),
       location_id: location ? location.id : null,

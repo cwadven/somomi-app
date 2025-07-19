@@ -19,11 +19,49 @@ const NotificationDateScreen = () => {
   
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
+  const [groupedNotifications, setGroupedNotifications] = useState([]);
 
   // 컴포넌트 마운트 시 해당 날짜의 최신 알림 데이터 로드
   useEffect(() => {
     loadDateNotifications();
   }, [date]);
+
+  // 알림을 제품별로 그룹화하는 함수
+  const groupNotificationsByProduct = (notificationsList) => {
+    const groupedMap = new Map();
+
+    // 알림을 제품 ID 기준으로 그룹화
+    notificationsList.forEach(notification => {
+      const productId = notification.product_id;
+      
+      if (!groupedMap.has(productId)) {
+        // 새 그룹 생성
+        groupedMap.set(productId, {
+          product_id: productId,
+          product_name: notification.product_name,
+          location_id: notification.location_id,
+          location_name: notification.location_name,
+          notifications: [notification],
+          combined: false
+        });
+      } else {
+        // 기존 그룹에 알림 추가
+        const group = groupedMap.get(productId);
+        group.notifications.push(notification);
+        
+        // 유통기한과 소진예상 알림이 모두 있는지 확인
+        const hasExpiry = group.notifications.some(n => n.notification_type === '유통기한');
+        const hasEstimated = group.notifications.some(n => n.notification_type === '소진 예상');
+        
+        if (hasExpiry && hasEstimated) {
+          group.combined = true;
+        }
+      }
+    });
+
+    // Map을 배열로 변환
+    return Array.from(groupedMap.values());
+  };
 
   // 해당 날짜의 알림 데이터 로드 함수
   const loadDateNotifications = async () => {
@@ -32,6 +70,11 @@ const NotificationDateScreen = () => {
       // 해당 날짜의 최신 알림 데이터 로드
       const dateNotifications = await loadProcessedNotifications(date);
       setNotifications(dateNotifications);
+      
+      // 알림을 제품별로 그룹화
+      const grouped = groupNotificationsByProduct(dateNotifications);
+      setGroupedNotifications(grouped);
+      
       setLoading(false);
     } catch (error) {
       console.error('알림 데이터 로드 중 오류 발생:', error);
@@ -40,15 +83,36 @@ const NotificationDateScreen = () => {
   };
 
   // 알림 상세 화면으로 이동
-  const navigateToNotificationDetail = (notification) => {
-    navigation.push('NotificationDetail', { 
-      notification,
-      hideHeader: true 
-    });
+  const navigateToNotificationDetail = (group) => {
+    if (group.combined) {
+      // 결합된 알림의 경우 첫 번째 알림을 기본으로 사용하고 추가 정보 포함
+      const combinedNotification = {
+        ...group.notifications[0],
+        combined: true,
+        allNotifications: group.notifications
+      };
+      
+      navigation.push('NotificationDetail', { 
+        notification: combinedNotification,
+        hideHeader: true 
+      });
+    } else {
+      // 단일 알림인 경우 해당 알림만 전달 (notifications 배열의 첫 번째 항목)
+      navigation.push('NotificationDetail', { 
+        notification: group.notifications[0],
+        hideHeader: true 
+      });
+    }
   };
 
   // 알림 유형에 따른 아이콘 반환
-  const getNotificationIcon = (type) => {
+  const getNotificationIcon = (group) => {
+    if (group.combined) {
+      // 결합된 알림은 특별한 아이콘 사용
+      return 'notifications';
+    }
+    
+    const type = group.notifications[0].notification_type;
     if (type === '유통기한') {
       return 'calendar';
     }
@@ -56,11 +120,35 @@ const NotificationDateScreen = () => {
   };
 
   // 알림 유형에 따른 색상 반환
-  const getNotificationColor = (type) => {
+  const getNotificationColor = (group) => {
+    if (group.combined) {
+      // 결합된 알림은 특별한 색상 사용
+      return '#9C27B0'; // 보라색
+    }
+    
+    const type = group.notifications[0].notification_type;
     if (type === '유통기한') {
       return '#2196F3';
     }
     return '#4CAF50';
+  };
+
+  // 알림 메시지 생성
+  const getNotificationMessage = (group) => {
+    if (group.combined) {
+      return `${group.product_name}의 유통기한과 소진 예상 알림이 있습니다.`;
+    }
+    
+    return group.notifications[0].message;
+  };
+
+  // 알림 유형 텍스트 생성
+  const getNotificationTypeText = (group) => {
+    if (group.combined) {
+      return '복합 알림';
+    }
+    
+    return group.notifications[0].notification_type;
   };
 
   // 알림 항목 렌더링
@@ -69,15 +157,15 @@ const NotificationDateScreen = () => {
       style={styles.notificationItem}
       onPress={() => navigateToNotificationDetail(item)}
     >
-      <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(item.notification_type) }]}>
-        <Ionicons name={getNotificationIcon(item.notification_type)} size={24} color="#fff" />
+      <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(item) }]}>
+        <Ionicons name={getNotificationIcon(item)} size={24} color="#fff" />
       </View>
       <View style={styles.notificationContent}>
         <View style={styles.notificationHeader}>
-          <Text style={styles.notificationType}>{item.notification_type}</Text>
+          <Text style={styles.notificationType}>{getNotificationTypeText(item)}</Text>
           <Text style={styles.productName}>{item.product_name}</Text>
         </View>
-        <Text style={styles.message} numberOfLines={2}>{item.message}</Text>
+        <Text style={styles.message} numberOfLines={2}>{getNotificationMessage(item)}</Text>
         <View style={styles.notificationFooter}>
           <Text style={styles.locationName}>
             {item.location_name ? `위치: ${item.location_name}` : '위치 없음'}
@@ -107,8 +195,8 @@ const NotificationDateScreen = () => {
         </View>
       ) : (
         <FlatList
-          data={notifications}
-          keyExtractor={(item, index) => `notification-${index}`}
+          data={groupedNotifications}
+          keyExtractor={(item, index) => `notification-group-${index}`}
           renderItem={renderNotificationItem}
           contentContainerStyle={styles.notificationsList}
           ListEmptyComponent={
