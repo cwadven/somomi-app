@@ -242,41 +242,10 @@ const AppNavigator = ({ linking }) => {
             })}
             screenListeners={({ navigation, route }) => ({
               tabPress: (e) => {
-                // 내 영역 탭을 클릭했을 때 LocationsScreen으로 이동하고 내비게이션 스택 초기화
+                // 내 영역 탭 클릭 시 기존 스택을 유지
                 if (route.name === 'Locations') {
                   e.preventDefault(); // 기본 동작 방지
-                  navigation.navigate('Locations', {
-                    screen: 'LocationsScreen'
-                  });
-                  // 내 영역 스택을 초기화하여 LocationsScreen만 남도록 설정
-                  navigation.dispatch(state => {
-                    // 현재 라우트 찾기
-                    const routes = state.routes.map(r => {
-                      if (r.name === 'Locations') {
-                        // Locations 스택의 라우트를 LocationsScreen 하나만 남도록 수정
-                        return {
-                          ...r,
-                          state: {
-                            ...r.state,
-                            routes: [
-                              {
-                                name: 'LocationsScreen',
-                                params: {},
-                              },
-                            ],
-                            index: 0,
-                          },
-                        };
-                      }
-                      return r;
-                    });
-                    
-                    return {
-                      ...state,
-                      routes,
-                      index: state.index,
-                    };
-                  });
+                  navigation.navigate('Locations');
                 }
               },
             })}

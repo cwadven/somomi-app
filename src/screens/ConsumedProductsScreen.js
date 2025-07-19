@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -9,7 +9,7 @@ import {
   SafeAreaView
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchConsumedProductsAsync } from '../redux/slices/productsSlice';
 
@@ -19,9 +19,17 @@ const ConsumedProductsScreen = () => {
   
   const { consumedProducts, consumedStatus, error } = useSelector(state => state.products);
   
+  // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
     dispatch(fetchConsumedProductsAsync());
   }, [dispatch]);
+  
+  // 화면에 포커스가 올 때마다 데이터 새로고침
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(fetchConsumedProductsAsync());
+    }, [dispatch])
+  );
   
   // 소진 처리된 날짜 포맷팅
   const formatConsumedDate = (dateString) => {

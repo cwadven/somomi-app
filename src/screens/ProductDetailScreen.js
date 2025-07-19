@@ -276,8 +276,9 @@ const ProductDetailScreen = () => {
                   title: '소진 처리 완료',
                   message: `${productName} 제품이 소진 처리되었습니다.`,
                   onConfirm: () => {
-                    // 모달 닫기만 수행 (화면 이동 없음)
+                    // 모달 닫기 후 이전 화면으로 이동
                     setSuccessModalVisible(false);
+                    navigation.goBack();
                   }
                 });
                 setSuccessModalVisible(true);

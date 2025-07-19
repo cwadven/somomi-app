@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -10,9 +10,11 @@ import {
   SafeAreaView
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchConsumedProductsAsync } from '../redux/slices/productsSlice';
+import { fetchConsumedProductsAsync, restoreConsumedProductAsync } from '../redux/slices/productsSlice';
+import LocationSelectionModal from '../components/LocationSelectionModal';
+import AlertModal from '../components/AlertModal';
 
 const ConsumedProductDetailScreen = () => {
   const route = useRoute();
@@ -20,17 +22,39 @@ const ConsumedProductDetailScreen = () => {
   const dispatch = useDispatch();
   
   const { productId } = route.params;
-  const { consumedProducts, consumedStatus, error } = useSelector(state => state.products);
+  const { consumedProducts, consumedStatus, status, error } = useSelector(state => state.products);
+  const [locationSelectionVisible, setLocationSelectionVisible] = useState(false);
+  
+  // 제품 정보를 로컬 상태로 관리
+  const [localProduct, setLocalProduct] = useState(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+  
+  // 알림 모달 상태
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertModalConfig, setAlertModalConfig] = useState({
+    title: '',
+    message: '',
+    buttons: [],
+    icon: '',
+    iconColor: ''
+  });
   
   // 현재 제품 찾기
-  const currentProduct = consumedProducts.find(product => product.id === productId);
+  const currentProduct = consumedProducts.find(product => product.id === productId) || localProduct;
   
+  // 컴포넌트 마운트 시 한 번만 실행
   useEffect(() => {
     // 소진 처리된 제품 목록이 없으면 로드
     if (consumedProducts.length === 0) {
       dispatch(fetchConsumedProductsAsync());
     }
-  }, [dispatch, consumedProducts.length]);
+    
+    // 현재 제품 정보를 로컬 상태에 저장 (최초 1회)
+    const product = consumedProducts.find(product => product.id === productId);
+    if (product && !localProduct) {
+      setLocalProduct(product);
+    }
+  }, [dispatch]);
   
   // 날짜 포맷팅 함수
   const formatDate = (dateString) => {
@@ -59,8 +83,80 @@ const ConsumedProductDetailScreen = () => {
     return categoryIcons[categoryName] || 'cube-outline';
   };
   
-  // 제품 데이터가 로딩 중일 경우 로딩 화면 표시
-  if (consumedStatus === 'loading') {
+  // 소진 철회 처리 함수
+  const handleRestoreProduct = () => {
+    // 제품에 영역 정보가 있는지 확인
+    if (currentProduct.locationId) {
+      // 소진 철회 전에 현재 제품 정보 저장
+      const productName = currentProduct.name;
+      
+      // 영역 정보가 있으면 바로 소진 철회 처리
+      setAlertModalConfig({
+        title: '소진 철회',
+        message: '이 제품을 소진 철회하시겠습니까?\n제품이 원래 있던 영역으로 복원됩니다.',
+        icon: 'refresh-circle',
+        iconColor: '#2196F3',
+        buttons: [
+          { text: '취소', style: 'cancel' },
+          { 
+            text: '소진 철회', 
+            onPress: () => {
+              setIsRestoring(true);
+              dispatch(restoreConsumedProductAsync({ id: currentProduct.id }))
+                .unwrap()
+                .then(() => {
+                  // 성공 시 바로 이전 화면으로 이동
+                  navigation.goBack();
+                })
+                .catch((error) => {
+                  setIsRestoring(false);
+                  showErrorModal(`소진 철회 중 오류가 발생했습니다: ${error.message}`);
+                });
+            }
+          }
+        ]
+      });
+      setAlertModalVisible(true);
+    } else {
+      // 영역 정보가 없으면 영역 선택 모달 표시
+      setLocationSelectionVisible(true);
+    }
+  };
+  
+  // 영역 선택 후 소진 철회 처리
+  const handleLocationSelect = (location) => {
+    // 소진 철회 전에 현재 제품 정보 저장
+    const productName = currentProduct.name;
+    
+    setIsRestoring(true);
+    dispatch(restoreConsumedProductAsync({ id: currentProduct.id, locationId: location.id }))
+      .unwrap()
+      .then(() => {
+        // 성공 시 바로 이전 화면으로 이동
+        navigation.goBack();
+      })
+      .catch((error) => {
+        setIsRestoring(false);
+        showErrorModal(`소진 철회 중 오류가 발생했습니다: ${error.message}`);
+      });
+  };
+  
+  // 오류 모달 표시
+  const showErrorModal = (message) => {
+    setAlertModalConfig({
+      title: '오류',
+      message,
+      icon: 'alert-circle',
+      iconColor: '#F44336',
+      buttons: [
+        { text: '확인' }
+      ]
+    });
+    setAlertModalVisible(true);
+  };
+  
+  // 제품 데이터가 로딩 중이거나 소진 철회 중일 경우 로딩 화면 표시
+  if (consumedStatus === 'loading' || isRestoring) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
@@ -220,7 +316,34 @@ const ConsumedProductDetailScreen = () => {
             </View>
           )}
         </View>
+        
+        {/* 소진 철회 버튼 */}
+        <TouchableOpacity 
+          style={styles.restoreButton}
+          onPress={handleRestoreProduct}
+        >
+          <Ionicons name="refresh" size={20} color="#fff" style={styles.restoreButtonIcon} />
+          <Text style={styles.restoreButtonText}>소진 철회</Text>
+        </TouchableOpacity>
       </ScrollView>
+      
+      {/* 영역 선택 모달 */}
+      <LocationSelectionModal
+        visible={locationSelectionVisible}
+        onClose={() => setLocationSelectionVisible(false)}
+        onSelectLocation={handleLocationSelect}
+      />
+      
+      {/* 알림 모달 */}
+      <AlertModal
+        visible={alertModalVisible}
+        title={alertModalConfig.title}
+        message={alertModalConfig.message}
+        buttons={alertModalConfig.buttons}
+        icon={alertModalConfig.icon}
+        iconColor={alertModalConfig.iconColor}
+        onClose={() => setAlertModalVisible(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -408,6 +531,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     lineHeight: 20,
+  },
+  restoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2196F3',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  restoreButtonIcon: {
+    marginRight: 8,
+  },
+  restoreButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
 

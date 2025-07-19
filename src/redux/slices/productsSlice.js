@@ -6,7 +6,8 @@ import {
   updateProductApi, 
   deleteProductApi,
   markProductAsConsumedApi,
-  fetchConsumedProductsApi
+  fetchConsumedProductsApi,
+  restoreConsumedProductApi
 } from '../../api/productsApi';
 import { deleteLocation } from './locationsSlice';
 
@@ -90,6 +91,19 @@ export const fetchConsumedProductsAsync = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await fetchConsumedProductsApi();
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// 소진 철회 액션
+export const restoreConsumedProductAsync = createAsyncThunk(
+  'products/restoreConsumed',
+  async ({ id, locationId = null }, { rejectWithValue }) => {
+    try {
+      const response = await restoreConsumedProductApi(id, locationId);
       return response;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -200,10 +214,7 @@ export const productsSlice = createSlice({
         if (!state.consumedProducts.some(p => p.id === action.payload.id)) {
           state.consumedProducts.push(action.payload);
         }
-        // 현재 제품이 소진 처리된 제품이면 초기화
-        if (state.currentProduct && state.currentProduct.id === action.payload.id) {
-          state.currentProduct = null;
-        }
+        // 현재 제품 상태 유지 (null로 설정하지 않음)
       })
       .addCase(markProductAsConsumedAsync.rejected, (state, action) => {
         state.status = 'failed';
@@ -220,6 +231,25 @@ export const productsSlice = createSlice({
       })
       .addCase(fetchConsumedProductsAsync.rejected, (state, action) => {
         state.consumedStatus = 'failed';
+        state.error = action.payload;
+      })
+      
+      // 소진 철회 액션 처리
+      .addCase(restoreConsumedProductAsync.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(restoreConsumedProductAsync.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        // 소진 처리된 제품 목록에서 제거
+        state.consumedProducts = state.consumedProducts.filter(product => product.id !== action.payload.id);
+        // 일반 제품 목록에 추가 (이미 있는 경우 중복 방지)
+        if (!state.products.some(p => p.id === action.payload.id)) {
+          state.products.push(action.payload);
+        }
+        // 현재 제품 상태 유지 (null로 설정하지 않음)
+      })
+      .addCase(restoreConsumedProductAsync.rejected, (state, action) => {
+        state.status = 'failed';
         state.error = action.payload;
       })
       
