@@ -103,46 +103,69 @@ const ProductDetailScreen = () => {
   
   // 소진 처리 함수
   const handleMarkAsConsumed = () => {
+    // 오늘 날짜를 기본값으로 설정
+    setSelectedYear(new Date().getFullYear());
+    setSelectedMonth(new Date().getMonth());
+    setSelectedDay(new Date().getDate());
+    
+    // 소진 처리 모달 표시
     setAlertModalConfig({
       title: '소진 처리',
       message: '이 제품을 소진 처리하시겠습니까?\n소진 처리된 제품은 소진 처리 목록으로 이동합니다.',
+      content: (
+        <View style={styles.consumptionDateContainer}>
+          <Text style={styles.consumptionDateLabel}>소진 날짜</Text>
+          <TouchableOpacity 
+            style={styles.datePickerButton}
+            onPress={() => {
+              // 알림 모달을 닫지 않고 날짜 선택 모달만 표시
+              setDatePickerVisible(true);
+            }}
+          >
+            <Text style={styles.datePickerButtonText}>
+              {`${selectedYear}년 ${selectedMonth + 1}월 ${selectedDay}일`}
+            </Text>
+            <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+          </TouchableOpacity>
+        </View>
+      ),
       buttons: [
         { text: '취소', style: 'cancel' },
         { 
-          text: '날짜 선택', 
-          style: 'default',
-          onPress: () => {
-            // 알림 모달 닫기
-            setAlertModalVisible(false);
-            // 날짜 선택 모달 표시
-            setDatePickerVisible(true);
-          }
-        },
-        { 
-          text: '오늘 소진', 
+          text: '소진 처리', 
           style: 'default',
           onPress: () => {
             // 소진 처리 전에 필요한 정보 저장
             const productName = currentProduct.name;
             
-            // 오늘 날짜로 소진 처리
-            dispatch(markProductAsConsumedAsync({ id: currentProduct.id }))
+            // 선택한 날짜로 소진 처리
+            const date = new Date(selectedYear, selectedMonth, selectedDay);
+            const formattedDate = formatDate(date);
+            
+            // 알림 모달 닫기
+            setAlertModalVisible(false);
+            
+            // 소진 처리 API 호출
+            dispatch(markProductAsConsumedAsync({ 
+              id: currentProduct.id, 
+              consumedDate: date.toISOString() 
+            }))
               .unwrap()
               .then(() => {
-                // 알림 모달 닫기
-                setAlertModalVisible(false);
-                
-                // 성공 모달 설정 및 표시
-                setSuccessModalConfig({
-                  title: '소진 처리 완료',
-                  message: `${productName} 제품이 소진 처리되었습니다.`,
-                  onConfirm: () => {
-                    // 모달 닫기 후 이전 화면으로 이동
-                    setSuccessModalVisible(false);
-                    navigation.goBack();
-                  }
-                });
-                setSuccessModalVisible(true);
+                // 약간의 지연 후 성공 모달 표시 (애니메이션 충돌 방지)
+                setTimeout(() => {
+                  // 성공 모달 설정 및 표시
+                  setSuccessModalConfig({
+                    title: '소진 처리 완료',
+                    message: `${productName} 제품이 ${formattedDate}에 소진 처리되었습니다.`,
+                    onConfirm: () => {
+                      // 모달 닫기 후 이전 화면으로 이동
+                      setSuccessModalVisible(false);
+                      navigation.goBack();
+                    }
+                  });
+                  setSuccessModalVisible(true);
+                }, 300);
               })
               .catch((err) => {
                 showErrorAlert(`소진 처리 중 오류가 발생했습니다: ${err.message}`);
@@ -158,38 +181,30 @@ const ProductDetailScreen = () => {
   
   // 선택한 날짜로 소진 처리
   const handleConfirmDate = () => {
-    // 소진 처리 전에 필요한 정보 저장
-    const productName = currentProduct.name;
-    
-    // 선택한 날짜 생성
-    const date = new Date(selectedYear, selectedMonth, selectedDay);
-    const formattedDate = formatDate(date);
-    
     // 날짜 선택 모달 닫기
     setDatePickerVisible(false);
     
-    // 선택한 날짜로 소진 처리
-    dispatch(markProductAsConsumedAsync({ 
-      id: currentProduct.id, 
-      consumedDate: date.toISOString() 
-    }))
-      .unwrap()
-      .then(() => {
-        // 성공 모달 설정 및 표시
-        setSuccessModalConfig({
-          title: '소진 처리 완료',
-          message: `${productName} 제품이 ${formattedDate}에 소진 처리되었습니다.`,
-          onConfirm: () => {
-            // 모달 닫기 후 이전 화면으로 이동
-            setSuccessModalVisible(false);
-            navigation.goBack();
-          }
-        });
-        setSuccessModalVisible(true);
-      })
-      .catch((err) => {
-        showErrorAlert(`소진 처리 중 오류가 발생했습니다: ${err.message}`);
-      });
+    // 소진 처리 모달의 내용 업데이트
+    setAlertModalConfig(prevConfig => ({
+      ...prevConfig,
+      content: (
+        <View style={styles.consumptionDateContainer}>
+          <Text style={styles.consumptionDateLabel}>소진 날짜</Text>
+          <TouchableOpacity 
+            style={styles.datePickerButton}
+            onPress={() => {
+              // 알림 모달을 닫지 않고 날짜 선택 모달만 표시
+              setDatePickerVisible(true);
+            }}
+          >
+            <Text style={styles.datePickerButtonText}>
+              {`${selectedYear}년 ${selectedMonth + 1}월 ${selectedDay}일`}
+            </Text>
+            <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+          </TouchableOpacity>
+        </View>
+      )
+    }));
   };
   
   // 월별 일수 계산
@@ -238,95 +253,122 @@ const ProductDetailScreen = () => {
         visible={datePickerVisible}
         transparent={true}
         animationType="slide"
+        onRequestClose={() => setDatePickerVisible(false)}
       >
         <View style={styles.datePickerModalOverlay}>
           <View style={styles.datePickerModalContent}>
-            <Text style={styles.datePickerTitle}>소진 날짜 선택</Text>
+            <View style={styles.datePickerHeader}>
+              <Text style={styles.datePickerTitle}>소진 날짜 선택</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setDatePickerVisible(false)}
+              >
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
             
             <View style={styles.datePickerContainer}>
               {/* 년도 선택 */}
               <View style={styles.datePickerColumn}>
                 <Text style={styles.datePickerLabel}>년도</Text>
-                <ScrollView style={styles.datePickerScroll}>
-                  {years.map((year) => (
-                    <TouchableOpacity
-                      key={`year-${year}`}
-                      style={[
-                        styles.datePickerOption,
-                        selectedYear === year && styles.datePickerOptionSelected
-                      ]}
-                      onPress={() => setSelectedYear(year)}
-                    >
-                      <Text
+                <View style={styles.datePickerScrollWrapper}>
+                  <ScrollView 
+                    style={styles.datePickerScroll}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {years.map((year) => (
+                      <TouchableOpacity
+                        key={`year-${year}`}
                         style={[
-                          styles.datePickerOptionText,
-                          selectedYear === year && styles.datePickerOptionTextSelected
+                          styles.datePickerOption,
+                          selectedYear === year && styles.datePickerOptionSelected
                         ]}
+                        onPress={() => setSelectedYear(year)}
                       >
-                        {year}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                        <Text
+                          style={[
+                            styles.datePickerOptionText,
+                            selectedYear === year && styles.datePickerOptionTextSelected
+                          ]}
+                        >
+                          {year}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  <View style={styles.datePickerSelector} />
+                </View>
               </View>
               
               {/* 월 선택 */}
               <View style={styles.datePickerColumn}>
                 <Text style={styles.datePickerLabel}>월</Text>
-                <ScrollView style={styles.datePickerScroll}>
-                  {months.map((monthName, index) => (
-                    <TouchableOpacity
-                      key={`month-${index}`}
-                      style={[
-                        styles.datePickerOption,
-                        selectedMonth === index && styles.datePickerOptionSelected
-                      ]}
-                      onPress={() => {
-                        setSelectedMonth(index);
-                        // 일수가 변경될 수 있으므로 선택한 일이 유효한지 확인
-                        const daysInNewMonth = getDaysInMonth(selectedYear, index);
-                        if (selectedDay > daysInNewMonth) {
-                          setSelectedDay(daysInNewMonth);
-                        }
-                      }}
-                    >
-                      <Text
+                <View style={styles.datePickerScrollWrapper}>
+                  <ScrollView 
+                    style={styles.datePickerScroll}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {months.map((monthName, index) => (
+                      <TouchableOpacity
+                        key={`month-${index}`}
                         style={[
-                          styles.datePickerOptionText,
-                          selectedMonth === index && styles.datePickerOptionTextSelected
+                          styles.datePickerOption,
+                          selectedMonth === index && styles.datePickerOptionSelected
                         ]}
+                        onPress={() => {
+                          setSelectedMonth(index);
+                          // 일수가 변경될 수 있으므로 선택한 일이 유효한지 확인
+                          const daysInNewMonth = getDaysInMonth(selectedYear, index);
+                          if (selectedDay > daysInNewMonth) {
+                            setSelectedDay(daysInNewMonth);
+                          }
+                        }}
                       >
-                        {monthName}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                        <Text
+                          style={[
+                            styles.datePickerOptionText,
+                            selectedMonth === index && styles.datePickerOptionTextSelected
+                          ]}
+                        >
+                          {monthName}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  <View style={styles.datePickerSelector} />
+                </View>
               </View>
               
               {/* 일 선택 */}
               <View style={styles.datePickerColumn}>
                 <Text style={styles.datePickerLabel}>일</Text>
-                <ScrollView style={styles.datePickerScroll}>
-                  {days.map((day) => (
-                    <TouchableOpacity
-                      key={`day-${day}`}
-                      style={[
-                        styles.datePickerOption,
-                        selectedDay === day && styles.datePickerOptionSelected
-                      ]}
-                      onPress={() => setSelectedDay(day)}
-                    >
-                      <Text
+                <View style={styles.datePickerScrollWrapper}>
+                  <ScrollView 
+                    style={styles.datePickerScroll}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {days.map((day) => (
+                      <TouchableOpacity
+                        key={`day-${day}`}
                         style={[
-                          styles.datePickerOptionText,
-                          selectedDay === day && styles.datePickerOptionTextSelected
+                          styles.datePickerOption,
+                          selectedDay === day && styles.datePickerOptionSelected
                         ]}
+                        onPress={() => setSelectedDay(day)}
                       >
-                        {day}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                        <Text
+                          style={[
+                            styles.datePickerOptionText,
+                            selectedDay === day && styles.datePickerOptionTextSelected
+                          ]}
+                        >
+                          {day}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  <View style={styles.datePickerSelector} />
+                </View>
               </View>
             </View>
             
@@ -732,6 +774,7 @@ const ProductDetailScreen = () => {
     </ScrollView>
   );
 
+  // 제품 상세 화면 렌더링
   return (
     <View style={styles.mainContainer}>
       {/* 탭 메뉴 */}
@@ -766,14 +809,14 @@ const ProductDetailScreen = () => {
           </Text>
         </TouchableOpacity>
       </View>
-      
+
       {/* 탭 내용 */}
       {activeTab === 'details' ? (
         renderProductDetails()
       ) : (
         renderNotificationsTab()
       )}
-      
+
       {/* 하단 액션 버튼 */}
       <View style={styles.bottomActionBar}>
         <TouchableOpacity 
@@ -801,10 +844,12 @@ const ProductDetailScreen = () => {
         </TouchableOpacity>
       </View>
       
+      {/* 알림 모달 */}
       <AlertModal
         visible={alertModalVisible}
         title={alertModalConfig.title}
         message={alertModalConfig.message}
+        content={alertModalConfig.content}
         buttons={alertModalConfig.buttons}
         onClose={() => setAlertModalVisible(false)}
         icon={alertModalConfig.icon}
@@ -834,7 +879,7 @@ const ProductDetailScreen = () => {
           </View>
         </View>
       </Modal>
-
+      
       {/* 날짜 선택 모달 */}
       {renderDatePicker()}
     </View>
@@ -1286,10 +1331,19 @@ const styles = StyleSheet.create({
     width: '90%',
     alignItems: 'center',
   },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 15,
+  },
+  closeButton: {
+    padding: 5,
+  },
   datePickerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 15,
     color: '#333',
   },
   datePickerContainer: {
@@ -1298,6 +1352,19 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 15,
     height: 200,
+  },
+  datePickerScrollWrapper: {
+    position: 'relative',
+    width: '100%',
+    height: 150,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  datePickerScroll: {
+    width: '100%',
+    height: 150,
   },
   datePickerColumn: {
     flex: 1,
@@ -1310,13 +1377,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: '600',
   },
-  datePickerScroll: {
-    width: '100%',
-    height: 150,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-  },
   datePickerOption: {
     paddingVertical: 10,
     paddingHorizontal: 15,
@@ -1324,6 +1384,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+    height: 40, // 고정 높이 설정
   },
   datePickerOptionSelected: {
     backgroundColor: '#4CAF50',
@@ -1351,9 +1412,16 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   datePickerButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0f0f0',
     borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    marginTop: 5,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   datePickerCancelButton: {
     backgroundColor: '#E0E0E0',
@@ -1370,6 +1438,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  consumptionDateContainer: {
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  consumptionDateLabel: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  datePickerButtonText: {
+    fontSize: 16,
+    color: '#333',
+    marginRight: 8,
+  },
+  datePickerSelector: {
+    display: 'none', // 선택 표시선 숨기기
   },
 });
 

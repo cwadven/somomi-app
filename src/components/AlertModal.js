@@ -2,7 +2,7 @@ import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const AlertModal = ({ visible, title, message, onClose, buttons, icon, iconColor }) => {
+const AlertModal = ({ visible, title, message, content, onClose, buttons, icon, iconColor }) => {
   // 버튼이 제공되지 않은 경우 기본 확인 버튼 사용
   const renderButtons = () => {
     if (buttons && buttons.length > 0) {
@@ -64,6 +64,10 @@ const AlertModal = ({ visible, title, message, onClose, buttons, icon, iconColor
           )}
           <Text style={styles.modalTitle}>{title || '알림'}</Text>
           <Text style={styles.modalText}>{message}</Text>
+          
+          {/* 커스텀 콘텐츠 영역 */}
+          {content && <View style={styles.contentContainer}>{content}</View>}
+          
           <View style={styles.buttonContainer}>
             {renderButtons()}
           </View>
@@ -109,6 +113,10 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  contentContainer: {
+    width: '100%',
+    marginBottom: 15,
   },
   buttonContainer: {
     flexDirection: 'row',
