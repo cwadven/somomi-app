@@ -474,17 +474,6 @@ const ProductDetailScreen = () => {
             </View>
           )}
         </View>
-        
-        {/* 버튼 섹션 */}
-        <View style={styles.buttonSection}>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.consumedButton]}
-            onPress={handleMarkAsConsumed}
-          >
-            <Ionicons name="checkmark-circle-outline" size={24} color="#fff" />
-            <Text style={styles.actionButtonText}>소진 처리</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     );
   };
@@ -555,10 +544,10 @@ const ProductDetailScreen = () => {
         
         <TouchableOpacity 
           style={styles.bottomActionButton}
-          onPress={handleNotification}
+          onPress={handleMarkAsConsumed}
         >
-          <Ionicons name="notifications-outline" size={24} color="#FF9800" />
-          <Text style={styles.bottomActionText}>알림</Text>
+          <Ionicons name="checkmark-circle-outline" size={24} color="#FF9800" />
+          <Text style={styles.bottomActionText}>소진 처리</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
