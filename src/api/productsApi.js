@@ -192,7 +192,7 @@ export const deleteProductApi = async (id) => {
 };
 
 // 소진 처리 API 함수
-export const markProductAsConsumedApi = async (id) => {
+export const markProductAsConsumedApi = async (id, consumedDate = null) => {
   try {
     // 저장된 최신 데이터 로드
     const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
@@ -208,7 +208,8 @@ export const markProductAsConsumedApi = async (id) => {
       const product = { ...sampleProducts[index] };
       
       // 소진 처리 정보 추가
-      product.consumedAt = new Date().toISOString();
+      // 소진 날짜가 제공되면 해당 날짜 사용, 아니면 현재 날짜 사용
+      product.consumedAt = consumedDate || new Date().toISOString();
       product.isConsumed = true;
       
       // 일반 제품 목록에서 제거

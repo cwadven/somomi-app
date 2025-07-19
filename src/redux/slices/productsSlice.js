@@ -75,9 +75,9 @@ export const deleteProductAsync = createAsyncThunk(
 // 소진 처리 액션
 export const markProductAsConsumedAsync = createAsyncThunk(
   'products/markAsConsumed',
-  async (id, { rejectWithValue }) => {
+  async ({ id, consumedDate = null }, { rejectWithValue }) => {
     try {
-      const response = await markProductAsConsumedApi(id);
+      const response = await markProductAsConsumedApi(id, consumedDate);
       return response;
     } catch (error) {
       return rejectWithValue(error.message);
