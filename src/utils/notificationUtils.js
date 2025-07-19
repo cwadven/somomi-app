@@ -224,9 +224,10 @@ export const createEstimatedNotification = (product, location, daysBeforeTarget,
 
 /**
  * 모든 알림을 처리하고 보낼 알림 목록을 생성하는 함수
+ * @param {boolean} skipSending - true일 경우 알림 전송을 건너뜁니다.
  * @returns {Promise<Array>} 알림 정보 배열
  */
-export const processAllNotifications = async () => {
+export const processAllNotifications = async (skipSending = false) => {
   try {
     // 1. 필요한 데이터 로드
     const notifications = await loadData(STORAGE_KEYS.NOTIFICATIONS) || [];
@@ -244,8 +245,8 @@ export const processAllNotifications = async () => {
     if (notificationsToSend.length > 0) {
       await saveProcessedNotifications(notificationsToSend);
       
-      // 웹 환경이 아닌 경우에만 알림 전송
-      if (Platform.OS !== 'web') {
+      // 웹 환경이 아니고 skipSending이 false인 경우에만 알림 전송
+      if (Platform.OS !== 'web' && !skipSending) {
         await sendNotifications(notificationsToSend);
       }
     }

@@ -10,23 +10,30 @@ import {
   Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { loadAllProcessedNotifications, loadProcessedNotifications } from '../utils/notificationUtils';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { loadAllProcessedNotifications, loadProcessedNotifications, processAllNotifications } from '../utils/notificationUtils';
 
 const NotificationsScreen = () => {
   const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
   const [dates, setDates] = useState([]);
 
-  // 컴포넌트 마운트 시 알림 데이터 로드
-  useEffect(() => {
-    loadNotificationsData();
-  }, []);
+  // 화면이 포커스를 받을 때마다 알림 데이터 로드
+  useFocusEffect(
+    React.useCallback(() => {
+      loadNotificationsData();
+    }, [])
+  );
 
   // 알림 데이터 로드 함수
   const loadNotificationsData = async () => {
     try {
       setLoading(true);
+      
+      // 알림 처리 실행 (새로운 알림 생성 및 저장, 알림 전송은 건너뜀)
+      await processAllNotifications(true);
+      
+      // 저장된 모든 알림 로드
       const allNotifications = await loadAllProcessedNotifications();
       
       // 날짜 목록 추출 및 내림차순 정렬

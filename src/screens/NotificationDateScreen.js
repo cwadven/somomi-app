@@ -1,19 +1,43 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  SafeAreaView
+  SafeAreaView,
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { loadProcessedNotifications } from '../utils/notificationUtils';
 
 const NotificationDateScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { date, notifications, formattedDate } = route.params;
+  const { date, formattedDate } = route.params;
+  
+  const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
+
+  // 컴포넌트 마운트 시 해당 날짜의 최신 알림 데이터 로드
+  useEffect(() => {
+    loadDateNotifications();
+  }, [date]);
+
+  // 해당 날짜의 알림 데이터 로드 함수
+  const loadDateNotifications = async () => {
+    try {
+      setLoading(true);
+      // 해당 날짜의 최신 알림 데이터 로드
+      const dateNotifications = await loadProcessedNotifications(date);
+      setNotifications(dateNotifications);
+      setLoading(false);
+    } catch (error) {
+      console.error('알림 데이터 로드 중 오류 발생:', error);
+      setLoading(false);
+    }
+  };
 
   // 알림 상세 화면으로 이동
   const navigateToNotificationDetail = (notification) => {
@@ -77,20 +101,26 @@ const NotificationDateScreen = () => {
         <View style={styles.headerRight} />
       </View>
 
-      <FlatList
-        data={notifications}
-        keyExtractor={(item, index) => `notification-${index}`}
-        renderItem={renderNotificationItem}
-        contentContainerStyle={styles.notificationsList}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="notifications-off-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>
-              {`${formattedDate}에 알림이 없습니다.`}
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+        </View>
+      ) : (
+        <FlatList
+          data={notifications}
+          keyExtractor={(item, index) => `notification-${index}`}
+          renderItem={renderNotificationItem}
+          contentContainerStyle={styles.notificationsList}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="notifications-off-outline" size={64} color="#ccc" />
+              <Text style={styles.emptyText}>
+                {`${formattedDate}에 알림이 없습니다.`}
+              </Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -119,6 +149,11 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 32,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   notificationsList: {
     padding: 16,
