@@ -15,31 +15,26 @@ import { Ionicons } from '@expo/vector-icons';
  * @param {Object} selectedLocation - 현재 선택된 영역
  * @param {Function} onSelectLocation - 영역 선택 시 호출되는 함수
  * @param {Function} onAddLocation - 영역 추가 버튼 클릭 시 호출되는 함수
- * @param {String} status - 영역 로딩 상태 ('idle', 'loading', 'succeeded', 'failed')
- * @param {Boolean} isRequired - 필수 필드 여부
- * @param {String} errorMessage - 에러 메시지
- * @param {Boolean} showError - 에러 표시 여부
- * @param {Object} ref - FlatList에 대한 참조
+ * @param {Boolean} isLoading - 영역 로딩 중 여부
+ * @param {Function} onRetry - 로드 재시도 함수
+ * @param {String} error - 에러 메시지
  */
 const LocationSelector = forwardRef(({ 
   locations = [], 
   selectedLocation, 
   onSelectLocation, 
   onAddLocation,
-  status = 'idle',
-  isRequired = false,
-  errorMessage = '',
-  showError = false
+  isLoading = false,
+  onRetry,
+  error = ''
 }, ref) => {
   return (
     <View style={styles.locationsContainer}>
-      <View style={styles.labelContainer}>
-        <Text style={styles.sectionTitle}>영역</Text>
-        {isRequired && <Text style={styles.requiredMark}>*</Text>}
-      </View>
-      
-      {status === 'loading' ? (
-        <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
+      {isLoading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
+          <Text style={styles.loaderText}>영역 정보를 불러오는 중...</Text>
+        </View>
       ) : locations.length > 0 ? (
         <>
           <FlatList
@@ -55,7 +50,7 @@ const LocationSelector = forwardRef(({
                 style={[
                   styles.locationChip,
                   selectedLocation?.id === item.id && styles.selectedLocationChip,
-                  showError && !selectedLocation && styles.locationChipError
+                  error && !selectedLocation && styles.locationChipError
                 ]}
                 onPress={() => onSelectLocation(item)}
               >
@@ -85,19 +80,31 @@ const LocationSelector = forwardRef(({
               </TouchableOpacity>
             }
           />
-          {showError && errorMessage ? (
-            <Text style={styles.errorText}>{errorMessage}</Text>
+          {error ? (
+            <Text style={styles.errorText}>{error}</Text>
           ) : null}
         </>
       ) : (
         <View style={styles.emptyLocations}>
           <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
-          <TouchableOpacity
-            style={styles.addLocationButton}
-            onPress={onAddLocation}
-          >
-            <Text style={styles.addLocationButtonText}>영역 추가하기</Text>
-          </TouchableOpacity>
+          <View style={styles.emptyButtonsContainer}>
+            <TouchableOpacity
+              style={styles.addLocationButton}
+              onPress={onAddLocation}
+            >
+              <Text style={styles.addLocationButtonText}>영역 추가하기</Text>
+            </TouchableOpacity>
+            
+            {onRetry && (
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={onRetry}
+              >
+                <Ionicons name="refresh" size={16} color="#fff" style={styles.retryIcon} />
+                <Text style={styles.retryButtonText}>다시 로드</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
     </View>
@@ -109,24 +116,7 @@ LocationSelector.displayName = 'LocationSelector';
 
 const styles = StyleSheet.create({
   locationsContainer: {
-    marginBottom: 20,
-  },
-  labelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  requiredMark: {
-    color: 'red',
-    fontWeight: 'bold',
-    marginLeft: 4,
-    fontSize: 16,
+    marginBottom: 10,
   },
   locationFlatList: {
     minHeight: 80,
@@ -208,19 +198,49 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 10,
   },
+  emptyButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
   addLocationButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 24,
+    marginRight: 10,
   },
   addLocationButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
+  retryButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  retryIcon: {
+    marginRight: 6,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loaderContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
   loader: {
-    marginVertical: 16,
+    marginBottom: 10,
+  },
+  loaderText: {
+    fontSize: 14,
+    color: '#666',
   },
   errorText: {
     color: 'red',

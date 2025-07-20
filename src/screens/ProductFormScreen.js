@@ -83,7 +83,6 @@ const ProductFormScreen = () => {
   // 스크롤 뷰 참조
   const scrollViewRef = useRef(null);
   const productNameInputRef = useRef(null);
-  const locationSectionRef = useRef(null);
   const purchaseDateSectionRef = useRef(null);
   const categoryListRef = useRef(null);
   
@@ -103,14 +102,10 @@ const ProductFormScreen = () => {
 
   // 카테고리 및 영역 데이터 로드
   useEffect(() => {
-    if (categoriesStatus === 'idle') {
-      dispatch(fetchCategories());
-    }
-    
-    if (locationsStatus === 'idle') {
-      dispatch(fetchLocations());
-    }
-  }, [dispatch, categoriesStatus, locationsStatus]);
+    dispatch(fetchCategories());
+    dispatch(fetchLocations());
+    dispatch(fetchProducts());
+  }, [dispatch]);
 
   // 수정 모드인 경우 제품 데이터 로드
   useEffect(() => {
@@ -159,22 +154,32 @@ const ProductFormScreen = () => {
 
   // 초기 선택된 영역 설정 및 해당 영역의 제품 개수 확인 (추가 모드)
   useEffect(() => {
-    if (!isEditMode && locationId && locations.length > 0) {
-      const location = locations.find(loc => loc.id === locationId);
-      if (location) {
-        setSelectedLocation(location);
-        
-        // 해당 영역의 제품 목록 필터링
-        const productsInLocation = allProducts && allProducts.filter(p => p.locationId === locationId) || [];
-        setCurrentLocationProducts(productsInLocation);
-        
-        // 비회원이고 제품이 5개 이상인 경우 회원가입 유도 모달 표시
-        if (!isAuthenticated && productsInLocation.length >= 5) {
-          setShowSignupPrompt(true);
+    if (!isEditMode && locationId) {
+      if (locations.length > 0) {
+        const location = locations.find(loc => loc.id === locationId);
+        if (location) {
+          setSelectedLocation(location);
+          
+          // 해당 영역의 제품 목록 필터링
+          const productsInLocation = allProducts && allProducts.filter(p => p.locationId === locationId) || [];
+          setCurrentLocationProducts(productsInLocation);
+          
+          // 비회원이고 제품이 5개 이상인 경우 회원가입 유도 모달 표시
+          if (!isAuthenticated && productsInLocation.length >= 5) {
+            setShowSignupPrompt(true);
+          }
+        } else {
+          // 영역을 찾지 못한 경우 다시 로드 시도
+          console.log('영역을 찾지 못했습니다. 다시 로드합니다:', locationId);
+          dispatch(fetchLocations());
         }
+      } else {
+        // 영역 데이터가 없는 경우 다시 로드 시도
+        console.log('영역 데이터가 없습니다. 다시 로드합니다.');
+        dispatch(fetchLocations());
       }
     }
-  }, [isEditMode, locationId, locations, allProducts, isAuthenticated]);
+  }, [isEditMode, locationId, locations, allProducts, isAuthenticated, dispatch]);
 
   // 카테고리 추가 모달 열기
   const handleOpenCategoryModal = () => {
@@ -318,11 +323,6 @@ const ProductFormScreen = () => {
           errorMessage = '제품명을 입력해주세요';
         }
         break;
-      case 'location':
-        if (!value) {
-          errorMessage = '영역을 선택해주세요';
-        }
-        break;
       case 'purchaseDate':
         if (!value) {
           errorMessage = '구매일을 선택해주세요';
@@ -340,9 +340,6 @@ const ProductFormScreen = () => {
     switch (name) {
       case 'productName':
         setProductName(value);
-        break;
-      case 'location':
-        setSelectedLocation(value);
         break;
       case 'purchaseDate':
         setPurchaseDate(value);
@@ -379,16 +376,6 @@ const ProductFormScreen = () => {
             });
           }
           break;
-        case 'location':
-          if (locationSectionRef.current) {
-            locationSectionRef.current.measure((fx, fy, width, height, px, py) => {
-              scrollViewRef.current.scrollTo({
-                y: py - 50,
-                animated: true
-              });
-            });
-          }
-          break;
         case 'purchaseDate':
           if (purchaseDateSectionRef.current) {
             purchaseDateSectionRef.current.measure((fx, fy, width, height, px, py) => {
@@ -409,7 +396,6 @@ const ProductFormScreen = () => {
   const isFormValid = () => {
     const newErrors = {
       productName: validateField('productName', productName),
-      location: validateField('location', selectedLocation),
       purchaseDate: validateField('purchaseDate', purchaseDate)
     };
     
@@ -417,7 +403,6 @@ const ProductFormScreen = () => {
     
     setTouched({
       productName: true,
-      location: true,
       purchaseDate: true
     });
     
@@ -426,25 +411,17 @@ const ProductFormScreen = () => {
     if (hasErrors) {
       if (newErrors.productName) {
         scrollToField('productName');
-      } else if (newErrors.location) {
-        scrollToField('location');
       } else if (newErrors.purchaseDate) {
         scrollToField('purchaseDate');
       }
     }
     
-    // 영역이 존재하는지 확인
-    if (locations.length === 0) {
+    // 영역이 존재하는지 확인 (추가 모드에서는 이미 선택된 영역이 있어야 함)
+    if (!selectedLocation) {
       Alert.alert(
         '알림',
-        '등록된 영역이 없습니다. 영역을 먼저 등록해주세요.',
-        [
-          { text: '취소', style: 'cancel' },
-          { 
-            text: '영역 등록하기', 
-            onPress: () => navigation.navigate('AddLocation')
-          }
-        ]
+        '현재 영역 정보를 찾을 수 없습니다. 다시 시도해주세요.',
+        [{ text: '확인', style: 'cancel' }]
       );
       return false;
     }
@@ -743,19 +720,6 @@ const ProductFormScreen = () => {
           onSelectCategory={setSelectedCategory} 
           onAddCategory={handleOpenCategoryModal}
           status={categoriesStatus}
-        />
-        
-        {/* 영역 선택 */}
-        <LocationSelector
-          ref={locationSectionRef}
-          locations={locations}
-          selectedLocation={selectedLocation}
-          onSelectLocation={(location) => handleFieldChange('location', location)}
-          onAddLocation={handleAddLocation}
-          status={locationsStatus}
-          isRequired={true}
-          errorMessage={errors.location}
-          showError={touched.location}
         />
         
         {/* 구매일 선택 */}
@@ -1100,6 +1064,33 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  formGroup: {
+    marginBottom: 20,
+  },
+  selectedLocationContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  selectedLocationContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  selectedLocationIcon: {
+    marginRight: 8,
+  },
+  selectedLocationText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  noLocationText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 
