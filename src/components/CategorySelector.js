@@ -45,7 +45,14 @@ const CategorySelector = forwardRef(({
                 styles.categoryChip,
                 selectedCategory?.id === item.id && styles.selectedCategoryChip
               ]}
-              onPress={() => onSelectCategory(item)}
+              onPress={() => {
+                // 이미 선택된 카테고리를 다시 선택하면 선택 해제
+                if (selectedCategory?.id === item.id) {
+                  onSelectCategory(null);
+                } else {
+                  onSelectCategory(item);
+                }
+              }}
             >
               <Text
                 style={[

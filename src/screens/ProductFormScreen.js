@@ -449,7 +449,7 @@ const ProductFormScreen = () => {
           name: productName,
           brand: brand,
           categoryId: selectedCategory ? selectedCategory.id : null,
-          category: selectedCategory,
+          category: selectedCategory || null,
           locationId: selectedLocation.id,
           purchaseDate: purchaseDate.toISOString(),
           expiryDate: expiryDate ? expiryDate.toISOString() : null,
@@ -470,7 +470,7 @@ const ProductFormScreen = () => {
         const productData = {
           name: productName,
           brand: brand,
-          category: selectedCategory,
+          category: selectedCategory || null,
           categoryId: selectedCategory?.id || null,
           locationId: selectedLocation?.id || null,
           purchaseDate: purchaseDate ? purchaseDate.toISOString() : new Date().toISOString(),
