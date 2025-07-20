@@ -248,7 +248,14 @@ export const fetchConsumedProductsApi = async () => {
       consumedProducts = storedConsumedProducts;
     }
     
-    return [...consumedProducts]; // 배열 복사본 반환
+    // 소진 처리일(consumedAt) 기준으로 최신순 정렬
+    const sortedConsumedProducts = [...consumedProducts].sort((a, b) => {
+      const dateA = a.consumedAt ? new Date(a.consumedAt).getTime() : 0;
+      const dateB = b.consumedAt ? new Date(b.consumedAt).getTime() : 0;
+      return dateB - dateA; // 내림차순 정렬 (최신순)
+    });
+    
+    return sortedConsumedProducts;
   } catch (error) {
     console.error('소진 제품 조회 중 오류 발생:', error);
     throw new Error('Failed to fetch consumed products');

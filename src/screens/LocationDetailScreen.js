@@ -507,7 +507,7 @@ const LocationDetailScreen = () => {
       <SignupPromptModal 
         visible={showSignupPrompt}
         onClose={() => setShowSignupPrompt(false)}
-        message="비회원은 영역당 최대 5개의 제품만 등록할 수 있습니다. 회원가입하여 더 많은 제품을 등록하세요!"
+        message="회원 가입하여 더 많은 제품을 등록하세요."
       />
     </View>
   );
