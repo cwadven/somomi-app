@@ -20,6 +20,7 @@ import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
 import ProductCard from '../components/ProductCard';
 import { checkAnonymousLimits } from '../utils/authUtils';
+import SlotStatusBar from '../components/SlotStatusBar';
 
 const LocationDetailScreen = () => {
   const dispatch = useDispatch();
@@ -40,6 +41,13 @@ const LocationDetailScreen = () => {
     iconColor: '',
   });
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  
+  // 제품 슬롯 상태 추가
+  const [productSlots, setProductSlots] = useState({
+    used: 0,
+    total: 3, // 기본값
+    available: true
+  });
   
   const { locations, status: locationStatus } = useSelector(state => state.locations);
   const { products, status: productStatus } = useSelector(state => state.products);
@@ -62,6 +70,25 @@ const LocationDetailScreen = () => {
       }
     }, [dispatch, locationId, isAllProducts])
   );
+  
+  // 슬롯 정보 업데이트
+  useEffect(() => {
+    if (!isAllProducts && products && locationId) {
+      // filteredProducts를 직접 사용하지 않고 여기서 필터링
+      const currentProducts = products.filter(product => 
+        product.locationId === locationId && !product.isConsumed
+      );
+      
+      const usedSlots = currentProducts.length;
+      const totalSlots = isAnonymous ? 5 : 30; // 비회원 5개, 회원 30개 (예시)
+      
+      setProductSlots({
+        used: usedSlots,
+        total: totalSlots,
+        available: usedSlots < totalSlots
+      });
+    }
+  }, [products, locationId, isAnonymous, isAllProducts]);
 
   // 영역 목록으로 돌아가기
   const handleBackToLocations = () => {
@@ -69,13 +96,30 @@ const LocationDetailScreen = () => {
   };
   
   const handleAddProduct = () => {
-    // 비회원 제한 확인
-    if (isAnonymous && filteredProducts.length >= 5) {
-      setShowSignupPrompt(true);
+    // 슬롯이 없으면 구독/구매 유도
+    if (!productSlots.available) {
+      // 비회원인 경우 회원가입 유도
+      if (isAnonymous) {
+        setShowSignupPrompt(true);
+        return;
+      }
+      
+      // 회원인 경우 구독/구매 유도
+      Alert.alert(
+        '슬롯 부족',
+        '제품 슬롯이 부족합니다. 구독하거나 추가 슬롯을 구매하세요.',
+        [
+          { text: '취소', style: 'cancel' },
+          { 
+            text: '구독 정보', 
+            onPress: () => navigation.navigate('Profile') // 프로필 또는 구독 화면으로 이동
+          }
+        ]
+      );
       return;
     }
     
-            navigation.navigate('ProductForm', { mode: 'add', locationId });
+    navigation.navigate('ProductForm', { mode: 'add', locationId });
   };
   
   const handleProductPress = (productId) => {
@@ -127,7 +171,8 @@ const LocationDetailScreen = () => {
     setAlertModalVisible(true);
   };
   
-  const renderItem = ({ item }) => {
+  // 제품 카드 렌더링
+  const renderProductCard = ({ item }) => {
     // 모든 제품 화면에서는 영역 이름을 표시
     const locationItem = isAllProducts ? 
       locations.find(loc => loc.id === item.locationId) : null;
@@ -142,6 +187,8 @@ const LocationDetailScreen = () => {
       />
     );
   };
+  
+  // 슬롯 사용률 계산을 위한 값만 유지 (availableSlots 변수 제거)
   
   const DeleteConfirmModal = () => (
     <Modal
@@ -196,6 +243,57 @@ const LocationDetailScreen = () => {
   
   const title = isAllProducts ? '모든 제품' : currentLocation?.title || '영역 상세';
 
+  // 제품 슬롯 그리드 렌더링
+  const renderProductSlots = () => {
+    if (isAllProducts) {
+      // 모든 제품 화면에서는 일반 리스트로 표시
+      return (
+        <FlatList
+          data={filteredProducts}
+          renderItem={renderProductCard}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
+              <Text style={styles.emptySubText}>
+                특정 영역에서 제품을 추가할 수 있습니다.
+              </Text>
+            </View>
+          }
+        />
+      );
+    }
+    
+    // 특정 영역 화면에서는 리스트로 표시 (기존 디자인 사용)
+    return (
+      <View style={styles.content}>
+        <FlatList
+          data={filteredProducts}
+          renderItem={renderProductCard}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
+              <Text style={styles.emptySubText}>
+                오른쪽 하단의 + 버튼을 눌러 제품을 추가하세요.
+              </Text>
+            </View>
+          }
+        />
+        
+        {/* 제품 추가 버튼 */}
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={handleAddProduct}
+        >
+          <Ionicons name="add" size={30} color="white" />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -242,107 +340,64 @@ const LocationDetailScreen = () => {
           )}
         </View>
         
-        {/* 비회원 사용자의 경우 제품 개수 표시 */}
-        {isAnonymous && !isAllProducts && (
-          <View style={styles.limitInfoContainer}>
-            <Text style={styles.limitInfoText}>
-              비회원은 영역당 최대 5개의 제품만 등록할 수 있습니다. ({filteredProducts.length}/5)
-            </Text>
-          </View>
+        {/* 슬롯 상태 표시 (특정 영역 화면에서만) */}
+        {!isAllProducts && (
+          <SlotStatusBar 
+            used={productSlots.used} 
+            total={productSlots.total} 
+            type="product" 
+          />
         )}
         
-        {/* 탭 메뉴 (제품 목록 / 알림 설정) */}
-        {!isAllProducts && (
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[
-                styles.tabButton,
-                activeTab === 'products' && styles.activeTabButton
-              ]}
-              onPress={() => setActiveTab('products')}
-            >
-              <Text style={[
-                styles.tabButtonText,
-                activeTab === 'products' && styles.activeTabButtonText
-              ]}>
-                제품 목록
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.tabButton,
-                activeTab === 'notifications' && styles.activeTabButton
-              ]}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'products' && styles.activeTab]}
+            onPress={() => setActiveTab('products')}
+          >
+            <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
+              제품 목록
+            </Text>
+          </TouchableOpacity>
+          {!isAllProducts && (
+            <TouchableOpacity 
+              style={[styles.tab, activeTab === 'notifications' && styles.activeTab]}
               onPress={() => setActiveTab('notifications')}
             >
-              <Text style={[
-                styles.tabButtonText,
-                activeTab === 'notifications' && styles.activeTabButtonText
-              ]}>
+              <Text style={[styles.tabText, activeTab === 'notifications' && styles.activeTabText]}>
                 알림 설정
               </Text>
             </TouchableOpacity>
-          </View>
+          )}
+        </View>
+      </View>
+      
+      <View style={styles.content}>
+        {activeTab === 'products' ? (
+          renderProductSlots()
+        ) : (
+          <ScrollView style={styles.scrollContainer}>
+            {currentLocation && (
+              <LocationNotificationSettings locationId={locationId} />
+            )}
+          </ScrollView>
         )}
       </View>
       
-      {activeTab === 'products' ? (
-        <>
-          <FlatList
-            data={filteredProducts}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={styles.listContainer}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
-                <Text style={styles.emptySubText}>
-                  {!isAllProducts ? '오른쪽 하단의 + 버튼을 눌러 제품을 추가하세요.' : '특정 영역에서 제품을 추가할 수 있습니다.'}
-                </Text>
-              </View>
-            }
-          />
-          
-          {!isAllProducts && (
-            <TouchableOpacity 
-              style={[
-                styles.addButton,
-                // 비회원이고 제품이 5개 이상이면 버튼 비활성화 스타일 적용
-                isAnonymous && filteredProducts.length >= 5 && styles.disabledAddButton
-              ]}
-              onPress={handleAddProduct}
-            >
-              <Ionicons name="add" size={30} color="white" />
-            </TouchableOpacity>
-          )}
-        </>
-      ) : (
-        <ScrollView style={styles.scrollContainer}>
-          <LocationNotificationSettings 
-            locationId={locationId}
-            location={currentLocation}
-          />
-        </ScrollView>
-      )}
-      
-      <DeleteConfirmModal />
-      
-      <AlertModal
+      <AlertModal 
         visible={alertModalVisible}
         title={alertModalConfig.title}
         message={alertModalConfig.message}
         buttons={alertModalConfig.buttons}
-        onClose={() => setAlertModalVisible(false)}
         icon={alertModalConfig.icon}
         iconColor={alertModalConfig.iconColor}
       />
       
-      {/* 회원가입 유도 모달 */}
+      <DeleteConfirmModal />
+      
       <SignupPromptModal 
         visible={showSignupPrompt}
         onClose={() => setShowSignupPrompt(false)}
-        message="비회원은 영역당 최대 5개의 제품만 등록할 수 있습니다. 회원가입하여 무제한으로 제품을 등록하세요!"
+        message="비회원은 영역당 최대 5개의 제품만 등록할 수 있습니다. 회원가입하여 더 많은 제품을 등록하세요!"
       />
     </View>
   );
@@ -353,28 +408,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f8f8',
   },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   header: {
-    padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
+    paddingTop: 16,
+    paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 16,
   },
   backButton: {
-    padding: 8,
-    marginRight: 8,
+    marginRight: 12,
   },
   locationIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
   headerTextContainer: {
     flex: 1,
@@ -387,45 +447,30 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 14,
     color: '#666',
-    marginTop: 4,
+    marginTop: 2,
   },
   headerActions: {
     flexDirection: 'row',
-    alignItems: 'center',
   },
   headerActionButton: {
     padding: 8,
     marginLeft: 8,
   },
+  content: {
+    flex: 1,
+  },
+  scrollContainer: {
+    flex: 1,
+  },
   listContainer: {
     padding: 16,
-    paddingBottom: 80,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    color: 'red',
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 4,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontWeight: '500',
   },
   emptyContainer: {
-    padding: 32,
+    padding: 20,
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#666',
     marginBottom: 8,
@@ -434,6 +479,73 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 20,
+    width: '80%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  modalMessage: {
+    fontSize: 16,
+    marginBottom: 20,
+    color: '#333',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  modalButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  deleteButton: {
+    backgroundColor: '#F44336',
+  },
+  cancelButtonText: {
+    color: '#333',
+  },
+  deleteButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginTop: 12,
+  },
+  tab: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginRight: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  activeTab: {
+    backgroundColor: '#4CAF50',
+  },
+  tabText: {
+    color: '#666',
+    fontWeight: '500',
+  },
+  activeTabText: {
+    color: 'white',
   },
   addButton: {
     position: 'absolute',
@@ -445,107 +557,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 20,
-    width: '80%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FF9800',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  modalMessage: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 22,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  modalButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginHorizontal: 8,
-  },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
-  },
-  cancelButtonText: {
-    color: '#666',
-    fontWeight: 'bold',
-  },
-  deleteButton: {
-    backgroundColor: '#F44336',
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  limitInfoContainer: {
-    backgroundColor: '#FFF9C4',
-    padding: 8,
-    marginTop: 8,
-    borderRadius: 4,
-  },
-  limitInfoText: {
-    fontSize: 12,
-    color: '#FF8F00',
-    textAlign: 'center',
-  },
-  disabledAddButton: {
-    backgroundColor: '#A5D6A7',
-    opacity: 0.7,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    marginTop: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  activeTabButton: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#4CAF50',
-  },
-  tabButtonText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  activeTabButtonText: {
-    color: '#4CAF50',
-    fontWeight: 'bold',
-  },
-  notificationsContainer: {
-    padding: 16,
-  },
-  scrollContainer: {
-    flex: 1,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
   },
 });
 
