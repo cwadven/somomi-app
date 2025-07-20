@@ -11,10 +11,13 @@ import {
   ActivityIndicator,
   Dimensions,
   BackHandler,
-  ToastAndroid,
   Platform,
   Alert
 } from 'react-native';
+
+// ToastAndroid를 조건부로 가져오기
+const ToastAndroid = Platform.OS === 'android' ? require('react-native').ToastAndroid : null;
+
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import ProductCard from '../components/ProductCard';
@@ -53,10 +56,10 @@ const HomeScreen = ({ navigation }) => {
           setExitApp(true);
           
           // 플랫폼에 따른 메시지 표시
-          if (Platform.OS === 'android') {
+          if (Platform.OS === 'android' && ToastAndroid) {
             ToastAndroid.show('뒤로가기 하면 앱이 종료됩니다', ToastAndroid.SHORT);
           } else {
-            // iOS에서는 Alert 사용
+            // iOS 또는 웹에서는 Alert 사용
             Alert.alert('알림', '뒤로가기 하면 앱이 종료됩니다', [], { cancelable: true });
           }
           

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -96,26 +96,40 @@ const LocationsScreen = () => {
     </TouchableOpacity>
   );
 
-  if (status === 'loading' && !locations.length) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
-  }
+  // 로딩 및 에러 상태 처리를 위한 변수
+  const isLoading = status === 'loading' && !locations.length;
+  const hasError = !!error;
+  
+  // useMemo로 조건부 렌더링 컴포넌트 준비
+  const loadingOrErrorComponent = useMemo(() => {
+    if (isLoading) {
+      return (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+        </View>
+      );
+    }
 
-  if (error) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>오류: {error}</Text>
-        <TouchableOpacity 
-          style={styles.retryButton}
-          onPress={() => dispatch(fetchLocations())}
-        >
-          <Text style={styles.retryButtonText}>다시 시도</Text>
-        </TouchableOpacity>
-      </View>
-    );
+    if (hasError) {
+      return (
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>오류: {error}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => dispatch(fetchLocations())}
+          >
+            <Text style={styles.retryButtonText}>다시 시도</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    
+    return null;
+  }, [isLoading, hasError, error, dispatch]);
+  
+  // 로딩 중이거나 에러가 있으면 해당 컴포넌트 반환
+  if (isLoading || hasError) {
+    return loadingOrErrorComponent;
   }
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -47,10 +47,12 @@ const LocationDetailScreen = () => {
   
   const currentLocation = locations.find(location => location.id === locationId);
   
-  // 모든 제품 또는 특정 영역의 제품만 필터링
-  const filteredProducts = isAllProducts 
-    ? products.filter(product => !product.isConsumed)  // 모든 제품 (소진되지 않은)
-    : products.filter(product => product.locationId === locationId && !product.isConsumed);  // 특정 영역 제품만
+  // 모든 제품 또는 특정 영역의 제품만 필터링 (메모이제이션 적용)
+  const filteredProducts = useMemo(() => {
+    return isAllProducts 
+      ? products.filter(product => !product.isConsumed)  // 모든 제품 (소진되지 않은)
+      : products.filter(product => product.locationId === locationId && !product.isConsumed);  // 특정 영역 제품만
+  }, [products, locationId, isAllProducts]);
   
   useFocusEffect(
     useCallback(() => {
@@ -172,13 +174,24 @@ const LocationDetailScreen = () => {
     </Modal>
   );
   
-  // 로딩 중이거나 데이터가 없는 경우
-  if (locationStatus === 'loading' || (productStatus === 'loading' && !filteredProducts.length)) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
+  // 로딩 상태 변수
+  const isLoading = locationStatus === 'loading' || (productStatus === 'loading' && !filteredProducts.length);
+  
+  // 로딩 컴포넌트 메모이제이션
+  const loadingComponent = useMemo(() => {
+    if (isLoading) {
+      return (
+        <View style={[styles.container, styles.centered]}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+        </View>
+      );
+    }
+    return null;
+  }, [isLoading]);
+  
+  // 로딩 중인 경우
+  if (isLoading) {
+    return loadingComponent;
   }
   
   const title = isAllProducts ? '모든 제품' : currentLocation?.title || '영역 상세';
