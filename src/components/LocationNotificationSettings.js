@@ -5,7 +5,8 @@ import {
   StyleSheet, 
   Switch, 
   TouchableOpacity, 
-  TextInput
+  TextInput,
+  ActivityIndicator
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,7 +25,7 @@ import AlertModal from './AlertModal';
 const LocationNotificationSettings = ({ locationId, location = {} }) => {
   const dispatch = useDispatch();
   const { currentNotifications, status } = useSelector(state => state.notifications);
-  const { isAuthenticated } = useSelector(state => state.auth);
+  const { isAnonymous } = useSelector(state => state.auth);
   
   // 영역 이름 안전하게 가져오기
   const locationTitle = location?.title || '영역';
@@ -196,8 +197,6 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
         })).unwrap();
       }
       
-      // 영역의 알림 설정을 해당 영역의 모든 제품에 적용하는 코드 제거
-      
       // 성공 모달 표시
       showSuccessModal();
     } catch (error) {
@@ -223,6 +222,32 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
       setter(text);
     }
   };
+
+  // 로딩 중 표시
+  if (status === 'loading') {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text style={styles.loadingText}>알림 설정을 불러오는 중...</Text>
+      </View>
+    );
+  }
+
+  // 오류 발생 시 표시
+  if (status === 'failed') {
+    return (
+      <View style={[styles.container, styles.errorContainer]}>
+        <Ionicons name="alert-circle" size={50} color="#F44336" />
+        <Text style={styles.errorText}>알림 설정을 불러오는 데 실패했습니다.</Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={() => dispatch(fetchLocationNotifications(locationId))}
+        >
+          <Text style={styles.retryButtonText}>다시 시도</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -380,6 +405,40 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#fff',
     borderRadius: 8,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    minHeight: 200,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    minHeight: 200,
+  },
+  errorText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#F44336',
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#4CAF50',
+    borderRadius: 4,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
   title: {
     fontSize: 18,

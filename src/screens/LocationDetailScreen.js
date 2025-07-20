@@ -5,7 +5,6 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   FlatList,
-  Alert,
   Modal,
   ActivityIndicator,
   ScrollView
@@ -41,6 +40,7 @@ const LocationDetailScreen = () => {
     iconColor: '',
   });
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [slotAlertModalVisible, setSlotAlertModalVisible] = useState(false); // 슬롯 부족 알림 모달 상태 추가
   
   // 슬롯 상세 정보 모달 상태
   const [slotDetailModalVisible, setSlotDetailModalVisible] = useState(false);
@@ -126,18 +126,21 @@ const LocationDetailScreen = () => {
         return;
       }
       
-      // 회원인 경우 구독/구매 유도
-      Alert.alert(
-        '슬롯 부족',
-        '제품 슬롯이 부족합니다. 구독하거나 추가 슬롯을 구매하세요.',
-        [
+      // 회원인 경우 구독/구매 유도 (Alert.alert 대신 AlertModal 사용)
+      setAlertModalConfig({
+        title: '슬롯 부족',
+        message: '제품 슬롯이 부족합니다. 구독하거나 추가 슬롯을 구매하세요.',
+        buttons: [
           { text: '취소', style: 'cancel' },
           { 
             text: '구독 정보', 
             onPress: () => navigation.navigate('Profile') // 프로필 또는 구독 화면으로 이동
           }
-        ]
-      );
+        ],
+        icon: 'alert-circle',
+        iconColor: '#FF9800',
+      });
+      setAlertModalVisible(true);
       return;
     }
     
@@ -483,7 +486,10 @@ const LocationDetailScreen = () => {
         {activeTab === 'products' ? (
           renderProductSlots()
         ) : (
-          <ScrollView style={styles.scrollContainer}>
+          <ScrollView 
+            style={styles.scrollContainer}
+            contentContainerStyle={styles.scrollContentContainer}
+          >
             {currentLocation && (
               <LocationNotificationSettings locationId={locationId} />
             )}
@@ -498,6 +504,7 @@ const LocationDetailScreen = () => {
         buttons={alertModalConfig.buttons}
         icon={alertModalConfig.icon}
         iconColor={alertModalConfig.iconColor}
+        onClose={() => setAlertModalVisible(false)}
       />
       
       <DeleteConfirmModal />
@@ -571,6 +578,11 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
+    width: '100%',
+  },
+  scrollContentContainer: {
+    padding: 16,
+    paddingBottom: 40,
   },
   listContainer: {
     padding: 16,

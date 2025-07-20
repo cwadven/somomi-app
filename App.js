@@ -1,10 +1,10 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useCallback } from 'react';
-import { Provider, useDispatch } from 'react-redux';
+import { Provider, useDispatch, useSelector } from 'react-redux';
 import { Platform, StyleSheet, Linking, AppState, View, ActivityIndicator, Text, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
-import { verifyToken, getAnonymousToken } from './src/redux/slices/authSlice';
+import { verifyToken, getAnonymousToken, logout } from './src/redux/slices/authSlice';
 import * as Updates from 'expo-updates';
 import Constants from 'expo-constants';
 import CodePushUpdateLoading from './src/components/CodePushUpdateLoading';
@@ -55,6 +55,7 @@ if (typeof localStorage === 'undefined') {
 // 앱 내부 컴포넌트 - 토큰 검증 및 초기화 로직을 포함
 const AppContent = () => {
   const dispatch = useDispatch();
+  const { isLoggedIn, isAnonymous, user } = useSelector(state => state.auth);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
   const [pushToken, setPushToken] = useState('');
@@ -264,8 +265,86 @@ const AppContent = () => {
             </TouchableOpacity>
           </View>
           
+          {/* 로그인 상태 표시 및 전환 버튼 */}
+          <View style={styles.loginStatusContainer}>
+            <Text style={styles.statusLabel}>로그인 상태:</Text>
+            <View style={[
+              styles.statusBadge, 
+              isLoggedIn ? styles.status_ready : (isAnonymous ? styles.status_checking : styles.status_idle)
+            ]}>
+              <Text style={styles.statusText}>
+                {isLoggedIn ? '로그인됨' : (isAnonymous ? '비회원' : '로그아웃됨')}
+              </Text>
+            </View>
+          </View>
+          
+          {isLoggedIn && user && (
+            <View style={styles.userInfoContainer}>
+              <Text style={styles.userInfoText}>
+                사용자: {user.username || user.name || '알 수 없음'}
+              </Text>
+            </View>
+          )}
+          
+          <View style={styles.loginButtonsContainer}>
+            {isLoggedIn ? (
+              <TouchableOpacity 
+                style={[styles.loginButton, styles.logoutBtn]}
+                onPress={() => {
+                  dispatch(logout());
+                  addLog('로그아웃 처리됨', 'warning');
+                }}
+              >
+                <Text style={styles.loginButtonText}>로그아웃</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity 
+                style={[styles.loginButton, styles.loginBtn]}
+                onPress={async () => {
+                  try {
+                    // 디버깅 목적으로 간단한 로그인 처리
+                    // 실제 앱에서는 이 부분을 실제 로그인 프로세스로 대체해야 함
+                    const mockUser = {
+                      id: '999',
+                      username: '디버그 사용자',
+                      email: 'debug@example.com',
+                      profileImage: 'https://via.placeholder.com/150'
+                    };
+                    
+                    dispatch({
+                      type: 'auth/loginSuccess',
+                      payload: mockUser
+                    });
+                    
+                    addLog('디버그 사용자로 로그인됨', 'success');
+                  } catch (error) {
+                    addLog(`로그인 실패: ${error.message}`, 'error');
+                  }
+                }}
+              >
+                <Text style={styles.loginButtonText}>디버그 로그인</Text>
+              </TouchableOpacity>
+            )}
+            
+            {!isAnonymous && !isLoggedIn && (
+              <TouchableOpacity 
+                style={[styles.loginButton, styles.anonymousBtn]}
+                onPress={async () => {
+                  try {
+                    await dispatch(getAnonymousToken()).unwrap();
+                    addLog('익명 사용자로 전환됨', 'info');
+                  } catch (error) {
+                    addLog(`익명 로그인 실패: ${error.message}`, 'error');
+                  }
+                }}
+              >
+                <Text style={styles.loginButtonText}>익명 사용자 전환</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          
           <View style={styles.statusContainer}>
-            <Text style={styles.statusLabel}>상태:</Text>
+            <Text style={styles.statusLabel}>업데이트 상태:</Text>
             <View style={[styles.statusBadge, styles[`status_${updateStatus}`]]}>
               <Text style={styles.statusText}>
                 {updateStatus === 'idle' && '대기 중'}
@@ -277,6 +356,7 @@ const AppContent = () => {
             </View>
           </View>
           
+          {/* 기존 코드 유지 */}
           <View style={styles.infoContainer}>
             <Text style={styles.infoLabel}>Runtime Version:</Text>
             <Text style={styles.infoValue}>{Constants.expoConfig?.runtimeVersion?.policy || '알 수 없음'}</Text>
@@ -577,6 +657,47 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
+    fontWeight: 'bold',
+  },
+  loginStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  userInfoContainer: {
+    marginBottom: 10,
+    paddingVertical: 5,
+  },
+  userInfoText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  loginButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  loginButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  loginBtn: {
+    backgroundColor: '#4285F4',
+  },
+  logoutBtn: {
+    backgroundColor: '#F44336',
+  },
+  anonymousBtn: {
+    backgroundColor: '#9E9E9E',
+  },
+  loginButtonText: {
+    color: 'white',
     fontWeight: 'bold',
   },
 });
