@@ -22,6 +22,7 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import NotificationDetailScreen from '../screens/NotificationDetailScreen';
 import NotificationDateScreen from '../screens/NotificationDateScreen';
 import StoreScreen from '../screens/StoreScreen';
+import PointScreen from '../screens/PointScreen';
 import MyProductsScreen from '../screens/MyProductsScreen';
 
 const Tab = createBottomTabNavigator();
@@ -271,11 +272,6 @@ const AppNavigator = ({ linking }) => {
               name="Profile" 
               component={ProfileStack} 
               options={{ title: '프로필' }}
-            />
-            <Tab.Screen 
-              name="Store" 
-              component={StoreScreen} 
-              options={{ title: '상점' }}
             />
           </Tab.Navigator>
         </NavigationContainer>

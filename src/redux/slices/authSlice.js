@@ -159,7 +159,13 @@ const initialState = {
       additionalSlots: 0, // 추가 구매한 제품 슬롯 수
     }
   },
+  points: {
+    balance: 0, // 현재 보유 G
+    totalPurchased: 0, // 총 구매한 G
+    totalUsed: 0, // 총 사용한 G
+  },
   purchaseHistory: [], // 구매 내역
+  pointHistory: [], // G 내역 (충전 및 사용)
 };
 
 export const authSlice = createSlice({
@@ -173,6 +179,46 @@ export const authSlice = createSlice({
       state.user = action.payload;
       state.error = null;
     },
+    // 포인트 충전
+    addPoints: (state, action) => {
+      const amount = action.payload.amount;
+      state.points.balance += amount;
+      state.points.totalPurchased += amount;
+      
+      // 포인트 내역에 추가
+      state.pointHistory.push({
+        id: `point_add_${Date.now()}`,
+        type: 'add',
+        amount: amount,
+        date: new Date().toISOString(),
+        description: action.payload.description || 'G 충전',
+        paymentMethod: action.payload.paymentMethod || '신용카드',
+      });
+    },
+
+    // 포인트 사용
+    usePoints: (state, action) => {
+      const amount = action.payload.amount;
+      if (state.points.balance >= amount) {
+        state.points.balance -= amount;
+        state.points.totalUsed += amount;
+        
+        // 포인트 내역에 추가
+        state.pointHistory.push({
+          id: `point_use_${Date.now()}`,
+          type: 'use',
+          amount: amount,
+          date: new Date().toISOString(),
+          description: action.payload.description || 'G 사용',
+          itemId: action.payload.itemId,
+          itemType: action.payload.itemType,
+        });
+        
+        return true;
+      }
+      return false;
+    },
+
     // 구독 정보 업데이트
     updateSubscription: (state, action) => {
       state.subscription = { ...state.subscription, ...action.payload };
@@ -199,7 +245,9 @@ export const authSlice = createSlice({
       state.token = null;
       state.subscription = initialState.subscription;
       state.slots = initialState.slots;
+      state.points = initialState.points;
       state.purchaseHistory = [];
+      state.pointHistory = [];
       // localStorage에서 토큰 제거
       localStorage.removeItem('jwt_token');
     },
@@ -332,7 +380,9 @@ export const {
   clearError,
   updateSubscription,
   updateSlots,
-  addPurchase
+  addPurchase,
+  addPoints,
+  usePoints
 } = authSlice.actions;
 
 export default authSlice.reducer; 

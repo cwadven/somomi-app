@@ -6,20 +6,20 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Alert,
-  Modal
+  Modal,
+  FlatList
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { updateSubscription, updateSlots, addPurchase } from '../redux/slices/authSlice';
+import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints } from '../redux/slices/authSlice';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
 
 const StoreScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
-  const { isLoggedIn, isAnonymous, user, subscription, slots } = useSelector(state => state.auth);
+  const { isLoggedIn, isAnonymous, user, subscription, slots, points, pointHistory } = useSelector(state => state.auth);
   
   // 모달 상태
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -33,33 +33,20 @@ const StoreScreen = () => {
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [purchaseConfirmVisible, setPurchaseConfirmVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [activeTab, setActiveTab] = useState('shop'); // 'shop' 또는 'points'
+  const [pointPurchaseConfirmVisible, setPointPurchaseConfirmVisible] = useState(false);
+  const [selectedPointPackage, setSelectedPointPackage] = useState(null);
   
   // 구독 플랜 정보
   const subscriptionPlans = [
     {
-      id: 'basic',
-      name: '기본 구독',
-      price: '5,000원/월',
-      features: [
-        '영역 5개 생성 가능',
-        '영역당 제품 10개 등록 가능',
-        '모든 알림 기능 사용 가능'
-      ],
-      locationSlots: 5,
+      id: 'standard',
+      name: '스탠다드 플랜',
+      pointPrice: 2900,
+      locationSlots: 3,
       productSlotsPerLocation: 10,
-    },
-    {
-      id: 'premium',
-      name: '프리미엄 구독',
-      price: '10,000원/월',
-      features: [
-        '영역 무제한 생성',
-        '영역당 제품 20개 등록 가능',
-        '모든 알림 기능 사용 가능',
-        'AI 추천 기능 사용 가능'
-      ],
-      locationSlots: 999, // 무제한
-      productSlotsPerLocation: 20,
+      description: '일반 사용자를 위한 플랜. 본 상품은 구매일로부터 30일간 유지됩니다.',
+      features: ['영역 3개', '영역당 제품 10개', '알림 기능', '통계 기능']
     }
   ];
   
@@ -67,35 +54,76 @@ const StoreScreen = () => {
   const slotItems = [
     {
       id: 'location_slot_1',
-      name: '영역 슬롯 1개',
-      price: '1,000원',
       type: 'locationSlot',
+      name: '영역 슬롯 1개',
+      pointPrice: 2000,
       amount: 1,
-      description: '영역을 1개 더 생성할 수 있습니다.'
+      description: '추가 영역 1개를 등록할 수 있습니다.'
     },
     {
       id: 'location_slot_3',
-      name: '영역 슬롯 3개',
-      price: '2,500원',
       type: 'locationSlot',
+      name: '영역 슬롯 3개',
+      pointPrice: 5000,
       amount: 3,
-      description: '영역을 3개 더 생성할 수 있습니다.'
+      description: '추가 영역 3개를 등록할 수 있습니다.'
     },
     {
       id: 'product_slot_5',
-      name: '제품 슬롯 5개',
-      price: '1,500원',
       type: 'productSlot',
+      name: '제품 슬롯 5개',
+      pointPrice: 1000,
       amount: 5,
-      description: '각 영역에 제품을 5개 더 등록할 수 있습니다.'
+      description: '영역당 추가 제품 5개를 등록할 수 있습니다.'
     },
     {
       id: 'product_slot_10',
-      name: '제품 슬롯 10개',
-      price: '2,800원',
       type: 'productSlot',
+      name: '제품 슬롯 10개',
+      pointPrice: 1800,
       amount: 10,
-      description: '각 영역에 제품을 10개 더 등록할 수 있습니다.'
+      description: '영역당 추가 제품 10개를 등록할 수 있습니다.'
+    }
+  ];
+  
+  // 포인트 패키지 정보
+  const pointPackages = [
+    {
+      id: 'point_1000',
+      name: '1,000 G',
+      points: 1000,
+      price: '1,000원',
+      description: '기본 젬 패키지'
+    },
+    {
+      id: 'point_5000',
+      name: '5,000 G',
+      points: 5000,
+      price: '5,000원',
+      description: '인기 젬 패키지'
+    },
+    {
+      id: 'point_10000',
+      name: '10,000 G',
+      points: 10000,
+      price: '10,000원',
+      description: '가성비 젬 패키지'
+    },
+    {
+      id: 'point_30000',
+      name: '30,000 G',
+      points: 30000,
+      price: '30,000원',
+      description: '대용량 젬 패키지',
+      bonus: 3000
+    },
+    {
+      id: 'point_50000',
+      name: '50,000 G',
+      points: 50000,
+      price: '50,000원',
+      description: '프리미엄 젬 패키지',
+      bonus: 7500
     }
   ];
   
@@ -143,6 +171,28 @@ const StoreScreen = () => {
     
     try {
       if (selectedProduct.type === 'subscription') {
+        // 포인트 차감
+        const pointCost = selectedProduct.pointPrice;
+        
+        // 포인트가 부족한 경우
+        if (points.balance < pointCost) {
+          showErrorModal(`젬이 부족합니다.\n현재 젬: ${points.balance.toLocaleString()}G\n필요 젬: ${pointCost.toLocaleString()}G`);
+          return;
+        }
+        
+        // 포인트 사용
+        const result = dispatch(usePoints({
+          amount: pointCost,
+          description: `${selectedProduct.name} 구독 구매`,
+          itemId: selectedProduct.id,
+          itemType: 'subscription'
+        }));
+        
+        if (!result) {
+          showErrorModal('젬 사용 중 오류가 발생했습니다.');
+          return;
+        }
+        
         // 구독 처리
         const expiryDate = new Date();
         expiryDate.setMonth(expiryDate.getMonth() + 1); // 1개월 구독
@@ -169,12 +219,35 @@ const StoreScreen = () => {
           type: 'subscription',
           planId: selectedProduct.id,
           planName: selectedProduct.name,
-          price: selectedProduct.price,
+          price: selectedProduct.pointPrice,
+          pointsUsed: pointCost,
           expiresAt: expiryDate.toISOString()
         }));
         
         showSuccessModal('구독 완료', `${selectedProduct.name} 구독이 완료되었습니다. 이제 더 많은 영역과 제품을 등록할 수 있습니다.`);
       } else if (selectedProduct.type === 'slot') {
+        // 포인트 차감
+        const pointCost = selectedProduct.pointPrice;
+        
+        // 포인트가 부족한 경우
+        if (points.balance < pointCost) {
+          showErrorModal(`젬이 부족합니다.\n현재 젬: ${points.balance.toLocaleString()}G\n필요 젬: ${pointCost.toLocaleString()}G`);
+          return;
+        }
+        
+        // 포인트 사용
+        const result = dispatch(usePoints({
+          amount: pointCost,
+          description: `${selectedProduct.name} 구매`,
+          itemId: selectedProduct.id,
+          itemType: 'slot'
+        }));
+        
+        if (!result) {
+          showErrorModal('젬 사용 중 오류가 발생했습니다.');
+          return;
+        }
+        
         // 슬롯 구매 처리
         if (selectedProduct.type === 'locationSlot') {
           dispatch(updateSlots({
@@ -196,7 +269,8 @@ const StoreScreen = () => {
           type: 'slot',
           itemId: selectedProduct.id,
           itemName: selectedProduct.name,
-          price: selectedProduct.price,
+          price: selectedProduct.pointPrice,
+          pointsUsed: pointCost,
           amount: selectedProduct.amount
         }));
         
@@ -204,6 +278,47 @@ const StoreScreen = () => {
       }
     } catch (error) {
       showErrorModal('구매 처리 중 오류가 발생했습니다.');
+    }
+  };
+  
+  // 포인트 충전 처리
+  const handlePurchasePoints = (pkg) => {
+    if (!isLoggedIn) {
+      if (isAnonymous) {
+        setShowSignupPrompt(true);
+      } else {
+        navigation.navigate('Profile');
+      }
+      return;
+    }
+    
+    setSelectedPointPackage(pkg);
+    setPointPurchaseConfirmVisible(true);
+  };
+  
+  // 포인트 구매 확정 처리
+  const confirmPointPurchase = () => {
+    setPointPurchaseConfirmVisible(false);
+    
+    if (!selectedPointPackage) return;
+    
+    try {
+      // 실제 결제 처리 로직 (여기서는 가상으로 처리)
+      const totalPoints = selectedPointPackage.points + (selectedPointPackage.bonus || 0);
+      
+      // 포인트 추가
+      dispatch(addPoints({
+        amount: totalPoints,
+        description: `${selectedPointPackage.name} 구매${selectedPointPackage.bonus ? ` (+보너스 ${selectedPointPackage.bonus}G)` : ''}`,
+        paymentMethod: '신용카드'
+      }));
+      
+      showSuccessModal(
+        'G 충전 완료', 
+        `${totalPoints.toLocaleString()}G가 충전되었습니다.\n현재 보유 G: ${(points.balance + totalPoints).toLocaleString()}G`
+      );
+    } catch (error) {
+      showErrorModal('결제 처리 중 오류가 발생했습니다.');
     }
   };
   
@@ -232,84 +347,174 @@ const StoreScreen = () => {
   };
   
   // 구매 확인 모달
-  const PurchaseConfirmModal = () => (
-    <Modal
-      visible={purchaseConfirmVisible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => setPurchaseConfirmVisible(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>구매 확인</Text>
-          
-          {selectedProduct && (
-            <>
+  const PurchaseConfirmModal = () => {
+    if (!selectedProduct) return null;
+    
+    return (
+      <Modal
+        visible={purchaseConfirmVisible}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>구매 확인</Text>
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => setPurchaseConfirmVisible(false)}
+              >
+                <Ionicons name="close" size={24} color="#999" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.modalContent}>
               <Text style={styles.modalProductName}>{selectedProduct.name}</Text>
-              <Text style={styles.modalProductPrice}>{selectedProduct.price}</Text>
+              <Text style={styles.modalProductPrice}>{selectedProduct.pointPrice.toLocaleString()}G</Text>
               
-              {selectedProduct.type === 'subscription' ? (
-                <Text style={styles.modalDescription}>
-                  구독은 매월 자동으로 갱신됩니다. 언제든지 취소할 수 있습니다.
-                </Text>
-              ) : (
+              {selectedProduct.type === 'subscription' && (
+                <View style={styles.modalFeatures}>
+                  {selectedProduct.features.map((feature, index) => (
+                    <View key={index} style={styles.modalFeatureItem}>
+                      <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                      <Text style={styles.modalFeatureText}>{feature}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              
+              {selectedProduct.type === 'slot' && (
                 <Text style={styles.modalDescription}>
                   {selectedProduct.description}
                 </Text>
               )}
-            </>
-          )}
-          
-          <View style={styles.modalButtons}>
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={() => setPurchaseConfirmVisible(false)}
-            >
-              <Text style={styles.cancelButtonText}>취소</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.confirmButton]}
-              onPress={confirmPurchase}
-            >
-              <Text style={styles.confirmButtonText}>구매하기</Text>
-            </TouchableOpacity>
+              
+              <View style={styles.pointInfoInModal}>
+                <Text style={styles.pointInfoText}>현재 젬: {points.balance.toLocaleString()}G</Text>
+                <Text style={styles.pointInfoText}>
+                  구매 후 젬: {Math.max(0, points.balance - selectedProduct.pointPrice).toLocaleString()}G
+                </Text>
+              </View>
+              
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalCancelButton]}
+                  onPress={() => setPurchaseConfirmVisible(false)}
+                >
+                  <Text style={styles.modalCancelButtonText}>취소</Text>
+                </TouchableOpacity>
+                
+                {points.balance >= selectedProduct.pointPrice ? (
+                  <TouchableOpacity 
+                    style={[styles.modalButton, styles.modalConfirmButton]}
+                    onPress={confirmPurchase}
+                  >
+                    <Text style={styles.modalConfirmButtonText}>구매하기</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity 
+                    style={[styles.modalButton, styles.modalChargeButton]}
+                    onPress={goToPointScreen}
+                  >
+                    <Text style={styles.chargePointButtonText}>젬 충전하기</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
           </View>
         </View>
-      </View>
-    </Modal>
-  );
+      </Modal>
+    );
+  };
+  
+  // 포인트 구매 확인 모달
+  const PointPurchaseConfirmModal = () => {
+    if (!selectedPointPackage) return null;
+    
+    return (
+      <Modal
+        visible={pointPurchaseConfirmVisible}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>G 구매 확인</Text>
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => setPointPurchaseConfirmVisible(false)}
+              >
+                <Ionicons name="close" size={24} color="#999" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.modalContent}>
+              <Text style={styles.modalProductName}>{selectedPointPackage.name}</Text>
+              <Text style={styles.modalProductPrice}>{selectedPointPackage.price}</Text>
+              
+              {selectedPointPackage.bonus && (
+                <Text style={styles.modalBonus}>+{selectedPointPackage.bonus.toLocaleString()} 보너스 젬</Text>
+              )}
+              
+              <Text style={styles.modalDescription}>
+                결제 후 즉시 젬이 충전됩니다.
+              </Text>
+              
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalCancelButton]}
+                  onPress={() => setPointPurchaseConfirmVisible(false)}
+                >
+                  <Text style={styles.modalCancelButtonText}>취소</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalConfirmButton]}
+                  onPress={confirmPointPurchase}
+                >
+                  <Text style={styles.modalConfirmButtonText}>결제하기</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
   
   // 구독 플랜 렌더링
   const renderSubscriptionPlans = () => {
     return subscriptionPlans.map((plan) => (
-      <View key={plan.id} style={styles.planCard}>
-        <View style={styles.planHeader}>
-          <Text style={styles.planName}>{plan.name}</Text>
-          <Text style={styles.planPrice}>{plan.price}</Text>
-        </View>
-        
+      <TouchableOpacity 
+        key={plan.id} 
+        style={styles.planCard}
+        onPress={() => handleSubscribe(plan)}
+      >
+        <Text style={styles.planName}>{plan.name}</Text>
+        <Text style={styles.planPrice}>
+          {plan.pointPrice === 0 ? '무료' : `${plan.pointPrice.toLocaleString()}G`}
+        </Text>
+        <Text style={styles.planDescription}>{plan.description}</Text>
         <View style={styles.planFeatures}>
           {plan.features.map((feature, index) => (
             <View key={index} style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={18} color="#4CAF50" style={styles.featureIcon} />
+              <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
               <Text style={styles.featureText}>{feature}</Text>
             </View>
           ))}
         </View>
-        
-        <TouchableOpacity 
-          style={[
-            styles.subscribeButton,
-            subscription?.plan === plan.id && styles.subscribedButton
-          ]}
-          onPress={() => handleSubscribe(plan)}
-          disabled={subscription?.plan === plan.id}
-        >
-          <Text style={styles.subscribeButtonText}>
-            {subscription?.plan === plan.id ? '구독 중' : '구독하기'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.planButtonContainer}>
+          <TouchableOpacity 
+            style={styles.planButton}
+            onPress={() => handleSubscribe(plan)}
+          >
+            <Text style={styles.planButtonText}>
+              {plan.pointPrice === 0 ? '시작하기' : '구독하기'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
     ));
   };
   
@@ -331,10 +536,60 @@ const StoreScreen = () => {
               />
             </View>
             <Text style={styles.slotName}>{item.name}</Text>
-            <Text style={styles.slotPrice}>{item.price}</Text>
+            <Text style={styles.slotPrice}>{item.pointPrice.toLocaleString()}G</Text>
             <Text style={styles.slotDescription}>{item.description}</Text>
           </TouchableOpacity>
         ))}
+      </View>
+    );
+  };
+  
+  // 포인트 패키지 렌더링
+  const renderPointPackages = () => {
+    return (
+      <View style={styles.pointPackagesRow}>
+        {pointPackages.slice(0, 3).map((pkg) => (
+          <TouchableOpacity 
+            key={pkg.id} 
+            style={styles.pointPackageCard}
+            onPress={() => handlePurchasePoints(pkg)}
+          >
+            <Text style={styles.pointPackageName}>{pkg.name}</Text>
+            <Text style={styles.pointPackagePrice}>{pkg.price}</Text>
+            {pkg.bonus && (
+              <Text style={styles.pointPackageBonus}>+{pkg.bonus}G 보너스</Text>
+            )}
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+  
+  // 포인트 내역 렌더링
+  const renderPointHistoryItem = ({ item }) => {
+    const isAdd = item.type === 'add';
+    
+    return (
+      <View style={styles.historyItem}>
+        <View style={styles.historyItemLeft}>
+          <Ionicons 
+            name={isAdd ? 'add-circle' : 'remove-circle'} 
+            size={24} 
+            color={isAdd ? '#4CAF50' : '#F44336'} 
+          />
+          <View style={styles.historyItemInfo}>
+            <Text style={styles.historyItemDescription}>{item.description}</Text>
+            <Text style={styles.historyItemDate}>
+              {new Date(item.date).toLocaleDateString()} {new Date(item.date).toLocaleTimeString()}
+            </Text>
+          </View>
+        </View>
+        <Text style={[
+          styles.historyItemAmount,
+          isAdd ? styles.historyItemAmountAdd : styles.historyItemAmountUse
+        ]}>
+          {isAdd ? '+' : '-'}{item.amount.toLocaleString()}G
+        </Text>
       </View>
     );
   };
@@ -376,6 +631,11 @@ const StoreScreen = () => {
     );
   };
   
+  // 포인트 화면으로 이동
+  const goToPointScreen = () => {
+    navigation.navigate('Point');
+  };
+  
   return (
     <View style={styles.container}>
       {/* 헤더 */}
@@ -391,9 +651,6 @@ const StoreScreen = () => {
       </View>
       
       <ScrollView style={styles.scrollContainer}>
-        {/* 현재 슬롯 상태 */}
-        {isLoggedIn && renderCurrentSlots()}
-        
         {/* 비로그인 상태 안내 */}
         {!isLoggedIn && (
           <View style={styles.loginPrompt}>
@@ -411,6 +668,19 @@ const StoreScreen = () => {
           </View>
         )}
         
+        {/* 포인트 정보 */}
+        {isLoggedIn && (
+          <View style={styles.pointInfoContainer}>
+            <View style={styles.pointInfoHeader}>
+              <Text style={styles.pointInfoTitle}>보유 G</Text>
+            </View>
+            <Text style={styles.pointInfoValue}>{points.balance.toLocaleString()}G</Text>
+          </View>
+        )}
+        
+        {/* 현재 슬롯 상태 */}
+        {isLoggedIn && renderCurrentSlots()}
+        
         {/* 구독 섹션 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>구독 플랜</Text>
@@ -424,10 +694,31 @@ const StoreScreen = () => {
           <Text style={styles.sectionTitle}>추가 슬롯 구매</Text>
           {renderSlotItems()}
         </View>
+        
+        {/* 포인트 내역 섹션 */}
+        {isLoggedIn && pointHistory.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>G 내역</Text>
+            <FlatList
+              data={pointHistory}
+              renderItem={renderPointHistoryItem}
+              keyExtractor={item => item.id}
+              scrollEnabled={false}
+              style={styles.historyList}
+            />
+          </View>
+        )}
+        
+        {/* 포인트 충전 섹션 - 맨 아래로 이동 */}
+        <View style={[styles.section, styles.pointChargeSection]}>
+          <Text style={styles.sectionTitle}>G 충전</Text>
+          {renderPointPackages()}
+        </View>
       </ScrollView>
       
       {/* 모달 */}
       <PurchaseConfirmModal />
+      <PointPurchaseConfirmModal />
       
       <AlertModal 
         visible={alertModalVisible}
@@ -518,7 +809,7 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
   },
   planFeatures: {
-    marginBottom: 16,
+    marginTop: 10,
   },
   featureItem: {
     flexDirection: 'row',
@@ -684,17 +975,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContent: {
+  modalContainer: {
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 20,
     width: '80%',
     alignItems: 'center',
   },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 16,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 16,
     color: '#333',
   },
   modalProductName: {
@@ -715,10 +1015,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
-  modalButtons: {
+  modalFeatures: {
+    marginBottom: 20,
+  },
+  modalFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalFeatureText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+  },
+  modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
+    marginTop: 20,
   },
   modalButton: {
     flex: 1,
@@ -727,19 +1041,299 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 8,
   },
-  cancelButton: {
+  modalCancelButton: {
     backgroundColor: '#f0f0f0',
   },
-  confirmButton: {
+  modalConfirmButton: {
     backgroundColor: '#4CAF50',
   },
-  cancelButtonText: {
+  modalCancelButtonText: {
     color: '#333',
     fontWeight: '600',
   },
-  confirmButtonText: {
+  modalConfirmButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  modalChargeButton: {
+    backgroundColor: '#2196F3',
+  },
+  chargePointButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  pointInfoContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    margin: 16,
+    marginTop: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  pointInfoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  pointInfoTitle: {
+    fontSize: 16,
+    color: '#666',
+  },
+  pointInfoValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  chargeButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  chargeButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  pointInfoInModal: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 4,
+    padding: 12,
+    marginBottom: 16,
+    width: '100%',
+  },
+  pointInfoText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  chargePointButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  chargePointButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  disabledButton: {
+    backgroundColor: '#BDBDBD',
+  },
+  
+  // 포인트 패키지 스타일
+  packagesContainer: {
+    flexDirection: 'column',
+  },
+  packageCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  packageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  packageName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  packagePrice: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
+  packageDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+  },
+  bonusContainer: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 12,
+  },
+  bonusText: {
+    color: '#4CAF50',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  buyButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 4,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  buyButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  
+  // 포인트 내역 스타일
+  historyList: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 8,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  historyItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  historyItemInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  historyItemDescription: {
+    fontSize: 14,
+    color: '#333',
+  },
+  historyItemDate: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  historyItemAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  historyItemAmountAdd: {
+    color: '#4CAF50',
+  },
+  historyItemAmountUse: {
+    color: '#F44336',
+  },
+  
+  // 정보 카드 스타일
+  infoCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  infoIcon: {
+    marginRight: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  
+  // 모달 스타일
+  modalBonus: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4CAF50',
+    marginBottom: 16,
+  },
+  pointChargeSection: {
+    backgroundColor: '#f5f8ff',
+    borderRadius: 8,
+    marginTop: 16,
+    marginHorizontal: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e0e8ff',
+  },
+  
+  pointPackagesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  
+  pointPackageCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    marginHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  
+  pointPackageName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  
+  pointPackagePrice: {
+    fontSize: 13,
+    color: '#4CAF50',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  
+  pointPackageBonus: {
+    fontSize: 11,
+    color: '#FF9800',
+    textAlign: 'center',
+  },
+  planButtonContainer: {
+    marginTop: 16,
+  },
+  planButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 4,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  planButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  planDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+    marginBottom: 0,
   },
 });
 
