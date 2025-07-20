@@ -40,6 +40,11 @@ const SlotPlaceholder = ({
       container: { width: 150, height: 150 },
       icon: 40,
       text: { fontSize: 16 }
+    },
+    row: {
+      container: { width: 100, height: 100, marginRight: 10 },
+      icon: 28,
+      text: { fontSize: 12 }
     }
   };
   

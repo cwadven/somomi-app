@@ -190,6 +190,11 @@ const LocationDetailScreen = () => {
   
   // 슬롯 사용률 계산을 위한 값만 유지 (availableSlots 변수 제거)
   
+  // 사용 가능한 슬롯 계산
+  const availableSlots = useMemo(() => {
+    return !isAllProducts ? Math.max(0, productSlots.total - productSlots.used) : 0;
+  }, [productSlots.total, productSlots.used, isAllProducts]);
+  
   const DeleteConfirmModal = () => (
     <Modal
       visible={deleteConfirmVisible}
@@ -265,9 +270,10 @@ const LocationDetailScreen = () => {
       );
     }
     
-    // 특정 영역 화면에서는 리스트로 표시 (기존 디자인 사용)
+    // 특정 영역 화면에서는 제품 목록만 표시
     return (
       <View style={styles.content}>
+        {/* 등록된 제품 목록 */}
         <FlatList
           data={filteredProducts}
           renderItem={renderProductCard}
@@ -283,12 +289,17 @@ const LocationDetailScreen = () => {
           }
         />
         
-        {/* 제품 추가 버튼 */}
+        {/* 제품 추가 버튼 (슬롯 개수 표시) */}
         <TouchableOpacity 
           style={styles.addButton}
           onPress={handleAddProduct}
         >
           <Ionicons name="add" size={30} color="white" />
+          {availableSlots > 0 && (
+            <View style={styles.slotCountBadge}>
+              <Text style={styles.slotCountText}>{availableSlots}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
     );
@@ -562,6 +573,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5,
+  },
+  slotCountBadge: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    backgroundColor: '#F44336',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  slotCountText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 
