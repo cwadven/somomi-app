@@ -178,7 +178,7 @@ const LocationsScreen = () => {
       {/* 영역 목록 */}
       <Text style={styles.sectionTitle}>내 영역 목록</Text>
       
-      {/* 영역 슬롯 그리드 */}
+      {/* 영역 슬롯 리스트 */}
       <View style={styles.locationsContainer}>
         {locations.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -188,23 +188,31 @@ const LocationsScreen = () => {
             </Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            <View style={styles.slotsContainer}>
-              {/* 사용 중인 영역 슬롯 */}
-              {locations.map((location) => (
-                <TouchableOpacity 
-                  key={location.id}
-                  style={styles.slotItem}
-                  onPress={() => handleLocationPress(location)}
-                >
-                  <View style={styles.slotIconContainer}>
-                    <Ionicons name={location.icon || 'cube-outline'} size={30} color="#4CAF50" />
+          <FlatList
+            data={locations}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity 
+                style={styles.locationListItem}
+                onPress={() => handleLocationPress(item)}
+              >
+                <View style={styles.locationListItemContent}>
+                  <View style={styles.locationIconContainer}>
+                    <Ionicons name={item.icon || 'cube-outline'} size={24} color="#4CAF50" />
                   </View>
-                  <Text style={styles.slotTitle} numberOfLines={1}>{location.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
+                  <View style={styles.locationListItemTextContainer}>
+                    <Text style={styles.locationListItemTitle}>{item.title}</Text>
+                    {item.description ? (
+                      <Text style={styles.locationListItemDescription} numberOfLines={1}>
+                        {item.description}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color="#999" />
+              </TouchableOpacity>
+            )}
+          />
         )}
         
         {/* 영역 추가 버튼 (우측 하단에 고정) */}
@@ -400,6 +408,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+  },
+  locationListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  locationListItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  locationListItemTextContainer: {
+    flex: 1,
+  },
+  locationListItemTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  locationListItemDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
   },
 });
 
