@@ -26,16 +26,9 @@ const LocationsScreen = () => {
   const isFocused = useIsFocused();
   
   const { locations, status, error } = useSelector(state => state.locations);
-  const { isAnonymous } = useSelector(state => state.auth);
+  const { isAnonymous, slots } = useSelector(state => state.auth);
   
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
-  
-  // 슬롯 관련 상태 추가
-  const [locationSlots, setLocationSlots] = useState({
-    used: 0,
-    total: 1, // 비회원 기본값
-    available: true
-  });
 
   // 화면이 포커스될 때마다 영역 데이터 로드
   useFocusEffect(
@@ -44,22 +37,6 @@ const LocationsScreen = () => {
     }, [dispatch])
   );
   
-  // 슬롯 정보 업데이트
-  useEffect(() => {
-    if (locations) {
-      // 실제 앱에서는 Redux 상태나 API에서 슬롯 정보를 가져와야 합니다
-      // 여기서는 예시로 구현합니다
-      const usedSlots = locations.length;
-      const totalSlots = isAnonymous ? 1 : 5; // 비회원 1개, 회원 5개 (예시)
-      
-      setLocationSlots({
-        used: usedSlots,
-        total: totalSlots,
-        available: usedSlots < totalSlots
-      });
-    }
-  }, [locations, isAnonymous]);
-
   // 뒤로가기 버튼 처리
   useEffect(() => {
     const handleBackPress = () => {
@@ -82,8 +59,13 @@ const LocationsScreen = () => {
   }, [isFocused, navigation]);
 
   const handleAddLocation = () => {
+    // Redux의 슬롯 정보를 사용하여 사용 가능한 슬롯 확인
+    const totalLocationSlots = slots.locationSlots.baseSlots + slots.locationSlots.additionalSlots;
+    const usedLocationSlots = locations.length;
+    const hasAvailableSlots = usedLocationSlots < totalLocationSlots;
+    
     // 슬롯이 없으면 구독/구매 유도
-    if (!locationSlots.available) {
+    if (!hasAvailableSlots) {
       // 비회원인 경우 회원가입 유도
       if (isAnonymous) {
         setShowSignupPrompt(true);
@@ -97,8 +79,8 @@ const LocationsScreen = () => {
         [
           { text: '취소', style: 'cancel' },
           { 
-            text: '구독 정보', 
-            onPress: () => navigation.navigate('Profile') // 프로필 또는 구독 화면으로 이동
+            text: '상점으로 이동', 
+            onPress: () => navigation.navigate('Store')
           }
         ]
       );
@@ -107,6 +89,12 @@ const LocationsScreen = () => {
     
     // 슬롯이 있으면 영역 추가 화면으로 이동
     navigation.navigate('AddLocation');
+  };
+  
+  // SignupPromptModal 메시지 동적 생성
+  const getSignupPromptMessage = () => {
+    const totalLocationSlots = slots.locationSlots.baseSlots;
+    return `비회원은 최대 ${totalLocationSlots}개의 영역만 생성할 수 있습니다. 회원가입하여 더 많은 영역을 생성하세요!`;
   };
 
   const handleLocationPress = (location) => {
@@ -156,15 +144,17 @@ const LocationsScreen = () => {
     return loadingOrErrorComponent;
   }
 
-  // 사용 가능한 슬롯 계산
-  const availableSlots = Math.max(0, locationSlots.total - locationSlots.used);
+  // Redux의 슬롯 정보를 사용하여 사용 가능한 슬롯 계산
+  const totalLocationSlots = slots.locationSlots.baseSlots + slots.locationSlots.additionalSlots;
+  const usedLocationSlots = locations.length;
+  const availableSlots = Math.max(0, totalLocationSlots - usedLocationSlots);
 
   return (
     <View style={styles.container}>
       {/* 슬롯 상태 표시 바 */}
       <SlotStatusBar 
-        used={locationSlots.used} 
-        total={locationSlots.total} 
+        used={usedLocationSlots} 
+        total={totalLocationSlots} 
         type="location" 
       />
       
@@ -189,39 +179,53 @@ const LocationsScreen = () => {
       <Text style={styles.sectionTitle}>내 영역 목록</Text>
       
       {/* 영역 슬롯 그리드 */}
-      <ScrollView>
-        <View style={styles.slotsContainer}>
-          {/* 사용 중인 영역 슬롯 */}
-          {locations.map((location) => (
-            <TouchableOpacity 
-              key={location.id}
-              style={styles.slotItem}
-              onPress={() => handleLocationPress(location)}
-            >
-              <View style={styles.slotIconContainer}>
-                <Ionicons name={location.icon || 'cube-outline'} size={30} color="#4CAF50" />
-              </View>
-              <Text style={styles.slotTitle} numberOfLines={1}>{location.title}</Text>
-            </TouchableOpacity>
-          ))}
-          
-          {/* 사용 가능한 빈 슬롯 */}
-          {Array.from({ length: availableSlots }).map((_, index) => (
-            <SlotPlaceholder 
-              key={`available-${index}`}
-              type="location"
-              size="medium"
-              onPress={handleAddLocation}
-            />
-          ))}
-        </View>
-      </ScrollView>
+      <View style={styles.locationsContainer}>
+        {locations.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
+            <Text style={styles.emptySubText}>
+              오른쪽 하단의 + 버튼을 눌러 영역을 추가하세요.
+            </Text>
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            <View style={styles.slotsContainer}>
+              {/* 사용 중인 영역 슬롯 */}
+              {locations.map((location) => (
+                <TouchableOpacity 
+                  key={location.id}
+                  style={styles.slotItem}
+                  onPress={() => handleLocationPress(location)}
+                >
+                  <View style={styles.slotIconContainer}>
+                    <Ionicons name={location.icon || 'cube-outline'} size={30} color="#4CAF50" />
+                  </View>
+                  <Text style={styles.slotTitle} numberOfLines={1}>{location.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        )}
+        
+        {/* 영역 추가 버튼 (우측 하단에 고정) */}
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={handleAddLocation}
+        >
+          <Ionicons name="add" size={30} color="white" />
+          {availableSlots > 0 && (
+            <View style={styles.slotCountBadge}>
+              <Text style={styles.slotCountText}>{availableSlots}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
       
       {/* 회원가입 유도 모달 */}
       <SignupPromptModal 
         visible={showSignupPrompt}
         onClose={() => setShowSignupPrompt(false)}
-        message="비회원은 최대 1개의 영역만 생성할 수 있습니다. 회원가입하여 더 많은 영역을 생성하세요!"
+        message={getSignupPromptMessage()}
       />
     </View>
   );
@@ -243,6 +247,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginVertical: 12,
     color: '#333',
+  },
+  locationsContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  scrollContent: {
+    paddingBottom: 80, // 하단 버튼을 위한 여백
   },
   slotsContainer: {
     flexDirection: 'row',
@@ -338,6 +349,57 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  addButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  slotCountBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FF9800',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  slotCountText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
+    marginBottom: 8,
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
 });
 

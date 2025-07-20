@@ -45,22 +45,9 @@ const LocationDetailScreen = () => {
   // 슬롯 상세 정보 모달 상태
   const [slotDetailModalVisible, setSlotDetailModalVisible] = useState(false);
   
-  // 제품 슬롯 상태 추가
-  const [productSlots, setProductSlots] = useState({
-    used: 0,
-    total: 3, // 기본값
-    available: true,
-    baseSlots: 3, // 기본 슬롯 수 (영역 기반)
-    additionalSlots: {
-      total: 0,      // 추가 슬롯 총합
-      itemSlots: 0,  // 아이템으로 추가된 슬롯
-      // 다른 추가 슬롯 유형도 여기에 추가 가능
-    }
-  });
-  
   const { locations, status: locationStatus } = useSelector(state => state.locations);
   const { products, status: productStatus } = useSelector(state => state.products);
-  const { isAnonymous } = useSelector(state => state.auth);
+  const { isAnonymous, slots } = useSelector(state => state.auth);
   
   const currentLocation = locations.find(location => location.id === locationId);
   
@@ -80,46 +67,19 @@ const LocationDetailScreen = () => {
     }, [dispatch, locationId, isAllProducts])
   );
   
-  // 슬롯 정보 업데이트
-  useEffect(() => {
-    if (!isAllProducts && products && locationId) {
-      // filteredProducts를 직접 사용하지 않고 여기서 필터링
-      const currentProducts = products.filter(product => 
-        product.locationId === locationId && !product.isConsumed
-      );
-      
-      const usedSlots = currentProducts.length;
-      
-      // 기본 슬롯 수와 추가 슬롯 수 계산
-      const baseSlots = 3; // 모든 영역에 기본 3개 슬롯 제공
-      
-      // 추가 슬롯은 초기에 0으로 설정 (추후 아이템이나 구독을 통해 추가될 수 있음)
-      const additionalSlotsTotal = 0;
-      const itemSlots = 0;
-      
-      const totalSlots = baseSlots + additionalSlotsTotal;
-      
-      setProductSlots({
-        used: usedSlots,
-        total: totalSlots,
-        available: usedSlots < totalSlots,
-        baseSlots,
-        additionalSlots: {
-          total: additionalSlotsTotal,
-          itemSlots: itemSlots
-        }
-      });
-    }
-  }, [products, locationId, isAnonymous, isAllProducts]);
-
   // 영역 목록으로 돌아가기
   const handleBackToLocations = () => {
     navigation.navigate('LocationsScreen');
   };
   
   const handleAddProduct = () => {
+    // Redux에서 제품 슬롯 정보 가져오기
+    const totalProductSlots = slots.productSlots.baseSlots + slots.productSlots.additionalSlots;
+    const usedProductSlots = filteredProducts.length;
+    const hasAvailableSlots = usedProductSlots < totalProductSlots;
+    
     // 슬롯이 없으면 구독/구매 유도
-    if (!productSlots.available) {
+    if (!hasAvailableSlots) {
       // 비회원인 경우 회원가입 유도
       if (isAnonymous) {
         setShowSignupPrompt(true);
@@ -133,8 +93,8 @@ const LocationDetailScreen = () => {
         buttons: [
           { text: '취소', style: 'cancel' },
           { 
-            text: '구독 정보', 
-            onPress: () => navigation.navigate('Profile') // 프로필 또는 구독 화면으로 이동
+            text: '상점으로 이동', 
+            onPress: () => navigation.navigate('Store')
           }
         ],
         icon: 'alert-circle',
@@ -213,13 +173,12 @@ const LocationDetailScreen = () => {
     );
   };
   
-  // 슬롯 사용률 계산을 위한 값만 유지 (availableSlots 변수 제거)
+  // Redux의 슬롯 정보를 사용하여 사용 가능한 슬롯 계산
+  const totalProductSlots = slots.productSlots.baseSlots + slots.productSlots.additionalSlots;
+  const usedProductSlots = !isAllProducts ? filteredProducts.length : 0;
+  const availableSlots = !isAllProducts ? Math.max(0, totalProductSlots - usedProductSlots) : 0;
   
-  // 사용 가능한 슬롯 계산
-  const availableSlots = useMemo(() => {
-    return !isAllProducts ? Math.max(0, productSlots.total - productSlots.used) : 0;
-  }, [productSlots.total, productSlots.used, isAllProducts]);
-  
+  // 삭제 확인 모달
   const DeleteConfirmModal = () => (
     <Modal
       visible={deleteConfirmVisible}
@@ -274,37 +233,30 @@ const LocationDetailScreen = () => {
           <View style={styles.slotDetailContainer}>
             <View style={styles.slotDetailItem}>
               <Text style={styles.slotDetailLabel}>사용 중인 슬롯:</Text>
-              <Text style={styles.slotDetailValue}>{productSlots.used}개</Text>
+              <Text style={styles.slotDetailValue}>{usedProductSlots}개</Text>
             </View>
             
             <View style={styles.slotDetailItem}>
               <Text style={styles.slotDetailLabel}>기본 제공 슬롯:</Text>
-              <Text style={styles.slotDetailValue}>{productSlots.baseSlots}개</Text>
+              <Text style={styles.slotDetailValue}>{slots.productSlots.baseSlots}개</Text>
             </View>
             
             <View style={styles.slotDetailItem}>
               <Text style={styles.slotDetailLabel}>추가 슬롯:</Text>
-              <Text style={styles.slotDetailValue}>{productSlots.additionalSlots.total}개</Text>
+              <Text style={styles.slotDetailValue}>{slots.productSlots.additionalSlots}개</Text>
             </View>
-            
-            {productSlots.additionalSlots.itemSlots > 0 && (
-              <View style={styles.slotDetailSubItem}>
-                <Text style={styles.slotDetailSubLabel}>- 아이템 슬롯:</Text>
-                <Text style={styles.slotDetailSubValue}>{productSlots.additionalSlots.itemSlots}개</Text>
-              </View>
-            )}
             
             <View style={[styles.slotDetailItem, styles.slotDetailTotal]}>
               <Text style={styles.slotDetailTotalLabel}>총 사용 가능 슬롯:</Text>
-              <Text style={styles.slotDetailTotalValue}>{productSlots.total}개</Text>
+              <Text style={styles.slotDetailTotalValue}>{totalProductSlots}개</Text>
             </View>
           </View>
           
           <View style={styles.slotDetailDescription}>
             <Text style={styles.slotDetailDescriptionText}>
               {isAnonymous ? 
-                `이 영역에는 기본 ${productSlots.baseSlots}개의 슬롯이 제공됩니다. 회원가입하면 아이템을 통해 더 많은 슬롯을 추가할 수 있습니다.` :
-                `이 영역에는 기본 ${productSlots.baseSlots}개의 슬롯이 제공됩니다. 아이템을 구매하여 더 많은 슬롯을 추가할 수 있습니다.`
+                `이 영역에는 기본 ${slots.productSlots.baseSlots}개의 슬롯이 제공됩니다. 회원가입하면 아이템을 통해 더 많은 슬롯을 추가할 수 있습니다.` :
+                `이 영역에는 기본 ${slots.productSlots.baseSlots}개의 슬롯이 제공됩니다. 아이템을 구매하여 더 많은 슬롯을 추가할 수 있습니다.`
               }
             </Text>
           </View>
@@ -453,8 +405,8 @@ const LocationDetailScreen = () => {
         {/* 슬롯 상태 표시 (특정 영역 화면에서만) */}
         {!isAllProducts && (
           <SlotStatusBar 
-            used={productSlots.used} 
-            total={productSlots.total} 
+            used={usedProductSlots} 
+            total={totalProductSlots} 
             type="product" 
             onDetailPress={() => setSlotDetailModalVisible(true)}
           />

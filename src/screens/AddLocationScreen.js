@@ -55,7 +55,7 @@ const AddLocationScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { status } = useSelector(state => state.locations);
-  const { isAnonymous } = useSelector(state => state.auth);
+  const { isAnonymous, slots } = useSelector(state => state.auth);
   const { locations } = useSelector(state => state.locations);
   
   // 스크롤 뷰 참조
@@ -97,8 +97,7 @@ const AddLocationScreen = () => {
   // 회원가입 유도 모달 상태
   const [signupPromptVisible, setSignupPromptVisible] = useState(false);
   const [signupPromptMessage, setSignupPromptMessage] = useState('');
-  const [limitInfo, setLimitInfo] = useState({ currentCount: 0, maxCount: 1 });
-
+  
   // 수정 모드일 경우 기존 데이터 로드
   useEffect(() => {
     if (isEditing && locationToEdit) {
@@ -121,14 +120,11 @@ const AddLocationScreen = () => {
   // 비회원 영역 제한 확인
   const checkLocationLimits = async () => {
     if (isAnonymous) {
-      const limitResult = await checkAnonymousLimits('locations');
+      const totalLocationSlots = slots.locationSlots.baseSlots;
+      const usedLocationSlots = locations.length;
       
-      if (limitResult.isLimited) {
-        setSignupPromptMessage(limitResult.message);
-        setLimitInfo({
-          currentCount: limitResult.currentCount,
-          maxCount: limitResult.maxCount
-        });
+      if (usedLocationSlots >= totalLocationSlots) {
+        setSignupPromptMessage(`비회원은 최대 ${totalLocationSlots}개의 영역만 생성할 수 있습니다. 회원가입하여 더 많은 영역을 생성하세요!`);
         setSignupPromptVisible(true);
       }
     }
@@ -292,10 +288,11 @@ const AddLocationScreen = () => {
     
     // 비회원 사용자의 영역 개수 제한 확인
     if (isAnonymous && !isEditing) {
-      const limitResult = await checkAnonymousLimits('locations');
-      if (limitResult.isLimited) {
-        setLimitInfo({ currentCount: limitResult.currentCount, maxCount: limitResult.maxCount });
-        setSignupPromptMessage(`무료 영역 등록은 ${limitResult.maxCount}개까지 가능합니다. 더 많은 영역을 등록하려면 회원가입이 필요합니다.`);
+      const totalLocationSlots = slots.locationSlots.baseSlots;
+      const usedLocationSlots = locations.length;
+      
+      if (usedLocationSlots >= totalLocationSlots) {
+        setSignupPromptMessage(`비회원은 최대 ${totalLocationSlots}개의 영역만 생성할 수 있습니다. 회원가입하여 더 많은 영역을 생성하세요!`);
         setSignupPromptVisible(true);
         return;
       }
@@ -346,60 +343,35 @@ const AddLocationScreen = () => {
     setShowSuccessModal(false);
     navigation.goBack();
   };
-
+  
   // 회원가입 유도 모달 닫기
   const handleSignupPromptClose = () => {
     setSignupPromptVisible(false);
-    navigation.goBack();
   };
-
-  // 아이콘 선택 컴포넌트 제거 (외부 컴포넌트로 대체)
   
-  // 등록/수정 성공 모달
+  // 성공 모달 컴포넌트
   const SuccessModal = () => (
     <Modal
       visible={showSuccessModal}
       transparent={true}
       animationType="fade"
-      onRequestClose={handleSuccessModalClose}
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <View style={styles.successIconContainer}>
+          <View style={styles.modalIconContainer}>
             <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
           </View>
-          
-          <Text style={styles.successTitle}>{isEditing ? '수정 완료!' : '등록 완료!'}</Text>
-          
-          <Text style={styles.successMessage}>
-            "{registeredLocation?.title}" 영역이 성공적으로 {isEditing ? '수정' : '등록'}되었습니다.
+          <Text style={styles.modalTitle}>
+            {isEditing ? '영역 수정 완료' : '영역 등록 완료'}
           </Text>
-          
-          <View style={styles.locationInfoContainer}>
-            {registeredLocation?.description && (
-              <View style={styles.locationInfoRow}>
-                <Text style={styles.locationInfoLabel}>설명:</Text>
-                <Text style={styles.locationInfoValue}>{registeredLocation.description}</Text>
-              </View>
-            )}
-            
-            <View style={styles.locationInfoRow}>
-              <Text style={styles.locationInfoLabel}>아이콘:</Text>
-              <View style={styles.iconPreview}>
-                <Ionicons 
-                  name={registeredLocation?.icon || 'cube-outline'} 
-                  size={24} 
-                  color="#4CAF50" 
-                />
-              </View>
-            </View>
-          </View>
-          
+          <Text style={styles.modalMessage}>
+            {isEditing ? '영역이 성공적으로 수정되었습니다.' : '새 영역이 성공적으로 등록되었습니다.'}
+          </Text>
           <TouchableOpacity 
-            style={styles.successButton}
+            style={styles.modalButton}
             onPress={handleSuccessModalClose}
           >
-            <Text style={styles.successButtonText}>확인</Text>
+            <Text style={styles.modalButtonText}>확인</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -460,7 +432,7 @@ const AddLocationScreen = () => {
           icons={availableIcons}
           selectedIcon={selectedIcon}
           onSelectIcon={setSelectedIcon}
-                />
+        />
         
         {/* 이미지 선택 (향후 구현) */}
         <View style={styles.imageSection}>
@@ -475,7 +447,7 @@ const AddLocationScreen = () => {
           <View style={styles.anonymousInfoContainer}>
             <Ionicons name="information-circle" size={20} color="#2196F3" style={styles.infoIcon} />
             <Text style={styles.anonymousInfoText}>
-              비회원은 영역을 1개만 추가할 수 있습니다. 현재 {locations.length}/1
+              비회원은 영역을 {slots.locationSlots.baseSlots}개만 추가할 수 있습니다. 현재 {locations.length}/{slots.locationSlots.baseSlots}
             </Text>
           </View>
         )}
@@ -515,8 +487,6 @@ const AddLocationScreen = () => {
         visible={signupPromptVisible}
         onClose={handleSignupPromptClose}
         message={signupPromptMessage}
-        currentCount={limitInfo.currentCount}
-        maxCount={limitInfo.maxCount}
       />
     </KeyboardAvoidingView>
   );
@@ -651,62 +621,30 @@ const styles = StyleSheet.create({
     width: '80%',
     maxWidth: 400,
   },
-  successIconContainer: {
+  modalIconContainer: {
     alignItems: 'center',
     marginBottom: 16,
   },
-  successTitle: {
-    fontSize: 24,
+  modalTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
     marginBottom: 8,
   },
-  successMessage: {
-    fontSize: 16,
+  modalMessage: {
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
     marginBottom: 16,
   },
-  locationInfoContainer: {
-    backgroundColor: '#f9f9f9',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  locationInfoRow: {
-    flexDirection: 'row',
-    marginBottom: 8,
-    alignItems: 'center',
-  },
-  locationInfoLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
-    width: 60,
-  },
-  locationInfoValue: {
-    fontSize: 14,
-    color: '#333',
-    flex: 1,
-  },
-  iconPreview: {
-    width: 36,
-    height: 36,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  successButton: {
+  modalButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
   },
-  successButtonText: {
+  modalButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',

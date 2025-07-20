@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints } from '../redux/slices/authSlice';
+import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
 
@@ -20,6 +21,14 @@ const StoreScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const { isLoggedIn, isAnonymous, user, subscription, slots, points, pointHistory } = useSelector(state => state.auth);
+  const { locations, status: locationsStatus } = useSelector(state => state.locations);
+  
+  // 영역 데이터 로드
+  useEffect(() => {
+    if (isLoggedIn) {
+      dispatch(fetchLocations());
+    }
+  }, [dispatch, isLoggedIn]);
   
   // 모달 상태
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -46,7 +55,7 @@ const StoreScreen = () => {
       locationSlots: 3,
       productSlotsPerLocation: 10,
       description: '일반 사용자를 위한 플랜. 본 상품은 구매일로부터 30일간 유지됩니다.',
-      features: ['영역 3개', '영역당 제품 10개', '알림 기능', '통계 기능']
+      features: ['영역 3개 (영역당 제품 10개)', '제품 슬롯 10개']
     }
   ];
   
@@ -1334,6 +1343,134 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 8,
     marginBottom: 0,
+  },
+  slotDetailsSection: {
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  slotDetailsSectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
+  },
+  slotItemsContainer: {
+    flexDirection: 'row',
+  },
+  slotItemCard: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    padding: 12,
+    marginRight: 8,
+    alignItems: 'center',
+    width: 100,
+  },
+  slotItemIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  slotItemName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+  },
+  emptySlotCard: {
+    backgroundColor: '#e0e0e0',
+    borderColor: '#ccc',
+    borderWidth: 1,
+  },
+  emptySlotIconContainer: {
+    backgroundColor: '#fff',
+  },
+  emptySlotText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  productListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  productListItemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e0f7fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  productListItemContent: {
+    flex: 1,
+  },
+  productListItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  productListItemLocation: {
+    fontSize: 12,
+    color: '#666',
+  },
+  productListItemExpiry: {
+    fontSize: 12,
+    color: '#F44336',
+    fontWeight: '600',
+    marginLeft: 10,
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+  },
+  viewAllButtonText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
   },
 });
 
