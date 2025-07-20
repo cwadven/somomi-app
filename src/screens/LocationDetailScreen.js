@@ -42,11 +42,20 @@ const LocationDetailScreen = () => {
   });
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   
+  // 슬롯 상세 정보 모달 상태
+  const [slotDetailModalVisible, setSlotDetailModalVisible] = useState(false);
+  
   // 제품 슬롯 상태 추가
   const [productSlots, setProductSlots] = useState({
     used: 0,
     total: 3, // 기본값
-    available: true
+    available: true,
+    baseSlots: 3, // 기본 슬롯 수 (영역 기반)
+    additionalSlots: {
+      total: 0,      // 추가 슬롯 총합
+      itemSlots: 0,  // 아이템으로 추가된 슬롯
+      // 다른 추가 슬롯 유형도 여기에 추가 가능
+    }
   });
   
   const { locations, status: locationStatus } = useSelector(state => state.locations);
@@ -80,12 +89,25 @@ const LocationDetailScreen = () => {
       );
       
       const usedSlots = currentProducts.length;
-      const totalSlots = isAnonymous ? 5 : 30; // 비회원 5개, 회원 30개 (예시)
+      
+      // 기본 슬롯 수와 추가 슬롯 수 계산
+      const baseSlots = 3; // 모든 영역에 기본 3개 슬롯 제공
+      
+      // 추가 슬롯은 초기에 0으로 설정 (추후 아이템이나 구독을 통해 추가될 수 있음)
+      const additionalSlotsTotal = 0;
+      const itemSlots = 0;
+      
+      const totalSlots = baseSlots + additionalSlotsTotal;
       
       setProductSlots({
         used: usedSlots,
         total: totalSlots,
-        available: usedSlots < totalSlots
+        available: usedSlots < totalSlots,
+        baseSlots,
+        additionalSlots: {
+          total: additionalSlotsTotal,
+          itemSlots: itemSlots
+        }
       });
     }
   }, [products, locationId, isAnonymous, isAllProducts]);
@@ -226,6 +248,80 @@ const LocationDetailScreen = () => {
     </Modal>
   );
   
+  // 슬롯 상세 정보 모달
+  const SlotDetailModal = () => (
+    <Modal
+      visible={slotDetailModalVisible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setSlotDetailModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>슬롯 상세 정보</Text>
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setSlotDetailModalVisible(false)}
+            >
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.slotDetailContainer}>
+            <View style={styles.slotDetailItem}>
+              <Text style={styles.slotDetailLabel}>사용 중인 슬롯:</Text>
+              <Text style={styles.slotDetailValue}>{productSlots.used}개</Text>
+            </View>
+            
+            <View style={styles.slotDetailItem}>
+              <Text style={styles.slotDetailLabel}>기본 제공 슬롯:</Text>
+              <Text style={styles.slotDetailValue}>{productSlots.baseSlots}개</Text>
+            </View>
+            
+            <View style={styles.slotDetailItem}>
+              <Text style={styles.slotDetailLabel}>추가 슬롯:</Text>
+              <Text style={styles.slotDetailValue}>{productSlots.additionalSlots.total}개</Text>
+            </View>
+            
+            {productSlots.additionalSlots.itemSlots > 0 && (
+              <View style={styles.slotDetailSubItem}>
+                <Text style={styles.slotDetailSubLabel}>- 아이템 슬롯:</Text>
+                <Text style={styles.slotDetailSubValue}>{productSlots.additionalSlots.itemSlots}개</Text>
+              </View>
+            )}
+            
+            <View style={[styles.slotDetailItem, styles.slotDetailTotal]}>
+              <Text style={styles.slotDetailTotalLabel}>총 사용 가능 슬롯:</Text>
+              <Text style={styles.slotDetailTotalValue}>{productSlots.total}개</Text>
+            </View>
+          </View>
+          
+          <View style={styles.slotDetailDescription}>
+            <Text style={styles.slotDetailDescriptionText}>
+              {isAnonymous ? 
+                `이 영역에는 기본 ${productSlots.baseSlots}개의 슬롯이 제공됩니다. 회원가입하면 아이템을 통해 더 많은 슬롯을 추가할 수 있습니다.` :
+                `이 영역에는 기본 ${productSlots.baseSlots}개의 슬롯이 제공됩니다. 아이템을 구매하여 더 많은 슬롯을 추가할 수 있습니다.`
+              }
+            </Text>
+          </View>
+          
+          {isAnonymous && (
+            <TouchableOpacity 
+              style={styles.signupButton}
+              onPress={() => {
+                setSlotDetailModalVisible(false);
+                setShowSignupPrompt(true);
+              }}
+            >
+              <Text style={styles.signupButtonText}>회원가입하기</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+  
   // 로딩 상태 변수
   const isLoading = locationStatus === 'loading' || (productStatus === 'loading' && !filteredProducts.length);
   
@@ -357,6 +453,7 @@ const LocationDetailScreen = () => {
             used={productSlots.used} 
             total={productSlots.total} 
             type="product" 
+            onDetailPress={() => setSlotDetailModalVisible(true)}
           />
         )}
         
@@ -404,6 +501,8 @@ const LocationDetailScreen = () => {
       />
       
       <DeleteConfirmModal />
+      
+      <SlotDetailModal />
       
       <SignupPromptModal 
         visible={showSignupPrompt}
@@ -503,10 +602,103 @@ const styles = StyleSheet.create({
     padding: 20,
     width: '80%',
   },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 12,
+    color: '#333',
+  },
+  closeButton: {
+    padding: 5,
+  },
+  slotDetailContainer: {
+    marginBottom: 15,
+  },
+  slotDetailItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  slotDetailLabel: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  slotDetailValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  slotDetailSubItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginLeft: 20,
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  slotDetailSubLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '400',
+  },
+  slotDetailSubValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  slotDetailTotal: {
+    borderBottomWidth: 0,
+    marginTop: 10,
+  },
+  slotDetailTotalLabel: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  slotDetailTotalValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  slotDetailDescription: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  slotDetailDescriptionText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  signupButton: {
+    marginTop: 20,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signupButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    marginLeft: 8,
   },
   modalMessage: {
     fontSize: 16,
@@ -516,12 +708,6 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-  },
-  modalButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    marginLeft: 8,
   },
   cancelButton: {
     backgroundColor: '#f0f0f0',
