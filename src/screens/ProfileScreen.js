@@ -238,6 +238,12 @@ const ProfileScreen = () => {
         />
 
         <SettingItem
+          icon="cart-outline"
+          title="상점"
+          onPress={() => navigation.navigate('Store')}
+        />
+
+        <SettingItem
           icon="information-circle-outline"
           title="앱 정보"
           onPress={showAppInfo}

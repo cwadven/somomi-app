@@ -21,6 +21,8 @@ import ConsumedProductDetailScreen from '../screens/ConsumedProductDetailScreen'
 import NotificationsScreen from '../screens/NotificationsScreen';
 import NotificationDetailScreen from '../screens/NotificationDetailScreen';
 import NotificationDateScreen from '../screens/NotificationDateScreen';
+import StoreScreen from '../screens/StoreScreen';
+import MyProductsScreen from '../screens/MyProductsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -167,6 +169,11 @@ const ProfileStack = () => {
         })}
       />
       <Stack.Screen 
+        name="Store" 
+        component={StoreScreen} 
+        options={{ title: '상점', headerShown: false }}
+      />
+      <Stack.Screen 
         name="ProductDetail" 
         component={ProductDetailScreen} 
         options={({ route }) => ({
@@ -264,6 +271,11 @@ const AppNavigator = ({ linking }) => {
               name="Profile" 
               component={ProfileStack} 
               options={{ title: '프로필' }}
+            />
+            <Tab.Screen 
+              name="Store" 
+              component={StoreScreen} 
+              options={{ title: '상점' }}
             />
           </Tab.Navigator>
         </NavigationContainer>

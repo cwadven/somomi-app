@@ -144,6 +144,22 @@ const initialState = {
   isAnonymous: false, // 비회원 여부
   loading: false,
   error: null,
+  subscription: {
+    isSubscribed: false,
+    plan: null, // 'basic', 'premium', 'pro' 등
+    expiresAt: null,
+  },
+  slots: {
+    locationSlots: {
+      baseSlots: 3, // 기본 영역 슬롯 수
+      additionalSlots: 0, // 추가 구매한 영역 슬롯 수
+    },
+    productSlots: {
+      baseSlots: 3, // 각 영역당 기본 제품 슬롯 수
+      additionalSlots: 0, // 추가 구매한 제품 슬롯 수
+    }
+  },
+  purchaseHistory: [], // 구매 내역
 };
 
 export const authSlice = createSlice({
@@ -157,12 +173,33 @@ export const authSlice = createSlice({
       state.user = action.payload;
       state.error = null;
     },
-    // 로그아웃
+    // 구독 정보 업데이트
+    updateSubscription: (state, action) => {
+      state.subscription = { ...state.subscription, ...action.payload };
+    },
+
+    // 슬롯 정보 업데이트
+    updateSlots: (state, action) => {
+      state.slots = { ...state.slots, ...action.payload };
+    },
+
+    // 구매 내역 추가
+    addPurchase: (state, action) => {
+      state.purchaseHistory.push({
+        ...action.payload,
+        purchaseDate: new Date().toISOString(),
+      });
+    },
+
+    // 로그아웃 시 구독 및 슬롯 정보도 초기화
     logout: (state) => {
       state.isLoggedIn = false;
       state.isAnonymous = false;
       state.user = null;
       state.token = null;
+      state.subscription = initialState.subscription;
+      state.slots = initialState.slots;
+      state.purchaseHistory = [];
       // localStorage에서 토큰 제거
       localStorage.removeItem('jwt_token');
     },
@@ -292,7 +329,10 @@ export const {
   updateUserInfo,
   setLoading,
   setError,
-  clearError
+  clearError,
+  updateSubscription,
+  updateSlots,
+  addPurchase
 } = authSlice.actions;
 
 export default authSlice.reducer; 
