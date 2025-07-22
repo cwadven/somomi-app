@@ -8,6 +8,7 @@ export const STORAGE_KEYS = {
   NOTIFICATIONS: 'somomi_notifications',
   CONSUMED_PRODUCTS: 'somomi_consumed_products',
   PROCESSED_NOTIFICATIONS: 'somomi_processed_notifications',
+  USER_SLOTS: 'somomi_user_slots', // 사용자 슬롯 정보
 };
 
 // 데이터 저장 함수
@@ -53,5 +54,29 @@ export const clearAllData = async () => {
   } catch (error) {
     console.error('Error clearing all data:', error);
     return false;
+  }
+}; 
+
+// 사용자 슬롯 정보 저장 함수
+export const saveUserSlots = async (slots) => {
+  try {
+    await saveData(STORAGE_KEYS.USER_SLOTS, slots);
+    console.log('사용자 슬롯 정보가 저장되었습니다:', slots);
+    return true;
+  } catch (error) {
+    console.error('사용자 슬롯 정보 저장 중 오류:', error);
+    return false;
+  }
+};
+
+// 사용자 슬롯 정보 로드 함수
+export const loadUserSlots = async () => {
+  try {
+    const slots = await loadData(STORAGE_KEYS.USER_SLOTS);
+    console.log('사용자 슬롯 정보 로드:', slots);
+    return slots;
+  } catch (error) {
+    console.error('사용자 슬롯 정보 로드 중 오류:', error);
+    return null;
   }
 }; 
