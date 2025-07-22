@@ -179,28 +179,23 @@ const StoreScreen = () => {
     if (!selectedProduct) return;
     
     try {
+      // 포인트 차감
+      const pointCost = selectedProduct.pointPrice;
+      
+      // 포인트가 부족한 경우
+      if (points.balance < pointCost) {
+        showErrorModal(`젬이 부족합니다.\n현재 젬: ${points.balance.toLocaleString()}G\n필요 젬: ${pointCost.toLocaleString()}G`);
+        return;
+      }
+      
       if (selectedProduct.type === 'subscription') {
-        // 포인트 차감
-        const pointCost = selectedProduct.pointPrice;
-        
-        // 포인트가 부족한 경우
-        if (points.balance < pointCost) {
-          showErrorModal(`젬이 부족합니다.\n현재 젬: ${points.balance.toLocaleString()}G\n필요 젬: ${pointCost.toLocaleString()}G`);
-          return;
-        }
-        
-        // 포인트 사용
-        const result = dispatch(usePoints({
+        // 포인트 사용 - usePoints 액션 호출
+        dispatch(usePoints({
           amount: pointCost,
           description: `${selectedProduct.name} 구독 구매`,
           itemId: selectedProduct.id,
           itemType: 'subscription'
         }));
-        
-        if (!result) {
-          showErrorModal('젬 사용 중 오류가 발생했습니다.');
-          return;
-        }
         
         // 구독 처리
         const expiryDate = new Date();
@@ -234,28 +229,14 @@ const StoreScreen = () => {
         }));
         
         showSuccessModal('구독 완료', `${selectedProduct.name} 구독이 완료되었습니다. 이제 더 많은 영역과 제품을 등록할 수 있습니다.`);
-      } else if (selectedProduct.type === 'slot') {
-        // 포인트 차감
-        const pointCost = selectedProduct.pointPrice;
-        
-        // 포인트가 부족한 경우
-        if (points.balance < pointCost) {
-          showErrorModal(`젬이 부족합니다.\n현재 젬: ${points.balance.toLocaleString()}G\n필요 젬: ${pointCost.toLocaleString()}G`);
-          return;
-        }
-        
-        // 포인트 사용
-        const result = dispatch(usePoints({
+      } else if (selectedProduct.type === 'productSlot' || selectedProduct.type === 'locationSlot') {
+        // 포인트 사용 - usePoints 액션 호출
+        dispatch(usePoints({
           amount: pointCost,
           description: `${selectedProduct.name} 구매`,
           itemId: selectedProduct.id,
           itemType: 'slot'
         }));
-        
-        if (!result) {
-          showErrorModal('젬 사용 중 오류가 발생했습니다.');
-          return;
-        }
         
         // 슬롯 구매 처리
         if (selectedProduct.type === 'locationSlot') {
@@ -264,12 +245,20 @@ const StoreScreen = () => {
               additionalSlots: slots.locationSlots.additionalSlots + selectedProduct.amount
             }
           }));
+          
+          // 업데이트된 슬롯 정보를 포함한 성공 메시지
+          const totalLocationSlots = slots.locationSlots.baseSlots + slots.locationSlots.additionalSlots + selectedProduct.amount;
+          showSuccessModal('구매 완료', `${selectedProduct.name} 구매가 완료되었습니다.\n현재 보유 영역 슬롯: ${totalLocationSlots}개`);
         } else if (selectedProduct.type === 'productSlot') {
           dispatch(updateSlots({
             productSlots: {
               additionalSlots: slots.productSlots.additionalSlots + selectedProduct.amount
             }
           }));
+          
+          // 업데이트된 슬롯 정보를 포함한 성공 메시지
+          const totalProductSlots = slots.productSlots.baseSlots + slots.productSlots.additionalSlots + selectedProduct.amount;
+          showSuccessModal('구매 완료', `${selectedProduct.name} 구매가 완료되었습니다.\n현재 보유 제품 슬롯: ${totalProductSlots}개/영역`);
         }
         
         // 구매 내역 추가
@@ -283,9 +272,10 @@ const StoreScreen = () => {
           amount: selectedProduct.amount
         }));
         
-        showSuccessModal('구매 완료', `${selectedProduct.name} 구매가 완료되었습니다.`);
+        // showSuccessModal('구매 완료', `${selectedProduct.name} 구매가 완료되었습니다.`); // 이 부분은 위에서 대체됨
       }
     } catch (error) {
+      console.log('error', error);
       showErrorModal('구매 처리 중 오류가 발생했습니다.');
     }
   };

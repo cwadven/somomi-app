@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { saveUserSlots, loadUserSlots } from '../../utils/storageUtils';
 
 // JWT 토큰 발급 API 호출 (실제 구현 시 서버에서 가져옴)
 export const getAnonymousToken = createAsyncThunk(
@@ -214,19 +215,51 @@ export const authSlice = createSlice({
           itemType: action.payload.itemType,
         });
         
-        return true;
+        // 로컬 스토리지에 슬롯 정보 저장
+        try {
+          saveUserSlots(state.slots);
+        } catch (error) {
+          console.error('슬롯 정보 저장 중 오류:', error);
+        }
       }
-      return false;
+      // 반환값 제거 - Immer 오류 해결
     },
 
     // 구독 정보 업데이트
     updateSubscription: (state, action) => {
       state.subscription = { ...state.subscription, ...action.payload };
+      
+      // 로컬 스토리지에 슬롯 정보 저장
+      try {
+        saveUserSlots(state.slots);
+      } catch (error) {
+        console.error('슬롯 정보 저장 중 오류:', error);
+      }
     },
 
     // 슬롯 정보 업데이트
     updateSlots: (state, action) => {
-      state.slots = { ...state.slots, ...action.payload };
+      // 기존 슬롯 정보를 깊은 복사로 업데이트
+      if (action.payload.locationSlots) {
+        state.slots.locationSlots = {
+          ...state.slots.locationSlots,
+          ...action.payload.locationSlots
+        };
+      }
+      
+      if (action.payload.productSlots) {
+        state.slots.productSlots = {
+          ...state.slots.productSlots,
+          ...action.payload.productSlots
+        };
+      }
+      
+      // 로컬 스토리지에 슬롯 정보 저장
+      try {
+        saveUserSlots(state.slots);
+      } catch (error) {
+        console.error('슬롯 정보 저장 중 오류:', error);
+      }
     },
 
     // 구매 내역 추가
