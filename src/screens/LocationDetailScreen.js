@@ -54,8 +54,8 @@ const LocationDetailScreen = () => {
   // 모든 제품 또는 특정 영역의 제품만 필터링 (메모이제이션 적용)
   const filteredProducts = useMemo(() => {
     return isAllProducts 
-      ? products.filter(product => !product.isConsumed)  // 모든 제품 (소진되지 않은)
-      : products.filter(product => product.locationId === locationId && !product.isConsumed);  // 특정 영역 제품만
+    ? products.filter(product => !product.isConsumed)  // 모든 제품 (소진되지 않은)
+    : products.filter(product => product.locationId === locationId && !product.isConsumed);  // 특정 영역 제품만
   }, [products, locationId, isAllProducts]);
   
   useFocusEffect(
@@ -66,7 +66,7 @@ const LocationDetailScreen = () => {
       }
     }, [dispatch, locationId, isAllProducts])
   );
-  
+
   // 영역 목록으로 돌아가기
   const handleBackToLocations = () => {
     navigation.navigate('LocationsScreen');
@@ -82,7 +82,7 @@ const LocationDetailScreen = () => {
     if (!hasAvailableSlots) {
       // 비회원인 경우 회원가입 유도
       if (isAnonymous) {
-        setShowSignupPrompt(true);
+      setShowSignupPrompt(true);
         return;
       }
       
@@ -104,7 +104,7 @@ const LocationDetailScreen = () => {
       return;
     }
     
-    navigation.navigate('ProductForm', { mode: 'add', locationId });
+            navigation.navigate('ProductForm', { mode: 'add', locationId });
   };
   
   const handleProductPress = (productId) => {
@@ -283,11 +283,11 @@ const LocationDetailScreen = () => {
   // 로딩 컴포넌트 메모이제이션
   const loadingComponent = useMemo(() => {
     if (isLoading) {
-      return (
-        <View style={[styles.container, styles.centered]}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-        </View>
-      );
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
     }
     return null;
   }, [isLoading]);
@@ -412,17 +412,17 @@ const LocationDetailScreen = () => {
           />
         )}
         
-        <View style={styles.tabContainer}>
-          <TouchableOpacity 
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
             style={[styles.tab, activeTab === 'products' && styles.activeTab]}
-            onPress={() => setActiveTab('products')}
-          >
+              onPress={() => setActiveTab('products')}
+            >
             <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
-              제품 목록
-            </Text>
-          </TouchableOpacity>
+                제품 목록
+              </Text>
+            </TouchableOpacity>
           {!isAllProducts && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.tab, activeTab === 'notifications' && styles.activeTab]}
               onPress={() => setActiveTab('notifications')}
             >
@@ -431,25 +431,25 @@ const LocationDetailScreen = () => {
               </Text>
             </TouchableOpacity>
           )}
-        </View>
+          </View>
       </View>
       
       <View style={styles.content}>
-        {activeTab === 'products' ? (
+      {activeTab === 'products' ? (
           renderProductSlots()
         ) : (
           <ScrollView 
             style={styles.scrollContainer}
             contentContainerStyle={styles.scrollContentContainer}
-          >
+            >
             {currentLocation && (
               <LocationNotificationSettings locationId={locationId} />
             )}
-          </ScrollView>
-        )}
+        </ScrollView>
+      )}
       </View>
       
-      <AlertModal 
+      <AlertModal
         visible={alertModalVisible}
         title={alertModalConfig.title}
         message={alertModalConfig.message}

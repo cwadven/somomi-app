@@ -34,7 +34,7 @@ const LocationSelector = forwardRef(({
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
           <Text style={styles.loaderText}>영역 정보를 불러오는 중...</Text>
-        </View>
+      </View>
       ) : locations.length > 0 ? (
         <>
           <FlatList
@@ -88,12 +88,12 @@ const LocationSelector = forwardRef(({
         <View style={styles.emptyLocations}>
           <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
           <View style={styles.emptyButtonsContainer}>
-            <TouchableOpacity
-              style={styles.addLocationButton}
-              onPress={onAddLocation}
-            >
-              <Text style={styles.addLocationButtonText}>영역 추가하기</Text>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addLocationButton}
+            onPress={onAddLocation}
+          >
+            <Text style={styles.addLocationButtonText}>영역 추가하기</Text>
+          </TouchableOpacity>
             
             {onRetry && (
               <TouchableOpacity

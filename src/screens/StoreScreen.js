@@ -23,6 +23,8 @@ const StoreScreen = () => {
   const { isLoggedIn, isAnonymous, user, subscription, slots, points, pointHistory } = useSelector(state => state.auth);
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
   
+  const [showPointHistory, setShowPointHistory] = useState(false);
+  
   // 영역 데이터 로드
   useEffect(() => {
     if (isLoggedIn) {
@@ -694,25 +696,44 @@ const StoreScreen = () => {
           {renderSlotItems()}
         </View>
         
-        {/* 포인트 내역 섹션 */}
-        {isLoggedIn && pointHistory.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>G 내역</Text>
-            <FlatList
-              data={pointHistory}
-              renderItem={renderPointHistoryItem}
-              keyExtractor={item => item.id}
-              scrollEnabled={false}
-              style={styles.historyList}
-            />
-          </View>
-        )}
-        
         {/* 포인트 충전 섹션 - 맨 아래로 이동 */}
         <View style={[styles.section, styles.pointChargeSection]}>
           <Text style={styles.sectionTitle}>G 충전</Text>
           {renderPointPackages()}
+          
+          {/* G 내역 보기 버튼 */}
+          {isLoggedIn && pointHistory.length > 0 && (
+            <TouchableOpacity 
+              style={styles.historyToggleButton}
+              onPress={() => setShowPointHistory(!showPointHistory)}
+            >
+              <Text style={styles.historyToggleText}>
+                {showPointHistory ? '내역 접기' : 'G 내역 자세히 보기'}
+              </Text>
+              <Ionicons 
+                name={showPointHistory ? 'chevron-up' : 'chevron-down'} 
+                size={16} 
+                color="#4CAF50" 
+              />
+            </TouchableOpacity>
+          )}
+          
+          {/* 포인트 내역 섹션 - 자세히 버튼 클릭 시에만 표시 */}
+          {isLoggedIn && pointHistory.length > 0 && showPointHistory && (
+            <View style={styles.historyContainer}>
+              <Text style={styles.historyTitle}>G 내역</Text>
+              <FlatList
+                data={pointHistory}
+                renderItem={renderPointHistoryItem}
+                keyExtractor={item => item.id}
+                scrollEnabled={false}
+                style={styles.historyList}
+              />
+            </View>
+          )}
         </View>
+        
+        {/* 포인트 내역 섹션 - 제거 */}
       </ScrollView>
       
       {/* 모달 */}
@@ -1461,6 +1482,34 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#666',
+  },
+  historyToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+  },
+  historyToggleText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  historyContainer: {
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  historyTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
   },
 });
 

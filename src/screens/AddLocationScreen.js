@@ -97,7 +97,7 @@ const AddLocationScreen = () => {
   // 회원가입 유도 모달 상태
   const [signupPromptVisible, setSignupPromptVisible] = useState(false);
   const [signupPromptMessage, setSignupPromptMessage] = useState('');
-  
+
   // 수정 모드일 경우 기존 데이터 로드
   useEffect(() => {
     if (isEditing && locationToEdit) {
@@ -343,7 +343,7 @@ const AddLocationScreen = () => {
     setShowSuccessModal(false);
     navigation.goBack();
   };
-  
+
   // 회원가입 유도 모달 닫기
   const handleSignupPromptClose = () => {
     setSignupPromptVisible(false);
@@ -432,7 +432,7 @@ const AddLocationScreen = () => {
           icons={availableIcons}
           selectedIcon={selectedIcon}
           onSelectIcon={setSelectedIcon}
-        />
+                />
         
         {/* 이미지 선택 (향후 구현) */}
         <View style={styles.imageSection}>

@@ -102,8 +102,8 @@ const ProductFormScreen = () => {
 
   // 카테고리 및 영역 데이터 로드
   useEffect(() => {
-    dispatch(fetchCategories());
-    dispatch(fetchLocations());
+      dispatch(fetchCategories());
+      dispatch(fetchLocations());
     dispatch(fetchProducts());
   }, [dispatch]);
 
@@ -156,28 +156,28 @@ const ProductFormScreen = () => {
   useEffect(() => {
     if (!isEditMode && locationId) {
       if (locations.length > 0) {
-        const location = locations.find(loc => loc.id === locationId);
-        if (location) {
-          setSelectedLocation(location);
-          
-          // 해당 영역의 제품 목록 필터링
-          const productsInLocation = allProducts && allProducts.filter(p => p.locationId === locationId) || [];
-          setCurrentLocationProducts(productsInLocation);
-          
-          // 비회원이고 제품이 5개 이상인 경우 회원가입 유도 모달 표시
-          if (!isAuthenticated && productsInLocation.length >= 5) {
-            setShowSignupPrompt(true);
-          }
+      const location = locations.find(loc => loc.id === locationId);
+      if (location) {
+        setSelectedLocation(location);
+        
+        // 해당 영역의 제품 목록 필터링
+        const productsInLocation = allProducts && allProducts.filter(p => p.locationId === locationId) || [];
+        setCurrentLocationProducts(productsInLocation);
+        
+        // 비회원이고 제품이 5개 이상인 경우 회원가입 유도 모달 표시
+        if (!isAuthenticated && productsInLocation.length >= 5) {
+          setShowSignupPrompt(true);
+        }
         } else {
           // 영역을 찾지 못한 경우 다시 로드 시도
           console.log('영역을 찾지 못했습니다. 다시 로드합니다:', locationId);
           dispatch(fetchLocations());
-        }
+      }
       } else {
         // 영역 데이터가 없는 경우 다시 로드 시도
         console.log('영역 데이터가 없습니다. 다시 로드합니다.');
         dispatch(fetchLocations());
-      }
+    }
     }
   }, [isEditMode, locationId, locations, allProducts, isAuthenticated, dispatch]);
 
