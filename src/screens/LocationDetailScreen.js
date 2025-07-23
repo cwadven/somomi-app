@@ -13,7 +13,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { fetchProducts, deleteProductAsync } from '../redux/slices/productsSlice';
-import { deleteLocation, fetchLocationById } from '../redux/slices/locationsSlice';
+import { deleteLocation, fetchLocationById, fetchLocations } from '../redux/slices/locationsSlice';
 import LocationNotificationSettings from '../components/LocationNotificationSettings';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
@@ -49,7 +49,19 @@ const LocationDetailScreen = () => {
   const { products, status: productStatus } = useSelector(state => state.products);
   const { isAnonymous, slots } = useSelector(state => state.auth);
   
-  const currentLocation = locations.find(location => location.id === locationId);
+  // 현재 영역 정보 가져오기 (Redux의 currentLocation 또는 locations 배열에서)
+  const currentLocation = useMemo(() => {
+    // 모든 제품 화면인 경우 null 반환
+    if (isAllProducts) return null;
+    
+    // Redux의 locations 배열에서 현재 영역 찾기
+    return locations.find(location => location.id === locationId);
+  }, [locations, locationId, isAllProducts]);
+  
+  // 디버깅 로그
+  useEffect(() => {
+    console.log('현재 영역 정보:', currentLocation);
+  }, [currentLocation]);
   
   // 모든 제품 또는 특정 영역의 제품만 필터링 (메모이제이션 적용)
   const filteredProducts = useMemo(() => {
@@ -58,15 +70,37 @@ const LocationDetailScreen = () => {
     : products.filter(product => product.locationId === locationId && !product.isConsumed);  // 특정 영역 제품만
   }, [products, locationId, isAllProducts]);
   
+  // 컴포넌트가 마운트될 때와 화면에 포커스될 때 데이터 로드
+  useEffect(() => {
+    console.log('LocationDetailScreen - useEffect 실행, locationId:', locationId);
+    dispatch(fetchProducts());
+    dispatch(fetchLocations()); // 모든 영역 정보 로드
+    
+    if (!isAllProducts && locationId) {
+      dispatch(fetchLocationById(locationId))
+        .unwrap()
+        .then(location => {
+          console.log('영역 정보 로드 성공:', location);
+        })
+        .catch(error => {
+          console.error('영역 정보 로드 실패:', error);
+        });
+    }
+  }, [dispatch, locationId, isAllProducts]);
+  
+  // 화면에 포커스될 때마다 데이터 새로고침
   useFocusEffect(
     useCallback(() => {
+      console.log('LocationDetailScreen - useFocusEffect 실행, locationId:', locationId);
       dispatch(fetchProducts());
+      dispatch(fetchLocations()); // 모든 영역 정보 로드
+      
       if (!isAllProducts && locationId) {
         dispatch(fetchLocationById(locationId));
       }
     }, [dispatch, locationId, isAllProducts])
   );
-
+  
   // 영역 목록으로 돌아가기
   const handleBackToLocations = () => {
     navigation.navigate('LocationsScreen');
@@ -442,8 +476,13 @@ const LocationDetailScreen = () => {
             style={styles.scrollContainer}
             contentContainerStyle={styles.scrollContentContainer}
             >
-            {currentLocation && (
-              <LocationNotificationSettings locationId={locationId} />
+            {locationId && locations.length > 0 ? (
+              <LocationNotificationSettings locationId={locationId} location={currentLocation} />
+            ) : (
+              <View style={[styles.container, styles.centered]}>
+                <ActivityIndicator size="large" color="#4CAF50" />
+                <Text style={styles.loadingText}>영역 정보를 불러오는 중...</Text>
+              </View>
             )}
         </ScrollView>
       )}
@@ -741,6 +780,11 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+    fontSize: 14,
   },
 });
 

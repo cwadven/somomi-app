@@ -26,9 +26,20 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
   const dispatch = useDispatch();
   const { currentNotifications, status } = useSelector(state => state.notifications);
   const { isAnonymous } = useSelector(state => state.auth);
+  const { locations } = useSelector(state => state.locations);
+  
+  // 영역 정보 가져오기 (props로 전달된 location이 없으면 Redux에서 찾기)
+  const locationData = location && Object.keys(location).length > 0 
+    ? location 
+    : locations.find(loc => loc.id === locationId) || {};
+  
+  // 디버그 로그
+  useEffect(() => {
+    console.log('LocationNotificationSettings - 영역 정보:', locationData);
+  }, [locationData]);
   
   // 영역 이름 안전하게 가져오기
-  const locationTitle = location?.title || '영역';
+  const locationTitle = locationData?.title || '영역';
   
   // 알림 설정 상태
   const [expiryEnabled, setExpiryEnabled] = useState(true);
@@ -52,6 +63,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
   // 컴포넌트 마운트 시 영역 알림 설정 로드
   useEffect(() => {
     if (locationId) {
+      console.log('영역 알림 설정 로드:', locationId);
       dispatch(fetchLocationNotifications(locationId));
     }
   }, [dispatch, locationId]);
