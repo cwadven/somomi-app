@@ -18,6 +18,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { fetchProductById, deleteProductAsync, markProductAsConsumedAsync } from '../redux/slices/productsSlice';
 import AlertModal from '../components/AlertModal';
 import ProductNotificationSettings from '../components/ProductNotificationSettings';
+import CalendarView from '../components/CalendarView';
+
+// 월별 일수 계산 함수
+const getDaysInMonth = (year, month) => {
+  return new Date(year, month + 1, 0).getDate();
+};
+
+// 월의 첫 날 요일 계산 함수
+const getFirstDayOfMonth = (year, month) => {
+  return new Date(year, month, 1).getDay();
+};
 
 // HP 바 컴포넌트
 const HPBar = ({ percentage, type }) => {
@@ -88,6 +99,10 @@ const ProductDetailScreen = () => {
   
   // 활성화된 탭 상태
   const [activeTab, setActiveTab] = useState('details'); // 'details' 또는 'notifications'
+  
+  // 달력 표시 상태
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   
   useEffect(() => {
     dispatch(fetchProductById(productId));
@@ -205,11 +220,6 @@ const ProductDetailScreen = () => {
         </View>
       )
     }));
-  };
-  
-  // 월별 일수 계산
-  const getDaysInMonth = (year, month) => {
-    return new Date(year, month + 1, 0).getDate();
   };
   
   // 년도 선택 옵션 생성
@@ -624,6 +634,121 @@ const ProductDetailScreen = () => {
     navigation.goBack();
   };
 
+
+  
+  // 달력에 표시할 날짜 생성
+  const getMarkedDates = () => {
+    const markedDates = [];
+    
+    // 유통기한 추가
+    if (currentProduct.expiryDate) {
+      markedDates.push({
+        date: new Date(currentProduct.expiryDate),
+        type: 'expiry',
+        label: '유통기한'
+      });
+    }
+    
+    // 소진 예상일 추가
+    if (currentProduct.estimatedEndDate) {
+      markedDates.push({
+        date: new Date(currentProduct.estimatedEndDate),
+        type: 'end',
+        label: '소진 예상일'
+      });
+    }
+    
+    return markedDates;
+  };
+  
+  // 유통기한 및 소진 예상일 정보 섹션에 달력 보기 버튼 추가
+  const renderInfoSection = () => {
+    return (
+      <View style={styles.infoSection}>
+        {/* 유통기한 정보 */}
+        {currentProduct.expiryDate && (
+          <View style={styles.hpSection}>
+            <View style={styles.hpHeader}>
+              <Ionicons name="calendar-outline" size={20} color="#2196F3" />
+              <Text style={styles.hpTitle}>유통기한</Text>
+              <Text style={styles.hpDate}>
+                {new Date(currentProduct.expiryDate).toLocaleDateString()}
+              </Text>
+            </View>
+            
+            <HPBar 
+              percentage={calculateExpiryPercentage() || 0} 
+              type="expiry" 
+            />
+            
+            <Text style={styles.hpText}>
+              {expiryDays > 0 
+                ? `유통기한까지 ${expiryDays}일 남았습니다.`
+                : '유통기한이 지났습니다!'
+              }
+            </Text>
+          </View>
+        )}
+        
+        {/* 소진 예상일 정보 */}
+        {currentProduct.estimatedEndDate && (
+          <View style={styles.hpSection}>
+            <View style={styles.hpHeader}>
+              <Ionicons name="hourglass-outline" size={20} color="#4CAF50" />
+              <Text style={styles.hpTitle}>소진 예상</Text>
+              <Text style={styles.hpDate}>
+                {new Date(currentProduct.estimatedEndDate).toLocaleDateString()}
+              </Text>
+            </View>
+            
+            <HPBar 
+              percentage={calculateConsumptionPercentage() || 0} 
+              type="consumption" 
+            />
+            
+            <Text style={styles.hpText}>
+              {consumptionDays > 0 
+                ? `소진 예상일까지 ${consumptionDays}일 남았습니다.`
+                : '소진 예상일이 지났습니다!'
+              }
+            </Text>
+          </View>
+        )}
+        
+        {/* 달력으로 보기 버튼 */}
+        {(currentProduct.expiryDate || currentProduct.estimatedEndDate) && (
+          <TouchableOpacity 
+            style={styles.calendarButton}
+            onPress={() => setShowCalendar(!showCalendar)}
+          >
+            <Ionicons 
+              name={showCalendar ? "calendar" : "calendar-outline"} 
+              size={20} 
+              color="#4CAF50" 
+            />
+            <Text style={styles.calendarButtonText}>
+              {showCalendar ? "달력 닫기" : "달력으로 보기"}
+            </Text>
+            <Ionicons 
+              name={showCalendar ? "chevron-up" : "chevron-down"} 
+              size={20} 
+              color="#4CAF50" 
+            />
+          </TouchableOpacity>
+        )}
+        
+        {/* 달력 렌더링 */}
+        {showCalendar && (
+          <CalendarView 
+            currentMonth={currentMonth}
+            onMonthChange={(newMonth) => setCurrentMonth(newMonth)}
+            markedDates={getMarkedDates()}
+          />
+        )}
+      </View>
+    );
+  };
+  
   // 제품 상세 정보 렌더링
   const renderProductDetails = () => {
     return (
@@ -671,57 +796,7 @@ const ProductDetailScreen = () => {
         </View>
         
         {/* 유통기한 및 소진 예상일 정보 */}
-        <View style={styles.infoSection}>
-          {/* 유통기한 정보 */}
-          {currentProduct.expiryDate && (
-            <View style={styles.hpSection}>
-              <View style={styles.hpHeader}>
-                <Ionicons name="calendar-outline" size={20} color="#2196F3" />
-                <Text style={styles.hpTitle}>유통기한</Text>
-                <Text style={styles.hpDate}>
-                  {new Date(currentProduct.expiryDate).toLocaleDateString()}
-                </Text>
-              </View>
-              
-              <HPBar 
-                percentage={calculateExpiryPercentage() || 0} 
-                type="expiry" 
-              />
-              
-              <Text style={styles.hpText}>
-                {expiryDays > 0 
-                  ? `유통기한까지 ${expiryDays}일 남았습니다.`
-                  : '유통기한이 지났습니다!'
-                }
-              </Text>
-            </View>
-          )}
-          
-          {/* 소진 예상일 정보 */}
-          {currentProduct.estimatedEndDate && (
-            <View style={styles.hpSection}>
-              <View style={styles.hpHeader}>
-                <Ionicons name="hourglass-outline" size={20} color="#4CAF50" />
-                <Text style={styles.hpTitle}>소진 예상</Text>
-                <Text style={styles.hpDate}>
-                  {new Date(currentProduct.estimatedEndDate).toLocaleDateString()}
-                </Text>
-              </View>
-              
-              <HPBar 
-                percentage={calculateConsumptionPercentage() || 0} 
-                type="consumption" 
-              />
-              
-              <Text style={styles.hpText}>
-                {consumptionDays > 0 
-                  ? `소진 예상일까지 ${consumptionDays}일 남았습니다.`
-                  : '소진 예상일이 지났습니다!'
-                }
-              </Text>
-            </View>
-          )}
-        </View>
+        {renderInfoSection()}
         
         {/* 추가 정보 섹션 */}
         <View style={styles.detailsSection}>
@@ -1456,6 +1531,25 @@ const styles = StyleSheet.create({
   },
   datePickerSelector: {
     display: 'none', // 선택 표시선 숨기기
+  },
+
+  calendarButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E0F2F7',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#2196F3',
+  },
+  calendarButtonText: {
+    fontSize: 14,
+    color: '#2196F3',
+    fontWeight: 'bold',
+    marginHorizontal: 5,
   },
 });
 
