@@ -661,6 +661,38 @@ const ProductDetailScreen = () => {
     return markedDates;
   };
   
+  // 달력에 표시할 날짜 범위 생성
+  const getDateRanges = () => {
+    const dateRanges = [];
+    
+    // 구매일이 있는 경우에만 범위 추가
+    if (currentProduct.purchaseDate) {
+      const purchaseDate = new Date(currentProduct.purchaseDate);
+      
+      // 구매일 ~ 유통기한 범위 추가
+      if (currentProduct.expiryDate) {
+        dateRanges.push({
+          startDate: purchaseDate,
+          endDate: new Date(currentProduct.expiryDate),
+          type: 'expiry',
+          label: '구매일~유통기한'
+        });
+      }
+      
+      // 구매일 ~ 소진 예상일 범위 추가
+      if (currentProduct.estimatedEndDate) {
+        dateRanges.push({
+          startDate: purchaseDate,
+          endDate: new Date(currentProduct.estimatedEndDate),
+          type: 'end',
+          label: '구매일~소진예상'
+        });
+      }
+    }
+    
+    return dateRanges;
+  };
+  
   // 유통기한 및 소진 예상일 정보 섹션에 달력 보기 버튼 추가
   const renderInfoSection = () => {
     return (
@@ -743,6 +775,7 @@ const ProductDetailScreen = () => {
             currentMonth={currentMonth}
             onMonthChange={(newMonth) => setCurrentMonth(newMonth)}
             markedDates={getMarkedDates()}
+            dateRanges={getDateRanges()}
           />
         )}
       </View>

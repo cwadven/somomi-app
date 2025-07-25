@@ -19,6 +19,7 @@ const getFirstDayOfMonth = (year, month) => {
  * @param {Date} props.currentMonth - 현재 표시할 달 (기본값: 현재 날짜)
  * @param {Function} props.onMonthChange - 월 변경 시 호출될 함수 (month: Date)
  * @param {Array} props.markedDates - 표시할 날짜 배열 [{date: Date, type: 'expiry'|'end'|'custom', color: '#color', label: '라벨'}]
+ * @param {Object} props.dateRanges - 표시할 날짜 범위 배열 [{startDate: Date, endDate: Date, type: 'expiry'|'end', color: '#color', label: '라벨'}]
  * @param {Object} props.customStyles - 커스텀 스타일 (선택사항)
  * @returns {JSX.Element}
  */
@@ -26,6 +27,7 @@ const CalendarView = ({
   currentMonth = new Date(),
   onMonthChange,
   markedDates = [],
+  dateRanges = [],
   customStyles = {}
 }) => {
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
@@ -65,6 +67,38 @@ const CalendarView = ({
     );
   };
   
+  // 날짜가 특정 범위에 속하는지 확인하고 해당 범위 정보 반환
+  const getDateRangeInfo = (date) => {
+    const ranges = [];
+    
+    dateRanges.forEach(range => {
+      const startDate = new Date(range.startDate);
+      const endDate = new Date(range.endDate);
+      
+      // 시간 정보 제거 (날짜만 비교)
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
+      const checkDate = new Date(date);
+      checkDate.setHours(0, 0, 0, 0);
+      
+      // 날짜가 범위 내에 있는지 확인
+      if (checkDate >= startDate && checkDate <= endDate) {
+        // 시작일, 끝일, 중간일 여부 확인
+        const isStartDate = checkDate.getTime() === startDate.getTime();
+        const isEndDate = checkDate.getTime() === endDate.getTime();
+        
+        ranges.push({
+          ...range,
+          isStartDate,
+          isEndDate,
+          isMiddleDate: !isStartDate && !isEndDate
+        });
+      }
+    });
+    
+    return ranges.length > 0 ? ranges : null;
+  };
+  
   // 달력 렌더링
   const renderCalendar = () => {
     const year = selectedMonth.getFullYear();
@@ -84,10 +118,76 @@ const CalendarView = ({
       const date = new Date(year, month, day);
       const isTodayDate = isToday(date);
       const marking = getMarking(date);
+      const rangeInfo = getDateRangeInfo(date);
       
       const isMarked = !!marking;
       const markingType = marking?.type || '';
       const markingColor = marking?.color;
+      
+      // 날짜 범위 스타일 계산
+      const rangeStyles = [];
+      const rangeTextStyles = [];
+      
+      if (rangeInfo) {
+        rangeInfo.forEach(range => {
+          const baseColor = range.type === 'expiry' ? '#2196F3' : range.type === 'end' ? '#4CAF50' : range.color || '#666';
+          const bgColor = `${baseColor}20`; // 20% 투명도
+          
+          // 범위 시작일
+          if (range.isStartDate) {
+            rangeStyles.push({
+              backgroundColor: bgColor,
+              borderLeftWidth: 2,
+              borderTopWidth: 2,
+              borderBottomWidth: 2,
+              borderLeftColor: baseColor,
+              borderTopColor: baseColor,
+              borderBottomColor: baseColor,
+              borderTopLeftRadius: 10,
+              borderBottomLeftRadius: 10,
+              marginRight: 0,
+            });
+            rangeTextStyles.push({
+              fontWeight: 'bold',
+              color: baseColor,
+            });
+          }
+          // 범위 끝일
+          else if (range.isEndDate) {
+            rangeStyles.push({
+              backgroundColor: bgColor,
+              borderRightWidth: 2,
+              borderTopWidth: 2,
+              borderBottomWidth: 2,
+              borderRightColor: baseColor,
+              borderTopColor: baseColor,
+              borderBottomColor: baseColor,
+              borderTopRightRadius: 10,
+              borderBottomRightRadius: 10,
+              marginLeft: 0,
+            });
+            rangeTextStyles.push({
+              fontWeight: 'bold',
+              color: baseColor,
+            });
+          }
+          // 범위 중간일
+          else if (range.isMiddleDate) {
+            rangeStyles.push({
+              backgroundColor: bgColor,
+              borderTopWidth: 2,
+              borderBottomWidth: 2,
+              borderTopColor: baseColor,
+              borderBottomColor: baseColor,
+              marginLeft: 0,
+              marginRight: 0,
+            });
+            rangeTextStyles.push({
+              color: baseColor,
+            });
+          }
+        });
+      }
       
       days.push(
         <View 
@@ -99,6 +199,7 @@ const CalendarView = ({
             isTodayDate && styles.todayDay,
             isMarked && markingType === 'custom' && { backgroundColor: `${markingColor}20` },
             isMarked && markingType === 'custom' && { borderColor: markingColor, borderWidth: 1 },
+            ...rangeStyles,
             customStyles.calendarDay
           ]}
         >
@@ -108,6 +209,7 @@ const CalendarView = ({
             isMarked && markingType === 'end' && styles.endDayText,
             isTodayDate && styles.todayDayText,
             isMarked && markingType === 'custom' && { color: markingColor },
+            ...rangeTextStyles,
             customStyles.calendarDayText
           ]}>
             {day}
@@ -185,6 +287,18 @@ const CalendarView = ({
             <Text style={styles.legendText}>소진 예상일</Text>
           </View>
         )}
+        {dateRanges.some(r => r.type === 'expiry') && (
+          <View style={styles.legendItem}>
+            <View style={[styles.legendLine, { backgroundColor: '#2196F320', borderColor: '#2196F3' }]} />
+            <Text style={styles.legendText}>구매일~유통기한</Text>
+          </View>
+        )}
+        {dateRanges.some(r => r.type === 'end') && (
+          <View style={styles.legendItem}>
+            <View style={[styles.legendLine, { backgroundColor: '#4CAF5020', borderColor: '#4CAF50' }]} />
+            <Text style={styles.legendText}>구매일~소진예상</Text>
+          </View>
+        )}
         {markedDates
           .filter(m => m.type === 'custom' && m.label)
           .map((marking, index) => (
@@ -196,6 +310,23 @@ const CalendarView = ({
                 ]} 
               />
               <Text style={styles.legendText}>{marking.label}</Text>
+            </View>
+          ))
+        }
+        {dateRanges
+          .filter(r => r.type === 'custom' && r.label)
+          .map((range, index) => (
+            <View key={`range-legend-${index}`} style={styles.legendItem}>
+              <View 
+                style={[
+                  styles.legendLine, 
+                  { 
+                    backgroundColor: `${range.color || '#666'}20`,
+                    borderColor: range.color || '#666' 
+                  }
+                ]} 
+              />
+              <Text style={styles.legendText}>{range.label}</Text>
             </View>
           ))
         }
@@ -343,6 +474,15 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 12,
     color: '#666',
+  },
+  legendLine: {
+    width: 20, // 범례 라인의 길이
+    height: 10, // 범례 라인의 높이
+    borderWidth: 2, // 범례 라인의 테두리 두께
+    borderTopWidth: 2,
+    borderBottomWidth: 2,
+    marginRight: 5,
+    borderRadius: 3,
   },
 });
 
