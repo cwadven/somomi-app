@@ -58,6 +58,13 @@ const CalendarView = ({
            date.getDate() === today.getDate();
   };
   
+  // 오늘 날짜 표시 컴포넌트
+  const TodayIndicator = () => (
+    <View style={styles.todayIndicator}>
+      <Text style={styles.todayIndicatorText}>오늘</Text>
+    </View>
+  );
+  
   // 날짜가 마킹된 날짜인지 확인하고 해당 마킹 정보 반환
   const getMarking = (date) => {
     return markedDates.find(marking => 
@@ -288,6 +295,7 @@ const CalendarView = ({
           {rangeStyles.length > 0 && rangeStyles.map((style, index) => (
             <View key={`range-${index}`} style={style} />
           ))}
+          {isTodayDate && <View style={styles.todayHighlight} />}
           <Text style={[
             styles.calendarDayText,
             isMarked && markingType === 'expiry' && styles.expiryDayText,
@@ -357,7 +365,12 @@ const CalendarView = ({
       {/* 범례 */}
       <View style={[styles.calendarLegend, customStyles.calendarLegend]}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, styles.todayDot]} />
+          <View style={[styles.legendDot, { 
+            backgroundColor: '#FF5722', 
+            width: 12, 
+            height: 12, 
+            borderRadius: 6 
+          }]} />
           <Text style={styles.legendText}>오늘</Text>
         </View>
         {markedDates.some(m => m.type === 'expiry') && (
@@ -392,11 +405,6 @@ const CalendarView = ({
               borderWidth: 1.5
             }]} />
             <Text style={styles.legendText}>구매일~소진예상</Text>
-          </View>
-        )}
-        {dateRanges.some(r => r.type === 'expiry') && dateRanges.some(r => r.type === 'end') && (
-          <View style={styles.legendItem}>
-            <Text style={styles.legendText}>두 범위는 실선과 점선으로 구분됩니다</Text>
           </View>
         )}
         {markedDates
@@ -513,13 +521,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   todayDay: {
-    backgroundColor: '#F0F0F0', // 회색
-    borderWidth: 1,
-    borderColor: '#B0B0B0',
+    backgroundColor: 'transparent', // 배경색 투명하게 변경
+    borderWidth: 2,
+    borderColor: '#FF5722', // 주황색 테두리
+    borderRadius: 10,
+    zIndex: 3, // 가장 위에 표시
   },
   todayDayText: {
-    color: '#B0B0B0',
+    color: '#FF5722', // 주황색
     fontWeight: 'bold',
+    fontSize: 16, // 글자 크기 키움
+    zIndex: 4, // 텍스트가 가장 위에 표시되도록
   },
   expiryDot: {
     position: 'absolute',
@@ -546,6 +558,17 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  todayHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FF5722', // 오늘 날짜 표시 색상
+    borderRadius: 10,
+    opacity: 0.15, // 투명도 낮춤
+    zIndex: 1, // 다른 요소들 위에 표시
   },
   calendarLegend: {
     flexDirection: 'row',
@@ -586,6 +609,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     marginRight: 5,
     borderRadius: 3,
+  },
+  todayIndicator: {
+    backgroundColor: '#FF5722',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    alignSelf: 'center',
+    marginTop: 10,
+  },
+  todayIndicatorText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 
 });
