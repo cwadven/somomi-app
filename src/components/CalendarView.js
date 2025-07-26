@@ -74,6 +74,15 @@ const CalendarView = ({
     );
   };
   
+  // 날짜에 해당하는 모든 마킹 정보 반환
+  const getAllMarkings = (date) => {
+    return markedDates.filter(marking => 
+      marking.date.getFullYear() === date.getFullYear() && 
+      marking.date.getMonth() === date.getMonth() && 
+      marking.date.getDate() === date.getDate()
+    );
+  };
+  
   // 날짜가 특정 범위에 속하는지 확인하고 해당 범위 정보 반환
   const getDateRangeInfo = (date) => {
     const ranges = [];
@@ -124,12 +133,12 @@ const CalendarView = ({
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
       const isTodayDate = isToday(date);
-      const marking = getMarking(date);
+      const markings = getAllMarkings(date);
       const rangeInfo = getDateRangeInfo(date);
       
-      const isMarked = !!marking;
-      const markingType = marking?.type || '';
-      const markingColor = marking?.color;
+      const hasExpiryMarking = markings.some(m => m.type === 'expiry');
+      const hasEndMarking = markings.some(m => m.type === 'end');
+      const hasCustomMarking = markings.some(m => m.type === 'custom');
       
       // 날짜 범위 스타일 계산
       const rangeStyles = [];
@@ -284,11 +293,11 @@ const CalendarView = ({
           key={`day-${day}`} 
           style={[
             styles.calendarDay,
-            isMarked && markingType === 'expiry' && styles.expiryDay,
-            isMarked && markingType === 'end' && styles.endDay,
+            hasExpiryMarking && styles.expiryDay,
+            hasEndMarking && styles.endDay,
             isTodayDate && styles.todayDay,
-            isMarked && markingType === 'custom' && { backgroundColor: `${markingColor}20` },
-            isMarked && markingType === 'custom' && { borderColor: markingColor, borderWidth: 1 },
+            hasCustomMarking && { backgroundColor: `${markings.find(m => m.type === 'custom')?.color}20` },
+            hasCustomMarking && { borderColor: markings.find(m => m.type === 'custom')?.color, borderWidth: 1 },
             customStyles.calendarDay
           ]}
         >
@@ -298,19 +307,19 @@ const CalendarView = ({
           {isTodayDate && <View style={styles.todayHighlight} />}
           <Text style={[
             styles.calendarDayText,
-            isMarked && markingType === 'expiry' && styles.expiryDayText,
-            isMarked && markingType === 'end' && styles.endDayText,
+            hasExpiryMarking && styles.expiryDayText,
+            hasEndMarking && styles.endDayText,
             isTodayDate && styles.todayDayText,
-            isMarked && markingType === 'custom' && { color: markingColor },
+            hasCustomMarking && { color: markings.find(m => m.type === 'custom')?.color },
             ...rangeTextStyles,
             customStyles.calendarDayText
           ]}>
             {day}
           </Text>
-          {isMarked && markingType === 'expiry' && <View style={styles.expiryDot} />}
-          {isMarked && markingType === 'end' && <View style={styles.endDot} />}
-          {isMarked && markingType === 'custom' && (
-            <View style={[styles.customDot, { backgroundColor: markingColor }]} />
+          {hasExpiryMarking && <View style={styles.expiryDot} />}
+          {hasEndMarking && <View style={styles.endDot} />}
+          {hasCustomMarking && (
+            <View style={[styles.customDot, { backgroundColor: markings.find(m => m.type === 'custom')?.color }]} />
           )}
         </View>
       );
@@ -545,7 +554,7 @@ const styles = StyleSheet.create({
   endDot: {
     position: 'absolute',
     bottom: 2,
-    right: 2,
+    right: 12, // 유통기한 점과 겹치지 않도록 위치 조정
     backgroundColor: '#4CAF50',
     width: 8,
     height: 8,
@@ -623,7 +632,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
-
 });
 
-export default CalendarView; 
+export default CalendarView;

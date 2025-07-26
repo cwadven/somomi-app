@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { addCategory } from '../redux/slices/categoriesSlice';
+import { generateId } from '../utils/idUtils';
 
 const CategoryAddModal = ({ visible, onClose, onCategoryAdded }) => {
   const dispatch = useDispatch();
@@ -43,7 +44,7 @@ const CategoryAddModal = ({ visible, onClose, onCategoryAdded }) => {
 
     // 새 카테고리 생성
     const newCategory = {
-      id: `category_${Date.now()}`,
+      id: generateId('category'),
       name: newCategoryName.trim(),
       description: newCategoryDescription.trim() || '',
       createdAt: new Date().toISOString()

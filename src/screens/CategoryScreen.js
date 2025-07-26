@@ -1,25 +1,28 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Modal,
   TextInput,
   Alert,
-  Modal
+  ActivityIndicator
 } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import { 
-  addCategory, 
-  updateCategory, 
-  deleteCategory 
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  fetchCategories,
+  addCategory,
+  updateCategory,
+  deleteCategory
 } from '../redux/slices/categoriesSlice';
+import { generateId } from '../utils/idUtils';
 
 const CategoryScreen = () => {
   const dispatch = useDispatch();
-  const { categories } = useSelector(state => state.categories);
+  const { categories, loading, error } = useSelector(state => state.categories);
   
   // 모달 상태
   const [modalVisible, setModalVisible] = useState(false);
@@ -75,7 +78,7 @@ const CategoryScreen = () => {
     } else {
       // 새 카테고리 추가
       dispatch(addCategory({
-        id: Date.now().toString(),
+        id: generateId('category'),
         name: categoryName.trim(),
         description: categoryDescription.trim(),
       }));

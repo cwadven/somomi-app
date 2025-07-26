@@ -1,5 +1,6 @@
 // 샘플 데이터 (나중에 실제 API로 대체)
 import { loadData, saveData, STORAGE_KEYS } from '../utils/storageUtils';
+import { generateId } from '../utils/idUtils';
 
 // 초기 샘플 데이터
 const initialSampleProducts = [];
@@ -108,15 +109,15 @@ export const addProductApi = async (product) => {
       sampleProducts = storedProducts;
     }
     
-      // 실제 API에서는 서버에서 ID를 생성합니다
-    const newId = (Math.max(...sampleProducts.map(p => parseInt(p.id)), 0) + 1).toString();
-      const newProduct = {
-        ...product,
-        id: newId,
-        remainingPercentage: 100, // 새 제품은 100% 남음
-      };
-      
-      // 데이터베이스에 추가
+    // 새로운 ID 생성
+    const newId = generateId('product');
+    const newProduct = {
+      ...product,
+      id: newId,
+      remainingPercentage: 100, // 새 제품은 100% 남음
+    };
+    
+    // 데이터베이스에 추가
     const updatedProducts = [...sampleProducts, newProduct];
     sampleProducts = updatedProducts;
     
@@ -324,14 +325,14 @@ export const addLocationApi = async (location) => {
       sampleLocations = storedLocations;
     }
     
-      // 실제 API에서는 서버에서 ID를 생성합니다
-    const newId = (Math.max(...sampleLocations.map(l => parseInt(l.id)), 0) + 1).toString();
-      const newLocation = {
-        ...location,
-        id: newId,
-      };
-      
-      // 데이터베이스에 추가
+    // 새로운 ID 생성
+    const newId = generateId('location');
+    const newLocation = {
+      ...location,
+      id: newId,
+    };
+    
+    // 데이터베이스에 추가
     const updatedLocations = [...sampleLocations, newLocation];
     sampleLocations = updatedLocations;
     
