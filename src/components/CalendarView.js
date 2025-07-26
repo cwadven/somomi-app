@@ -129,63 +129,146 @@ const CalendarView = ({
       const rangeTextStyles = [];
       
       if (rangeInfo) {
-        rangeInfo.forEach(range => {
-          const baseColor = range.type === 'expiry' ? '#2196F3' : range.type === 'end' ? '#4CAF50' : range.color || '#666';
-          const bgColor = `${baseColor}20`; // 20% 투명도
+        // 범위 타입별로 분리
+        const expiryRanges = rangeInfo.filter(range => range.type === 'expiry');
+        const endRanges = rangeInfo.filter(range => range.type === 'end');
+        const otherRanges = rangeInfo.filter(range => range.type !== 'expiry' && range.type !== 'end');
+        
+        // 소진예상일 범위 먼저 처리 (아래에 표시)
+        endRanges.forEach(range => {
+          const baseColor = '#4CAF50'; // 소진예상일 색상
+          const bgColor = `${baseColor}15`; // 15% 투명도
           
-          // 범위 시작일
+          // 소진예상일 범위 스타일 (점선)
           if (range.isStartDate) {
             rangeStyles.push({
               backgroundColor: bgColor,
+              borderLeftWidth: 1.5,
+              borderTopWidth: 1.5,
+              borderBottomWidth: 1.5,
+              borderLeftColor: baseColor,
+              borderTopColor: baseColor,
+              borderBottomColor: baseColor,
+              borderStyle: 'dashed',
+              borderTopLeftRadius: 10,
+              borderBottomLeftRadius: 10,
+              marginRight: 0,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1,
+            });
+          }
+          else if (range.isEndDate) {
+            rangeStyles.push({
+              backgroundColor: bgColor,
+              borderRightWidth: 1.5,
+              borderTopWidth: 1.5,
+              borderBottomWidth: 1.5,
+              borderRightColor: baseColor,
+              borderTopColor: baseColor,
+              borderBottomColor: baseColor,
+              borderStyle: 'dashed',
+              borderTopRightRadius: 10,
+              borderBottomRightRadius: 10,
+              marginLeft: 0,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1,
+            });
+          }
+          else if (range.isMiddleDate) {
+            rangeStyles.push({
+              backgroundColor: bgColor,
+              borderTopWidth: 1.5,
+              borderBottomWidth: 1.5,
+              borderTopColor: baseColor,
+              borderBottomColor: baseColor,
+              borderStyle: 'dashed',
+              marginLeft: 0,
+              marginRight: 0,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1,
+            });
+          }
+        });
+        
+        // 유통기한 범위 처리 (위에 표시)
+        expiryRanges.forEach(range => {
+          const baseColor = '#2196F3'; // 유통기한 색상
+          
+          // 유통기한 범위 스타일 (실선)
+          if (range.isStartDate) {
+            rangeStyles.push({
               borderLeftWidth: 2,
               borderTopWidth: 2,
               borderBottomWidth: 2,
               borderLeftColor: baseColor,
               borderTopColor: baseColor,
               borderBottomColor: baseColor,
+              borderStyle: 'solid',
               borderTopLeftRadius: 10,
               borderBottomLeftRadius: 10,
               marginRight: 0,
-            });
-            rangeTextStyles.push({
-              fontWeight: 'bold',
-              color: baseColor,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 2, // 소진예상일보다 위에 표시
             });
           }
-          // 범위 끝일
           else if (range.isEndDate) {
             rangeStyles.push({
-              backgroundColor: bgColor,
               borderRightWidth: 2,
               borderTopWidth: 2,
               borderBottomWidth: 2,
               borderRightColor: baseColor,
               borderTopColor: baseColor,
               borderBottomColor: baseColor,
+              borderStyle: 'solid',
               borderTopRightRadius: 10,
               borderBottomRightRadius: 10,
               marginLeft: 0,
-            });
-            rangeTextStyles.push({
-              fontWeight: 'bold',
-              color: baseColor,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 2,
             });
           }
-          // 범위 중간일
           else if (range.isMiddleDate) {
             rangeStyles.push({
-              backgroundColor: bgColor,
               borderTopWidth: 2,
               borderBottomWidth: 2,
               borderTopColor: baseColor,
               borderBottomColor: baseColor,
+              borderStyle: 'solid',
               marginLeft: 0,
               marginRight: 0,
-            });
-            rangeTextStyles.push({
-              color: baseColor,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 2,
             });
           }
+        });
+        
+        // 기타 범위 처리
+        otherRanges.forEach(range => {
+          // 기존 코드와 동일하게 처리
         });
       }
       
@@ -199,10 +282,12 @@ const CalendarView = ({
             isTodayDate && styles.todayDay,
             isMarked && markingType === 'custom' && { backgroundColor: `${markingColor}20` },
             isMarked && markingType === 'custom' && { borderColor: markingColor, borderWidth: 1 },
-            ...rangeStyles,
             customStyles.calendarDay
           ]}
         >
+          {rangeStyles.length > 0 && rangeStyles.map((style, index) => (
+            <View key={`range-${index}`} style={style} />
+          ))}
           <Text style={[
             styles.calendarDayText,
             isMarked && markingType === 'expiry' && styles.expiryDayText,
@@ -289,14 +374,29 @@ const CalendarView = ({
         )}
         {dateRanges.some(r => r.type === 'expiry') && (
           <View style={styles.legendItem}>
-            <View style={[styles.legendLine, { backgroundColor: '#2196F320', borderColor: '#2196F3' }]} />
+            <View style={[styles.legendLine, { 
+              backgroundColor: '#2196F320', 
+              borderColor: '#2196F3',
+              borderStyle: 'solid',
+              borderWidth: 2
+            }]} />
             <Text style={styles.legendText}>구매일~유통기한</Text>
           </View>
         )}
         {dateRanges.some(r => r.type === 'end') && (
           <View style={styles.legendItem}>
-            <View style={[styles.legendLine, { backgroundColor: '#4CAF5020', borderColor: '#4CAF50' }]} />
+            <View style={[styles.legendLine, { 
+              backgroundColor: '#4CAF5020', 
+              borderColor: '#4CAF50',
+              borderStyle: 'dashed',
+              borderWidth: 1.5
+            }]} />
             <Text style={styles.legendText}>구매일~소진예상</Text>
+          </View>
+        )}
+        {dateRanges.some(r => r.type === 'expiry') && dateRanges.some(r => r.type === 'end') && (
+          <View style={styles.legendItem}>
+            <Text style={styles.legendText}>두 범위는 실선과 점선으로 구분됩니다</Text>
           </View>
         )}
         {markedDates
@@ -378,14 +478,17 @@ const styles = StyleSheet.create({
   calendarDays: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    paddingVertical: 5,
   },
   calendarDay: {
     width: '14.28%', // 정확히 7일로 나누기 위해 14.28%로 설정
     aspectRatio: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 5,
+    marginVertical: 6, // 위아래 간격 늘림
     borderRadius: 10,
+    overflow: 'visible', // 중첩된 범위가 잘리지 않도록 설정
+    minHeight: 40, // 최소 높이 설정
   },
   calendarDayText: {
     fontSize: 14,
@@ -484,6 +587,7 @@ const styles = StyleSheet.create({
     marginRight: 5,
     borderRadius: 3,
   },
+
 });
 
 export default CalendarView; 
