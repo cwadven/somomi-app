@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -19,16 +19,14 @@ import { fetchProductById, deleteProductAsync, markProductAsConsumedAsync } from
 import AlertModal from '../components/AlertModal';
 import ProductNotificationSettings from '../components/ProductNotificationSettings';
 import CalendarView from '../components/CalendarView';
-
-// 월별 일수 계산 함수
-const getDaysInMonth = (year, month) => {
-  return new Date(year, month + 1, 0).getDate();
-};
-
-// 월의 첫 날 요일 계산 함수
-const getFirstDayOfMonth = (year, month) => {
-  return new Date(year, month, 1).getDay();
-};
+import { 
+  getDaysInMonth, 
+  getFirstDayOfMonth, 
+  generateMonthOptions, 
+  generateDayOptions, 
+  generateYearOptions,
+  formatDate
+} from '../utils/dateUtils';
 
 // HP 바 컴포넌트
 const HPBar = ({ percentage, type }) => {
@@ -70,6 +68,13 @@ const ProductDetailScreen = () => {
   const { productId } = route.params;
   const { currentProduct, status, error } = useSelector(state => state.products);
   
+  // 최신 상태를 참조하기 위한 ref
+  const consumptionDateRef = useRef({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth(),
+    day: new Date().getDate()
+  });
+  
   // 소진 처리 성공 모달 상태
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successModalConfig, setSuccessModalConfig] = useState({
@@ -97,6 +102,18 @@ const ProductDetailScreen = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   
+  // 날짜 선택 모달의 임시 상태 - 모달 내에서만 사용
+  const [tempYear, setTempYear] = useState(selectedYear);
+  const [tempMonth, setTempMonth] = useState(selectedMonth);
+  const [tempDay, setTempDay] = useState(selectedDay);
+  
+  // 소진 처리에 사용할 날짜 상태 (별도로 관리)
+  const [consumptionDate, setConsumptionDate] = useState({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth(),
+    day: new Date().getDate()
+  });
+  
   // 활성화된 탭 상태
   const [activeTab, setActiveTab] = useState('details'); // 'details' 또는 'notifications'
   
@@ -107,23 +124,125 @@ const ProductDetailScreen = () => {
   useEffect(() => {
     dispatch(fetchProductById(productId));
   }, [dispatch, productId]);
+
+  // 소진 처리 날짜 상태 변화 감지 및 로깅
+  useEffect(() => {
+    // consumptionDate 상태가 변경될 때마다 ref 업데이트
+    consumptionDateRef.current = consumptionDate;
+  }, [consumptionDate]);
   
-  // 날짜 포맷팅 함수
-  const formatDate = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}년 ${month}월 ${day}일`;
+  // 날짜 선택 모달이 열릴 때 현재 선택된 날짜로 임시 상태 초기화
+  useEffect(() => {
+    if (datePickerVisible) {
+      setTempYear(selectedYear);
+      setTempMonth(selectedMonth);
+      setTempDay(selectedDay);
+    }
+  }, [datePickerVisible, selectedYear, selectedMonth, selectedDay]);
+  
+  // 소진 처리 모달이 열려있을 때 선택된 날짜가 변경되면 모달 내용 업데이트
+  useEffect(() => {
+    if (alertModalVisible && alertModalConfig.title === '소진 처리') {
+      // 현재 선택된 날짜 텍스트
+      const dateText = `${selectedYear}년 ${selectedMonth + 1}월 ${selectedDay}일`;
+      
+      // 소진 처리용 상태도 함께 업데이트
+      setConsumptionDate({
+        year: selectedYear,
+        month: selectedMonth,
+        day: selectedDay
+      });
+      
+      // 소진 처리 모달의 내용 업데이트
+      setAlertModalConfig(prevConfig => ({
+        ...prevConfig,
+        content: (
+          <View style={styles.consumptionDateContainer}>
+            <Text style={styles.consumptionDateLabel}>소진 날짜</Text>
+            <TouchableOpacity 
+              style={styles.datePickerButton}
+              onPress={() => {
+                // 알림 모달을 닫지 않고 날짜 선택 모달만 표시
+                setDatePickerVisible(true);
+              }}
+            >
+              <Text style={styles.datePickerButtonText}>{dateText}</Text>
+              <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+            </TouchableOpacity>
+          </View>
+        )
+      }));
+    }
+  }, [selectedYear, selectedMonth, selectedDay, alertModalVisible]);
+  
+  // 날짜 선택 모달 확인 버튼 처리
+  const handleDatePickerConfirm = () => {
+    // 선택된 날짜를 상태에 저장
+    setSelectedYear(tempYear);
+    setSelectedMonth(tempMonth);
+    setSelectedDay(tempDay);
+    
+    // 소진 처리용 상태에도 저장
+    setConsumptionDate({
+      year: tempYear,
+      month: tempMonth,
+      day: tempDay
+    });
+    
+    // 소진 처리 모달의 내용 업데이트 - 약간의 지연 후 실행하여 상태 업데이트가 반영되도록 함
+    setTimeout(() => {
+      setAlertModalConfig(prevConfig => {
+        // 현재 선택된 날짜 텍스트 - 임시 변수에서 직접 가져옴
+        const dateText = `${tempYear}년 ${tempMonth + 1}월 ${tempDay}일`;
+        
+        return {
+          ...prevConfig,
+          content: (
+            <View style={styles.consumptionDateContainer}>
+              <Text style={styles.consumptionDateLabel}>소진 날짜</Text>
+              <TouchableOpacity 
+                style={styles.datePickerButton}
+                onPress={() => {
+                  // 알림 모달을 닫지 않고 날짜 선택 모달만 표시
+                  setDatePickerVisible(true);
+                }}
+              >
+                <Text style={styles.datePickerButtonText}>{dateText}</Text>
+                <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+              </TouchableOpacity>
+            </View>
+          )
+        };
+      });
+    }, 100);
+    
+    // 날짜 선택 모달 닫기
+    setDatePickerVisible(false);
+  };
+  
+  // 날짜 선택 모달 취소 버튼 처리
+  const handleDatePickerCancel = () => {
+    setDatePickerVisible(false);
   };
   
   // 소진 처리 함수
   const handleMarkAsConsumed = () => {
-    // 오늘 날짜를 기본값으로 설정
-    setSelectedYear(new Date().getFullYear());
-    setSelectedMonth(new Date().getMonth());
-    setSelectedDay(new Date().getDate());
+    // 임시 날짜 변수도 함께 초기화
+    setTempYear(selectedYear);
+    setTempMonth(selectedMonth);
+    setTempDay(selectedDay);
     
-    // 소진 처리 모달 표시
+    // 소진 처리용 상태 초기화 (현재 선택된 날짜로)
+    setConsumptionDate({
+      year: selectedYear,
+      month: selectedMonth,
+      day: selectedDay
+    });
+    
+    // 현재 선택된 날짜 텍스트
+    const dateText = `${selectedYear}년 ${selectedMonth + 1}월 ${selectedDay}일`;
+    
+    // 소진 처리 모달 표시 - 함수형 업데이트 사용
     setAlertModalConfig({
       title: '소진 처리',
       message: '이 제품을 소진 처리하시겠습니까?\n소진 처리된 제품은 소진 처리 목록으로 이동합니다.',
@@ -137,9 +256,7 @@ const ProductDetailScreen = () => {
               setDatePickerVisible(true);
             }}
           >
-            <Text style={styles.datePickerButtonText}>
-              {`${selectedYear}년 ${selectedMonth + 1}월 ${selectedDay}일`}
-            </Text>
+            <Text style={styles.datePickerButtonText}>{dateText}</Text>
             <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
           </TouchableOpacity>
         </View>
@@ -149,12 +266,16 @@ const ProductDetailScreen = () => {
         { 
           text: '소진 처리', 
           style: 'default',
-          onPress: () => {
+          // 소진 처리 버튼 클릭 시 최신 상태를 참조하는 함수
+          onPress: function() {
             // 소진 처리 전에 필요한 정보 저장
             const productName = currentProduct.name;
             
+            // consumptionDateRef에서 최신 날짜 정보 가져오기
+            const { year, month, day } = consumptionDateRef.current;
+            
             // 선택한 날짜로 소진 처리
-            const date = new Date(selectedYear, selectedMonth, selectedDay);
+            const date = new Date(year, month, day);
             const formattedDate = formatDate(date);
             
             // 알림 모달 닫기
@@ -194,76 +315,20 @@ const ProductDetailScreen = () => {
     setAlertModalVisible(true);
   };
   
-  // 선택한 날짜로 소진 처리
-  const handleConfirmDate = () => {
-    // 날짜 선택 모달 닫기
-    setDatePickerVisible(false);
-    
-    // 소진 처리 모달의 내용 업데이트
-    setAlertModalConfig(prevConfig => ({
-      ...prevConfig,
-      content: (
-        <View style={styles.consumptionDateContainer}>
-          <Text style={styles.consumptionDateLabel}>소진 날짜</Text>
-          <TouchableOpacity 
-            style={styles.datePickerButton}
-            onPress={() => {
-              // 알림 모달을 닫지 않고 날짜 선택 모달만 표시
-              setDatePickerVisible(true);
-            }}
-          >
-            <Text style={styles.datePickerButtonText}>
-              {`${selectedYear}년 ${selectedMonth + 1}월 ${selectedDay}일`}
-            </Text>
-            <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
-          </TouchableOpacity>
-        </View>
-      )
-    }));
-  };
-  
-  // 년도 선택 옵션 생성
-  const generateYearOptions = () => {
-    const currentYear = new Date().getFullYear();
-    const years = [];
-    for (let i = currentYear - 5; i <= currentYear; i++) {
-      years.push(i);
-    }
-    return years;
-  };
-  
-  // 월 선택 옵션 생성
-  const generateMonthOptions = () => {
-    return [
-      '1월', '2월', '3월', '4월', '5월', '6월',
-      '7월', '8월', '9월', '10월', '11월', '12월'
-    ];
-  };
-  
-  // 일 선택 옵션 생성
-  const generateDayOptions = () => {
-    const daysInMonth = getDaysInMonth(selectedYear, selectedMonth);
-    const days = [];
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(i);
-    }
-    return days;
-  };
-  
   // 날짜 선택 모달 렌더링
   const renderDatePicker = () => {
     if (!datePickerVisible) return null;
     
     const years = generateYearOptions();
     const months = generateMonthOptions();
-    const days = generateDayOptions();
+    const days = generateDayOptions(tempYear, tempMonth);
     
     return (
       <Modal
         visible={datePickerVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setDatePickerVisible(false)}
+        onRequestClose={handleDatePickerCancel}
       >
         <View style={styles.datePickerModalOverlay}>
           <View style={styles.datePickerModalContent}>
@@ -271,7 +336,7 @@ const ProductDetailScreen = () => {
               <Text style={styles.datePickerTitle}>소진 날짜 선택</Text>
               <TouchableOpacity
                 style={styles.closeButton}
-                onPress={() => setDatePickerVisible(false)}
+                onPress={handleDatePickerCancel}
               >
                 <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
@@ -291,14 +356,14 @@ const ProductDetailScreen = () => {
                         key={`year-${year}`}
                         style={[
                           styles.datePickerOption,
-                          selectedYear === year && styles.datePickerOptionSelected
+                          tempYear === year && styles.datePickerOptionSelected
                         ]}
-                        onPress={() => setSelectedYear(year)}
+                        onPress={() => setTempYear(year)}
                       >
                         <Text
                           style={[
                             styles.datePickerOptionText,
-                            selectedYear === year && styles.datePickerOptionTextSelected
+                            tempYear === year && styles.datePickerOptionTextSelected
                           ]}
                         >
                           {year}
@@ -323,21 +388,21 @@ const ProductDetailScreen = () => {
                         key={`month-${index}`}
                         style={[
                           styles.datePickerOption,
-                          selectedMonth === index && styles.datePickerOptionSelected
+                          tempMonth === index && styles.datePickerOptionSelected
                         ]}
                         onPress={() => {
-                          setSelectedMonth(index);
+                          setTempMonth(index);
                           // 일수가 변경될 수 있으므로 선택한 일이 유효한지 확인
-                          const daysInNewMonth = getDaysInMonth(selectedYear, index);
-                          if (selectedDay > daysInNewMonth) {
-                            setSelectedDay(daysInNewMonth);
+                          const daysInNewMonth = getDaysInMonth(tempYear, index);
+                          if (tempDay > daysInNewMonth) {
+                            setTempDay(daysInNewMonth);
                           }
                         }}
                       >
                         <Text
                           style={[
                             styles.datePickerOptionText,
-                            selectedMonth === index && styles.datePickerOptionTextSelected
+                            tempMonth === index && styles.datePickerOptionTextSelected
                           ]}
                         >
                           {monthName}
@@ -357,19 +422,19 @@ const ProductDetailScreen = () => {
                     style={styles.datePickerScroll}
                     showsVerticalScrollIndicator={false}
                   >
-                    {days.map((day) => (
+                    {generateDayOptions(tempYear, tempMonth).map((day) => (
                       <TouchableOpacity
                         key={`day-${day}`}
                         style={[
                           styles.datePickerOption,
-                          selectedDay === day && styles.datePickerOptionSelected
+                          tempDay === day && styles.datePickerOptionSelected
                         ]}
-                        onPress={() => setSelectedDay(day)}
+                        onPress={() => setTempDay(day)}
                       >
                         <Text
                           style={[
                             styles.datePickerOptionText,
-                            selectedDay === day && styles.datePickerOptionTextSelected
+                            tempDay === day && styles.datePickerOptionTextSelected
                           ]}
                         >
                           {day}
@@ -384,19 +449,19 @@ const ProductDetailScreen = () => {
             
             {/* 선택된 날짜 표시 */}
             <Text style={styles.selectedDateText}>
-              선택된 날짜: {selectedYear}년 {selectedMonth + 1}월 {selectedDay}일
+              선택된 날짜: {tempYear}년 {tempMonth + 1}월 {tempDay}일
             </Text>
             
             <View style={styles.datePickerButtons}>
               <TouchableOpacity 
                 style={[styles.datePickerButton, styles.datePickerCancelButton]}
-                onPress={() => setDatePickerVisible(false)}
+                onPress={handleDatePickerCancel}
               >
                 <Text style={styles.datePickerCancelButtonText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.datePickerButton, styles.datePickerConfirmButton]}
-                onPress={handleConfirmDate}
+                onPress={handleDatePickerConfirm}
               >
                 <Text style={styles.datePickerConfirmButtonText}>확인</Text>
               </TouchableOpacity>
