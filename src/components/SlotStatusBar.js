@@ -22,7 +22,7 @@ const SlotStatusBar = ({ used, total, type = 'product', onDetailPress }) => {
   };
   
   // 슬롯 유형에 따른 텍스트 설정
-  const typeText = type === 'location' ? '영역' : '슬롯';
+  const typeText = type === 'location' ? '템플릿' : '슬롯';
   
   // 사용 중인 슬롯과 전체 슬롯 수를 안전하게 표시
   const safeUsed = isNaN(used) ? 0 : used;

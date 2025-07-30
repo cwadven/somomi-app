@@ -27,7 +27,7 @@ const LocationsScreen = () => {
   const route = useRoute();
   
   const { locations, status, error } = useSelector(state => state.locations);
-  const { isAnonymous, slots } = useSelector(state => state.auth);
+  const { isAnonymous, slots, userLocationTemplateInstances } = useSelector(state => state.auth);
   
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
 
@@ -80,42 +80,32 @@ const LocationsScreen = () => {
   }, [isFocused, navigation]);
 
   const handleAddLocation = () => {
-    // Redux의 슬롯 정보를 사용하여 사용 가능한 슬롯 확인
-    const totalLocationSlots = slots.locationSlots.baseSlots + slots.locationSlots.additionalSlots;
-    const usedLocationSlots = locations.length;
-    const hasAvailableSlots = usedLocationSlots < totalLocationSlots;
+    // 사용자의 템플릿 인스턴스 확인
+    const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
     
-    // 슬롯이 없으면 구독/구매 유도
-    if (!hasAvailableSlots) {
-      // 비회원인 경우 회원가입 유도
-      if (isAnonymous) {
-        setShowSignupPrompt(true);
-        return;
-      }
-      
-      // 회원인 경우 구독/구매 유도
-      Alert.alert(
-        '슬롯 부족',
-        '영역 슬롯이 부족합니다. 구독하거나 추가 슬롯을 구매하세요.',
-        [
-          { text: '취소', style: 'cancel' },
-          { 
-            text: '상점으로 이동', 
-            onPress: () => navigation.navigate('Store')
-          }
-        ]
-      );
+    console.log('영역 추가 시도:', {
+      userLocationTemplateInstances,
+      availableTemplates,
+      usedTemplates: userLocationTemplateInstances.filter(template => template.used)
+    });
+    
+    // 사용 가능한 템플릿이 없으면 안내 (비회원만)
+    if (availableTemplates.length === 0 && isAnonymous) {
+      setShowSignupPrompt(true);
       return;
     }
     
-    // 슬롯이 있으면 영역 추가 화면으로 이동
+    // 템플릿 유무와 관계없이 영역 추가 화면으로 이동
     navigation.navigate('AddLocation');
   };
   
   // SignupPromptModal 메시지 동적 생성
   const getSignupPromptMessage = () => {
-    const totalLocationSlots = slots.locationSlots.baseSlots;
-    return `비회원은 최대 ${totalLocationSlots}개의 영역만 생성할 수 있습니다. 회원가입하여 더 많은 영역을 생성하세요!`;
+    const totalTemplates = userLocationTemplateInstances.length;
+    const availableTemplates = userLocationTemplateInstances.filter(template => !template.used).length;
+    const usedTemplates = userLocationTemplateInstances.filter(template => template.used).length;
+    
+    return `비회원은 최대 ${totalTemplates}개의 영역 템플릿만 사용할 수 있습니다. 회원가입하여 더 많은 영역을 생성하세요!`;
   };
 
   const handleLocationPress = (location) => {
@@ -165,17 +155,25 @@ const LocationsScreen = () => {
     return loadingOrErrorComponent;
   }
 
-  // Redux의 슬롯 정보를 사용하여 사용 가능한 슬롯 계산
-  const totalLocationSlots = slots.locationSlots.baseSlots + slots.locationSlots.additionalSlots;
-  const usedLocationSlots = locations.length;
-  const availableSlots = Math.max(0, totalLocationSlots - usedLocationSlots);
+  // 템플릿 인스턴스 기준으로 사용 가능한 슬롯 계산
+  const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
+  const usedTemplates = userLocationTemplateInstances.filter(template => template.used);
+  const totalTemplates = userLocationTemplateInstances.length;
+  
+  // 콘솔에 현재 템플릿 상태 출력
+  console.log('LocationsScreen - 템플릿 상태:', {
+    총_템플릿_수: totalTemplates,
+    사용_중인_템플릿_수: usedTemplates.length,
+    사용_가능한_템플릿_수: availableTemplates.length,
+    템플릿_목록: userLocationTemplateInstances
+  });
 
   return (
     <View style={styles.container}>
-      {/* 슬롯 상태 표시 바 */}
+      {/* 슬롯 상태 표시 바 - 템플릿 인스턴스 기준 */}
       <SlotStatusBar 
-        used={usedLocationSlots} 
-        total={totalLocationSlots} 
+        used={usedTemplates.length} 
+        total={totalTemplates} 
         type="location" 
       />
       
@@ -236,15 +234,18 @@ const LocationsScreen = () => {
           />
         )}
         
-        {/* 영역 추가 버튼 (우측 하단에 고정) */}
+        {/* 영역 추가 버튼 (우측 하단에 고정) - 사용 가능한 템플릿이 있을 때만 배지 표시 */}
         <TouchableOpacity 
-          style={styles.addButton}
+          style={[
+            styles.addButton,
+            availableTemplates.length === 0 ? styles.disabledAddButton : null
+          ]}
           onPress={handleAddLocation}
         >
           <Ionicons name="add" size={30} color="white" />
-          {availableSlots > 0 && (
+          {availableTemplates.length > 0 && (
             <View style={styles.slotCountBadge}>
-              <Text style={styles.slotCountText}>{availableSlots}</Text>
+              <Text style={styles.slotCountText}>{availableTemplates.length}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -394,6 +395,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  disabledAddButton: {
+    opacity: 0.7, // 비활성화된 버튼의 투명도 조절
+    backgroundColor: '#9E9E9E', // 비활성화된 버튼의 배경색 변경
   },
   slotCountBadge: {
     position: 'absolute',

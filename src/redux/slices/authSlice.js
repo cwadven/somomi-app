@@ -100,7 +100,7 @@ export const registerUser = createAsyncThunk(
   }
 );
 
-// 토큰 검증 및 사용자 정보 가져오기
+// 토큰 검증 API 호출
 export const verifyToken = createAsyncThunk(
   'auth/verifyToken',
   async (_, { rejectWithValue }) => {
@@ -109,20 +109,21 @@ export const verifyToken = createAsyncThunk(
       const token = localStorage.getItem('jwt_token');
       
       if (!token) {
+        console.log('토큰이 없습니다. 초기 상태로 설정합니다.');
         return null;
       }
       
       // 실제 구현에서는 서버에 토큰 검증 요청
-      // 여기서는 토큰 형식으로 사용자 타입 판별
-      const isAnonymous = token.startsWith('anonymous_');
-      
-      if (isAnonymous) {
+      // 여기서는 토큰 형식에 따라 사용자 타입 결정
+      if (token.startsWith('anonymous_')) {
+        console.log('익명 사용자 토큰 검증 성공');
         return { 
           token,
           isAnonymous: true
         };
       } else {
         // 실제 구현에서는 서버에서 사용자 정보를 받아옴
+        console.log('로그인 사용자 토큰 검증 성공');
         return {
           token,
           isAnonymous: false,
@@ -134,6 +135,7 @@ export const verifyToken = createAsyncThunk(
         };
       }
     } catch (error) {
+      console.error('토큰 검증 오류:', error);
       return rejectWithValue(error.message);
     }
   }
@@ -182,8 +184,8 @@ const initialState = {
   },
   purchaseHistory: [], // 구매 내역
   pointHistory: [], // G 내역 (충전 및 사용)
-  // 사용자가 소유한 영역 템플릿 인스턴스 목록 - 초기에는 빈 배열로 설정
-  userLocationTemplateInstances: []
+  // 사용자가 소유한 영역 템플릿 인스턴스 목록 - 비회원은 기본 템플릿 1개 제공
+  userLocationTemplateInstances: [createBasicLocationTemplate()]
 };
 
 export const authSlice = createSlice({
@@ -299,9 +301,10 @@ export const authSlice = createSlice({
       state.purchaseHistory = [];
       state.pointHistory = [];
       // 템플릿 인스턴스를 비회원 상태로 초기화 (1개만 제공)
-      state.userLocationTemplateInstances = [
-        createBasicLocationTemplate()
-      ];
+      console.log('로그아웃: 템플릿 인스턴스 초기화');
+      const template = createBasicLocationTemplate();
+      state.userLocationTemplateInstances = [template];
+      console.log('로그아웃 후 템플릿 인스턴스:', [template]);
       // localStorage에서 토큰 제거
       localStorage.removeItem('jwt_token');
     },
@@ -338,12 +341,16 @@ export const authSlice = createSlice({
     // 템플릿 인스턴스를 다시 사용 가능하게 설정
     releaseTemplateInstance: (state, action) => {
       const locationId = action.payload;
+      console.log('템플릿 인스턴스 해제:', { locationId });
       const templateInstance = state.userLocationTemplateInstances.find(
         t => t.usedInLocationId === locationId
       );
       if (templateInstance) {
+        console.log('해제할 템플릿 인스턴스 찾음:', templateInstance);
         templateInstance.used = false;
         templateInstance.usedInLocationId = null;
+      } else {
+        console.log('해제할 템플릿 인스턴스를 찾을 수 없음:', locationId);
       }
     },
     
@@ -371,9 +378,10 @@ export const authSlice = createSlice({
         state.error = null;
         
         // 비회원은 기본 템플릿 1개만 제공
-        state.userLocationTemplateInstances = [
-          createBasicLocationTemplate()
-        ];
+        console.log('익명 토큰 발급: 템플릿 인스턴스 초기화');
+        const template = createBasicLocationTemplate();
+        state.userLocationTemplateInstances = [template];
+        console.log('익명 토큰 발급 후 템플릿 인스턴스:', [template]);
       })
       .addCase(getAnonymousToken.rejected, (state, action) => {
         state.loading = false;
@@ -393,11 +401,14 @@ export const authSlice = createSlice({
         state.error = null;
         
         // 회원은 기본 템플릿 3개 제공
-        state.userLocationTemplateInstances = [
+        console.log('카카오 로그인 성공: 템플릿 인스턴스 초기화');
+        const templates = [
           createBasicLocationTemplate(),
           createBasicLocationTemplate(),
           createBasicLocationTemplate()
         ];
+        state.userLocationTemplateInstances = templates;
+        console.log('카카오 로그인 후 템플릿 인스턴스:', templates);
       })
       .addCase(kakaoLogin.rejected, (state, action) => {
         state.loading = false;
@@ -417,11 +428,14 @@ export const authSlice = createSlice({
         state.error = null;
         
         // 회원은 기본 템플릿 3개 제공
-        state.userLocationTemplateInstances = [
+        console.log('일반 로그인 성공: 템플릿 인스턴스 초기화');
+        const templates = [
           createBasicLocationTemplate(),
           createBasicLocationTemplate(),
           createBasicLocationTemplate()
         ];
+        state.userLocationTemplateInstances = templates;
+        console.log('일반 로그인 후 템플릿 인스턴스:', templates);
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
@@ -441,11 +455,14 @@ export const authSlice = createSlice({
         state.error = null;
         
         // 회원은 기본 템플릿 3개 제공
-        state.userLocationTemplateInstances = [
+        console.log('회원가입 성공: 템플릿 인스턴스 초기화');
+        const templates = [
           createBasicLocationTemplate(),
           createBasicLocationTemplate(),
           createBasicLocationTemplate()
         ];
+        state.userLocationTemplateInstances = templates;
+        console.log('회원가입 후 템플릿 인스턴스:', templates);
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
@@ -460,37 +477,41 @@ export const authSlice = createSlice({
         state.loading = false;
         
         if (!action.payload) {
-          // 토큰이 없는 경우
-          state.isLoggedIn = false;
-          state.isAnonymous = false;
+          // 토큰이 없는 경우 초기 상태로 설정
           state.token = null;
           state.user = null;
-          // 기본 템플릿 없음
-          state.userLocationTemplateInstances = [];
-        } else if (action.payload.isAnonymous) {
-          // 익명 토큰인 경우
           state.isLoggedIn = false;
-          state.isAnonymous = true;
-          state.token = action.payload.token;
-          state.user = null;
-          
-          // 비회원은 기본 템플릿 1개만 제공
-          state.userLocationTemplateInstances = [
-            createBasicLocationTemplate()
-          ];
-        } else {
-          // 로그인 토큰인 경우
-          state.isLoggedIn = true;
           state.isAnonymous = false;
-          state.token = action.payload.token;
+          state.error = null;
+          // 기본 템플릿 1개 제공
+          console.log('토큰 없음: 기본 템플릿 1개 제공');
+          const template = createBasicLocationTemplate();
+          state.userLocationTemplateInstances = [template];
+          console.log('토큰 없음 후 템플릿 인스턴스:', [template]);
+          return;
+        }
+        
+        state.token = action.payload.token;
+        state.isAnonymous = action.payload.isAnonymous;
+        
+        if (!action.payload.isAnonymous) {
+          state.isLoggedIn = true;
           state.user = action.payload.user;
-          
-          // 회원은 기본 템플릿 3개 제공
-          state.userLocationTemplateInstances = [
+          // 로그인 사용자는 기본 템플릿 3개 제공
+          console.log('토큰 검증 (로그인 사용자): 템플릿 인스턴스 초기화');
+          const templates = [
             createBasicLocationTemplate(),
             createBasicLocationTemplate(),
             createBasicLocationTemplate()
           ];
+          state.userLocationTemplateInstances = templates;
+          console.log('토큰 검증 후 템플릿 인스턴스 (로그인):', templates);
+        } else {
+          // 익명 사용자는 기본 템플릿 1개 제공
+          console.log('토큰 검증 (익명 사용자): 템플릿 인스턴스 초기화');
+          const template = createBasicLocationTemplate();
+          state.userLocationTemplateInstances = [template];
+          console.log('토큰 검증 후 템플릿 인스턴스 (익명):', [template]);
         }
         
         state.error = null;

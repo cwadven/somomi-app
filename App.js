@@ -16,6 +16,7 @@ import { loadCategories } from './src/redux/slices/categoriesSlice';
 import PushNotificationDebugger from './src/components/PushNotificationDebugger';
 import AlertModal from './src/components/AlertModal';
 import { pushNotificationService } from './src/utils/pushNotificationService';
+import { loginUser } from './src/redux/slices/authSlice';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
@@ -302,22 +303,21 @@ const AppContent = () => {
                 style={[styles.loginButton, styles.loginBtn]}
                 onPress={async () => {
                   try {
+                    console.log('디버그 로그인 시작');
                     // 디버깅 목적으로 간단한 로그인 처리
                     // 실제 앱에서는 이 부분을 실제 로그인 프로세스로 대체해야 함
-                    const mockUser = {
-                      id: '999',
+                    const mockCredentials = {
                       username: '디버그 사용자',
-                      email: 'debug@example.com',
-                      profileImage: 'https://via.placeholder.com/150'
+                      email: 'debug@example.com'
                     };
                     
-                    dispatch({
-                      type: 'auth/loginSuccess',
-                      payload: mockUser
-                    });
+                    // loginUser 액션을 사용하여 로그인 처리
+                    const result = await dispatch(loginUser(mockCredentials)).unwrap();
+                    console.log('디버그 로그인 성공:', result);
                     
                     addLog('디버그 사용자로 로그인됨', 'success');
                   } catch (error) {
+                    console.error('디버그 로그인 실패:', error);
                     addLog(`로그인 실패: ${error.message}`, 'error');
                   }
                 }}

@@ -33,23 +33,12 @@ const AddLocationScreen = () => {
   // 사용 가능한 템플릿 인스턴스만 필터링
   const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
   
-  // 템플릿이 없으면 기본 템플릿 생성
+  // 사용자의 템플릿 인스턴스 목록 콘솔 출력
   useEffect(() => {
-    if (availableTemplates.length === 0 && !isEditMode) {
-      console.log('사용 가능한 템플릿이 없습니다. 기본 템플릿을 생성합니다.');
-      dispatch(addTemplateInstance({
-        productId: 'basic_location',
-        name: '기본 영역',
-        description: '기본적인 제품 관리 기능을 제공하는 영역',
-        icon: 'cube-outline',
-        feature: {
-          baseSlots: 5
-        },
-        used: false,
-        usedInLocationId: null
-      }));
-    }
-  }, [availableTemplates.length, dispatch, isEditMode]);
+    console.log('사용자의 현재 템플릿 인스턴스 목록:', userLocationTemplateInstances);
+    console.log('사용 가능한 템플릿 인스턴스 목록:', availableTemplates);
+    console.log('사용 중인 템플릿 인스턴스 목록:', userLocationTemplateInstances.filter(template => template.used));
+  }, [userLocationTemplateInstances, availableTemplates]);
   
   // 뒤로 가기 핸들러
   const handleGoBack = () => {
@@ -142,6 +131,7 @@ const AddLocationScreen = () => {
       return;
     }
     
+    // 수정 모드가 아니고 템플릿이 선택되지 않은 경우에만 검증
     if (!selectedTemplateInstance && !isEditMode) {
       setAlertModalConfig({
         title: '선택 오류',
@@ -327,80 +317,63 @@ const AddLocationScreen = () => {
                 </View>
               );
             })}
-            
-            {availableTemplates.length === 0 && (
-              <View style={styles.emptyTemplates}>
-                <Text style={styles.emptyTemplatesText}>
-                  사용 가능한 템플릿이 없습니다. 상점에서 템플릿을 구매하세요.
-                </Text>
-                <TouchableOpacity
-                  style={styles.storeButton}
-                  onPress={() => navigation.navigate('Store')}
-                >
-                  <Text style={styles.storeButtonText}>상점으로 이동</Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
         )}
         
         {/* 영역 정보 입력 섹션 */}
-        {(selectedTemplateInstance || isEditMode) && (
-          <>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>영역 정보</Text>
-              
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>이름</Text>
-                <TextInput
-                  style={styles.input}
-                  value={locationData.title}
-                  onChangeText={(text) => handleInputChange('title', text)}
-                  placeholder="영역 이름을 입력하세요"
-                />
-              </View>
-              
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>설명 (선택사항)</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={locationData.description}
-                  onChangeText={(text) => handleInputChange('description', text)}
-                  placeholder="영역에 대한 설명을 입력하세요"
-                  multiline
-                />
-              </View>
-              
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>아이콘</Text>
-                <TouchableOpacity
-                  style={styles.iconSelector}
-                  onPress={() => setIsIconSelectorVisible(true)}
-                >
-                  <View style={styles.selectedIconContainer}>
-                    <Ionicons name={locationData.icon} size={24} color="#4CAF50" />
-                  </View>
-                  <Text style={styles.iconSelectorText}>아이콘 선택</Text>
-                  <Ionicons name="chevron-forward" size={20} color="#999" />
-                </TouchableOpacity>
-              </View>
-            </View>
-            
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>영역 정보</Text>
+          
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>이름</Text>
+            <TextInput
+              style={styles.input}
+              value={locationData.title}
+              onChangeText={(text) => handleInputChange('title', text)}
+              placeholder="영역 이름을 입력하세요"
+            />
+          </View>
+          
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>설명 (선택사항)</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={locationData.description}
+              onChangeText={(text) => handleInputChange('description', text)}
+              placeholder="영역에 대한 설명을 입력하세요"
+              multiline
+            />
+          </View>
+          
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>아이콘</Text>
             <TouchableOpacity
-              style={styles.createButton}
-              onPress={handleCreateLocation}
-              disabled={isLoading}
+              style={styles.iconSelector}
+              onPress={() => setIsIconSelectorVisible(true)}
             >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.createButtonText}>
-                  {isEditMode ? '영역 수정' : '영역 생성'}
-                </Text>
-              )}
+              <View style={styles.selectedIconContainer}>
+                <Ionicons name={locationData.icon} size={24} color="#4CAF50" />
+              </View>
+              <Text style={styles.iconSelectorText}>아이콘 선택</Text>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
             </TouchableOpacity>
-          </>
-        )}
+          </View>
+        </View>
+        
+        {/* 영역 생성/수정 버튼 */}
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={handleCreateLocation}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.createButtonText}>
+              {isEditMode ? '영역 수정' : '영역 생성'}
+            </Text>
+          )}
+        </TouchableOpacity>
         
         {/* 아이콘 선택 모달 */}
         <IconSelector

@@ -18,14 +18,19 @@ const KakaoLoginButton = ({ onLoginStart, onLoginComplete, onLoginError }) => {
     try {
       setLoading(true);
       if (onLoginStart) onLoginStart();
-
+      
+      console.log('카카오 로그인 버튼 클릭: 로그인 요청 시작');
       const result = await requestKakaoLogin();
+      console.log('카카오 로그인 요청 결과:', result);
       
       if (result.success && result.data) {
+        console.log('카카오 로그인 성공: Redux 액션 디스패치 시작');
         // Redux 액션 디스패치
-        await dispatch(kakaoLogin(result.data)).unwrap();
+        const response = await dispatch(kakaoLogin(result.data)).unwrap();
+        console.log('카카오 로그인 Redux 액션 완료:', response);
         if (onLoginComplete) onLoginComplete();
       } else {
+        console.log('카카오 로그인 실패:', result.error);
         if (onLoginError) onLoginError(result.error || '로그인에 실패했습니다.');
       }
     } catch (error) {

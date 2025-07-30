@@ -12,6 +12,7 @@ const KAKAO_REDIRECT_URI = 'exp://YOUR_EXPO_HOST/--/kakao-auth'; // 실제 리�
 // 카카오 로그인 요청 함수
 export const requestKakaoLogin = async () => {
   try {
+    console.log('카카오 로그인 요청 시작');
     // 인증 요청 URL 생성
     const authUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_APP_KEY}&redirect_uri=${encodeURIComponent(KAKAO_REDIRECT_URI)}&response_type=code`;
     
@@ -21,19 +22,25 @@ export const requestKakaoLogin = async () => {
       returnUrl: KAKAO_REDIRECT_URI
     });
     
+    console.log('카카오 인증 세션 결과:', result);
+    
     // 사용자가 인증을 취소한 경우
     if (result.type === 'dismiss' || result.type === 'cancel') {
+      console.log('카카오 로그인 취소됨');
       return { success: false, error: '로그인이 취소되었습니다.' };
     }
     
     // 인증 성공
     if (result.type === 'success' && result.params.code) {
+      console.log('카카오 인증 코드 획득 성공');
       // 인증 코드로 토큰 요청
       const tokenResponse = await getKakaoToken(result.params.code);
       
       if (tokenResponse.success) {
+        console.log('카카오 토큰 획득 성공');
         // 토큰으로 사용자 정보 요청
         const userInfo = await getKakaoUserInfo(tokenResponse.access_token);
+        console.log('카카오 사용자 정보 획득 성공:', userInfo);
         return {
           success: true,
           data: {
@@ -48,9 +55,11 @@ export const requestKakaoLogin = async () => {
         };
       }
       
+      console.log('카카오 토큰 획득 실패:', tokenResponse);
       return tokenResponse;
     }
     
+    console.log('카카오 로그인 실패: 알 수 없는 오류');
     return { success: false, error: '알 수 없는 오류가 발생했습니다.' };
   } catch (error) {
     console.error('Kakao login error:', error);
