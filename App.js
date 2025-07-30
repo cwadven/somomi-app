@@ -4,7 +4,7 @@ import { Provider, useDispatch, useSelector } from 'react-redux';
 import { Platform, StyleSheet, Linking, AppState, View, ActivityIndicator, Text, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
-import { verifyToken, getAnonymousToken, logout } from './src/redux/slices/authSlice';
+import { verifyToken, getAnonymousToken, logout, loadUserLocationTemplateInstances } from './src/redux/slices/authSlice';
 import * as Updates from 'expo-updates';
 import Constants from 'expo-constants';
 import CodePushUpdateLoading from './src/components/CodePushUpdateLoading';
@@ -17,6 +17,8 @@ import PushNotificationDebugger from './src/components/PushNotificationDebugger'
 import AlertModal from './src/components/AlertModal';
 import { pushNotificationService } from './src/utils/pushNotificationService';
 import { loginUser } from './src/redux/slices/authSlice';
+import { fetchLocations } from './src/redux/slices/locationsSlice';
+import { fetchProducts, fetchConsumedProducts } from './src/redux/slices/productsSlice';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
@@ -173,49 +175,56 @@ const AppContent = () => {
     }
   };
   
-  useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        setIsLoading(true);
-        // 로컬 데이터 초기화
-        await initializeData();
-        await initializeNotificationsData();
-        
-        // 카테고리 데이터 로드
-        await dispatch(loadCategories());
-        
-        setDataInitialized(true);
-        
-        // 저장된 토큰 검증
-        const result = await dispatch(verifyToken()).unwrap();
-        
-        // 토큰이 없는 경우 익명 토큰 발급
-        if (!result) {
-          await dispatch(getAnonymousToken()).unwrap();
+  // 앱 초기화 함수
+  const initializeApp = async () => {
+    try {
+      setIsLoading(true);
+      
+      // 토큰 검증
+      await dispatch(verifyToken()).unwrap();
+      
+      // 사용자 영역 템플릿 인스턴스 로드
+      await dispatch(loadUserLocationTemplateInstances()).unwrap();
+      
+      // 영역 데이터 로드
+      await dispatch(fetchLocations()).unwrap();
+      
+      // 제품 데이터 로드
+      await dispatch(fetchProducts()).unwrap();
+      
+      // 소진된 제품 데이터 로드
+      await dispatch(fetchConsumedProducts()).unwrap();
+      
+      // 카테고리 로드
+      await dispatch(loadCategories()).unwrap();
+      
+      // 알림 데이터 초기화
+      await dispatch(initializeNotificationsData()).unwrap();
+      
+      // 푸시 알림 초기화
+      if (Platform.OS !== 'web' && messaging) {
+        const token = await pushNotificationService.initialize();
+        if (token) {
+          setPushToken(token);
         }
-        
-        // 웹이 아닌 환경에서만 알림 관련 코드 실행
-        if (Platform.OS !== 'web' && messaging) {
-          // 알림 초기화 및 권한 요청
-          pushNotificationService.setupNotificationHandler();
-          const token = await pushNotificationService.registerForPushNotifications();
-          if (token) {
-            setPushToken(token);
-          }
-        }
-      } catch (error) {
-        console.error('인증 초기화 실패:', error);
-        // 오류 발생 시 익명 토큰 발급
-        try {
-          await dispatch(getAnonymousToken()).unwrap();
-        } catch (anonymousError) {
-          console.error('익명 토큰 발급 실패:', anonymousError);
-        }
-      } finally {
-        setIsLoading(false);
       }
-    };
-    
+      
+      setDataInitialized(true);
+    } catch (error) {
+      console.error('앱 초기화 오류:', error);
+      
+      // 오류 발생 시 익명 토큰 발급 시도
+      try {
+        await dispatch(getAnonymousToken()).unwrap();
+      } catch (anonymousError) {
+        console.error('익명 토큰 발급 실패:', anonymousError);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  useEffect(() => {
     initializeApp();
     
     // 앱 상태 변경 리스너 등록

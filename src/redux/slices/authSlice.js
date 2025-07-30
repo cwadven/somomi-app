@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { saveUserSlots, loadUserSlots } from '../../utils/storageUtils';
+import { saveUserSlots, loadUserSlots, saveUserLocationTemplates, loadUserLocationTemplates } from '../../utils/storageUtils';
 import { generateId } from '../../utils/idUtils';
 
 // JWT 토큰 발급 API 호출 (실제 구현 시 서버에서 가져옴)
@@ -136,6 +136,31 @@ export const verifyToken = createAsyncThunk(
       }
     } catch (error) {
       console.error('토큰 검증 오류:', error);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// 사용자 영역 템플릿 인스턴스 로드
+export const loadUserLocationTemplateInstances = createAsyncThunk(
+  'auth/loadUserLocationTemplateInstances',
+  async (_, { rejectWithValue }) => {
+    try {
+      console.log('사용자 영역 템플릿 인스턴스 로드 시작');
+      const templates = await loadUserLocationTemplates();
+      console.log('로드된 사용자 영역 템플릿 인스턴스:', templates);
+      
+      // 저장된 템플릿이 없으면 기본 템플릿 생성
+      if (!templates || templates.length === 0) {
+        console.log('저장된 템플릿이 없어 기본 템플릿을 생성합니다.');
+        const defaultTemplate = createBasicLocationTemplate();
+        await saveUserLocationTemplates([defaultTemplate]);
+        return [defaultTemplate];
+      }
+      
+      return templates;
+    } catch (error) {
+      console.error('사용자 영역 템플릿 인스턴스 로드 오류:', error);
       return rejectWithValue(error.message);
     }
   }
@@ -305,6 +330,12 @@ export const authSlice = createSlice({
       const template = createBasicLocationTemplate();
       state.userLocationTemplateInstances = [template];
       console.log('로그아웃 후 템플릿 인스턴스:', [template]);
+      
+      // AsyncStorage에 저장
+      saveUserLocationTemplates([template])
+        .then(() => console.log('로그아웃 후 템플릿 인스턴스 저장 성공'))
+        .catch(err => console.error('로그아웃 후 템플릿 인스턴스 저장 실패:', err));
+      
       // localStorage에서 토큰 제거
       localStorage.removeItem('jwt_token');
     },
@@ -333,6 +364,11 @@ export const authSlice = createSlice({
         console.log('템플릿 인스턴스 찾음:', templateInstance);
         templateInstance.used = true;
         templateInstance.usedInLocationId = locationId;
+        
+        // AsyncStorage에 저장
+        saveUserLocationTemplates(state.userLocationTemplateInstances)
+          .then(() => console.log('템플릿 인스턴스 사용 표시 저장 성공'))
+          .catch(err => console.error('템플릿 인스턴스 사용 표시 저장 실패:', err));
       } else {
         console.log('템플릿 인스턴스를 찾을 수 없음:', templateId);
       }
@@ -349,6 +385,11 @@ export const authSlice = createSlice({
         console.log('해제할 템플릿 인스턴스 찾음:', templateInstance);
         templateInstance.used = false;
         templateInstance.usedInLocationId = null;
+        
+        // AsyncStorage에 저장
+        saveUserLocationTemplates(state.userLocationTemplateInstances)
+          .then(() => console.log('템플릿 인스턴스 해제 저장 성공'))
+          .catch(err => console.error('템플릿 인스턴스 해제 저장 실패:', err));
       } else {
         console.log('해제할 템플릿 인스턴스를 찾을 수 없음:', locationId);
       }
@@ -363,6 +404,11 @@ export const authSlice = createSlice({
       };
       console.log('생성된 템플릿 인스턴스:', newTemplate);
       state.userLocationTemplateInstances.push(newTemplate);
+      
+      // AsyncStorage에 저장
+      saveUserLocationTemplates(state.userLocationTemplateInstances)
+        .then(() => console.log('템플릿 인스턴스 추가 저장 성공'))
+        .catch(err => console.error('템플릿 인스턴스 추가 저장 실패:', err));
     }
   },
   extraReducers: (builder) => {
@@ -382,6 +428,11 @@ export const authSlice = createSlice({
         const template = createBasicLocationTemplate();
         state.userLocationTemplateInstances = [template];
         console.log('익명 토큰 발급 후 템플릿 인스턴스:', [template]);
+        
+        // AsyncStorage에 저장
+        saveUserLocationTemplates([template])
+          .then(() => console.log('익명 토큰 발급 후 템플릿 인스턴스 저장 성공'))
+          .catch(err => console.error('익명 토큰 발급 후 템플릿 인스턴스 저장 실패:', err));
       })
       .addCase(getAnonymousToken.rejected, (state, action) => {
         state.loading = false;
@@ -409,6 +460,11 @@ export const authSlice = createSlice({
         ];
         state.userLocationTemplateInstances = templates;
         console.log('카카오 로그인 후 템플릿 인스턴스:', templates);
+        
+        // AsyncStorage에 저장
+        saveUserLocationTemplates(templates)
+          .then(() => console.log('카카오 로그인 후 템플릿 인스턴스 저장 성공'))
+          .catch(err => console.error('카카오 로그인 후 템플릿 인스턴스 저장 실패:', err));
       })
       .addCase(kakaoLogin.rejected, (state, action) => {
         state.loading = false;
@@ -436,6 +492,11 @@ export const authSlice = createSlice({
         ];
         state.userLocationTemplateInstances = templates;
         console.log('일반 로그인 후 템플릿 인스턴스:', templates);
+        
+        // AsyncStorage에 저장
+        saveUserLocationTemplates(templates)
+          .then(() => console.log('일반 로그인 후 템플릿 인스턴스 저장 성공'))
+          .catch(err => console.error('일반 로그인 후 템플릿 인스턴스 저장 실패:', err));
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
@@ -463,6 +524,11 @@ export const authSlice = createSlice({
         ];
         state.userLocationTemplateInstances = templates;
         console.log('회원가입 후 템플릿 인스턴스:', templates);
+        
+        // AsyncStorage에 저장
+        saveUserLocationTemplates(templates)
+          .then(() => console.log('회원가입 후 템플릿 인스턴스 저장 성공'))
+          .catch(err => console.error('회원가입 후 템플릿 인스턴스 저장 실패:', err));
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
@@ -488,6 +554,11 @@ export const authSlice = createSlice({
           const template = createBasicLocationTemplate();
           state.userLocationTemplateInstances = [template];
           console.log('토큰 없음 후 템플릿 인스턴스:', [template]);
+          
+          // AsyncStorage에 저장
+          saveUserLocationTemplates([template])
+            .then(() => console.log('토큰 없음 후 템플릿 인스턴스 저장 성공'))
+            .catch(err => console.error('토큰 없음 후 템플릿 인스턴스 저장 실패:', err));
           return;
         }
         
@@ -506,12 +577,22 @@ export const authSlice = createSlice({
           ];
           state.userLocationTemplateInstances = templates;
           console.log('토큰 검증 후 템플릿 인스턴스 (로그인):', templates);
+          
+          // AsyncStorage에 저장
+          saveUserLocationTemplates(templates)
+            .then(() => console.log('토큰 검증 후 템플릿 인스턴스 (로그인) 저장 성공'))
+            .catch(err => console.error('토큰 검증 후 템플릿 인스턴스 (로그인) 저장 실패:', err));
         } else {
           // 익명 사용자는 기본 템플릿 1개 제공
           console.log('토큰 검증 (익명 사용자): 템플릿 인스턴스 초기화');
           const template = createBasicLocationTemplate();
           state.userLocationTemplateInstances = [template];
           console.log('토큰 검증 후 템플릿 인스턴스 (익명):', [template]);
+          
+          // AsyncStorage에 저장
+          saveUserLocationTemplates([template])
+            .then(() => console.log('토큰 검증 후 템플릿 인스턴스 (익명) 저장 성공'))
+            .catch(err => console.error('토큰 검증 후 템플릿 인스턴스 (익명) 저장 실패:', err));
         }
         
         state.error = null;
@@ -519,6 +600,21 @@ export const authSlice = createSlice({
       .addCase(verifyToken.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+      
+      // 사용자 영역 템플릿 인스턴스 로드 처리
+      .addCase(loadUserLocationTemplateInstances.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(loadUserLocationTemplateInstances.fulfilled, (state, action) => {
+        state.loading = false;
+        state.userLocationTemplateInstances = action.payload;
+        console.log('사용자 영역 템플릿 인스턴스 로드 완료:', action.payload);
+      })
+      .addCase(loadUserLocationTemplateInstances.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        console.error('사용자 영역 템플릿 인스턴스 로드 실패:', action.payload);
       });
   },
 });

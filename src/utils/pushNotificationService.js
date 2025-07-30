@@ -100,9 +100,31 @@ class PushNotificationService {
     }
   }
   
-  // 현재 로그 가져오기
+  // 푸시 알림 서비스 초기화
+  async initialize() {
+    try {
+      this.addDebugLog('푸시 알림 서비스 초기화 시작');
+      
+      // 알림 핸들러 설정
+      this.setupNotificationHandler();
+      
+      // 알림 권한 요청 및 토큰 등록
+      const token = await this.registerForPushNotifications();
+      if (token) {
+        this.addDebugLog(`푸시 알림 토큰 획득: ${token}`);
+      }
+      
+      this.addDebugLog('푸시 알림 서비스 초기화 완료');
+      return token;
+    } catch (error) {
+      this.addDebugLog(`푸시 알림 서비스 초기화 오류: ${error.message}`, 'error');
+      return null;
+    }
+  }
+
+  // 디버그 로그 가져오기
   getDebugLogs() {
-    return [...debugLogs];
+    return debugLogs;
   }
   
   // 로그 초기화
@@ -519,3 +541,25 @@ export const pushNotificationService = new PushNotificationService();
 export const getPushNotificationLogs = () => pushNotificationService.getDebugLogs();
 export const clearPushNotificationLogs = () => pushNotificationService.clearDebugLogs();
 export const setPushNotificationDebugCallback = (callback) => pushNotificationService.setDebugCallback(callback); 
+
+// 푸시 알림 서비스 초기화 (권한 요청 및 토큰 설정)
+export const initializePushNotificationService = async () => {
+  try {
+    console.log('푸시 알림 서비스 초기화 시작');
+    
+    // 알림 핸들러 설정
+    pushNotificationService.setupNotificationHandler();
+    
+    // 알림 권한 요청 및 토큰 등록
+    const token = await pushNotificationService.registerForPushNotifications();
+    if (token) {
+      console.log('푸시 알림 토큰 획득:', token);
+    }
+    
+    console.log('푸시 알림 서비스 초기화 완료');
+    return token;
+  } catch (error) {
+    console.error('푸시 알림 서비스 초기화 오류:', error);
+    return null;
+  }
+}; 

@@ -172,7 +172,7 @@ const LocationsScreen = () => {
     <View style={styles.container}>
       {/* 슬롯 상태 표시 바 - 템플릿 인스턴스 기준 */}
       <SlotStatusBar 
-        used={usedTemplates.length} 
+        used={locations.length} 
         total={totalTemplates} 
         type="location" 
       />

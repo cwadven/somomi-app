@@ -284,7 +284,7 @@ const ProductDetailScreen = () => {
             // 소진 처리 API 호출
             dispatch(markProductAsConsumedAsync({ 
               id: currentProduct.id, 
-              consumedDate: date.toISOString() 
+              consumptionDate: date.toISOString() 
             }))
               .unwrap()
               .then(() => {

@@ -193,8 +193,10 @@ export const deleteProductApi = async (id) => {
 };
 
 // 소진 처리 API 함수
-export const markProductAsConsumedApi = async (id, consumedDate = null) => {
+export const markProductAsConsumedApi = async (id, consumptionDate = null) => {
   try {
+    console.log('소진 처리 API 호출:', { id, consumptionDate });
+    
     // 저장된 최신 데이터 로드
     const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
     const storedConsumedProducts = await loadData(STORAGE_KEYS.CONSUMED_PRODUCTS) || [];
@@ -203,15 +205,22 @@ export const markProductAsConsumedApi = async (id, consumedDate = null) => {
       sampleProducts = storedProducts;
     }
     
+    console.log('소진 처리할 제품 ID:', id);
+    console.log('현재 제품 목록:', sampleProducts.map(p => ({ id: p.id, name: p.name })));
+    
     const index = sampleProducts.findIndex(p => p.id === id);
+    console.log('제품 인덱스:', index);
+    
     if (index !== -1) {
       // 제품 복사
       const product = { ...sampleProducts[index] };
       
       // 소진 처리 정보 추가
       // 소진 날짜가 제공되면 해당 날짜 사용, 아니면 현재 날짜 사용
-      product.consumedAt = consumedDate || new Date().toISOString();
+      product.consumedAt = consumptionDate || new Date().toISOString();
       product.isConsumed = true;
+      
+      console.log('소진 처리된 제품:', product);
       
       // 일반 제품 목록에서 제거
       const updatedProducts = [
@@ -232,6 +241,7 @@ export const markProductAsConsumedApi = async (id, consumedDate = null) => {
       
       return product;
     } else {
+      console.error('제품을 찾을 수 없음:', id);
       throw new Error('Product not found');
     }
   } catch (error) {

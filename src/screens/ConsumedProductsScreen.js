@@ -11,7 +11,7 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchConsumedProductsAsync } from '../redux/slices/productsSlice';
+import { fetchConsumedProducts } from '../redux/slices/productsSlice';
 
 const ConsumedProductsScreen = () => {
   const dispatch = useDispatch();
@@ -21,13 +21,13 @@ const ConsumedProductsScreen = () => {
   
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
-    dispatch(fetchConsumedProductsAsync());
+    dispatch(fetchConsumedProducts());
   }, [dispatch]);
   
   // 화면에 포커스가 올 때마다 데이터 새로고침
   useFocusEffect(
     useCallback(() => {
-      dispatch(fetchConsumedProductsAsync());
+      dispatch(fetchConsumedProducts());
     }, [dispatch])
   );
   
@@ -112,7 +112,7 @@ const ConsumedProductsScreen = () => {
         <Text style={styles.errorText}>데이터를 불러오는 중 오류가 발생했습니다.</Text>
         <TouchableOpacity 
           style={styles.retryButton}
-          onPress={() => dispatch(fetchConsumedProductsAsync())}
+          onPress={() => dispatch(fetchConsumedProducts())}
         >
           <Text style={styles.retryButtonText}>다시 시도</Text>
         </TouchableOpacity>

@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { saveLocations, loadLocations } from '../../utils/storageUtils';
 
 // 영역 목록 가져오기
 export const fetchLocations = createAsyncThunk(
@@ -11,8 +12,14 @@ export const fetchLocations = createAsyncThunk(
       const currentLocations = getState().locations.locations;
       console.log('현재 저장된 영역 목록:', currentLocations);
       
-      // 실제 구현에서는 API 호출
-      // 여기서는 현재 상태의 영역 목록 반환 (빈 배열이 아님)
+      // 영역 목록이 비어있으면 AsyncStorage에서 로드
+      if (currentLocations.length === 0) {
+        const storedLocations = await loadLocations();
+        console.log('AsyncStorage에서 로드한 영역 목록:', storedLocations);
+        return storedLocations;
+      }
+      
+      // 이미 영역 목록이 있으면 그대로 반환
       return currentLocations;
     } catch (error) {
       console.error('영역 목록 가져오기 오류:', error);
@@ -60,6 +67,10 @@ export const createLocation = createAsyncThunk(
       
       console.log('생성된 영역:', newLocation);
       
+      // 새 영역이 생성된 후 전체 영역 목록을 AsyncStorage에 저장
+      const updatedLocations = [...getState().locations.locations, newLocation];
+      await saveLocations(updatedLocations);
+      
       return newLocation;
     } catch (error) {
       console.error('영역 생성 오류:', error);
@@ -71,10 +82,17 @@ export const createLocation = createAsyncThunk(
 // 영역 수정
 export const updateLocation = createAsyncThunk(
   'locations/updateLocation',
-  async (locationData, { rejectWithValue }) => {
+  async (locationData, { rejectWithValue, getState }) => {
     try {
       // 실제 구현에서는 API 호출
       // 여기서는 수정된 데이터 그대로 반환
+      
+      // 영역 수정 후 전체 영역 목록을 AsyncStorage에 저장
+      const updatedLocations = getState().locations.locations.map(location => 
+        location.id === locationData.id ? locationData : location
+      );
+      await saveLocations(updatedLocations);
+      
       return locationData;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -85,10 +103,16 @@ export const updateLocation = createAsyncThunk(
 // 영역 삭제
 export const deleteLocation = createAsyncThunk(
   'locations/deleteLocation',
-  async (locationId, { rejectWithValue }) => {
+  async (locationId, { rejectWithValue, getState }) => {
     try {
       // 실제 구현에서는 API 호출
-      // 여기서는 삭제할 ID 반환
+      
+      // 영역 삭제 후 전체 영역 목록을 AsyncStorage에 저장
+      const updatedLocations = getState().locations.locations.filter(
+        location => location.id !== locationId
+      );
+      await saveLocations(updatedLocations);
+      
       return locationId;
     } catch (error) {
       return rejectWithValue(error.message);

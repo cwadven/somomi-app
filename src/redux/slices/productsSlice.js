@@ -10,15 +10,30 @@ import {
   restoreConsumedProductApi
 } from '../../api/productsApi';
 import { deleteLocation } from './locationsSlice';
+import { saveProducts, loadProducts, saveConsumedProducts, loadConsumedProducts } from '../../utils/storageUtils';
 
 // 비동기 액션 생성
 export const fetchProducts = createAsyncThunk(
   'products/fetchProducts',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
-      const response = await fetchProductsApi();
-      return response;
+      console.log('fetchProducts 시작');
+      
+      // 현재 상태에서 제품 목록 가져오기
+      const currentProducts = getState().products.products;
+      console.log('현재 저장된 제품 목록:', currentProducts);
+      
+      // 제품 목록이 비어있으면 AsyncStorage에서 로드
+      if (currentProducts.length === 0) {
+        const storedProducts = await loadProducts();
+        console.log('AsyncStorage에서 로드한 제품 목록:', storedProducts);
+        return storedProducts;
+      }
+      
+      // 이미 제품 목록이 있으면 그대로 반환
+      return currentProducts;
     } catch (error) {
+      console.error('제품 목록 가져오기 오류:', error);
       return rejectWithValue(error.message);
     }
   }
@@ -53,13 +68,13 @@ export const fetchProductsByLocation = createAsyncThunk(
         }
       }
       
-      // 제품 데이터가 없으면 API 호출
-      const allProducts = await fetchProductsApi();
+      // 제품 데이터가 없으면 AsyncStorage에서 로드
+      const storedProducts = await loadProducts();
       
       if (locationId === 'all') {
-        return allProducts;
+        return storedProducts;
       } else {
-        return allProducts.filter(product => product.locationId === locationId);
+        return storedProducts.filter(product => product.locationId === locationId);
       }
     } catch (error) {
       return rejectWithValue(error.message);
@@ -69,9 +84,14 @@ export const fetchProductsByLocation = createAsyncThunk(
 
 export const addProductAsync = createAsyncThunk(
   'products/addProduct',
-  async (product, { rejectWithValue }) => {
+  async (product, { rejectWithValue, getState }) => {
     try {
       const response = await addProductApi(product);
+      
+      // 새 제품이 추가된 후 전체 제품 목록을 AsyncStorage에 저장
+      const updatedProducts = [...getState().products.products, response];
+      await saveProducts(updatedProducts);
+      
       return response;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -81,9 +101,16 @@ export const addProductAsync = createAsyncThunk(
 
 export const updateProductAsync = createAsyncThunk(
   'products/updateProduct',
-  async (product, { rejectWithValue }) => {
+  async (product, { rejectWithValue, getState }) => {
     try {
       const response = await updateProductApi(product);
+      
+      // 제품 수정 후 전체 제품 목록을 AsyncStorage에 저장
+      const updatedProducts = getState().products.products.map(p => 
+        p.id === product.id ? response : p
+      );
+      await saveProducts(updatedProducts);
+      
       return response;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -93,9 +120,14 @@ export const updateProductAsync = createAsyncThunk(
 
 export const deleteProductAsync = createAsyncThunk(
   'products/deleteProduct',
-  async (id, { rejectWithValue }) => {
+  async (id, { rejectWithValue, getState }) => {
     try {
       await deleteProductApi(id);
+      
+      // 제품 삭제 후 전체 제품 목록을 AsyncStorage에 저장
+      const updatedProducts = getState().products.products.filter(p => p.id !== id);
+      await saveProducts(updatedProducts);
+      
       return id;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -105,10 +137,19 @@ export const deleteProductAsync = createAsyncThunk(
 
 // 소진 처리 액션
 export const markProductAsConsumedAsync = createAsyncThunk(
-  'products/markAsConsumed',
-  async ({ id, consumedDate = null }, { rejectWithValue }) => {
+  'products/markProductAsConsumed',
+  async ({ id, consumptionDate }, { rejectWithValue, getState }) => {
     try {
-      const response = await markProductAsConsumedApi(id, consumedDate);
+      const response = await markProductAsConsumedApi(id, consumptionDate);
+      
+      // 제품이 소진된 후 전체 제품 목록과 소진된 제품 목록을 AsyncStorage에 저장
+      const { products, consumedProducts } = getState().products;
+      const updatedProducts = products.filter(p => p.id !== id);
+      const updatedConsumedProducts = [...consumedProducts, response];
+      
+      await saveProducts(updatedProducts);
+      await saveConsumedProducts(updatedConsumedProducts);
+      
       return response;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -117,13 +158,27 @@ export const markProductAsConsumedAsync = createAsyncThunk(
 );
 
 // 소진 처리된 제품 조회 액션
-export const fetchConsumedProductsAsync = createAsyncThunk(
+export const fetchConsumedProducts = createAsyncThunk(
   'products/fetchConsumedProducts',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
-      const response = await fetchConsumedProductsApi();
-      return response;
+      console.log('fetchConsumedProducts 시작');
+      
+      // 현재 상태에서 소진된 제품 목록 가져오기
+      const currentConsumedProducts = getState().products.consumedProducts;
+      console.log('현재 저장된 소진된 제품 목록:', currentConsumedProducts);
+      
+      // 소진된 제품 목록이 비어있으면 AsyncStorage에서 로드
+      if (currentConsumedProducts.length === 0) {
+        const storedConsumedProducts = await loadConsumedProducts();
+        console.log('AsyncStorage에서 로드한 소진된 제품 목록:', storedConsumedProducts);
+        return storedConsumedProducts;
+      }
+      
+      // 이미 소진된 제품 목록이 있으면 그대로 반환
+      return currentConsumedProducts;
     } catch (error) {
+      console.error('소진된 제품 목록 가져오기 오류:', error);
       return rejectWithValue(error.message);
     }
   }
@@ -131,10 +186,19 @@ export const fetchConsumedProductsAsync = createAsyncThunk(
 
 // 소진 철회 액션
 export const restoreConsumedProductAsync = createAsyncThunk(
-  'products/restoreConsumed',
-  async ({ id, locationId = null }, { rejectWithValue }) => {
+  'products/restoreConsumedProduct',
+  async (productId, { rejectWithValue, getState }) => {
     try {
-      const response = await restoreConsumedProductApi(id, locationId);
+      const response = await restoreConsumedProductApi(productId);
+      
+      // 소진된 제품이 복원된 후 전체 제품 목록과 소진된 제품 목록을 AsyncStorage에 저장
+      const { products, consumedProducts } = getState().products;
+      const updatedProducts = [...products, response];
+      const updatedConsumedProducts = consumedProducts.filter(p => p.id !== productId);
+      
+      await saveProducts(updatedProducts);
+      await saveConsumedProducts(updatedConsumedProducts);
+      
       return response;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -305,14 +369,14 @@ export const productsSlice = createSlice({
       })
       
       // 소진 처리된 제품 조회 액션 처리
-      .addCase(fetchConsumedProductsAsync.pending, (state) => {
+      .addCase(fetchConsumedProducts.pending, (state) => {
         state.consumedStatus = 'loading';
       })
-      .addCase(fetchConsumedProductsAsync.fulfilled, (state, action) => {
+      .addCase(fetchConsumedProducts.fulfilled, (state, action) => {
         state.consumedStatus = 'succeeded';
         state.consumedProducts = action.payload;
       })
-      .addCase(fetchConsumedProductsAsync.rejected, (state, action) => {
+      .addCase(fetchConsumedProducts.rejected, (state, action) => {
         state.consumedStatus = 'failed';
         state.error = action.payload;
       })
