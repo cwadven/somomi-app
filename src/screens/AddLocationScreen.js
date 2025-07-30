@@ -7,13 +7,14 @@ import {
   TouchableOpacity, 
   ScrollView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  SafeAreaView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { createLocation } from '../redux/slices/locationsSlice';
-import { markTemplateInstanceAsUsed } from '../redux/slices/authSlice';
+import { markTemplateInstanceAsUsed, addTemplateInstance } from '../redux/slices/authSlice';
 import IconSelector from '../components/IconSelector';
 
 const AddLocationScreen = () => {
@@ -26,6 +27,29 @@ const AddLocationScreen = () => {
   // 사용 가능한 템플릿 인스턴스만 필터링
   const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
   
+  // 템플릿이 없으면 기본 템플릿 생성
+  useEffect(() => {
+    if (availableTemplates.length === 0) {
+      console.log('사용 가능한 템플릿이 없습니다. 기본 템플릿을 생성합니다.');
+      dispatch(addTemplateInstance({
+        productId: 'basic_location',
+        name: '기본 영역',
+        description: '기본적인 제품 관리 기능을 제공하는 영역',
+        icon: 'cube-outline',
+        feature: {
+          baseSlots: 5
+        },
+        used: false,
+        usedInLocationId: null
+      }));
+    }
+  }, [availableTemplates.length, dispatch]);
+  
+  // 뒤로 가기 핸들러
+  const handleGoBack = () => {
+    navigation.goBack();
+  };
+
   // 템플릿 인스턴스를 productId별로 그룹화
   const groupedTemplates = availableTemplates.reduce((groups, template) => {
     const { productId } = template;
@@ -57,6 +81,13 @@ const AddLocationScreen = () => {
       });
     }
   }, [selectedTemplateInstance]);
+
+  // 첫 번째 템플릿을 자동으로 선택
+  useEffect(() => {
+    if (availableTemplates.length > 0 && !selectedTemplateInstance) {
+      setSelectedTemplateInstance(availableTemplates[0]);
+    }
+  }, [availableTemplates, selectedTemplateInstance]);
   
   // 입력값 변경 핸들러
   const handleInputChange = (key, value) => {
@@ -96,6 +127,11 @@ const AddLocationScreen = () => {
     setIsLoading(true);
     
     try {
+      console.log('영역 생성 시작:', {
+        locationData,
+        selectedTemplateInstance
+      });
+      
       // 영역 생성 API 호출
       const result = await dispatch(createLocation({
         ...locationData,
@@ -104,6 +140,8 @@ const AddLocationScreen = () => {
         feature: selectedTemplateInstance.feature
       })).unwrap();
       
+      console.log('영역 생성 성공:', result);
+      
       // 생성된 영역 ID로 템플릿 인스턴스를 사용됨으로 표시
       dispatch(markTemplateInstanceAsUsed({
         templateId: selectedTemplateInstance.id,
@@ -111,7 +149,17 @@ const AddLocationScreen = () => {
       }));
       
       setIsLoading(false);
-      navigation.goBack();
+      
+      // 영역 목록 화면으로 돌아가기 (강제로 새로고침)
+      console.log('영역 생성 완료, 영역 목록 화면으로 이동');
+      
+      // 탭 네비게이터의 Locations 탭으로 이동
+      navigation.navigate('Locations');
+      
+      // 성공 메시지 표시
+      setTimeout(() => {
+        Alert.alert('성공', '영역이 성공적으로 생성되었습니다.');
+      }, 300);
     } catch (error) {
       setIsLoading(false);
       console.error('영역 생성 실패:', error);
@@ -128,134 +176,170 @@ const AddLocationScreen = () => {
   };
   
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>템플릿 선택</Text>
-        <Text style={styles.sectionDescription}>
-          영역을 생성할 템플릿을 선택하세요. 템플릿에 따라 제공되는 기능이 다릅니다.
-        </Text>
-        
-        {Object.entries(groupedTemplates).map(([productId, templates]) => {
-          // 해당 productId의 첫 번째 템플릿에서 공통 정보 가져오기
-          const { name, description, icon } = templates[0];
-          
-          return (
-            <View key={productId} style={styles.templateGroup}>
-              <View style={styles.templateGroupHeader}>
-                <View style={styles.templateIconContainer}>
-                  <Ionicons name={icon} size={24} color="#4CAF50" />
-                </View>
-                <View style={styles.templateGroupInfo}>
-                  <Text style={styles.templateGroupName}>{name}</Text>
-                  <Text style={styles.templateGroupDescription}>{description}</Text>
-                </View>
-              </View>
-              
-              <View style={styles.templateOptions}>
-                {templates.map(template => (
-                  <TouchableOpacity
-                    key={template.id}
-                    style={[
-                      styles.templateOption,
-                      selectedTemplateInstance?.id === template.id && styles.selectedTemplateOption
-                    ]}
-                    onPress={() => handleTemplateSelect(template)}
-                  >
-                    <Text style={styles.templateOptionTitle}>
-                      기본 슬롯: {renderSlotCount(template.feature.baseSlots)}
-                    </Text>
-                    {selectedTemplateInstance?.id === template.id && (
-                      <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          );
-        })}
-        
-        {availableTemplates.length === 0 && (
-          <View style={styles.emptyTemplates}>
-            <Text style={styles.emptyTemplatesText}>
-              사용 가능한 템플릿이 없습니다. 상점에서 템플릿을 구매하세요.
-            </Text>
-            <TouchableOpacity
-              style={styles.storeButton}
-              onPress={() => navigation.navigate('Store')}
-            >
-              <Text style={styles.storeButtonText}>상점으로 이동</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+    <SafeAreaView style={styles.safeArea}>
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
+          <Ionicons name="chevron-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>영역 생성</Text>
+        <View style={styles.headerRight} />
       </View>
       
-      {selectedTemplateInstance && (
-        <>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>영역 정보</Text>
+      <ScrollView style={styles.container}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>템플릿 선택</Text>
+          <Text style={styles.sectionDescription}>
+            영역을 생성할 템플릿을 선택하세요. 템플릿에 따라 제공되는 기능이 다릅니다.
+          </Text>
+          
+          {Object.entries(groupedTemplates).map(([productId, templates]) => {
+            // 해당 productId의 첫 번째 템플릿에서 공통 정보 가져오기
+            const { name, description, icon } = templates[0];
             
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>이름</Text>
-              <TextInput
-                style={styles.input}
-                value={locationData.title}
-                onChangeText={(text) => handleInputChange('title', text)}
-                placeholder="영역 이름을 입력하세요"
-              />
-            </View>
-            
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>설명 (선택사항)</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={locationData.description}
-                onChangeText={(text) => handleInputChange('description', text)}
-                placeholder="영역에 대한 설명을 입력하세요"
-                multiline
-              />
-            </View>
-            
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>아이콘</Text>
-              <TouchableOpacity
-                style={styles.iconSelector}
-                onPress={() => setIsIconSelectorVisible(true)}
-              >
-                <View style={styles.selectedIconContainer}>
-                  <Ionicons name={locationData.icon} size={24} color="#4CAF50" />
+            return (
+              <View key={productId} style={styles.templateGroup}>
+                <View style={styles.templateGroupHeader}>
+                  <View style={styles.templateIconContainer}>
+                    <Ionicons name={icon} size={24} color="#4CAF50" />
+                  </View>
+                  <View style={styles.templateGroupInfo}>
+                    <Text style={styles.templateGroupName}>{name}</Text>
+                    <Text style={styles.templateGroupDescription}>{description}</Text>
+                  </View>
                 </View>
-                <Text style={styles.iconSelectorText}>아이콘 선택</Text>
-                <Ionicons name="chevron-forward" size={20} color="#999" />
+                
+                <View style={styles.templateOptions}>
+                  {templates.map(template => (
+                    <TouchableOpacity
+                      key={template.id}
+                      style={[
+                        styles.templateOption,
+                        selectedTemplateInstance?.id === template.id && styles.selectedTemplateOption
+                      ]}
+                      onPress={() => handleTemplateSelect(template)}
+                    >
+                      <Text style={styles.templateOptionTitle}>
+                        기본 슬롯: {renderSlotCount(template.feature.baseSlots)}
+                      </Text>
+                      {selectedTemplateInstance?.id === template.id && (
+                        <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            );
+          })}
+          
+          {availableTemplates.length === 0 && (
+            <View style={styles.emptyTemplates}>
+              <Text style={styles.emptyTemplatesText}>
+                사용 가능한 템플릿이 없습니다. 상점에서 템플릿을 구매하세요.
+              </Text>
+              <TouchableOpacity
+                style={styles.storeButton}
+                onPress={() => navigation.navigate('Store')}
+              >
+                <Text style={styles.storeButtonText}>상점으로 이동</Text>
               </TouchableOpacity>
             </View>
-          </View>
-          
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={handleCreateLocation}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.createButtonText}>영역 생성</Text>
-            )}
-          </TouchableOpacity>
-        </>
-      )}
-      
-      {/* 아이콘 선택 모달 */}
-      <IconSelector
-        visible={isIconSelectorVisible}
-        onClose={() => setIsIconSelectorVisible(false)}
-        onSelect={handleIconSelect}
-        selectedIcon={locationData.icon}
-      />
-    </ScrollView>
+          )}
+        </View>
+        
+        {selectedTemplateInstance && (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>영역 정보</Text>
+              
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>이름</Text>
+                <TextInput
+                  style={styles.input}
+                  value={locationData.title}
+                  onChangeText={(text) => handleInputChange('title', text)}
+                  placeholder="영역 이름을 입력하세요"
+                />
+              </View>
+              
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>설명 (선택사항)</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={locationData.description}
+                  onChangeText={(text) => handleInputChange('description', text)}
+                  placeholder="영역에 대한 설명을 입력하세요"
+                  multiline
+                />
+              </View>
+              
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>아이콘</Text>
+                <TouchableOpacity
+                  style={styles.iconSelector}
+                  onPress={() => setIsIconSelectorVisible(true)}
+                >
+                  <View style={styles.selectedIconContainer}>
+                    <Ionicons name={locationData.icon} size={24} color="#4CAF50" />
+                  </View>
+                  <Text style={styles.iconSelectorText}>아이콘 선택</Text>
+                  <Ionicons name="chevron-forward" size={20} color="#999" />
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={handleCreateLocation}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.createButtonText}>영역 생성</Text>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
+        
+        {/* 아이콘 선택 모달 */}
+        <IconSelector
+          visible={isIconSelectorVisible}
+          onClose={() => setIsIconSelectorVisible(false)}
+          onSelect={handleIconSelect}
+          selectedIcon={locationData.icon}
+        />
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f8f8f8',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    height: 56,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  headerRight: {
+    width: 40,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',

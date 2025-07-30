@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation, useIsFocused } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useIsFocused, useRoute } from '@react-navigation/native';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import SignupPromptModal from '../components/SignupPromptModal';
 import { checkAnonymousLimits } from '../utils/authUtils';
@@ -24,6 +24,7 @@ const LocationsScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
+  const route = useRoute();
   
   const { locations, status, error } = useSelector(state => state.locations);
   const { isAnonymous, slots } = useSelector(state => state.auth);
@@ -31,11 +32,31 @@ const LocationsScreen = () => {
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
 
   // 화면이 포커스될 때마다 영역 데이터 로드
-  useFocusEffect(
-    useCallback(() => {
+  useEffect(() => {
+    if (isFocused) {
+      console.log('LocationsScreen: 영역 목록 로드 시작');
+      dispatch(fetchLocations())
+        .then(result => {
+          console.log('LocationsScreen: 영역 목록 로드 성공', result);
+        })
+        .catch(err => {
+          console.error('LocationsScreen: 영역 목록 로드 실패', err);
+        });
+    }
+  }, [dispatch, isFocused]);
+  
+  // route.params.refresh가 변경될 때마다 영역 목록 새로고침
+  useEffect(() => {
+    if (route.params?.refresh) {
+      console.log('LocationsScreen: refresh 파라미터 감지, 영역 목록 새로고침', route.params.refresh);
       dispatch(fetchLocations());
-    }, [dispatch])
-  );
+    }
+  }, [dispatch, route.params?.refresh]);
+  
+  // 디버깅용: locations 변경 감지
+  useEffect(() => {
+    console.log('LocationsScreen: 현재 영역 목록', locations);
+  }, [locations]);
   
   // 뒤로가기 버튼 처리
   useEffect(() => {

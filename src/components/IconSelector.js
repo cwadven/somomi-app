@@ -4,64 +4,161 @@ import {
   Text, 
   StyleSheet, 
   TouchableOpacity,
-  FlatList
+  FlatList,
+  Modal,
+  SafeAreaView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 /**
- * 아이콘 선택 컴포넌트
- * @param {Array} icons - 선택 가능한 아이콘 목록 배열
+ * 아이콘 선택 모달 컴포넌트
+ * @param {Boolean} visible - 모달 표시 여부
+ * @param {Function} onClose - 모달 닫기 함수
  * @param {String} selectedIcon - 현재 선택된 아이콘
- * @param {Function} onSelectIcon - 아이콘 선택 시 호출되는 함수
+ * @param {Function} onSelect - 아이콘 선택 시 호출되는 함수
  */
 const IconSelector = ({ 
-  icons = [], 
+  visible = false,
+  onClose,
   selectedIcon, 
-  onSelectIcon
+  onSelect
 }) => {
+  // 기본 아이콘 목록
+  const defaultIcons = [
+    'home-outline',
+    'cube-outline',
+    'business-outline',
+    'cart-outline',
+    'fast-food-outline',
+    'restaurant-outline',
+    'beer-outline',
+    'cafe-outline',
+    'pizza-outline',
+    'nutrition-outline',
+    'ice-cream-outline',
+    'basket-outline',
+    'gift-outline',
+    'medkit-outline',
+    'fitness-outline',
+    'paw-outline',
+    'bed-outline',
+    'desktop-outline',
+    'phone-portrait-outline',
+    'tablet-portrait-outline',
+    'laptop-outline',
+    'tv-outline',
+    'game-controller-outline',
+    'headset-outline',
+    'musical-notes-outline',
+    'book-outline',
+    'library-outline',
+    'school-outline',
+    'brush-outline',
+    'color-palette-outline',
+    'shirt-outline',
+    'footsteps-outline',
+    'glasses-outline',
+    'umbrella-outline',
+    'car-outline',
+    'bicycle-outline',
+    'airplane-outline',
+    'train-outline',
+    'boat-outline',
+    'briefcase-outline',
+    'cash-outline',
+    'card-outline',
+    'wallet-outline',
+    'calculator-outline',
+    'hammer-outline',
+    'construct-outline',
+    'build-outline',
+    'leaf-outline',
+    'flower-outline',
+    'planet-outline'
+  ];
+
   return (
-    <View style={styles.iconSelectorContainer}>
-      <Text style={styles.sectionTitle}>아이콘 선택</Text>
-      <FlatList
-        horizontal
-        data={icons}
-        keyExtractor={(item, index) => `icon-${index}-${item}`}
-        showsHorizontalScrollIndicator={true}
-        style={styles.iconFlatList}
-        contentContainerStyle={styles.iconsList}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.iconItem,
-              selectedIcon === item && styles.selectedIconItem
-            ]}
-            onPress={() => onSelectIcon(item)}
-          >
-            <Ionicons 
-              name={item} 
-              size={24} 
-              color={selectedIcon === item ? '#fff' : '#4CAF50'} 
-            />
-          </TouchableOpacity>
-        )}
-      />
-    </View>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>아이콘 선택</Text>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+          
+          <FlatList
+            data={defaultIcons}
+            keyExtractor={(item) => `icon-${item}`}
+            numColumns={5}
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={styles.iconsList}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.iconItem,
+                  selectedIcon === item && styles.selectedIconItem
+                ]}
+                onPress={() => {
+                  onSelect(item);
+                  onClose();
+                }}
+              >
+                <Ionicons 
+                  name={item} 
+                  size={24} 
+                  color={selectedIcon === item ? '#fff' : '#4CAF50'} 
+                />
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </SafeAreaView>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  iconSelectorContainer: {
-    marginBottom: 20,
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  sectionTitle: {
-    fontSize: 16,
+  modalContent: {
+    width: '90%',
+    maxHeight: '80%',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#333',
-    fontWeight: '500',
-    marginBottom: 10,
   },
-  iconFlatList: {
-    minHeight: 80,
-    flexGrow: 0,
+  closeButton: {
+    padding: 4,
   },
   iconsList: {
     paddingVertical: 8,
@@ -75,7 +172,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    margin: 8,
     borderWidth: 1,
     borderColor: '#e0e0e0',
     elevation: 1,

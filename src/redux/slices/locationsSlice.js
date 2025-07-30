@@ -3,34 +3,20 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 // 영역 목록 가져오기
 export const fetchLocations = createAsyncThunk(
   'locations/fetchLocations',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
-      // 실제 구현에서는 API 호출
-      // 여기서는 임시 데이터 반환
-      const mockLocations = [
-        {
-          id: 'loc_1',
-          title: '내 집',
-          description: '우리 집 냉장고',
-          icon: 'home-outline',
-          templateInstanceId: 'template_instance_1', // 사용된 템플릿 인스턴스 ID
-          productId: 'basic_location', // 템플릿 제품 ID
-          feature: { baseSlots: 5 } // 템플릿 기능
-        },
-        {
-          id: 'loc_2',
-          title: '회사',
-          description: '사무실 냉장고',
-          icon: 'business-outline',
-          templateInstanceId: 'template_instance_2', // 사용된 템플릿 인스턴스 ID
-          productId: 'basic_location', // 템플릿 제품 ID
-          feature: { baseSlots: 5 } // 템플릿 기능
-        }
-      ];
+      console.log('fetchLocations 시작');
       
-      return mockLocations;
+      // 현재 상태에서 영역 목록 가져오기
+      const currentLocations = getState().locations.locations;
+      console.log('현재 저장된 영역 목록:', currentLocations);
+      
+      // 실제 구현에서는 API 호출
+      // 여기서는 현재 상태의 영역 목록 반환 (빈 배열이 아님)
+      return currentLocations;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('영역 목록 가져오기 오류:', error);
+      return rejectWithValue(error.message || '영역 목록을 불러오는 중 오류가 발생했습니다.');
     }
   }
 );
@@ -59,8 +45,11 @@ export const fetchLocationById = createAsyncThunk(
 // 영역 생성
 export const createLocation = createAsyncThunk(
   'locations/createLocation',
-  async (locationData, { rejectWithValue }) => {
+  async (locationData, { rejectWithValue, getState, dispatch }) => {
     try {
+      // 디버깅 로그
+      console.log('createLocation 시작:', locationData);
+      
       // 실제 구현에서는 API 호출
       // 여기서는 임시 ID 생성 후 반환
       const newLocation = {
@@ -69,9 +58,12 @@ export const createLocation = createAsyncThunk(
         // templateInstanceId, productId, feature는 locationData에서 전달받음
       };
       
+      console.log('생성된 영역:', newLocation);
+      
       return newLocation;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('영역 생성 오류:', error);
+      return rejectWithValue(error.message || '영역 생성 중 오류가 발생했습니다.');
     }
   }
 );

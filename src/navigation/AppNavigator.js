@@ -69,60 +69,42 @@ const HomeStack = () => {
   );
 };
 
-// 영역 스택 네비게이터
-const LocationsStack = () => {
-  return (
-    <Stack.Navigator
-      initialRouteName="LocationsScreen"
-      screenOptions={{
-        headerStyle: {
-          elevation: 0,
-          shadowOpacity: 0,
-          borderBottomWidth: 0,
-        }
+// 영역 관련 스택 네비게이터
+const LocationsStack = () => (
+  <Stack.Navigator
+    screenOptions={{
+      headerShown: false,
+    }}
+  >
+    <Stack.Screen name="LocationsScreen" component={LocationsScreen} />
+    <Stack.Screen 
+      name="LocationDetail" 
+      component={LocationDetailScreen} 
+      options={{ animation: 'slide_from_right' }}
+    />
+    <Stack.Screen 
+      name="AddLocation" 
+      component={AddLocationScreen} 
+      options={{ 
+        animation: 'slide_from_bottom',
+        presentation: 'modal'
       }}
-    >
-      <Stack.Screen 
-        name="LocationsScreen" 
-        component={LocationsScreen} 
-        options={{ title: '영역 목록', headerShown: false }}
-      />
-      <Stack.Screen 
-        name="LocationDetail" 
-        component={LocationDetailScreen} 
-        options={({ route }) => ({ 
-          title: route.params.locationId === 'all' ? '모든 제품' : '영역 상세',
-          headerShown: false
-        })}
-      />
-      <Stack.Screen 
-        name="AddLocation" 
-        component={AddLocationScreen} 
-        options={{ title: '영역 추가' }}
-      />
-      <Stack.Screen 
-        name="ProductForm" 
-        component={ProductFormScreen} 
-        options={({ route }) => ({ 
-          title: route.params?.mode === 'edit' ? '제품 수정' : '제품 등록' 
-        })}
-      />
-      <Stack.Screen 
-        name="ProductDetail" 
-        component={ProductDetailScreen} 
-        options={({ route }) => ({
-          title: '제품 상세',
-          headerShown: route.params?.hideHeader === true ? false : true
-        })}
-      />
-      <Stack.Screen 
-        name="Category" 
-        component={CategoryScreen} 
-        options={{ title: '카테고리' }}
-      />
-    </Stack.Navigator>
-  );
-};
+    />
+    <Stack.Screen 
+      name="ProductForm" 
+      component={ProductFormScreen} 
+      options={{ 
+        animation: 'slide_from_bottom',
+        presentation: 'modal'
+      }}
+    />
+    <Stack.Screen 
+      name="ProductDetail" 
+      component={ProductDetailScreen} 
+      options={{ animation: 'slide_from_right' }}
+    />
+  </Stack.Navigator>
+);
 
 // 프로필 스택 네비게이터
 const ProfileStack = () => {

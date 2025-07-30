@@ -182,10 +182,8 @@ const initialState = {
   },
   purchaseHistory: [], // 구매 내역
   pointHistory: [], // G 내역 (충전 및 사용)
-  // 사용자가 소유한 영역 템플릿 인스턴스 목록
-  userLocationTemplateInstances: [
-    createBasicLocationTemplate()
-  ]
+  // 사용자가 소유한 영역 템플릿 인스턴스 목록 - 초기에는 빈 배열로 설정
+  userLocationTemplateInstances: []
 };
 
 export const authSlice = createSlice({
@@ -326,10 +324,14 @@ export const authSlice = createSlice({
     // 템플릿 인스턴스를 사용됨으로 표시
     markTemplateInstanceAsUsed: (state, action) => {
       const { templateId, locationId } = action.payload;
+      console.log('템플릿 인스턴스 사용 표시:', { templateId, locationId });
       const templateInstance = state.userLocationTemplateInstances.find(t => t.id === templateId);
       if (templateInstance) {
+        console.log('템플릿 인스턴스 찾음:', templateInstance);
         templateInstance.used = true;
         templateInstance.usedInLocationId = locationId;
+      } else {
+        console.log('템플릿 인스턴스를 찾을 수 없음:', templateId);
       }
     },
     
@@ -347,10 +349,12 @@ export const authSlice = createSlice({
     
     // 새로운 템플릿 인스턴스 추가
     addTemplateInstance: (state, action) => {
+      console.log('새 템플릿 인스턴스 추가:', action.payload);
       const newTemplate = {
         ...action.payload,
         id: generateId('locationTemplate')
       };
+      console.log('생성된 템플릿 인스턴스:', newTemplate);
       state.userLocationTemplateInstances.push(newTemplate);
     }
   },
