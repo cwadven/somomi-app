@@ -91,7 +91,7 @@ const LocationDetailScreen = () => {
   // 영역 수정 화면으로 이동
   const handleEditPress = () => {
     navigation.navigate('AddLocation', { 
-      isEditing: true,
+      isEditMode: true,
       location: currentLocation
     });
   };
