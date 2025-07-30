@@ -36,6 +36,37 @@ export const fetchProductById = createAsyncThunk(
   }
 );
 
+// 특정 영역의 제품 목록 가져오기
+export const fetchProductsByLocation = createAsyncThunk(
+  'products/fetchProductsByLocation',
+  async (locationId, { rejectWithValue, getState }) => {
+    try {
+      // 모든 제품 가져오기
+      const { products } = getState().products;
+      
+      // 이미 제품 데이터가 있으면 필터링만 수행
+      if (products.length > 0) {
+        if (locationId === 'all') {
+          return products;
+        } else {
+          return products.filter(product => product.locationId === locationId);
+        }
+      }
+      
+      // 제품 데이터가 없으면 API 호출
+      const allProducts = await fetchProductsApi();
+      
+      if (locationId === 'all') {
+        return allProducts;
+      } else {
+        return allProducts.filter(product => product.locationId === locationId);
+      }
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 export const addProductAsync = createAsyncThunk(
   'products/addProduct',
   async (product, { rejectWithValue }) => {
@@ -118,6 +149,7 @@ const initialState = {
   consumedStatus: 'idle', // 소진 처리된 제품 로딩 상태
   error: null,
   currentProduct: null,
+  locationProducts: {}, // 영역별 제품 목록 캐시
 };
 
 export const productsSlice = createSlice({
@@ -159,6 +191,24 @@ export const productsSlice = createSlice({
         state.error = action.payload;
       })
       
+      // fetchProductsByLocation 처리
+      .addCase(fetchProductsByLocation.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(fetchProductsByLocation.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        // 전체 제품 목록이 비어있으면 업데이트
+        if (state.products.length === 0 && action.meta.arg === 'all') {
+          state.products = action.payload;
+        }
+        // 영역별 제품 목록 캐시 업데이트
+        state.locationProducts[action.meta.arg] = action.payload;
+      })
+      .addCase(fetchProductsByLocation.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
+      })
+      
       // addProductAsync 처리
       .addCase(addProductAsync.pending, (state) => {
         state.status = 'loading';
@@ -166,6 +216,15 @@ export const productsSlice = createSlice({
       .addCase(addProductAsync.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.products.push(action.payload);
+        
+        // 영역별 제품 목록 캐시 업데이트
+        const locationId = action.payload.locationId;
+        if (state.locationProducts[locationId]) {
+          state.locationProducts[locationId].push(action.payload);
+        }
+        if (state.locationProducts['all']) {
+          state.locationProducts['all'].push(action.payload);
+        }
       })
       .addCase(addProductAsync.rejected, (state, action) => {
         state.status = 'failed';
@@ -183,6 +242,16 @@ export const productsSlice = createSlice({
           state.products[index] = action.payload;
         }
         state.currentProduct = action.payload;
+        
+        // 영역별 제품 목록 캐시 업데이트
+        Object.keys(state.locationProducts).forEach(locationId => {
+          const productIndex = state.locationProducts[locationId].findIndex(
+            product => product.id === action.payload.id
+          );
+          if (productIndex !== -1) {
+            state.locationProducts[locationId][productIndex] = action.payload;
+          }
+        });
       })
       .addCase(updateProductAsync.rejected, (state, action) => {
         state.status = 'failed';
@@ -196,6 +265,13 @@ export const productsSlice = createSlice({
       .addCase(deleteProductAsync.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.products = state.products.filter(product => product.id !== action.payload);
+        
+        // 영역별 제품 목록 캐시 업데이트
+        Object.keys(state.locationProducts).forEach(locationId => {
+          state.locationProducts[locationId] = state.locationProducts[locationId].filter(
+            product => product.id !== action.payload
+          );
+        });
       })
       .addCase(deleteProductAsync.rejected, (state, action) => {
         state.status = 'failed';
@@ -215,6 +291,13 @@ export const productsSlice = createSlice({
           state.consumedProducts.push(action.payload);
         }
         // 현재 제품 상태 유지 (null로 설정하지 않음)
+        
+        // 영역별 제품 목록 캐시 업데이트
+        Object.keys(state.locationProducts).forEach(locationId => {
+          state.locationProducts[locationId] = state.locationProducts[locationId].filter(
+            product => product.id !== action.payload.id
+          );
+        });
       })
       .addCase(markProductAsConsumedAsync.rejected, (state, action) => {
         state.status = 'failed';
@@ -247,6 +330,15 @@ export const productsSlice = createSlice({
           state.products.push(action.payload);
         }
         // 현재 제품 상태 유지 (null로 설정하지 않음)
+        
+        // 영역별 제품 목록 캐시 업데이트
+        const locationId = action.payload.locationId;
+        if (locationId && state.locationProducts[locationId]) {
+          state.locationProducts[locationId].push(action.payload);
+        }
+        if (state.locationProducts['all']) {
+          state.locationProducts['all'].push(action.payload);
+        }
       })
       .addCase(restoreConsumedProductAsync.rejected, (state, action) => {
         state.status = 'failed';
@@ -263,6 +355,18 @@ export const productsSlice = createSlice({
         // 현재 제품이 해당 영역의 제품이면 초기화
         if (state.currentProduct && state.currentProduct.locationId === deletedLocationId) {
           state.currentProduct = null;
+        }
+        
+        // 영역별 제품 목록 캐시에서 해당 영역 제거
+        if (state.locationProducts[deletedLocationId]) {
+          delete state.locationProducts[deletedLocationId];
+        }
+        
+        // 'all' 캐시 업데이트
+        if (state.locationProducts['all']) {
+          state.locationProducts['all'] = state.locationProducts['all'].filter(
+            product => product.locationId !== deletedLocationId
+          );
         }
       });
   },

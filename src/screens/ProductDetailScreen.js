@@ -124,7 +124,7 @@ const ProductDetailScreen = () => {
   useEffect(() => {
     dispatch(fetchProductById(productId));
   }, [dispatch, productId]);
-
+  
   // 소진 처리 날짜 상태 변화 감지 및 로깅
   useEffect(() => {
     // consumptionDate 상태가 변경될 때마다 ref 업데이트

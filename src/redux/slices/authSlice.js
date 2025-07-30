@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { saveUserSlots, loadUserSlots } from '../../utils/storageUtils';
+import { generateId } from '../../utils/idUtils';
 
 // JWT 토큰 발급 API 호출 (실제 구현 시 서버에서 가져옴)
 export const getAnonymousToken = createAsyncThunk(
@@ -138,6 +139,20 @@ export const verifyToken = createAsyncThunk(
   }
 );
 
+// 기본 템플릿 생성 함수
+const createBasicLocationTemplate = () => ({
+  id: generateId('locationTemplate'),
+  productId: 'basic_location',
+  name: '기본 영역',
+  description: '기본적인 제품 관리 기능을 제공하는 영역',
+  icon: 'cube-outline',
+  feature: {
+    baseSlots: 5
+  },
+  used: false,
+  usedInLocationId: null
+});
+
 const initialState = {
   token: null,
   user: null,
@@ -167,6 +182,10 @@ const initialState = {
   },
   purchaseHistory: [], // 구매 내역
   pointHistory: [], // G 내역 (충전 및 사용)
+  // 사용자가 소유한 영역 템플릿 인스턴스 목록
+  userLocationTemplateInstances: [
+    createBasicLocationTemplate()
+  ]
 };
 
 export const authSlice = createSlice({
@@ -281,6 +300,10 @@ export const authSlice = createSlice({
       state.points = initialState.points;
       state.purchaseHistory = [];
       state.pointHistory = [];
+      // 템플릿 인스턴스를 비회원 상태로 초기화 (1개만 제공)
+      state.userLocationTemplateInstances = [
+        createBasicLocationTemplate()
+      ];
       // localStorage에서 토큰 제거
       localStorage.removeItem('jwt_token');
     },
@@ -299,6 +322,37 @@ export const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    
+    // 템플릿 인스턴스를 사용됨으로 표시
+    markTemplateInstanceAsUsed: (state, action) => {
+      const { templateId, locationId } = action.payload;
+      const templateInstance = state.userLocationTemplateInstances.find(t => t.id === templateId);
+      if (templateInstance) {
+        templateInstance.used = true;
+        templateInstance.usedInLocationId = locationId;
+      }
+    },
+    
+    // 템플릿 인스턴스를 다시 사용 가능하게 설정
+    releaseTemplateInstance: (state, action) => {
+      const locationId = action.payload;
+      const templateInstance = state.userLocationTemplateInstances.find(
+        t => t.usedInLocationId === locationId
+      );
+      if (templateInstance) {
+        templateInstance.used = false;
+        templateInstance.usedInLocationId = null;
+      }
+    },
+    
+    // 새로운 템플릿 인스턴스 추가
+    addTemplateInstance: (state, action) => {
+      const newTemplate = {
+        ...action.payload,
+        id: generateId('locationTemplate')
+      };
+      state.userLocationTemplateInstances.push(newTemplate);
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -311,6 +365,11 @@ export const authSlice = createSlice({
         state.token = action.payload.token;
         state.isAnonymous = true;
         state.error = null;
+        
+        // 비회원은 기본 템플릿 1개만 제공
+        state.userLocationTemplateInstances = [
+          createBasicLocationTemplate()
+        ];
       })
       .addCase(getAnonymousToken.rejected, (state, action) => {
         state.loading = false;
@@ -328,6 +387,13 @@ export const authSlice = createSlice({
         state.token = action.payload.token;
         state.user = action.payload.user;
         state.error = null;
+        
+        // 회원은 기본 템플릿 3개 제공
+        state.userLocationTemplateInstances = [
+          createBasicLocationTemplate(),
+          createBasicLocationTemplate(),
+          createBasicLocationTemplate()
+        ];
       })
       .addCase(kakaoLogin.rejected, (state, action) => {
         state.loading = false;
@@ -345,6 +411,13 @@ export const authSlice = createSlice({
         state.token = action.payload.token;
         state.user = action.payload.user;
         state.error = null;
+        
+        // 회원은 기본 템플릿 3개 제공
+        state.userLocationTemplateInstances = [
+          createBasicLocationTemplate(),
+          createBasicLocationTemplate(),
+          createBasicLocationTemplate()
+        ];
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
@@ -362,6 +435,13 @@ export const authSlice = createSlice({
         state.token = action.payload.token;
         state.user = action.payload.user;
         state.error = null;
+        
+        // 회원은 기본 템플릿 3개 제공
+        state.userLocationTemplateInstances = [
+          createBasicLocationTemplate(),
+          createBasicLocationTemplate(),
+          createBasicLocationTemplate()
+        ];
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
@@ -381,18 +461,32 @@ export const authSlice = createSlice({
           state.isAnonymous = false;
           state.token = null;
           state.user = null;
+          // 기본 템플릿 없음
+          state.userLocationTemplateInstances = [];
         } else if (action.payload.isAnonymous) {
           // 익명 토큰인 경우
           state.isLoggedIn = false;
           state.isAnonymous = true;
           state.token = action.payload.token;
           state.user = null;
+          
+          // 비회원은 기본 템플릿 1개만 제공
+          state.userLocationTemplateInstances = [
+            createBasicLocationTemplate()
+          ];
         } else {
           // 로그인 토큰인 경우
           state.isLoggedIn = true;
           state.isAnonymous = false;
           state.token = action.payload.token;
           state.user = action.payload.user;
+          
+          // 회원은 기본 템플릿 3개 제공
+          state.userLocationTemplateInstances = [
+            createBasicLocationTemplate(),
+            createBasicLocationTemplate(),
+            createBasicLocationTemplate()
+          ];
         }
         
         state.error = null;
@@ -415,7 +509,10 @@ export const {
   updateSlots,
   addPurchase,
   addPoints,
-  usePoints
+  usePoints,
+  markTemplateInstanceAsUsed,
+  releaseTemplateInstance,
+  addTemplateInstance
 } = authSlice.actions;
 
 export default authSlice.reducer; 

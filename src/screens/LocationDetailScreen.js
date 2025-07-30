@@ -1,512 +1,358 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   TouchableOpacity, 
-  FlatList,
-  Modal,
+  Alert, 
+  ScrollView, 
   ActivityIndicator,
-  ScrollView
+  FlatList,
+  Modal
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
-import { fetchProducts, deleteProductAsync } from '../redux/slices/productsSlice';
-import { deleteLocation, fetchLocationById, fetchLocations } from '../redux/slices/locationsSlice';
-import LocationNotificationSettings from '../components/LocationNotificationSettings';
-import AlertModal from '../components/AlertModal';
-import SignupPromptModal from '../components/SignupPromptModal';
+import { fetchLocationById, deleteLocation } from '../redux/slices/locationsSlice';
+import { fetchProductsByLocation } from '../redux/slices/productsSlice';
+import { releaseTemplateInstance } from '../redux/slices/authSlice';
 import ProductCard from '../components/ProductCard';
-import { checkAnonymousLimits } from '../utils/authUtils';
 import SlotStatusBar from '../components/SlotStatusBar';
+import SlotPlaceholder from '../components/SlotPlaceholder';
+import LocationNotificationSettings from '../components/LocationNotificationSettings';
 
 const LocationDetailScreen = () => {
-  const dispatch = useDispatch();
   const navigation = useNavigation();
   const route = useRoute();
+  const dispatch = useDispatch();
   
-  const { locationId } = route.params || {};
-  const isAllProducts = locationId === 'all';
+  const { locationId, isAllProducts } = route.params;
+  const isAllProductsView = isAllProducts || locationId === 'all';
   
-  const [activeTab, setActiveTab] = useState('products');
-  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-  const [alertModalVisible, setAlertModalVisible] = useState(false);
-  const [alertModalConfig, setAlertModalConfig] = useState({
-    title: '',
-    message: '',
-    buttons: [],
-    icon: '',
-    iconColor: '',
-  });
-  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
-  const [slotAlertModalVisible, setSlotAlertModalVisible] = useState(false); // 슬롯 부족 알림 모달 상태 추가
+  const { currentLocation, status, error } = useSelector(state => state.locations);
+  const { products } = useSelector(state => state.products);
+  const { slots } = useSelector(state => state.auth);
   
-  // 슬롯 상세 정보 모달 상태
-  const [slotDetailModalVisible, setSlotDetailModalVisible] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [locationProducts, setLocationProducts] = useState([]);
+  const [activeTab, setActiveTab] = useState('products'); // 'products' 또는 'notifications'
   
-  const { locations, status: locationStatus } = useSelector(state => state.locations);
-  const { products, status: productStatus } = useSelector(state => state.products);
-  const { isAnonymous, slots } = useSelector(state => state.auth);
-  
-  // 현재 영역 정보 가져오기 (Redux의 currentLocation 또는 locations 배열에서)
-  const currentLocation = useMemo(() => {
-    // 모든 제품 화면인 경우 null 반환
-    if (isAllProducts) return null;
-    
-    // Redux의 locations 배열에서 현재 영역 찾기
-    return locations.find(location => location.id === locationId);
-  }, [locations, locationId, isAllProducts]);
-  
-  // 디버깅 로그
+  // 영역 정보 로드
   useEffect(() => {
-    console.log('현재 영역 정보:', currentLocation);
-  }, [currentLocation]);
+    if (!isAllProductsView) {
+      dispatch(fetchLocationById(locationId));
+    }
+  }, [dispatch, locationId, isAllProductsView]);
   
-  // 모든 제품 또는 특정 영역의 제품만 필터링 (메모이제이션 적용)
-  const filteredProducts = useMemo(() => {
-    return isAllProducts 
-    ? products.filter(product => !product.isConsumed)  // 모든 제품 (소진되지 않은)
-    : products.filter(product => product.locationId === locationId && !product.isConsumed);  // 특정 영역 제품만
-  }, [products, locationId, isAllProducts]);
-  
-  // 컴포넌트가 마운트될 때와 화면에 포커스될 때 데이터 로드
+  // 제품 목록 로드
   useEffect(() => {
-    console.log('LocationDetailScreen - useEffect 실행, locationId:', locationId);
-    dispatch(fetchProducts());
-    dispatch(fetchLocations()); // 모든 영역 정보 로드
-    
-    if (!isAllProducts && locationId) {
-      dispatch(fetchLocationById(locationId))
-        .unwrap()
-        .then(location => {
-          console.log('영역 정보 로드 성공:', location);
-        })
-        .catch(error => {
-          console.error('영역 정보 로드 실패:', error);
-        });
-    }
-  }, [dispatch, locationId, isAllProducts]);
+    dispatch(fetchProductsByLocation(isAllProductsView ? 'all' : locationId));
+  }, [dispatch, locationId, isAllProductsView]);
   
-  // 화면에 포커스될 때마다 데이터 새로고침
-  useFocusEffect(
-    useCallback(() => {
-      console.log('LocationDetailScreen - useFocusEffect 실행, locationId:', locationId);
-      dispatch(fetchProducts());
-      dispatch(fetchLocations()); // 모든 영역 정보 로드
-      
-      if (!isAllProducts && locationId) {
-        dispatch(fetchLocationById(locationId));
-      }
-    }, [dispatch, locationId, isAllProducts])
-  );
-  
-  // 영역 목록으로 돌아가기
-  const handleBackToLocations = () => {
-    navigation.navigate('LocationsScreen');
-  };
-  
-  const handleAddProduct = () => {
-    // Redux에서 제품 슬롯 정보 가져오기
-    const totalProductSlots = slots.productSlots.baseSlots + slots.productSlots.additionalSlots;
-    const usedProductSlots = filteredProducts.length;
-    const hasAvailableSlots = usedProductSlots < totalProductSlots;
-    
-    // 슬롯이 없으면 구독/구매 유도
-    if (!hasAvailableSlots) {
-      // 비회원인 경우 회원가입 유도
-      if (isAnonymous) {
-      setShowSignupPrompt(true);
-        return;
-      }
-      
-      // 회원인 경우 구독/구매 유도 (Alert.alert 대신 AlertModal 사용)
-      setAlertModalConfig({
-        title: '슬롯 부족',
-        message: '제품 슬롯이 부족합니다. 구독하거나 추가 슬롯을 구매하세요.',
-        buttons: [
-          { text: '취소', style: 'cancel' },
-          { 
-            text: '상점으로 이동', 
-            onPress: () => navigation.navigate('Store')
-          }
-        ],
-        icon: 'alert-circle',
-        iconColor: '#FF9800',
-      });
-      setAlertModalVisible(true);
-      return;
-    }
-    
-            navigation.navigate('ProductForm', { mode: 'add', locationId });
-  };
-  
-  const handleProductPress = (productId) => {
-    navigation.navigate('ProductDetail', { productId });
-  };
-  
-  const handleEditLocation = () => {
-    if (currentLocation) {
-      navigation.navigate('AddLocation', { 
-        isEditing: true, 
-        location: currentLocation 
-      });
-    }
-  };
-  
-  const handleDeleteLocation = () => {
-    if (filteredProducts.length > 0) {
-      showErrorAlert(
-        '이 영역에 제품이 있어 삭제할 수 없습니다. 먼저 제품을 다른 영역으로 이동하거나 삭제해주세요.'
-      );
+  // 제품 목록 필터링
+  useEffect(() => {
+    if (isAllProductsView) {
+      setLocationProducts(products);
     } else {
-      setDeleteConfirmVisible(true);
+      const filteredProducts = products.filter(product => product.locationId === locationId);
+      setLocationProducts(filteredProducts);
     }
+  }, [products, locationId, isAllProductsView]);
+  
+  // 뒤로가기 핸들러
+  const handleGoBack = () => {
+    navigation.goBack();
   };
   
-  const deleteLocationAndNavigate = () => {
-    setDeleteConfirmVisible(false);
+  // 영역 삭제 확인 모달 표시
+  const handleDeletePress = () => {
+    setShowDeleteConfirm(true);
+  };
+  
+  // 영역 삭제 실행
+  const handleDeleteConfirm = async () => {
+    setShowDeleteConfirm(false);
     
-    if (locationId) {
-      dispatch(deleteLocation(locationId))
-        .unwrap()
-        .then(() => {
-          navigation.goBack();
-        })
-        .catch((error) => {
-          showErrorAlert(`영역 삭제 중 오류가 발생했습니다: ${error}`);
-        });
+    try {
+      // 영역 삭제
+      await dispatch(deleteLocation(locationId)).unwrap();
+      
+      // 템플릿 인스턴스 해제 (다시 사용 가능하게)
+      if (currentLocation?.templateInstanceId) {
+        dispatch(releaseTemplateInstance(locationId));
+      }
+      
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert('오류', '영역 삭제 중 문제가 발생했습니다.');
     }
   };
   
-  const showErrorAlert = (message) => {
-    setAlertModalConfig({
-      title: '오류',
-      message,
-      buttons: [{ text: '확인', onPress: () => setAlertModalVisible(false) }],
-      icon: 'alert-circle',
-      iconColor: '#F44336',
+  // 영역 수정 화면으로 이동
+  const handleEditPress = () => {
+    navigation.navigate('AddLocation', { 
+      isEditing: true,
+      location: currentLocation
     });
-    setAlertModalVisible(true);
   };
   
-  // 제품 카드 렌더링
-  const renderProductCard = ({ item }) => {
-    // 모든 제품 화면에서는 영역 이름을 표시
-    const locationItem = isAllProducts ? 
-      locations.find(loc => loc.id === item.locationId) : null;
-    const locationName = locationItem ? locationItem.title : '미지정 영역';
-    
-    return (
-      <ProductCard 
-        product={item} 
-        onPress={() => handleProductPress(item.id)}
-        locationName={locationName}
-        showLocation={isAllProducts} // 모든 제품 화면에서만 영역 표시
-      />
-    );
+  // 제품 추가 화면으로 이동
+  const handleAddProduct = () => {
+    navigation.navigate('ProductForm', { locationId });
   };
   
-  // Redux의 슬롯 정보를 사용하여 사용 가능한 슬롯 계산
-  const totalProductSlots = slots.productSlots.baseSlots + slots.productSlots.additionalSlots;
-  const usedProductSlots = !isAllProducts ? filteredProducts.length : 0;
-  const availableSlots = !isAllProducts ? Math.max(0, totalProductSlots - usedProductSlots) : 0;
+  // 제품 상세 화면으로 이동
+  const handleProductPress = (product) => {
+    navigation.navigate('ProductDetail', { productId: product.id });
+  };
   
-  // 삭제 확인 모달
-  const DeleteConfirmModal = () => (
-    <Modal
-      visible={deleteConfirmVisible}
-      transparent={true}
-      animationType="fade"
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>영역 삭제</Text>
-          <Text style={styles.modalMessage}>
-            정말 이 영역을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
-          </Text>
-          <View style={styles.modalButtons}>
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={() => setDeleteConfirmVisible(false)}
-            >
-              <Text style={styles.cancelButtonText}>취소</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.deleteButton]}
-              onPress={deleteLocationAndNavigate}
-            >
-              <Text style={styles.deleteButtonText}>삭제</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
+  // 탭 변경 핸들러
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+  };
   
-  // 슬롯 상세 정보 모달
-  const SlotDetailModal = () => (
-    <Modal
-      visible={slotDetailModalVisible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => setSlotDetailModalVisible(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>슬롯 상세 정보</Text>
-            <TouchableOpacity 
-              style={styles.closeButton}
-              onPress={() => setSlotDetailModalVisible(false)}
-            >
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.slotDetailContainer}>
-            <View style={styles.slotDetailItem}>
-              <Text style={styles.slotDetailLabel}>사용 중인 슬롯:</Text>
-              <Text style={styles.slotDetailValue}>{usedProductSlots}개</Text>
-            </View>
-            
-            <View style={styles.slotDetailItem}>
-              <Text style={styles.slotDetailLabel}>기본 제공 슬롯:</Text>
-              <Text style={styles.slotDetailValue}>{slots.productSlots.baseSlots}개</Text>
-            </View>
-            
-            <View style={styles.slotDetailItem}>
-              <Text style={styles.slotDetailLabel}>추가 슬롯:</Text>
-              <Text style={styles.slotDetailValue}>{slots.productSlots.additionalSlots}개</Text>
-            </View>
-            
-            <View style={[styles.slotDetailItem, styles.slotDetailTotal]}>
-              <Text style={styles.slotDetailTotalLabel}>총 사용 가능 슬롯:</Text>
-              <Text style={styles.slotDetailTotalValue}>{totalProductSlots}개</Text>
-            </View>
-          </View>
-          
-          <View style={styles.slotDetailDescription}>
-            <Text style={styles.slotDetailDescriptionText}>
-              {isAnonymous ? 
-                `이 영역에는 기본 ${slots.productSlots.baseSlots}개의 슬롯이 제공됩니다. 회원가입하면 아이템을 통해 더 많은 슬롯을 추가할 수 있습니다.` :
-                `이 영역에는 기본 ${slots.productSlots.baseSlots}개의 슬롯이 제공됩니다. 아이템을 구매하여 더 많은 슬롯을 추가할 수 있습니다.`
-              }
-            </Text>
-          </View>
-          
-          {isAnonymous && (
-            <TouchableOpacity 
-              style={styles.signupButton}
-              onPress={() => {
-                setSlotDetailModalVisible(false);
-                setShowSignupPrompt(true);
-              }}
-            >
-              <Text style={styles.signupButtonText}>회원가입하기</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    </Modal>
-  );
-  
-  // 로딩 상태 변수
-  const isLoading = locationStatus === 'loading' || (productStatus === 'loading' && !filteredProducts.length);
-  
-  // 로딩 컴포넌트 메모이제이션
-  const loadingComponent = useMemo(() => {
-    if (isLoading) {
+  // 로딩 중 표시
+  if (!isAllProductsView && status === 'loading') {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleGoBack}
+          >
+            <Ionicons name="arrow-back" size={24} color="#4CAF50" />
+          </TouchableOpacity>
+          <Text style={styles.loadingText}>로딩 중...</Text>
+        </View>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+        </View>
       </View>
     );
-    }
-    return null;
-  }, [isLoading]);
-  
-  // 로딩 중인 경우
-  if (isLoading) {
-    return loadingComponent;
   }
   
-  const title = isAllProducts ? '모든 제품' : currentLocation?.title || '영역 상세';
-
-  // 제품 슬롯 그리드 렌더링
-  const renderProductSlots = () => {
-    if (isAllProducts) {
-      // 모든 제품 화면에서는 일반 리스트로 표시
-      return (
-        <FlatList
-          data={filteredProducts}
-          renderItem={renderProductCard}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
-              <Text style={styles.emptySubText}>
-                특정 영역에서 제품을 추가할 수 있습니다.
-              </Text>
-            </View>
-          }
-        />
-      );
+  // 오류 표시
+  if (!isAllProductsView && error) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleGoBack}
+          >
+            <Ionicons name="arrow-back" size={24} color="#4CAF50" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>오류</Text>
+        </View>
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>오류: {error}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => dispatch(fetchLocationById(locationId))}
+          >
+            <Text style={styles.retryButtonText}>다시 시도</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+  
+  // 제품 슬롯 계산
+  const calculateProductSlots = () => {
+    if (isAllProductsView) {
+      return { used: products.length, total: 999 }; // 모든 제품 보기에서는 슬롯 제한 없음
     }
     
-    // 특정 영역 화면에서는 제품 목록만 표시
+    // 영역의 기본 슬롯 + 추가 슬롯
+    const baseSlots = currentLocation?.feature?.baseSlots || slots.productSlots.baseSlots;
+    const additionalSlots = slots.productSlots.additionalSlots;
+    const totalSlots = baseSlots === -1 ? -1 : (baseSlots + additionalSlots); // -1은 무제한
+    
+    return { 
+      used: locationProducts.length,
+      total: totalSlots
+    };
+  };
+  
+  const { used: usedSlots, total: totalSlots } = calculateProductSlots();
+  
+  // 슬롯 상태에 따른 제품 추가 가능 여부
+  const canAddProduct = totalSlots === -1 || usedSlots < totalSlots;
+  
+  // 제품 목록 탭 렌더링
+  const renderProductsTab = () => {
     return (
-      <View style={styles.content}>
-        {/* 등록된 제품 목록 */}
-        <FlatList
-          data={filteredProducts}
-          renderItem={renderProductCard}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
+      <View style={styles.productsContainer}>
+        {locationProducts.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
+            {!isAllProductsView && (
               <Text style={styles.emptySubText}>
                 오른쪽 하단의 + 버튼을 눌러 제품을 추가하세요.
               </Text>
-            </View>
-          }
-        />
+            )}
+          </View>
+        ) : (
+          <FlatList
+            data={locationProducts}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <ProductCard 
+                product={item} 
+                onPress={() => handleProductPress(item)}
+              />
+            )}
+            contentContainerStyle={styles.productsList}
+          />
+        )}
         
-        {/* 제품 추가 버튼 (슬롯 개수 표시) */}
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={handleAddProduct}
-        >
-          <Ionicons name="add" size={30} color="white" />
-          {availableSlots > 0 && (
-            <View style={styles.slotCountBadge}>
-              <Text style={styles.slotCountText}>{availableSlots}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        {/* 제품 추가 버튼 (모든 제품 보기가 아닐 때만 표시) */}
+        {!isAllProductsView && (
+          <TouchableOpacity 
+            style={[
+              styles.addButton,
+              !canAddProduct && styles.disabledButton
+            ]}
+            onPress={handleAddProduct}
+            disabled={!canAddProduct}
+          >
+            <Ionicons name="add" size={30} color="white" />
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
-
+  
+  // 알림 설정 탭 렌더링
+  const renderNotificationsTab = () => {
+    return (
+      <ScrollView style={styles.notificationsContainer}>
+        <LocationNotificationSettings locationId={locationId} location={currentLocation} />
+      </ScrollView>
+    );
+  };
+  
   return (
     <View style={styles.container}>
+      {/* 헤더 */}
       <View style={styles.header}>
-        <View style={styles.headerContent}>
+        <View style={styles.headerLeft}>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={handleBackToLocations}
+            onPress={handleGoBack}
           >
             <Ionicons name="arrow-back" size={24} color="#4CAF50" />
           </TouchableOpacity>
           
-          {!isAllProducts && currentLocation && (
-            <View style={styles.locationIconContainer}>
-              <Ionicons 
-                name={currentLocation.icon || 'cube-outline'} 
-                size={30} 
-                color="#4CAF50" 
-              />
-            </View>
-          )}
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.title}>{title}</Text>
-            {!isAllProducts && currentLocation && (
-              <Text style={styles.description}>{currentLocation.description}</Text>
-            )}
-          </View>
-          
-          {!isAllProducts && (
-            <View style={styles.headerActions}>
-              <TouchableOpacity 
-                style={styles.headerActionButton}
-                onPress={handleEditLocation}
-              >
-                <Ionicons name="create-outline" size={24} color="#4CAF50" />
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.headerActionButton}
-                onPress={handleDeleteLocation}
-              >
-                <Ionicons name="trash-outline" size={24} color="#F44336" />
-              </TouchableOpacity>
-            </View>
+          {isAllProductsView ? (
+            <>
+              <View style={styles.locationIconContainer}>
+                <Ionicons name="albums-outline" size={24} color="#4CAF50" />
+              </View>
+              <View style={styles.headerTextContainer}>
+                <Text style={styles.locationTitle}>모든 제품</Text>
+                <Text style={styles.locationDescription}>등록된 모든 제품을 확인합니다</Text>
+              </View>
+            </>
+          ) : currentLocation && (
+            <>
+              <View style={styles.locationIconContainer}>
+                <Ionicons name={currentLocation.icon || 'cube-outline'} size={24} color="#4CAF50" />
+              </View>
+              <View style={styles.headerTextContainer}>
+                <Text style={styles.locationTitle}>{currentLocation.title}</Text>
+                {currentLocation.description ? (
+                  <Text style={styles.locationDescription}>{currentLocation.description}</Text>
+                ) : null}
+              </View>
+            </>
           )}
         </View>
         
-        {/* 슬롯 상태 표시 (특정 영역 화면에서만) */}
-        {!isAllProducts && (
-          <SlotStatusBar 
-            used={usedProductSlots} 
-            total={totalProductSlots} 
-            type="product" 
-            onDetailPress={() => setSlotDetailModalVisible(true)}
-          />
-        )}
-        
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-            style={[styles.tab, activeTab === 'products' && styles.activeTab]}
-              onPress={() => setActiveTab('products')}
+        {/* 영역 수정/삭제 버튼 (모든 제품 보기가 아닐 때만 표시) */}
+        {!isAllProductsView && (
+          <View style={styles.headerActions}>
+            <TouchableOpacity 
+              style={styles.headerActionButton}
+              onPress={handleEditPress}
             >
-            <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
-                제품 목록
-              </Text>
+              <Ionicons name="create-outline" size={24} color="#4CAF50" />
             </TouchableOpacity>
-          {!isAllProducts && (
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'notifications' && styles.activeTab]}
-              onPress={() => setActiveTab('notifications')}
+            
+            <TouchableOpacity 
+              style={styles.headerActionButton}
+              onPress={handleDeletePress}
             >
-              <Text style={[styles.tabText, activeTab === 'notifications' && styles.activeTabText]}>
-                알림 설정
-              </Text>
+              <Ionicons name="trash-outline" size={24} color="#F44336" />
             </TouchableOpacity>
-          )}
           </View>
+        )}
       </View>
       
-      <View style={styles.content}>
-      {activeTab === 'products' ? (
-          renderProductSlots()
-        ) : (
-          <ScrollView 
-            style={styles.scrollContainer}
-            contentContainerStyle={styles.scrollContentContainer}
-            >
-            {locationId && locations.length > 0 ? (
-              <LocationNotificationSettings locationId={locationId} location={currentLocation} />
-            ) : (
-              <View style={[styles.container, styles.centered]}>
-                <ActivityIndicator size="large" color="#4CAF50" />
-                <Text style={styles.loadingText}>영역 정보를 불러오는 중...</Text>
-              </View>
-            )}
-        </ScrollView>
+      {/* 슬롯 상태 표시 (모든 제품 보기가 아닐 때만 표시) */}
+      {!isAllProductsView && (
+        <SlotStatusBar 
+          used={usedSlots} 
+          total={totalSlots} 
+          type="product" 
+        />
       )}
-      </View>
       
-      <AlertModal
-        visible={alertModalVisible}
-        title={alertModalConfig.title}
-        message={alertModalConfig.message}
-        buttons={alertModalConfig.buttons}
-        icon={alertModalConfig.icon}
-        iconColor={alertModalConfig.iconColor}
-        onClose={() => setAlertModalVisible(false)}
-      />
+      {/* 탭 메뉴 (모든 제품 보기가 아닐 때만 표시) */}
+      {!isAllProductsView && (
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'products' && styles.activeTab]}
+            onPress={() => handleTabChange('products')}
+          >
+            <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
+              제품 목록
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'notifications' && styles.activeTab]}
+            onPress={() => handleTabChange('notifications')}
+          >
+            <Text style={[styles.tabText, activeTab === 'notifications' && styles.activeTabText]}>
+              알림 설정
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
       
-      <DeleteConfirmModal />
+      {/* 탭 내용 */}
+      {isAllProductsView || activeTab === 'products' ? renderProductsTab() : renderNotificationsTab()}
       
-      <SlotDetailModal />
-      
-      <SignupPromptModal 
-        visible={showSignupPrompt}
-        onClose={() => setShowSignupPrompt(false)}
-        message="회원 가입하여 더 많은 제품을 등록하세요."
-      />
+      {/* 삭제 확인 모달 */}
+      <Modal
+        visible={showDeleteConfirm}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>영역 삭제</Text>
+            <Text style={styles.modalMessage}>
+              이 영역을 삭제하시겠습니까? 영역 내의 모든 제품 정보도 함께 삭제됩니다.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowDeleteConfirm(false)}
+              >
+                <Text style={styles.cancelButtonText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleDeleteConfirm}
+              >
+                <Text style={styles.confirmButtonText}>삭제</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -517,218 +363,98 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f8f8',
   },
   centered: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  errorText: {
+    fontSize: 16,
+    color: '#F44336',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 4,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
     backgroundColor: 'white',
-    paddingTop: 16,
-    paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
-  headerContent: {
+  headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    flex: 1,
   },
   backButton: {
-    marginRight: 12,
-  },
-  locationIconContainer: {
+    marginRight: 16,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    marginLeft: 16,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerActionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  locationIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#e8f5e9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
   headerTextContainer: {
     flex: 1,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  description: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
-  },
-  headerActions: {
-    flexDirection: 'row',
-  },
-  headerActionButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContainer: {
-    flex: 1,
-    width: '100%',
-  },
-  scrollContentContainer: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  listContainer: {
-    padding: 16,
-  },
-  emptyContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#666',
-    marginBottom: 8,
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 20,
-    width: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  modalTitle: {
+  locationTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
   },
-  closeButton: {
-    padding: 5,
-  },
-  slotDetailContainer: {
-    marginBottom: 15,
-  },
-  slotDetailItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  slotDetailLabel: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '500',
-  },
-  slotDetailValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  slotDetailSubItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginLeft: 20,
-    paddingVertical: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  slotDetailSubLabel: {
+  locationDescription: {
     fontSize: 14,
     color: '#666',
-    fontWeight: '400',
-  },
-  slotDetailSubValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  slotDetailTotal: {
-    borderBottomWidth: 0,
-    marginTop: 10,
-  },
-  slotDetailTotalLabel: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '500',
-  },
-  slotDetailTotalValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  slotDetailDescription: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  slotDetailDescriptionText: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-  },
-  signupButton: {
-    marginTop: 20,
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  signupButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  modalButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  modalMessage: {
-    fontSize: 16,
-    marginBottom: 20,
-    color: '#333',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
-  },
-  deleteButton: {
-    backgroundColor: '#F44336',
-  },
-  cancelButtonText: {
-    color: '#333',
-  },
-  deleteButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    marginTop: 4,
   },
   tabContainer: {
     flexDirection: 'row',
+    backgroundColor: 'white',
     paddingHorizontal: 16,
-    marginTop: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   tab: {
     paddingVertical: 8,
@@ -747,10 +473,39 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: 'white',
   },
+  productsContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  notificationsContainer: {
+    flex: 1,
+    backgroundColor: '#f8f8f8',
+  },
+  productsList: {
+    padding: 16,
+    paddingBottom: 80, // 하단 버튼을 위한 여백
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
+    marginBottom: 8,
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
   addButton: {
     position: 'absolute',
-    bottom: 20,
-    right: 20,
+    right: 16,
+    bottom: 16,
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -759,32 +514,59 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
     elevation: 5,
   },
-  slotCountBadge: {
-    position: 'absolute',
-    top: -10,
-    right: -10,
-    backgroundColor: '#F44336',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
+  disabledButton: {
+    backgroundColor: '#9E9E9E',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
   },
-  slotCountText: {
-    color: 'white',
-    fontSize: 14,
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 20,
+    width: '80%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
   },
-  loadingText: {
-    marginTop: 10,
-    color: '#666',
+  modalMessage: {
     fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  modalButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#f5f5f5',
+  },
+  confirmButton: {
+    backgroundColor: '#F44336',
+  },
+  cancelButtonText: {
+    color: '#333',
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 

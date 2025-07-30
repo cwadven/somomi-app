@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -6,489 +6,252 @@ import {
   TextInput, 
   TouchableOpacity, 
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
-  Image,
-  Modal,
-  ActivityIndicator,
-  Switch
+  ActivityIndicator
 } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { addLocation, updateLocation } from '../redux/slices/locationsSlice';
-import { addNotification } from '../redux/slices/notificationsSlice';
-import AlertModal from '../components/AlertModal';
-import SignupPromptModal from '../components/SignupPromptModal';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
+import { createLocation } from '../redux/slices/locationsSlice';
+import { markTemplateInstanceAsUsed } from '../redux/slices/authSlice';
 import IconSelector from '../components/IconSelector';
-import { checkAnonymousLimits } from '../utils/authUtils';
-
-// 조건부 ImagePicker 임포트
-let ImagePicker;
-if (Platform.OS !== 'web') {
-  // 네이티브 환경에서만 임포트
-  ImagePicker = require('expo-image-picker');
-}
-
-// 사용 가능한 아이콘 목록
-const availableIcons = [
-  'home-outline',
-  'restaurant-outline',
-  'water-outline',
-  'bed-outline',
-  'desktop-outline',
-  'shirt-outline',
-  'tv-outline',
-  'book-outline',
-  'fitness-outline',
-  'cube-outline',
-  'paw-outline',
-  'car-outline',
-  'medical-outline',
-  'briefcase-outline',
-  'flower-outline'
-];
 
 const AddLocationScreen = () => {
-  const dispatch = useDispatch();
   const navigation = useNavigation();
-  const route = useRoute();
-  const { status } = useSelector(state => state.locations);
-  const { isAnonymous, slots } = useSelector(state => state.auth);
-  const { locations } = useSelector(state => state.locations);
+  const dispatch = useDispatch();
   
-  // 스크롤 뷰 참조
-  const scrollViewRef = useRef(null);
+  // 템플릿 인스턴스 목록 가져오기
+  const { userLocationTemplateInstances } = useSelector(state => state.auth);
   
-  // 입력 필드 참조
-  const titleInputRef = useRef(null);
+  // 사용 가능한 템플릿 인스턴스만 필터링
+  const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
   
-  // 수정 모드 확인
-  const isEditing = route.params?.isEditing || false;
-  const locationToEdit = route.params?.location || null;
+  // 템플릿 인스턴스를 productId별로 그룹화
+  const groupedTemplates = availableTemplates.reduce((groups, template) => {
+    const { productId } = template;
+    if (!groups[productId]) {
+      groups[productId] = [];
+    }
+    groups[productId].push(template);
+    return groups;
+  }, {});
   
-  // 상태
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState('cube-outline');
-  const [selectedColor, setSelectedColor] = useState('#4CAF50');
-  const [showIconPicker, setShowIconPicker] = useState(false);
-  const [showColorPicker, setShowColorPicker] = useState(false);
-  
-  // 폼 유효성 검사 상태
-  const [touched, setTouched] = useState({ title: false });
-  const [errors, setErrors] = useState({ title: '' });
-  
-  // 모달 상태
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [registeredLocation, setRegisteredLocation] = useState(null);
-  
-  // 커스텀 알림 모달 상태
-  const [alertModalVisible, setAlertModalVisible] = useState(false);
-  const [alertModalConfig, setAlertModalConfig] = useState({
+  // 상태 관리
+  const [selectedTemplateInstance, setSelectedTemplateInstance] = useState(null);
+  const [locationData, setLocationData] = useState({
     title: '',
-    message: '',
-    buttons: [],
-    icon: '',
-    iconColor: ''
+    description: '',
+    icon: 'cube-outline',
   });
-
-  // 회원가입 유도 모달 상태
-  const [signupPromptVisible, setSignupPromptVisible] = useState(false);
-  const [signupPromptMessage, setSignupPromptMessage] = useState('');
-
-  // 수정 모드일 경우 기존 데이터 로드
+  const [isIconSelectorVisible, setIsIconSelectorVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // 선택된 템플릿이 있으면 기본 정보 설정
   useEffect(() => {
-    if (isEditing && locationToEdit) {
-      setTitle(locationToEdit.title || '');
-      setDescription(locationToEdit.description || '');
-      setSelectedIcon(locationToEdit.icon || 'cube-outline');
-      setSelectedColor(locationToEdit.color || '#4CAF50');
-      
-      // 알림 설정 관련 코드 제거 (알림 설정은 별도 화면에서 관리)
-    }
-  }, [isEditing, locationToEdit]);
-
-  // 화면 진입 시 비회원 제한 확인 (수정 모드가 아닐 때만)
-  useEffect(() => {
-    if (!isEditing) {
-      checkLocationLimits();
-    }
-  }, [isEditing, isAnonymous]);
-
-  // 비회원 영역 제한 확인
-  const checkLocationLimits = async () => {
-    if (isAnonymous) {
-      const totalLocationSlots = slots.locationSlots.baseSlots;
-      const usedLocationSlots = locations.length;
-      
-      if (usedLocationSlots >= totalLocationSlots) {
-        setSignupPromptMessage(`비회원은 최대 ${totalLocationSlots}개의 영역만 생성할 수 있습니다. 회원가입하여 더 많은 영역을 생성하세요!`);
-        setSignupPromptVisible(true);
-      }
-    }
-  };
-
-  // 필드 유효성 검사 함수
-  const validateField = (name, value) => {
-    let errorMessage = '';
-    
-    switch (name) {
-      case 'title':
-        if (!value.trim()) {
-          errorMessage = '영역 제목을 입력해주세요';
-        }
-        break;
-      default:
-        break;
-    }
-    
-    return errorMessage;
-  };
-  
-  // 필드 변경 핸들러
-  const handleFieldChange = (name, value) => {
-    // 필드 값 업데이트
-    switch (name) {
-      case 'title':
-        setTitle(value);
-        break;
-      default:
-        break;
-    }
-    
-    // 필드가 터치되었음을 표시
-    setTouched(prev => ({ ...prev, [name]: true }));
-    
-    // 유효성 검사 수행
-    const errorMessage = validateField(name, value);
-    setErrors(prev => ({ ...prev, [name]: errorMessage }));
-  };
-  
-  // 필드 블러(포커스 아웃) 핸들러
-  const handleFieldBlur = (name, value) => {
-    // 필드가 터치되었음을 표시
-    setTouched(prev => ({ ...prev, [name]: true }));
-    
-    // 유효성 검사 수행
-    const errorMessage = validateField(name, value);
-    setErrors(prev => ({ ...prev, [name]: errorMessage }));
-  };
-
-  // 폼 유효성 검사
-  const isFormValid = () => {
-    // 모든 필수 필드에 대해 유효성 검사 수행
-    const newErrors = {
-      title: validateField('title', title)
-    };
-    
-    // 에러 상태 업데이트
-    setErrors(newErrors);
-    
-    // 모든 필드가 터치되었음을 표시
-    setTouched({
-      title: true
-    });
-    
-    // 에러가 있는지 확인
-    const hasErrors = Object.values(newErrors).some(error => error !== '');
-    
-    // 에러가 있으면 해당 필드로 스크롤
-    if (hasErrors) {
-      if (newErrors.title) {
-        scrollToField('title');
-      }
-    }
-    
-    return !hasErrors;
-  };
-  
-  // 특정 필드로 스크롤하는 함수
-  const scrollToField = (fieldName) => {
-    if (scrollViewRef.current) {
-      switch (fieldName) {
-        case 'title':
-          if (titleInputRef.current) {
-            titleInputRef.current.measure((fx, fy, width, height, px, py) => {
-              scrollViewRef.current.scrollTo({
-                y: py - 50,
-                animated: true
-              });
-            });
-          }
-          break;
-        default:
-          break;
-      }
-    }
-  };
-  
-  // 알림 표시 함수
-  const showAlert = (title, message) => {
-    setAlertModalConfig({
-      title,
-      message,
-      buttons: [{ text: '확인', style: 'default' }],
-      icon: 'information-circle',
-      iconColor: '#4CAF50'
-    });
-    setAlertModalVisible(true);
-  };
-  
-  // 오류 알림 표시
-  const showErrorAlert = (message) => {
-    Alert.alert('오류', message, [{ text: '확인', style: 'default' }]);
-  };
-
-  // 이미지 선택 핸들러 (네이티브)
-  const pickImageNative = async () => {
-    if (!ImagePicker) return;
-    
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (status !== 'granted') {
-      showAlert('권한 오류', '갤러리 접근 권한이 필요합니다.');
-      return;
-    }
-    
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
-    
-    if (!result.cancelled && result.assets && result.assets[0]) {
-      // 현재 이미지 처리 기능은 구현되지 않았음
-      showAlert('알림', '현재 버전에서는 이미지 업로드가 지원되지 않습니다.');
-    }
-  };
-  
-  // 이미지 선택 핸들러 (웹)
-  const pickImageWeb = () => {
-    showAlert('알림', '현재 버전에서는 이미지 업로드가 지원되지 않습니다.');
-  };
-  
-  // 플랫폼에 따른 이미지 선택 함수
-  const pickImage = () => {
-    if (Platform.OS === 'web') {
-      pickImageWeb();
-    } else {
-      pickImageNative();
-    }
-  };
-
-  // 제출 처리
-  const handleSubmit = async () => {
-    // 폼 유효성 검사
-    if (!isFormValid()) {
-      return;
-    }
-    
-    // 비회원 사용자의 영역 개수 제한 확인
-    if (isAnonymous && !isEditing) {
-      const totalLocationSlots = slots.locationSlots.baseSlots;
-      const usedLocationSlots = locations.length;
-      
-      if (usedLocationSlots >= totalLocationSlots) {
-        setSignupPromptMessage(`비회원은 최대 ${totalLocationSlots}개의 영역만 생성할 수 있습니다. 회원가입하여 더 많은 영역을 생성하세요!`);
-        setSignupPromptVisible(true);
-        return;
-      }
-    }
-    
-    // 영역 데이터 구성
-    const locationData = {
-      title,
-      description,
-      icon: selectedIcon,
-      color: selectedColor,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    if (isEditing) {
-      // 수정 모드: 기존 ID 포함
-      const updatedLocation = {
+    if (selectedTemplateInstance) {
+      setLocationData({
         ...locationData,
-        id: locationToEdit.id
-      };
+        title: selectedTemplateInstance.name,
+        description: selectedTemplateInstance.description,
+        icon: selectedTemplateInstance.icon,
+      });
+    }
+  }, [selectedTemplateInstance]);
+  
+  // 입력값 변경 핸들러
+  const handleInputChange = (key, value) => {
+    setLocationData({
+      ...locationData,
+      [key]: value
+    });
+  };
+  
+  // 아이콘 선택 핸들러
+  const handleIconSelect = (icon) => {
+    setLocationData({
+      ...locationData,
+      icon
+    });
+    setIsIconSelectorVisible(false);
+  };
+  
+  // 템플릿 인스턴스 선택 핸들러
+  const handleTemplateSelect = (template) => {
+    setSelectedTemplateInstance(template);
+  };
+  
+  // 영역 생성 버튼 클릭 핸들러
+  const handleCreateLocation = async () => {
+    // 필수 입력값 검증
+    if (!locationData.title.trim()) {
+      Alert.alert('입력 오류', '영역 이름을 입력해주세요.');
+      return;
+    }
+    
+    if (!selectedTemplateInstance) {
+      Alert.alert('선택 오류', '템플릿을 선택해주세요.');
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      // 영역 생성 API 호출
+      const result = await dispatch(createLocation({
+        ...locationData,
+        templateInstanceId: selectedTemplateInstance.id,
+        productId: selectedTemplateInstance.productId,
+        feature: selectedTemplateInstance.feature
+      })).unwrap();
       
-      dispatch(updateLocation(updatedLocation))
-        .unwrap()
-        .then((result) => {
-          setRegisteredLocation(result);
-          setShowSuccessModal(true);
-        })
-        .catch((error) => {
-          showErrorAlert(`영역 수정에 실패했습니다: ${error.message}`);
-        });
-    } else {
-      // 신규 등록 모드
-      dispatch(addLocation(locationData))
-        .unwrap()
-        .then((result) => {
-          setRegisteredLocation(result);
-          setShowSuccessModal(true);
-        })
-        .catch((error) => {
-          showErrorAlert(`영역 등록에 실패했습니다: ${error.message}`);
-        });
+      // 생성된 영역 ID로 템플릿 인스턴스를 사용됨으로 표시
+      dispatch(markTemplateInstanceAsUsed({
+        templateId: selectedTemplateInstance.id,
+        locationId: result.id
+      }));
+      
+      setIsLoading(false);
+      navigation.goBack();
+    } catch (error) {
+      setIsLoading(false);
+      console.error('영역 생성 실패:', error);
+      Alert.alert('오류', '영역 생성 중 오류가 발생했습니다.');
     }
   };
   
-  // 성공 모달 닫기 및 화면 이동
-  const handleSuccessModalClose = () => {
-    setShowSuccessModal(false);
-    navigation.goBack();
-  };
-
-  // 회원가입 유도 모달 닫기
-  const handleSignupPromptClose = () => {
-    setSignupPromptVisible(false);
+  // baseSlots 값을 표시하는 함수
+  const renderSlotCount = (baseSlots) => {
+    if (baseSlots === -1) {
+      return '무제한';
+    }
+    return `${baseSlots}개`;
   };
   
-  // 성공 모달 컴포넌트
-  const SuccessModal = () => (
-    <Modal
-      visible={showSuccessModal}
-      transparent={true}
-      animationType="fade"
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalIconContainer}>
-            <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
-          </View>
-          <Text style={styles.modalTitle}>
-            {isEditing ? '영역 수정 완료' : '영역 등록 완료'}
-          </Text>
-          <Text style={styles.modalMessage}>
-            {isEditing ? '영역이 성공적으로 수정되었습니다.' : '새 영역이 성공적으로 등록되었습니다.'}
-          </Text>
-          <TouchableOpacity 
-            style={styles.modalButton}
-            onPress={handleSuccessModalClose}
-          >
-            <Text style={styles.modalButtonText}>확인</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView 
-        ref={scrollViewRef}
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={16}
-        removeClippedSubviews={false}
-      >
-        <Text style={styles.title}>{isEditing ? '영역 수정' : '영역 추가'}</Text>
+    <ScrollView style={styles.container}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>템플릿 선택</Text>
+        <Text style={styles.sectionDescription}>
+          영역을 생성할 템플릿을 선택하세요. 템플릿에 따라 제공되는 기능이 다릅니다.
+        </Text>
         
-        {/* 영역 제목 입력 */}
-        <View style={styles.inputGroup}>
-          <View style={styles.labelContainer}>
-            <Text style={styles.label}>영역 제목</Text>
-            <Text style={styles.requiredMark}>*</Text>
-          </View>
-          <TextInput
-            ref={titleInputRef}
-            style={[
-              styles.input,
-              touched.title && errors.title ? styles.inputError : null
-            ]}
-            value={title}
-            onChangeText={(text) => handleFieldChange('title', text)}
-            onBlur={() => handleFieldBlur('title', title)}
-            placeholder="예: 주방, 화장실, 거실 등"
-          />
-          {touched.title && errors.title ? (
-            <Text style={styles.errorText}>{errors.title}</Text>
-          ) : null}
-        </View>
+        {Object.entries(groupedTemplates).map(([productId, templates]) => {
+          // 해당 productId의 첫 번째 템플릿에서 공통 정보 가져오기
+          const { name, description, icon } = templates[0];
+          
+          return (
+            <View key={productId} style={styles.templateGroup}>
+              <View style={styles.templateGroupHeader}>
+                <View style={styles.templateIconContainer}>
+                  <Ionicons name={icon} size={24} color="#4CAF50" />
+                </View>
+                <View style={styles.templateGroupInfo}>
+                  <Text style={styles.templateGroupName}>{name}</Text>
+                  <Text style={styles.templateGroupDescription}>{description}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.templateOptions}>
+                {templates.map(template => (
+                  <TouchableOpacity
+                    key={template.id}
+                    style={[
+                      styles.templateOption,
+                      selectedTemplateInstance?.id === template.id && styles.selectedTemplateOption
+                    ]}
+                    onPress={() => handleTemplateSelect(template)}
+                  >
+                    <Text style={styles.templateOptionTitle}>
+                      기본 슬롯: {renderSlotCount(template.feature.baseSlots)}
+                    </Text>
+                    {selectedTemplateInstance?.id === template.id && (
+                      <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          );
+        })}
         
-        {/* 영역 설명 입력 */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>영역 설명</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={description}
-            onChangeText={setDescription}
-            placeholder="영역에 대한 설명을 입력하세요 (선택사항)"
-            multiline
-            numberOfLines={4}
-          />
-        </View>
-        
-        {/* 아이콘 선택 */}
-        <IconSelector 
-          icons={availableIcons}
-          selectedIcon={selectedIcon}
-          onSelectIcon={setSelectedIcon}
-                />
-        
-        {/* 이미지 선택 (향후 구현) */}
-        <View style={styles.imageSection}>
-          <Text style={styles.sectionTitle}>대표 이미지 (선택사항)</Text>
-          <Text style={styles.imageDescription}>
-            현재 버전에서는 이미지 업로드가 지원되지 않습니다.
-          </Text>
-        </View>
-        
-        {/* 비회원 안내 메시지 */}
-        {isAnonymous && !isEditing && (
-          <View style={styles.anonymousInfoContainer}>
-            <Ionicons name="information-circle" size={20} color="#2196F3" style={styles.infoIcon} />
-            <Text style={styles.anonymousInfoText}>
-              비회원은 영역을 {slots.locationSlots.baseSlots}개만 추가할 수 있습니다. 현재 {locations.length}/{slots.locationSlots.baseSlots}
+        {availableTemplates.length === 0 && (
+          <View style={styles.emptyTemplates}>
+            <Text style={styles.emptyTemplatesText}>
+              사용 가능한 템플릿이 없습니다. 상점에서 템플릿을 구매하세요.
             </Text>
+            <TouchableOpacity
+              style={styles.storeButton}
+              onPress={() => navigation.navigate('Store')}
+            >
+              <Text style={styles.storeButtonText}>상점으로 이동</Text>
+            </TouchableOpacity>
           </View>
         )}
-        
-        {/* 등록/수정 버튼 */}
-        <TouchableOpacity 
-          style={styles.submitButton}
-          onPress={handleSubmit}
-          disabled={status === 'loading'}
-        >
-          {status === 'loading' ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.submitButtonText}>
-              {isEditing ? '영역 수정하기' : '영역 등록하기'}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
+      </View>
       
-      {/* 성공 모달 */}
-      <SuccessModal />
+      {selectedTemplateInstance && (
+        <>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>영역 정보</Text>
+            
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>이름</Text>
+              <TextInput
+                style={styles.input}
+                value={locationData.title}
+                onChangeText={(text) => handleInputChange('title', text)}
+                placeholder="영역 이름을 입력하세요"
+              />
+            </View>
+            
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>설명 (선택사항)</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={locationData.description}
+                onChangeText={(text) => handleInputChange('description', text)}
+                placeholder="영역에 대한 설명을 입력하세요"
+                multiline
+              />
+            </View>
+            
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>아이콘</Text>
+              <TouchableOpacity
+                style={styles.iconSelector}
+                onPress={() => setIsIconSelectorVisible(true)}
+              >
+                <View style={styles.selectedIconContainer}>
+                  <Ionicons name={locationData.icon} size={24} color="#4CAF50" />
+                </View>
+                <Text style={styles.iconSelectorText}>아이콘 선택</Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={handleCreateLocation}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.createButtonText}>영역 생성</Text>
+            )}
+          </TouchableOpacity>
+        </>
+      )}
       
-      {/* 커스텀 알림 모달 */}
-      <AlertModal
-        visible={alertModalVisible}
-        title={alertModalConfig.title}
-        message={alertModalConfig.message}
-        buttons={alertModalConfig.buttons}
-        onClose={() => setAlertModalVisible(false)}
-        icon={alertModalConfig.icon}
-        iconColor={alertModalConfig.iconColor}
+      {/* 아이콘 선택 모달 */}
+      <IconSelector
+        visible={isIconSelectorVisible}
+        onClose={() => setIsIconSelectorVisible(false)}
+        onSelect={handleIconSelect}
+        selectedIcon={locationData.icon}
       />
-      
-      {/* 회원가입 유도 모달 */}
-      <SignupPromptModal
-        visible={signupPromptVisible}
-        onClose={handleSignupPromptClose}
-        message={signupPromptMessage}
-      />
-    </KeyboardAvoidingView>
+    </ScrollView>
   );
 };
 
@@ -496,254 +259,163 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',
-  },
-  scrollContainer: {
     padding: 16,
   },
-  title: {
-    fontSize: 24,
+  section: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 24,
+    marginBottom: 8,
     color: '#333',
   },
-  inputGroup: {
-    marginBottom: 20,
+  sectionDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
   },
-  labelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+  formGroup: {
+    marginBottom: 16,
   },
   label: {
     fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 8,
     color: '#333',
-  },
-  requiredMark: {
-    color: 'red',
-    fontWeight: 'bold',
-    marginLeft: 4,
-    fontSize: 16,
   },
   input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
+    backgroundColor: '#f5f5f5',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-  },
-  inputError: {
-    borderColor: 'red',
-  },
-  errorText: {
-    color: 'red',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  iconSelectorContainer: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 12,
-    color: '#333',
-  },
-  iconsList: {
-    paddingVertical: 8,
-  },
-  iconItem: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  selectedIconItem: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
-  },
-  imageSection: {
-    marginBottom: 20,
-  },
-  imageDescription: {
-    color: '#666',
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  anonymousInfoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E3F2FD',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  infoIcon: {
-    marginRight: 8,
-  },
-  anonymousInfoText: {
-    color: '#0D47A1',
-    fontSize: 14,
-    flex: 1,
-  },
-  submitButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  // 모달 스타일
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 20,
-    width: '80%',
-    maxWidth: 400,
-  },
-  modalIconContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  modalMessage: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  modalButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  modalButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  notificationSection: {
-    marginBottom: 20,
-    backgroundColor: '#f9f9f9',
-    padding: 16,
-    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
   },
-  switchLabel: {
+  iconSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  selectedIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e8f5e9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  iconSelectorText: {
+    flex: 1,
     fontSize: 16,
     color: '#333',
   },
-  notificationHelp: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
-    fontStyle: 'italic',
-  },
-  notificationTypeContainer: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  notificationTypeButton: {
-    flex: 1,
-    padding: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-    marginHorizontal: 4,
-  },
-  selectedNotificationType: {
+  createButton: {
     backgroundColor: '#4CAF50',
-  },
-  notificationTypeText: {
-    color: '#4CAF50',
-    fontWeight: '500',
-  },
-  selectedNotificationTypeText: {
-    color: '#fff',
-  },
-  daysBeforeLabel: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 12,
-  },
-  daysBeforeContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -4,
-  },
-  daysBeforeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-    margin: 4,
-  },
-  selectedDaysBeforeButton: {
-    backgroundColor: '#4CAF50',
-  },
-  daysBeforeText: {
-    fontSize: 14,
-    color: '#4CAF50',
-  },
-  selectedDaysBeforeText: {
-    color: '#fff',
-  },
-  repeatDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-  anonymousNotificationContainer: {
-    backgroundColor: '#f0f0f0',
-    padding: 16,
     borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  createButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  templateGroup: {
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  templateGroupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#f5f5f5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
-  lockIcon: {
+  templateIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e8f5e9',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
-  anonymousNotificationText: {
+  templateGroupInfo: {
     flex: 1,
-    color: '#666',
+  },
+  templateGroupName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  templateGroupDescription: {
     fontSize: 14,
-    lineHeight: 20,
+    color: '#666',
+    marginTop: 4,
+  },
+  templateOptions: {
+    padding: 12,
+  },
+  templateOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  selectedTemplateOption: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#e8f5e9',
+  },
+  templateOptionTitle: {
+    fontSize: 15,
+    color: '#333',
+  },
+  emptyTemplates: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  emptyTemplatesText: {
+    fontSize: 15,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  storeButton: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  storeButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 
