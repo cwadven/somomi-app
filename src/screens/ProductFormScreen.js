@@ -13,7 +13,8 @@ import {
   ActivityIndicator,
   TouchableWithoutFeedback,
   Keyboard,
-  FlatList
+  FlatList,
+  SafeAreaView
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +27,7 @@ import CategoryAddModal from '../components/CategoryAddModal';
 import CategorySelector from '../components/CategorySelector';
 import LocationSelector from '../components/LocationSelector';
 import SignupPromptModal from '../components/SignupPromptModal';
+import AlertModal from '../components/AlertModal';
 
 // 조건부 DateTimePicker 임포트
 let DateTimePicker;
@@ -76,6 +78,14 @@ const ProductFormScreen = () => {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [createdProduct, setCreatedProduct] = useState(null);
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertModalConfig, setAlertModalConfig] = useState({
+    title: '',
+    message: '',
+    buttons: [],
+    icon: '',
+    iconColor: ''
+  });
   
   // 추가 모드 전용 상태
   const [currentLocationProducts, setCurrentLocationProducts] = useState([]);
@@ -188,16 +198,12 @@ const ProductFormScreen = () => {
 
   // 카테고리 추가 처리
   const handleAddCategory = (newCategory) => {
+    // 카테고리 추가 후 선택
     setSelectedCategory(newCategory);
     setShowCategoryModal(false);
     
-    if (categoryListRef && categoryListRef.current) {
-      setTimeout(() => {
-        categoryListRef.current.scrollToEnd({ animated: true });
-      }, 300);
-    }
-    
-    Alert.alert('알림', '새 카테고리가 추가되었습니다.');
+    // 성공 메시지 표시
+    showInfoAlert('알림', '새 카테고리가 추가되었습니다.');
   };
 
   // 영역 추가 화면으로 이동
@@ -251,37 +257,39 @@ const ProductFormScreen = () => {
   
   // 웹용 날짜 입력 확인
   const handleConfirmWebDate = () => {
-    try {
-      let date;
-      if (tempDateString.includes('-')) {
-        const [year, month, day] = tempDateString.split('-').map(Number);
-        
-        if (!year || !month || !day || 
-            isNaN(year) || isNaN(month) || isNaN(day) ||
-            month < 1 || month > 12 || day < 1 || day > 31) {
-          throw new Error('유효하지 않은 날짜 형식');
+    // 입력된 날짜 문자열 파싱
+    const datePattern = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
+    const match = tempDateString.match(datePattern);
+    
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1; // JavaScript 월은 0부터 시작
+      const day = parseInt(match[3], 10);
+      
+      const parsedDate = new Date(year, month, day);
+      
+      // 유효한 날짜인지 확인
+      if (
+        parsedDate.getFullYear() === year &&
+        parsedDate.getMonth() === month &&
+        parsedDate.getDate() === day
+      ) {
+        // 선택된 날짜 타입에 따라 상태 업데이트
+        if (currentDateType === 'purchase') {
+          setPurchaseDate(parsedDate);
+        } else if (currentDateType === 'expiry') {
+          setExpiryDate(parsedDate);
+        } else if (currentDateType === 'estimated') {
+          setEstimatedEndDate(parsedDate);
         }
         
-        date = new Date(year, month - 1, day);
+        // 모달 닫기
+        setShowWebDateModal(false);
       } else {
-        date = new Date(tempDateString);
+        showErrorAlert('유효한 날짜 형식이 아닙니다. (YYYY-MM-DD)');
       }
-      
-      if (isNaN(date.getTime())) {
-        throw new Error('유효하지 않은 날짜');
-      }
-      
-      if (currentDateType === 'purchase') {
-        setPurchaseDate(date);
-      } else if (currentDateType === 'expiry') {
-        setExpiryDate(date);
-      } else if (currentDateType === 'estimated') {
-        setEstimatedEndDate(date);
-      }
-      
-      setShowWebDateModal(false);
-    } catch (error) {
-      Alert.alert('오류', '유효한 날짜 형식이 아닙니다. (YYYY-MM-DD)');
+    } else {
+      showErrorAlert('유효한 날짜 형식이 아닙니다. (YYYY-MM-DD)');
     }
   };
   
@@ -418,10 +426,10 @@ const ProductFormScreen = () => {
     
     // 영역이 존재하는지 확인 (추가 모드에서는 이미 선택된 영역이 있어야 함)
     if (!selectedLocation) {
-      Alert.alert(
+      showErrorAlert(
         '알림',
         '현재 영역 정보를 찾을 수 없습니다. 다시 시도해주세요.',
-        [{ text: '확인', style: 'cancel' }]
+        [{ text: '확인' }]
       );
       return false;
     }
@@ -437,68 +445,63 @@ const ProductFormScreen = () => {
 
   // 제품 등록/수정 처리
   const handleSubmit = async () => {
-    try {
-      if (!isFormValid()) {
+    // 폼 유효성 검사
+    if (!isFormValid()) {
+      // 오류가 있으면 첫 번째 오류 필드로 스크롤
+      if (errors.productName) {
+        scrollToField('productName');
+        return;
+      } else if (errors.location) {
+        scrollToField('location');
+        return;
+      } else if (errors.purchaseDate) {
+        scrollToField('purchaseDate');
         return;
       }
-      
+      return;
+    }
+
+    // 로그인 필요한 경우 회원가입 유도
+    if (!isAuthenticated && !isEditMode) {
+      setShowSignupPrompt(true);
+      return;
+    }
+
+    // 영역이 선택되지 않은 경우 확인
+    if (!selectedLocation && !locationId) {
+      showConfirmAlert(
+        '영역 선택 필요',
+        '영역이 선택되지 않았습니다. 영역을 선택하시겠습니까?',
+        handleAddLocation
+      );
+      return;
+    }
+
+    try {
+      const productData = {
+        name: productName,
+        brand: brand || null,
+        category: selectedCategory,
+        locationId: locationId || (selectedLocation ? selectedLocation.id : null),
+        purchaseDate: purchaseDate.toISOString(),
+        expiryDate: expiryDate ? expiryDate.toISOString() : null,
+        estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
+        memo: memo || null
+      };
+
+      let result;
       if (isEditMode) {
         // 수정 모드
-        const updatedProductData = {
-          id: productId,
-          name: productName,
-          brand: brand,
-          categoryId: selectedCategory ? selectedCategory.id : null,
-          category: selectedCategory || null,
-          locationId: selectedLocation.id,
-          purchaseDate: purchaseDate.toISOString(),
-          expiryDate: expiryDate ? expiryDate.toISOString() : null,
-          estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
-          memo,
-          updatedAt: new Date().toISOString(),
-          // 기존 데이터 유지
-          image: currentProduct.image,
-          remainingPercentage: currentProduct.remainingPercentage,
-          createdAt: currentProduct.createdAt || currentProduct.purchaseDate,
-        };
-        
-        const result = await dispatch(updateProductAsync(updatedProductData)).unwrap();
-        setCreatedProduct(result);
-        setShowSuccessModal(true);
+        result = await dispatch(updateProductAsync({ ...productData, id: productId })).unwrap();
       } else {
         // 추가 모드
-        const productData = {
-          name: productName,
-          brand: brand,
-          category: selectedCategory || null,
-          categoryId: selectedCategory?.id || null,
-          locationId: selectedLocation?.id || null,
-          purchaseDate: purchaseDate ? purchaseDate.toISOString() : new Date().toISOString(),
-          expiryDate: expiryDate ? expiryDate.toISOString() : null,
-          estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
-          memo: memo,
-          createdAt: new Date().toISOString()
-        };
-        
-        const result = await dispatch(addProductAsync(productData)).unwrap();
-        setCreatedProduct(result);
-        setShowSuccessModal(true);
-        
-        // 비회원 사용자인 경우 회원가입 유도 모달 표시 (제품 3개 이상 등록 시)
-        const products = await dispatch(fetchProducts()).unwrap();
-        if (!isAuthenticated && products.length >= 3) {
-          setTimeout(() => {
-            setShowSignupPrompt(true);
-          }, 1000);
-        }
+        result = await dispatch(addProductAsync(productData)).unwrap();
       }
+
+      setCreatedProduct(result);
+      setShowSuccessModal(true);
     } catch (error) {
-      console.error('제품 처리 오류:', error);
-      Alert.alert(
-        '오류',
-        `제품 ${isEditMode ? '수정' : '등록'} 중 오류가 발생했습니다. 다시 시도해주세요.`,
-        [{ text: '확인', style: 'default' }]
-      );
+      showErrorAlert('오류', `제품 ${isEditMode ? '수정' : '등록'} 중 오류가 발생했습니다: ${error.message}`);
     }
   };
   
@@ -665,217 +668,278 @@ const ProductFormScreen = () => {
     );
   }
 
+  // 오류 모달 표시
+  const showErrorAlert = (title, message, buttons = [{ text: '확인' }]) => {
+    setAlertModalConfig({
+      title,
+      message,
+      icon: 'alert-circle',
+      iconColor: '#F44336',
+      buttons
+    });
+    setAlertModalVisible(true);
+  };
+
+  // 정보 모달 표시
+  const showInfoAlert = (title, message, buttons = [{ text: '확인' }]) => {
+    setAlertModalConfig({
+      title,
+      message,
+      icon: 'information-circle',
+      iconColor: '#2196F3',
+      buttons
+    });
+    setAlertModalVisible(true);
+  };
+
+  // 확인 모달 표시
+  const showConfirmAlert = (title, message, onConfirm) => {
+    setAlertModalConfig({
+      title,
+      message,
+      icon: 'help-circle',
+      iconColor: '#FF9800',
+      buttons: [
+        { text: '취소', style: 'cancel' },
+        { text: '확인', onPress: onConfirm }
+      ]
+    });
+    setAlertModalVisible(true);
+  };
+
   return (
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView 
-        ref={scrollViewRef}
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.title}>
-          {isEditMode ? '제품 수정' : '제품 등록'}
-        </Text>
-        
-        {/* 제품명 입력 */}
-        <View style={styles.inputGroup}>
-          <View style={styles.labelContainer}>
-            <Text style={styles.label}>제품명</Text>
-            <Text style={styles.requiredMark}>*</Text>
-          </View>
-          <TextInput
-            ref={productNameInputRef}
-            style={[
-              styles.input,
-              touched.productName && errors.productName ? styles.inputError : null
-            ]}
-            value={productName}
-            onChangeText={(text) => handleFieldChange('productName', text)}
-            onBlur={() => handleFieldBlur('productName', productName)}
-            placeholder="제품명을 입력하세요"
-          />
-          {touched.productName && errors.productName ? (
-            <Text style={styles.errorText}>{errors.productName}</Text>
-          ) : null}
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={navigation.goBack} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>
+            {isEditMode ? '제품 수정' : '제품 등록'}
+          </Text>
+          <View style={styles.headerPlaceholder} />
         </View>
-        
-        {/* 브랜드 입력 */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>브랜드 (선택)</Text>
-          <TextInput
-            style={styles.input}
-            value={brand}
-            onChangeText={setBrand}
-            placeholder="브랜드명을 입력하세요"
-          />
-        </View>
-        
-        {/* 카테고리 선택 */}
-        <CategorySelector 
-          ref={categoryListRef}
-          categories={categories} 
-          selectedCategory={selectedCategory} 
-          onSelectCategory={setSelectedCategory} 
-          onAddCategory={handleOpenCategoryModal}
-          status={categoriesStatus}
-        />
-        
-        {/* 구매일 선택 */}
-        <View 
-          ref={purchaseDateSectionRef}
-          style={styles.inputGroup}
+        <ScrollView 
+          ref={scrollViewRef}
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.labelContainer}>
-            <Text style={styles.label}>구매일</Text>
-            <Text style={styles.requiredMark}>*</Text>
-          </View>
-          <TouchableOpacity 
-            style={[
-              styles.dateInput,
-              touched.purchaseDate && errors.purchaseDate ? styles.inputError : null
-            ]}
-            onPress={() => {
-              if (Platform.OS === 'web') {
-                handleWebDateSelect('purchase');
-              } else {
-                setShowPurchaseDatePicker(true);
-              }
-              setTouched(prev => ({ ...prev, purchaseDate: true }));
-            }}
-          >
-            <Text style={styles.dateText}>
-              {formatDate(purchaseDate)}
-            </Text>
-            <Ionicons name="calendar-outline" size={20} color="#666" />
-          </TouchableOpacity>
-          {touched.purchaseDate && errors.purchaseDate ? (
-            <Text style={styles.errorText}>{errors.purchaseDate}</Text>
-          ) : null}
-          {Platform.OS !== 'web' && showPurchaseDatePicker && (
-            <DateTimePicker
-              value={purchaseDate || new Date()}
-              mode="date"
-              display="default"
-              onChange={(event, date) => {
-                handleDateChange(event, date, 'purchase');
-                handleFieldChange('purchaseDate', date);
-              }}
-            />
-          )}
-        </View>
-        
-        {/* 유통기한 선택 */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>유통기한 (선택)</Text>
-          <TouchableOpacity 
-            style={styles.dateInput}
-            onPress={() => {
-              if (Platform.OS === 'web') {
-                handleWebDateSelect('expiry');
-              } else {
-                setShowExpiryDatePicker(true);
-              }
-            }}
-          >
-            <Text style={styles.dateText}>
-              {expiryDate ? formatDate(expiryDate) : '날짜 선택'}
-            </Text>
-            <Ionicons name="calendar-outline" size={20} color="#666" />
-          </TouchableOpacity>
-          {Platform.OS !== 'web' && showExpiryDatePicker && (
-            <DateTimePicker
-              value={expiryDate || new Date()}
-              mode="date"
-              display="default"
-              onChange={(event, date) => handleDateChange(event, date, 'expiry')}
-            />
-          )}
-        </View>
-        
-        {/* 소진 예상일 선택 */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>소진 예상일 (선택)</Text>
-          <TouchableOpacity 
-            style={styles.dateInput}
-            onPress={() => {
-              if (Platform.OS === 'web') {
-                handleWebDateSelect('estimated');
-              } else {
-                setShowEstimatedEndDatePicker(true);
-              }
-            }}
-          >
-            <Text style={styles.dateText}>
-              {estimatedEndDate ? formatDate(estimatedEndDate) : '날짜 선택'}
-            </Text>
-            <Ionicons name="calendar-outline" size={20} color="#666" />
-          </TouchableOpacity>
-          {Platform.OS !== 'web' && showEstimatedEndDatePicker && (
-            <DateTimePicker
-              value={estimatedEndDate || new Date()}
-              mode="date"
-              display="default"
-              onChange={(event, date) => handleDateChange(event, date, 'estimated')}
-            />
-          )}
-        </View>
-        
-        {/* 메모 입력 */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>메모 (선택)</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={memo}
-            onChangeText={setMemo}
-            placeholder="메모를 입력하세요"
-            multiline={true}
-            numberOfLines={4}
-          />
-        </View>
-        
-        {/* 등록/수정 버튼 */}
-        <TouchableOpacity 
-          style={[
-            styles.submitButton,
-            productsStatus === 'loading' && styles.disabledButton
-          ]}
-          onPress={handleSubmit}
-          disabled={productsStatus === 'loading'}
-        >
-          {productsStatus === 'loading' ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#ffffff" />
-              <Text style={[styles.submitButtonText, styles.loadingText]}>
-                {isEditMode ? '수정 중...' : '등록 중...'}
-              </Text>
+          <Text style={styles.title}>
+            {isEditMode ? '제품 수정' : '제품 등록'}
+          </Text>
+          
+          {/* 제품명 입력 */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelContainer}>
+              <Text style={styles.label}>제품명</Text>
+              <Text style={styles.requiredMark}>*</Text>
             </View>
-          ) : (
-            <Text style={styles.submitButtonText}>
-              {isEditMode ? '제품 수정' : '제품 등록'}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-      
-      {/* 웹용 날짜 선택 모달 */}
-      {Platform.OS === 'web' && <WebDatePickerModal />}
-      
-      {/* 성공 모달 */}
-      <SuccessModal />
-      
-      {/* 카테고리 추가 모달 */}
-      <CategoryModal />
-      
-      {/* 회원가입 유도 모달 (추가 모드만) */}
-      {!isEditMode && showSignupPrompt && (
-        <SignupPromptModal 
-          visible={showSignupPrompt}
-          onClose={() => setShowSignupPrompt(false)}
-          onSignup={() => navigation.navigate('Signup')}
+            <TextInput
+              ref={productNameInputRef}
+              style={[
+                styles.input,
+                touched.productName && errors.productName ? styles.inputError : null
+              ]}
+              value={productName}
+              onChangeText={(text) => handleFieldChange('productName', text)}
+              onBlur={() => handleFieldBlur('productName', productName)}
+              placeholder="제품명을 입력하세요"
+            />
+            {touched.productName && errors.productName ? (
+              <Text style={styles.errorText}>{errors.productName}</Text>
+            ) : null}
+          </View>
+          
+          {/* 브랜드 입력 */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>브랜드 (선택)</Text>
+            <TextInput
+              style={styles.input}
+              value={brand}
+              onChangeText={setBrand}
+              placeholder="브랜드명을 입력하세요"
+            />
+          </View>
+          
+          {/* 카테고리 선택 */}
+          <CategorySelector 
+            ref={categoryListRef}
+            categories={categories} 
+            selectedCategory={selectedCategory} 
+            onSelectCategory={setSelectedCategory} 
+            onAddCategory={handleOpenCategoryModal}
+            status={categoriesStatus}
+          />
+          
+          {/* 구매일 선택 */}
+          <View 
+            ref={purchaseDateSectionRef}
+            style={styles.inputGroup}
+          >
+            <View style={styles.labelContainer}>
+              <Text style={styles.label}>구매일</Text>
+              <Text style={styles.requiredMark}>*</Text>
+            </View>
+            <TouchableOpacity 
+              style={[
+                styles.dateInput,
+                touched.purchaseDate && errors.purchaseDate ? styles.inputError : null
+              ]}
+              onPress={() => {
+                if (Platform.OS === 'web') {
+                  handleWebDateSelect('purchase');
+                } else {
+                  setShowPurchaseDatePicker(true);
+                }
+                setTouched(prev => ({ ...prev, purchaseDate: true }));
+              }}
+            >
+              <Text style={styles.dateText}>
+                {formatDate(purchaseDate)}
+              </Text>
+              <Ionicons name="calendar-outline" size={20} color="#666" />
+            </TouchableOpacity>
+            {touched.purchaseDate && errors.purchaseDate ? (
+              <Text style={styles.errorText}>{errors.purchaseDate}</Text>
+            ) : null}
+            {Platform.OS !== 'web' && showPurchaseDatePicker && (
+              <DateTimePicker
+                value={purchaseDate || new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, date) => {
+                  handleDateChange(event, date, 'purchase');
+                  handleFieldChange('purchaseDate', date);
+                }}
+              />
+            )}
+          </View>
+          
+          {/* 유통기한 선택 */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>유통기한 (선택)</Text>
+            <TouchableOpacity 
+              style={styles.dateInput}
+              onPress={() => {
+                if (Platform.OS === 'web') {
+                  handleWebDateSelect('expiry');
+                } else {
+                  setShowExpiryDatePicker(true);
+                }
+              }}
+            >
+              <Text style={styles.dateText}>
+                {expiryDate ? formatDate(expiryDate) : '날짜 선택'}
+              </Text>
+              <Ionicons name="calendar-outline" size={20} color="#666" />
+            </TouchableOpacity>
+            {Platform.OS !== 'web' && showExpiryDatePicker && (
+              <DateTimePicker
+                value={expiryDate || new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, date) => handleDateChange(event, date, 'expiry')}
+              />
+            )}
+          </View>
+          
+          {/* 소진 예상일 선택 */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>소진 예상일 (선택)</Text>
+            <TouchableOpacity 
+              style={styles.dateInput}
+              onPress={() => {
+                if (Platform.OS === 'web') {
+                  handleWebDateSelect('estimated');
+                } else {
+                  setShowEstimatedEndDatePicker(true);
+                }
+              }}
+            >
+              <Text style={styles.dateText}>
+                {estimatedEndDate ? formatDate(estimatedEndDate) : '날짜 선택'}
+              </Text>
+              <Ionicons name="calendar-outline" size={20} color="#666" />
+            </TouchableOpacity>
+            {Platform.OS !== 'web' && showEstimatedEndDatePicker && (
+              <DateTimePicker
+                value={estimatedEndDate || new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, date) => handleDateChange(event, date, 'estimated')}
+              />
+            )}
+          </View>
+          
+          {/* 메모 입력 */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>메모 (선택)</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={memo}
+              onChangeText={setMemo}
+              placeholder="메모를 입력하세요"
+              multiline={true}
+              numberOfLines={4}
+            />
+          </View>
+          
+          {/* 등록/수정 버튼 */}
+          <TouchableOpacity 
+            style={[
+              styles.submitButton,
+              productsStatus === 'loading' && styles.disabledButton
+            ]}
+            onPress={handleSubmit}
+            disabled={productsStatus === 'loading'}
+          >
+            {productsStatus === 'loading' ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#ffffff" />
+                <Text style={[styles.submitButtonText, styles.loadingText]}>
+                  {isEditMode ? '수정 중...' : '등록 중...'}
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.submitButtonText}>
+                {isEditMode ? '제품 수정' : '제품 등록'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
+        
+        {/* 웹용 날짜 선택 모달 */}
+        {Platform.OS === 'web' && <WebDatePickerModal />}
+        
+        {/* 성공 모달 */}
+        <SuccessModal />
+        
+        {/* 카테고리 추가 모달 */}
+        <CategoryModal />
+        
+        {/* 회원가입 유도 모달 (추가 모드만) */}
+        {!isEditMode && showSignupPrompt && (
+          <SignupPromptModal 
+            visible={showSignupPrompt}
+            onClose={() => setShowSignupPrompt(false)}
+            onSignup={() => navigation.navigate('Signup')}
+          />
+        )}
+        
+        {/* 알림 모달 */}
+        <AlertModal
+          visible={alertModalVisible}
+          title={alertModalConfig.title}
+          message={alertModalConfig.message}
+          buttons={alertModalConfig.buttons}
+          onClose={() => setAlertModalVisible(false)}
+          icon={alertModalConfig.icon}
+          iconColor={alertModalConfig.iconColor}
         />
-      )}
+      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 };
@@ -884,6 +948,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 40 : 10, // SafeAreaView에 맞추기
+    paddingBottom: 10,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerPlaceholder: {
+    width: 40, // 뒤로가기 버튼과 제목 사이의 간격을 조정
   },
   scrollContainer: {
     padding: 16,

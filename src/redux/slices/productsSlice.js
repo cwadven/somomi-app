@@ -187,20 +187,23 @@ export const fetchConsumedProducts = createAsyncThunk(
 // 소진 철회 액션
 export const restoreConsumedProductAsync = createAsyncThunk(
   'products/restoreConsumedProduct',
-  async (productId, { rejectWithValue, getState }) => {
+  async ({ id, locationId = null }, { rejectWithValue, getState }) => {
     try {
-      const response = await restoreConsumedProductApi(productId);
+      console.log('소진 철회 액션 시작:', { id, locationId });
+      const response = await restoreConsumedProductApi(id, locationId);
       
-      // 소진된 제품이 복원된 후 전체 제품 목록과 소진된 제품 목록을 AsyncStorage에 저장
+      // 소진 철회 후 전체 제품 목록과 소진된 제품 목록을 AsyncStorage에 저장
       const { products, consumedProducts } = getState().products;
       const updatedProducts = [...products, response];
-      const updatedConsumedProducts = consumedProducts.filter(p => p.id !== productId);
+      const updatedConsumedProducts = consumedProducts.filter(p => p.id !== id);
       
       await saveProducts(updatedProducts);
       await saveConsumedProducts(updatedConsumedProducts);
       
+      console.log('소진 철회 성공:', response);
       return response;
     } catch (error) {
+      console.error('소진 철회 실패:', error);
       return rejectWithValue(error.message);
     }
   }

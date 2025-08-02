@@ -461,15 +461,24 @@ export const fetchPopularProductsApi = async () => {
 // 소진 철회 API 함수
 export const restoreConsumedProductApi = async (id, locationId = null) => {
   try {
+    console.log('소진 철회 API 호출:', { id, locationId });
+    
     // 저장된 최신 데이터 로드
     const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS) || [];
     const storedConsumedProducts = await loadData(STORAGE_KEYS.CONSUMED_PRODUCTS) || [];
     
+    console.log('소진 철회 - 현재 제품 목록:', storedProducts.length);
+    console.log('소진 철회 - 현재 소진된 제품 목록:', storedConsumedProducts.length);
+    console.log('소진 철회 - 소진된 제품 ID 목록:', storedConsumedProducts.map(p => p.id));
+    
     // 소진 처리된 제품 목록에서 제품 찾기
     const index = storedConsumedProducts.findIndex(p => p.id === id);
+    console.log('소진 철회 - 제품 인덱스:', index);
+    
     if (index !== -1) {
       // 제품 복사
       const product = { ...storedConsumedProducts[index] };
+      console.log('소진 철회 - 찾은 제품:', product);
       
       // 소진 처리 정보 제거
       delete product.consumedAt;
@@ -497,8 +506,10 @@ export const restoreConsumedProductApi = async (id, locationId = null) => {
       sampleProducts = updatedProducts;
       consumedProducts = updatedConsumedProducts;
       
+      console.log('소진 철회 성공:', product);
       return product;
     } else {
+      console.error('소진된 제품 목록에서 제품을 찾을 수 없음:', id);
       throw new Error('Product not found in consumed products');
     }
   } catch (error) {

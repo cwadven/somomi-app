@@ -12,7 +12,7 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchConsumedProductsAsync, restoreConsumedProductAsync } from '../redux/slices/productsSlice';
+import { fetchConsumedProducts, restoreConsumedProductAsync } from '../redux/slices/productsSlice';
 import LocationSelectionModal from '../components/LocationSelectionModal';
 import AlertModal from '../components/AlertModal';
 
@@ -46,7 +46,7 @@ const ConsumedProductDetailScreen = () => {
   useEffect(() => {
     // 소진 처리된 제품 목록이 없으면 로드
     if (consumedProducts.length === 0) {
-      dispatch(fetchConsumedProductsAsync());
+      dispatch(fetchConsumedProducts());
     }
     
     // 현재 제품 정보를 로컬 상태에 저장 (최초 1회)
@@ -171,7 +171,7 @@ const ConsumedProductDetailScreen = () => {
         <Text style={styles.errorText}>오류: {error}</Text>
         <TouchableOpacity 
           style={styles.retryButton}
-          onPress={() => dispatch(fetchConsumedProductsAsync())}
+          onPress={() => dispatch(fetchConsumedProducts())}
         >
           <Text style={styles.retryButtonText}>다시 시도</Text>
         </TouchableOpacity>
