@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
   debugButton: {
     position: 'absolute',
     bottom: 80, // 기존 디버그 버튼보다 위에 위치하도록 조정
-    right: 20,
+    left: 20,
     width: 50,
     height: 50,
     borderRadius: 25,
