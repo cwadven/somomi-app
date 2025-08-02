@@ -99,40 +99,39 @@ const LocationsScreen = () => {
       usedTemplates: userLocationTemplateInstances.filter(template => template.used)
     });
     
-    // 비회원이고 사용 가능한 템플릿이 없는 경우
-    if (availableTemplates.length === 0 && isAnonymous) {
-      // 비회원에게 회원가입 유도 모달 표시
-      setShowSignupPrompt(true);
-      return;
-    }
-    
-    // 로그인 사용자이고 사용 가능한 템플릿이 없는 경우
-    if (availableTemplates.length === 0 && !isAnonymous) {
-      setAlertModalConfig({
-        title: '템플릿 부족',
-        message: '사용 가능한 영역 템플릿이 없습니다. 상점에서 템플릿을 구매하거나, 새로운 기본 템플릿을 추가할 수 있습니다.',
-        icon: 'information-circle',
-        iconColor: '#2196F3',
-        buttons: [
-          { 
-            text: '상점으로 이동', 
-            onPress: () => navigation.navigate('Store') 
-          },
-          { 
-            text: '기본 템플릿 추가', 
-            onPress: () => {
-              // 새로운 기본 템플릿 추가
-              dispatch(addBasicTemplateInstance());
-              // 영역 생성 화면으로 이동
-              navigation.navigate('AddLocation');
-            } 
-          },
-          { 
-            text: '취소'
-          }
-        ]
-      });
-      setAlertModalVisible(true);
+    // 사용 가능한 템플릿이 없는 경우
+    if (availableTemplates.length === 0) {
+      // 비회원인 경우 회원가입 유도 모달 표시
+      if (isAnonymous) {
+        setShowSignupPrompt(true);
+      } else {
+        // 로그인 사용자인 경우 템플릿 부족 알림
+        setAlertModalConfig({
+          title: '템플릿 부족',
+          message: '사용 가능한 영역 템플릿이 없습니다. 상점에서 템플릿을 구매하거나, 새로운 기본 템플릿을 추가할 수 있습니다.',
+          icon: 'information-circle',
+          iconColor: '#2196F3',
+          buttons: [
+            { 
+              text: '상점으로 이동', 
+              onPress: () => navigation.navigate('Store') 
+            },
+            { 
+              text: '기본 템플릿 추가', 
+              onPress: () => {
+                // 새로운 기본 템플릿 추가
+                dispatch(addBasicTemplateInstance());
+                // 영역 생성 화면으로 이동
+                navigation.navigate('AddLocation');
+              } 
+            },
+            { 
+              text: '취소'
+            }
+          ]
+        });
+        setAlertModalVisible(true);
+      }
       return;
     }
     
@@ -142,8 +141,6 @@ const LocationsScreen = () => {
   
   // 회원가입 유도 메시지 가져오기
   const getSignupPromptMessage = () => {
-    const { locations } = useSelector(state => state.locations);
-    
     // 템플릿이 부족한 경우 (사용 가능한 템플릿이 없는 경우)
     const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
     if (availableTemplates.length === 0) {
@@ -218,7 +215,7 @@ const LocationsScreen = () => {
     <View style={styles.container}>
       {/* 슬롯 상태 표시 바 - 템플릿 인스턴스 기준 */}
       <SlotStatusBar 
-        used={locations.length} 
+        used={usedTemplates.length} 
         total={totalTemplates} 
         type="location" 
       />

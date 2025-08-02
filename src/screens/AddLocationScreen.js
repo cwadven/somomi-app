@@ -33,12 +33,37 @@ const AddLocationScreen = () => {
   // 사용 가능한 템플릿 인스턴스만 필터링
   const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
   
-  // 사용자의 템플릿 인스턴스 목록 콘솔 출력
+  // 사용자의 템플릿 인스턴스 목록 콘솔 출력 및 템플릿 부족 확인
   useEffect(() => {
-    console.log('사용자의 현재 템플릿 인스턴스 목록:', userLocationTemplateInstances);
-    console.log('사용 가능한 템플릿 인스턴스 목록:', availableTemplates);
-    console.log('사용 중인 템플릿 인스턴스 목록:', userLocationTemplateInstances.filter(template => template.used));
-  }, [userLocationTemplateInstances, availableTemplates]);
+    // 컴포넌트 마운트 시 한 번만 실행되는 로직
+    const checkTemplates = () => {
+      console.log('사용자의 현재 템플릿 인스턴스 목록:', userLocationTemplateInstances);
+      console.log('사용 가능한 템플릿 인스턴스 목록:', availableTemplates);
+      console.log('사용 중인 템플릿 인스턴스 목록:', userLocationTemplateInstances.filter(template => template.used));
+      
+      // 수정 모드가 아니고 사용 가능한 템플릿이 없는 경우 뒤로 가기
+      if (!isEditMode && availableTemplates.length === 0) {
+        setAlertModalConfig({
+          title: '템플릿 부족',
+          message: '사용 가능한 영역 템플릿이 없습니다. 영역 목록으로 돌아갑니다.',
+          buttons: [
+            { 
+              text: '확인',
+              onPress: () => navigation.goBack()
+            }
+          ],
+          icon: 'alert-circle',
+          iconColor: '#F44336'
+        });
+        setAlertModalVisible(true);
+      }
+    };
+    
+    // 초기 실행
+    checkTemplates();
+    
+    // 이 useEffect는 컴포넌트 마운트 시 한 번만 실행
+  }, []);
   
   // 뒤로 가기 핸들러
   const handleGoBack = () => {
