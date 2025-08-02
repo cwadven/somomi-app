@@ -409,6 +409,21 @@ export const authSlice = createSlice({
       saveUserLocationTemplates(state.userLocationTemplateInstances)
         .then(() => console.log('템플릿 인스턴스 추가 저장 성공'))
         .catch(err => console.error('템플릿 인스턴스 추가 저장 실패:', err));
+    },
+    
+    // 기본 템플릿 인스턴스 추가 (비회원용)
+    addBasicTemplateInstance: (state) => {
+      console.log('기본 템플릿 인스턴스 추가');
+      const newTemplate = createBasicLocationTemplate();
+      console.log('생성된 기본 템플릿 인스턴스:', newTemplate);
+      state.userLocationTemplateInstances.push(newTemplate);
+      
+      // AsyncStorage에 저장
+      saveUserLocationTemplates(state.userLocationTemplateInstances)
+        .then(() => console.log('기본 템플릿 인스턴스 추가 저장 성공'))
+        .catch(err => console.error('기본 템플릿 인스턴스 추가 저장 실패:', err));
+      
+      return newTemplate;
     }
   },
   extraReducers: (builder) => {
@@ -633,7 +648,8 @@ export const {
   usePoints,
   markTemplateInstanceAsUsed,
   releaseTemplateInstance,
-  addTemplateInstance
+  addTemplateInstance,
+  addBasicTemplateInstance
 } = authSlice.actions;
 
 export default authSlice.reducer; 

@@ -15,10 +15,12 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useIsFocused, useRoute } from '@react-navigation/native';
 import { fetchLocations } from '../redux/slices/locationsSlice';
+import { addBasicTemplateInstance } from '../redux/slices/authSlice';
 import SignupPromptModal from '../components/SignupPromptModal';
 import { checkAnonymousLimits } from '../utils/authUtils';
 import SlotPlaceholder from '../components/SlotPlaceholder';
 import SlotStatusBar from '../components/SlotStatusBar';
+import AlertModal from '../components/AlertModal';
 
 const LocationsScreen = () => {
   const dispatch = useDispatch();
@@ -30,6 +32,14 @@ const LocationsScreen = () => {
   const { isAnonymous, slots, userLocationTemplateInstances } = useSelector(state => state.auth);
   
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertModalConfig, setAlertModalConfig] = useState({
+    title: '',
+    message: '',
+    buttons: [],
+    icon: '',
+    iconColor: ''
+  });
 
   // 화면이 포커스될 때마다 영역 데이터 로드
   useEffect(() => {
@@ -89,23 +99,59 @@ const LocationsScreen = () => {
       usedTemplates: userLocationTemplateInstances.filter(template => template.used)
     });
     
-    // 사용 가능한 템플릿이 없으면 안내 (비회원만)
+    // 비회원이고 사용 가능한 템플릿이 없는 경우
     if (availableTemplates.length === 0 && isAnonymous) {
+      // 비회원에게 회원가입 유도 모달 표시
       setShowSignupPrompt(true);
       return;
     }
     
-    // 템플릿 유무와 관계없이 영역 추가 화면으로 이동
+    // 로그인 사용자이고 사용 가능한 템플릿이 없는 경우
+    if (availableTemplates.length === 0 && !isAnonymous) {
+      setAlertModalConfig({
+        title: '템플릿 부족',
+        message: '사용 가능한 영역 템플릿이 없습니다. 상점에서 템플릿을 구매하거나, 새로운 기본 템플릿을 추가할 수 있습니다.',
+        icon: 'information-circle',
+        iconColor: '#2196F3',
+        buttons: [
+          { 
+            text: '상점으로 이동', 
+            onPress: () => navigation.navigate('Store') 
+          },
+          { 
+            text: '기본 템플릿 추가', 
+            onPress: () => {
+              // 새로운 기본 템플릿 추가
+              dispatch(addBasicTemplateInstance());
+              // 영역 생성 화면으로 이동
+              navigation.navigate('AddLocation');
+            } 
+          },
+          { 
+            text: '취소'
+          }
+        ]
+      });
+      setAlertModalVisible(true);
+      return;
+    }
+    
+    // 템플릿이 있는 경우 영역 추가 화면으로 이동
     navigation.navigate('AddLocation');
   };
   
-  // SignupPromptModal 메시지 동적 생성
+  // 회원가입 유도 메시지 가져오기
   const getSignupPromptMessage = () => {
-    const totalTemplates = userLocationTemplateInstances.length;
-    const availableTemplates = userLocationTemplateInstances.filter(template => !template.used).length;
-    const usedTemplates = userLocationTemplateInstances.filter(template => template.used).length;
+    const { locations } = useSelector(state => state.locations);
     
-    return `비회원은 최대 ${totalTemplates}개의 영역 템플릿만 사용할 수 있습니다. 회원가입하여 더 많은 영역을 생성하세요!`;
+    // 템플릿이 부족한 경우 (사용 가능한 템플릿이 없는 경우)
+    const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
+    if (availableTemplates.length === 0) {
+      return '비회원은 최대 1개의 영역 템플릿만 사용할 수 있습니다. 회원가입하여 더 많은 영역을 생성하세요!';
+    }
+    
+    // 기본 메시지
+    return '비회원은 일부 기능이 제한됩니다.\n회원가입 후 모든 기능을 이용해보세요.';
   };
 
   const handleLocationPress = (location) => {
@@ -256,6 +302,17 @@ const LocationsScreen = () => {
         visible={showSignupPrompt}
         onClose={() => setShowSignupPrompt(false)}
         message={getSignupPromptMessage()}
+        currentCount={userLocationTemplateInstances.filter(template => template.used).length}
+        maxCount={1}
+      />
+      <AlertModal
+        visible={alertModalVisible}
+        title={alertModalConfig.title}
+        message={alertModalConfig.message}
+        buttons={alertModalConfig.buttons}
+        onClose={() => setAlertModalVisible(false)}
+        icon={alertModalConfig.icon}
+        iconColor={alertModalConfig.iconColor}
       />
     </View>
   );
