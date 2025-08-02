@@ -6,9 +6,15 @@ import {
   TouchableOpacity,
   FlatList,
   Modal,
-  SafeAreaView
+  SafeAreaView,
+  Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+// 화면 너비 가져오기
+const { width } = Dimensions.get('window');
+// 화면 크기에 따라 열 수 조정 (작은 화면에서는 3, 큰 화면에서는 4)
+const numColumns = width < 360 ? 3 : 4;
 
 /**
  * 아이콘 선택 모달 컴포넌트
@@ -96,7 +102,7 @@ const IconSelector = ({
           <FlatList
             data={defaultIcons}
             keyExtractor={(item) => `icon-${item}`}
-            numColumns={5}
+            numColumns={numColumns}
             showsVerticalScrollIndicator={true}
             contentContainerStyle={styles.iconsList}
             renderItem={({ item }) => (
@@ -132,8 +138,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    width: '90%',
-    maxHeight: '80%',
+    width: '95%',
+    maxHeight: '90%',
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
@@ -166,9 +172,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconItem: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',

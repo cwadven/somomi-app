@@ -103,8 +103,6 @@ const AddLocationScreen = () => {
     if (selectedTemplateInstance && !isEditMode) {
       setLocationData({
         ...locationData,
-        title: selectedTemplateInstance.name,
-        description: selectedTemplateInstance.description,
         icon: selectedTemplateInstance.icon,
       });
     }
@@ -355,7 +353,7 @@ const AddLocationScreen = () => {
               style={styles.input}
               value={locationData.title}
               onChangeText={(text) => handleInputChange('title', text)}
-              placeholder="영역 이름을 입력하세요"
+              placeholder={selectedTemplateInstance ? selectedTemplateInstance.name : "영역 이름을 입력하세요"}
             />
           </View>
           
@@ -365,7 +363,7 @@ const AddLocationScreen = () => {
               style={[styles.input, styles.textArea]}
               value={locationData.description}
               onChangeText={(text) => handleInputChange('description', text)}
-              placeholder="영역에 대한 설명을 입력하세요"
+              placeholder={selectedTemplateInstance ? selectedTemplateInstance.description : "영역에 대한 설명을 입력하세요"}
               multiline
             />
           </View>
@@ -505,6 +503,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+    minHeight: 56,
   },
   selectedIconContainer: {
     width: 40,
@@ -513,12 +512,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#e8f5e9',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   iconSelectorText: {
     flex: 1,
     fontSize: 16,
     color: '#333',
+    marginRight: 8,
   },
   createButton: {
     backgroundColor: '#4CAF50',
