@@ -29,8 +29,10 @@ const LocationsScreen = () => {
   const route = useRoute();
   
   const { locations, status, error } = useSelector(state => state.locations);
-  const { isAnonymous, slots, userLocationTemplateInstances } = useSelector(state => state.auth);
-  
+  const { isAnonymous, isLoggedIn, userLocationTemplateInstances } = useSelector(state => state.auth);
+
+  // 자동 연동 모달 제거 (요청사항)
+ 
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [alertModalConfig, setAlertModalConfig] = useState({
@@ -40,6 +42,10 @@ const LocationsScreen = () => {
     icon: '',
     iconColor: ''
   });
+  // 템플릿 선택 모달 상태
+  const [templatePickerVisible, setTemplatePickerVisible] = useState(false);
+  const [templatePickerLocation, setTemplatePickerLocation] = useState(null);
+  const [freeTemplates, setFreeTemplates] = useState([]);
 
   // 화면이 포커스될 때마다 영역 데이터 로드
   useEffect(() => {
@@ -54,7 +60,12 @@ const LocationsScreen = () => {
         });
     }
   }, [dispatch, isFocused]);
-  
+
+  // 로그인 후 자동 연동 모달은 표시하지 않음 (요청사항)
+  useEffect(() => {
+    // no-op
+  }, [isLoggedIn, userLocationTemplateInstances, locations]);
+
   // route.params.refresh가 변경될 때마다 영역 목록 새로고침
   useEffect(() => {
     if (route.params?.refresh) {
@@ -152,6 +163,68 @@ const LocationsScreen = () => {
   };
 
   const handleLocationPress = (location) => {
+    // 로그인 상태에서 템플릿에 연동되지 않은 영역은 접근 차단
+    const linked = userLocationTemplateInstances.some(t => t.usedInLocationId === location.id);
+    const hasFreeTemplate = userLocationTemplateInstances.some(t => !t.used);
+    if (isLoggedIn && !linked) {
+      if (hasFreeTemplate) {
+        // 템플릿 선택 목록 구성
+        const free = userLocationTemplateInstances.filter(t => !t.used);
+        setFreeTemplates(free);
+        setTemplatePickerLocation(location);
+        setAlertModalConfig({
+          title: '템플릿 선택',
+          message: '연동할 템플릿을 선택하세요.',
+          icon: 'link-outline',
+          iconColor: '#4CAF50',
+          buttons: [
+            { text: '취소', style: 'cancel', onPress: () => setTemplatePickerVisible(false) }
+          ],
+          content: (
+            <View>
+              {free.map((tpl) => (
+                <TouchableOpacity
+                  key={tpl.id}
+                  style={styles.templatePickerItem}
+                  onPress={() => {
+                    dispatch({ type: 'auth/markTemplateInstanceAsUsed', payload: { templateId: tpl.id, locationId: location.id } });
+                    setTemplatePickerVisible(false);
+                    navigation.navigate('LocationDetail', { locationId: location.id });
+                  }}
+                >
+                  <View style={styles.templatePickerLeft}>
+                    <View style={styles.templatePickerIconBox}>
+                      <Ionicons name={tpl.icon || 'cube-outline'} size={18} color="#4CAF50" />
+                    </View>
+                    <View>
+                      <Text style={styles.templatePickerTitle}>{tpl.name || '템플릿'}</Text>
+                      <Text style={styles.templatePickerDesc}>
+                        기본 슬롯: {tpl.feature?.baseSlots === -1 ? '무제한' : tpl.feature?.baseSlots}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#999" />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )
+        });
+        setTemplatePickerVisible(true);
+      } else {
+        setAlertModalConfig({
+          title: '탬플릿 부족',
+          message: '이 영역은 템플릿이 없어 접근할 수 없습니다. 템플릿을 구매하고 연동해주세요.',
+          icon: 'alert-circle',
+          iconColor: '#F44336',
+          buttons: [
+            { text: '닫기' },
+            { text: '상점으로 이동', onPress: () => navigation.navigate('Store') }
+          ]
+        });
+        setAlertModalVisible(true);
+      }
+      return;
+    }
     navigation.navigate('LocationDetail', { locationId: location.id });
   };
 
@@ -219,6 +292,7 @@ const LocationsScreen = () => {
         total={totalTemplates} 
         type="location" 
       />
+      {/* 자동 연동 모달 제거됨 */}
       
       {/* 모든 제품 버튼 */}
       <TouchableOpacity 
@@ -269,6 +343,11 @@ const LocationsScreen = () => {
                         {item.description}
                       </Text>
                     ) : null}
+                    {isLoggedIn && !userLocationTemplateInstances.some(t => t.usedInLocationId === item.id) && (
+                      <Text style={{ color: '#F44336', marginTop: 4, fontSize: 12 }}>
+                        템플릿 미연동(비활성화)
+                      </Text>
+                    )}
                   </View>
                 </View>
                 <Ionicons name="chevron-forward" size={24} color="#999" />
@@ -303,11 +382,12 @@ const LocationsScreen = () => {
         maxCount={1}
       />
       <AlertModal
-        visible={alertModalVisible}
+        visible={alertModalVisible || templatePickerVisible}
         title={alertModalConfig.title}
         message={alertModalConfig.message}
+        content={alertModalConfig.content}
         buttons={alertModalConfig.buttons}
-        onClose={() => setAlertModalVisible(false)}
+        onClose={() => { setAlertModalVisible(false); setTemplatePickerVisible(false); }}
         icon={alertModalConfig.icon}
         iconColor={alertModalConfig.iconColor}
       />
@@ -528,6 +608,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+  },
+  templatePickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+  },
+  templatePickerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  templatePickerIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e8f5e9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  templatePickerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  templatePickerDesc: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
 });
 

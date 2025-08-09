@@ -63,6 +63,7 @@ export const createLocation = createAsyncThunk(
         ...locationData,
         id: `loc_${Date.now()}`,
         // templateInstanceId, productId, feature는 locationData에서 전달받음
+        disabled: false,
       };
       
       console.log('생성된 영역:', newLocation);
