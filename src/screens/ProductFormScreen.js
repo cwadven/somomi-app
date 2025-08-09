@@ -51,9 +51,9 @@ const ProductFormScreen = () => {
   // Redux 상태
   const { categories, status: categoriesStatus } = useSelector(state => state.categories);
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
-  const { allProducts, currentProduct, status: productsStatus } = useSelector(state => state.products);
-  const { isAuthenticated } = useSelector(state => state.auth);
-  
+  const { products, currentProduct, status: productsStatus } = useSelector(state => state.products);
+  const { isLoggedIn, isAnonymous, slots } = useSelector(state => state.auth);
+
   // 폼 상태
   const [productName, setProductName] = useState('');
   const [brand, setBrand] = useState('');
@@ -166,30 +166,25 @@ const ProductFormScreen = () => {
   useEffect(() => {
     if (!isEditMode && locationId) {
       if (locations.length > 0) {
-      const location = locations.find(loc => loc.id === locationId);
-      if (location) {
-        setSelectedLocation(location);
-        
-        // 해당 영역의 제품 목록 필터링
-        const productsInLocation = allProducts && allProducts.filter(p => p.locationId === locationId) || [];
-        setCurrentLocationProducts(productsInLocation);
-        
-        // 비회원이고 제품이 5개 이상인 경우 회원가입 유도 모달 표시
-        if (!isAuthenticated && productsInLocation.length >= 5) {
-          setShowSignupPrompt(true);
-        }
+        const location = locations.find(loc => loc.id === locationId);
+        if (location) {
+          setSelectedLocation(location);
+          
+          // 해당 영역의 제품 목록 필터링 (소진 전 제품만 고려)
+          const productsInLocation = (products || []).filter(p => p.locationId === locationId && !p.isConsumed);
+          setCurrentLocationProducts(productsInLocation);
         } else {
           // 영역을 찾지 못한 경우 다시 로드 시도
           console.log('영역을 찾지 못했습니다. 다시 로드합니다:', locationId);
           dispatch(fetchLocations());
-      }
+        }
       } else {
         // 영역 데이터가 없는 경우 다시 로드 시도
         console.log('영역 데이터가 없습니다. 다시 로드합니다.');
         dispatch(fetchLocations());
+      }
     }
-    }
-  }, [isEditMode, locationId, locations, allProducts, isAuthenticated, dispatch]);
+  }, [isEditMode, locationId, locations, products, dispatch]);
 
   // 카테고리 추가 모달 열기
   const handleOpenCategoryModal = () => {
@@ -422,6 +417,7 @@ const ProductFormScreen = () => {
       } else if (newErrors.purchaseDate) {
         scrollToField('purchaseDate');
       }
+      return false;
     }
     
     // 영역이 존재하는지 확인 (추가 모드에서는 이미 선택된 영역이 있어야 함)
@@ -434,13 +430,18 @@ const ProductFormScreen = () => {
       return false;
     }
     
-    // 비회원인 경우 제품 개수 제한 확인 (추가 모드만)
-    if (!isEditMode && !isAuthenticated && currentLocationProducts.length >= 5) {
-      setShowSignupPrompt(true);
+    // 영역별 슬롯 한도 확인 (baseSlots + additionalSlots, -1은 무제한)
+    const baseSlots = selectedLocation?.feature?.baseSlots ?? slots?.productSlots?.baseSlots ?? 0;
+    const additionalSlots = slots?.productSlots?.additionalSlots ?? 0;
+    const totalSlots = baseSlots === -1 ? -1 : baseSlots + additionalSlots;
+    const usedCount = currentLocationProducts.length;
+
+    if (totalSlots !== -1 && usedCount >= totalSlots) {
+      showErrorAlert('슬롯 한도 초과', '해당 영역의 제품 슬롯이 가득 찼습니다.');
       return false;
     }
     
-    return !hasErrors;
+    return true;
   };
 
   // 제품 등록/수정 처리
@@ -461,11 +462,7 @@ const ProductFormScreen = () => {
       return;
     }
 
-    // 로그인 필요한 경우 회원가입 유도
-    if (!isAuthenticated && !isEditMode) {
-      setShowSignupPrompt(true);
-      return;
-    }
+    // 로그인/비로그인 여부에 따른 추가 제한 없이 슬롯 로직만 적용 (비회원도 슬롯 내에서 등록 가능)
 
     // 영역이 선택되지 않은 경우 확인
     if (!selectedLocation && !locationId) {
