@@ -287,7 +287,8 @@ export const authSlice = createSlice({
         
         // 로컬 스토리지에 슬롯 정보 저장
         try {
-          saveUserSlots(state.slots);
+          const plainSlots = JSON.parse(JSON.stringify(state.slots));
+          saveUserSlots(plainSlots);
         } catch (error) {
           console.error('슬롯 정보 저장 중 오류:', error);
         }
@@ -301,7 +302,8 @@ export const authSlice = createSlice({
       
       // 로컬 스토리지에 슬롯 정보 저장
       try {
-        saveUserSlots(state.slots);
+        const plainSlots = JSON.parse(JSON.stringify(state.slots));
+        saveUserSlots(plainSlots);
       } catch (error) {
         console.error('슬롯 정보 저장 중 오류:', error);
       }
@@ -326,7 +328,8 @@ export const authSlice = createSlice({
       
       // 로컬 스토리지에 슬롯 정보 저장
       try {
-        saveUserSlots(state.slots);
+        const plainSlots = JSON.parse(JSON.stringify(state.slots));
+        saveUserSlots(plainSlots);
       } catch (error) {
         console.error('슬롯 정보 저장 중 오류:', error);
       }
@@ -393,7 +396,8 @@ export const authSlice = createSlice({
         templateInstance.usedInLocationId = locationId;
         
         // AsyncStorage에 저장
-        saveUserLocationTemplates(state.userLocationTemplateInstances)
+        const plainTemplates = JSON.parse(JSON.stringify(state.userLocationTemplateInstances));
+        saveUserLocationTemplates(plainTemplates)
           .then(() => console.log('템플릿 인스턴스 사용 표시 저장 성공'))
           .catch(err => console.error('템플릿 인스턴스 사용 표시 저장 실패:', err));
       } else {
@@ -414,7 +418,8 @@ export const authSlice = createSlice({
         templateInstance.usedInLocationId = null;
         
         // AsyncStorage에 저장
-        saveUserLocationTemplates(state.userLocationTemplateInstances)
+        const plainTemplates = JSON.parse(JSON.stringify(state.userLocationTemplateInstances));
+        saveUserLocationTemplates(plainTemplates)
           .then(() => console.log('템플릿 인스턴스 해제 저장 성공'))
           .catch(err => console.error('템플릿 인스턴스 해제 저장 실패:', err));
       } else {
@@ -433,7 +438,8 @@ export const authSlice = createSlice({
       state.userLocationTemplateInstances.push(newTemplate);
       
       // AsyncStorage에 저장
-      saveUserLocationTemplates(state.userLocationTemplateInstances)
+      const plainTemplates = JSON.parse(JSON.stringify(state.userLocationTemplateInstances));
+      saveUserLocationTemplates(plainTemplates)
         .then(() => console.log('템플릿 인스턴스 추가 저장 성공'))
         .catch(err => console.error('템플릿 인스턴스 추가 저장 실패:', err));
     },
@@ -446,12 +452,11 @@ export const authSlice = createSlice({
       state.userLocationTemplateInstances.push(newTemplate);
       
       // AsyncStorage에 저장
-      saveUserLocationTemplates(state.userLocationTemplateInstances)
-        .then(() => console.log('기본 템플릿 인스턴스 추가 저장 성공'))
-        .catch(err => console.error('기본 템플릿 인스턴스 추가 저장 실패:', err));
-      
-      return newTemplate;
-    }
+      const plainTemplates = JSON.parse(JSON.stringify(state.userLocationTemplateInstances));
+            saveUserLocationTemplates(plainTemplates)
+         .then(() => console.log('기본 템플릿 인스턴스 추가 저장 성공'))
+         .catch(err => console.error('기본 템플릿 인스턴스 추가 저장 실패:', err));
+     }
   },
   extraReducers: (builder) => {
     builder
@@ -612,20 +617,27 @@ export const authSlice = createSlice({
           return;
         }
         
+        // 공통 플래그/토큰 복원
         state.token = action.payload.token;
         state.isAnonymous = action.payload.isAnonymous;
         
-        // 저장된 템플릿 인스턴스가 있으면 사용
+        // 로그인 사용자라면 로그인 상태/사용자 정보 복원 (템플릿 존재 여부와 무관하게 선행)
+        if (!action.payload.isAnonymous) {
+          state.isLoggedIn = true;
+          if (action.payload.user) {
+            state.user = action.payload.user;
+          }
+        } else {
+          state.isLoggedIn = false;
+          state.user = null;
+        }
+        
+        // 템플릿 복원 우선
         if (action.payload.templates) {
           console.log('저장된 템플릿 인스턴스 사용:', action.payload.templates);
           state.userLocationTemplateInstances = action.payload.templates;
-          return;
-        }
-        
-        if (!action.payload.isAnonymous) {
-          state.isLoggedIn = true;
-          state.user = action.payload.user;
-          // 로그인 사용자는 기본 템플릿 3개 제공
+        } else if (!action.payload.isAnonymous) {
+          // 로그인 사용자이며 저장된 템플릿이 없을 때 기본 3개 제공
           console.log('토큰 검증 (로그인 사용자): 템플릿 인스턴스 초기화');
           const templates = [
             createBasicLocationTemplate(),
@@ -640,22 +652,15 @@ export const authSlice = createSlice({
             .then(() => console.log('토큰 검증 후 템플릿 인스턴스 (로그인) 저장 성공'))
             .catch(err => console.error('토큰 검증 후 템플릿 인스턴스 (로그인) 저장 실패:', err));
         } else {
-          // 익명 사용자는 기본 템플릿 1개 제공
+          // 익명 사용자 처리
           console.log('토큰 검증 (익명 사용자): 템플릿 인스턴스 확인');
-          
-          // 이미 사용 중인 템플릿이 있는지 확인
           const usedTemplates = state.userLocationTemplateInstances.filter(t => t.used);
-          
           if (usedTemplates.length > 0) {
-            // 이미 사용 중인 템플릿이 있으면 템플릿 상태 유지
             console.log('익명 사용자가 이미 템플릿을 사용 중입니다. 템플릿 상태 유지:', state.userLocationTemplateInstances);
-          } else {
-            // 사용 중인 템플릿이 없으면 기본 템플릿 1개 제공
+          } else if (!action.payload.templates) {
             const template = createBasicLocationTemplate();
             state.userLocationTemplateInstances = [template];
             console.log('토큰 검증 후 템플릿 인스턴스 (익명):', [template]);
-            
-            // AsyncStorage에 저장
             saveUserLocationTemplates([template])
               .then(() => console.log('토큰 검증 후 템플릿 인스턴스 (익명) 저장 성공'))
               .catch(err => console.error('토큰 검증 후 템플릿 인스턴스 (익명) 저장 실패:', err));

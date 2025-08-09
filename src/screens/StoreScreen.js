@@ -12,7 +12,7 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints } from '../redux/slices/authSlice';
+import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance } from '../redux/slices/authSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
@@ -247,6 +247,10 @@ const StoreScreen = () => {
               additionalSlots: slots.locationSlots.additionalSlots + selectedProduct.amount
             }
           }));
+          // 영역 템플릿도 함께 추가하여 즉시 사용 가능하도록 함
+          for (let i = 0; i < selectedProduct.amount; i++) {
+            dispatch(addBasicTemplateInstance());
+          }
           
           // 업데이트된 슬롯 정보를 포함한 성공 메시지
           const totalLocationSlots = slots.locationSlots.baseSlots + slots.locationSlots.additionalSlots + selectedProduct.amount;
