@@ -162,20 +162,23 @@ export const createExpiryNotification = (product, location, daysBeforeTarget, no
   const expiryDate = new Date(product.expiryDate);
   const today = new Date();
   
-  // 남은 일수 계산
-  const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+  // 남은 일수 계산 (트리거용 - 기존 로직 유지)
+  const rawDaysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
   
   // 알림 조건 확인
-  if (daysLeft <= daysBeforeTarget && daysLeft >= 0) {
+  if (rawDaysLeft <= daysBeforeTarget && rawDaysLeft >= 0) {
     // 만료 시간은 당일 23:59:59로 설정
     const expireAt = new Date(expiryDate);
     expireAt.setHours(23, 59, 59, 999);
     
+    // 표시용 남은 일수 보정: 당일 만료인 경우 1일로 표시
+    const displayDaysLeft = rawDaysLeft === 0 ? 1 : rawDaysLeft;
+
     return {
       location_name: location ? location.title : null,
       product_name: product.name,
       notification_type: '유통기한',
-      message: `${product.name}의 유통기한이 ${daysLeft}일 남았습니다.`,
+      message: `${product.name}의 유통기한이 ${displayDaysLeft}일 남았습니다.`,
       expire_at: expireAt.toISOString(),
       location_id: location ? location.id : null,
       product_id: product.id,
@@ -198,20 +201,23 @@ export const createEstimatedNotification = (product, location, daysBeforeTarget,
   const estimatedDate = new Date(product.estimatedEndDate);
   const today = new Date();
   
-  // 남은 일수 계산
-  const daysLeft = Math.ceil((estimatedDate - today) / (1000 * 60 * 60 * 24));
+  // 남은 일수 계산 (트리거용 - 기존 로직 유지)
+  const rawDaysLeft = Math.ceil((estimatedDate - today) / (1000 * 60 * 60 * 24));
   
   // 알림 조건 확인
-  if (daysLeft <= daysBeforeTarget && daysLeft >= 0) {
+  if (rawDaysLeft <= daysBeforeTarget && rawDaysLeft >= 0) {
     // 만료 시간은 당일 23:59:59로 설정
     const expireAt = new Date(estimatedDate);
     expireAt.setHours(23, 59, 59, 999);
     
+    // 표시용 남은 일수 보정: 당일인 경우 1일로 표시
+    const displayDaysLeft = rawDaysLeft === 0 ? 1 : rawDaysLeft;
+
     return {
       location_name: location ? location.title : null,
       product_name: product.name,
       notification_type: '소진 예상',
-      message: `${product.name}의 소진예상일이 ${daysLeft}일 남았습니다.`,
+      message: `${product.name}의 소진예상일이 ${displayDaysLeft}일 남았습니다.`,
       expire_at: expireAt.toISOString(),
       location_id: location ? location.id : null,
       product_id: product.id,
