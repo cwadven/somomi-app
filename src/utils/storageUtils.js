@@ -10,6 +10,8 @@ export const STORAGE_KEYS = {
   PROCESSED_NOTIFICATIONS: 'somomi_processed_notifications',
   USER_SLOTS: 'somomi_user_slots', // 사용자 슬롯 정보
   USER_LOCATION_TEMPLATES: 'somomi_user_location_templates', // 사용자 영역 템플릿 인스턴스
+  JWT_TOKEN: 'somomi_jwt_token',
+  DEVICE_ID: 'somomi_device_id',
 };
 
 // 데이터 저장 함수
@@ -179,4 +181,23 @@ export const loadUserLocationTemplates = async () => {
     console.error('사용자 영역 템플릿 인스턴스 로드 중 오류:', error);
     return null;
   }
+};
+
+// JWT 토큰 영구 저장/로드/삭제
+export const saveJwtToken = async (token) => {
+  return saveData(STORAGE_KEYS.JWT_TOKEN, token);
+};
+export const loadJwtToken = async () => {
+  return loadData(STORAGE_KEYS.JWT_TOKEN);
+};
+export const removeJwtToken = async () => {
+  return removeData(STORAGE_KEYS.JWT_TOKEN);
+};
+
+// 디바이스 ID 영구 저장/로드
+export const saveDeviceId = async (deviceId) => {
+  return saveData(STORAGE_KEYS.DEVICE_ID, deviceId);
+};
+export const loadDeviceId = async () => {
+  return loadData(STORAGE_KEYS.DEVICE_ID);
 }; 

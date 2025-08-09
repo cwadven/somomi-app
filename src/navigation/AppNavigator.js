@@ -235,7 +235,8 @@ const AppNavigator = ({ linking }) => {
                 // 내 영역 탭 클릭 시 기존 스택을 유지
                 if (route.name === 'Locations') {
                   e.preventDefault(); // 기본 동작 방지
-                  navigation.navigate('Locations');
+                  // 현재 탭을 다시 눌렀을 때 Locations 스택의 루트로 이동
+                  navigation.navigate('Locations', { screen: 'LocationsScreen' });
                 }
               },
             })}

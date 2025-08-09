@@ -475,8 +475,17 @@ const ProductDetailScreen = () => {
   // 제품 데이터가 로딩 중일 경우 로딩 화면 표시
   if (status === 'loading') {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+      <View style={styles.mainContainer}>
+        <View style={styles.headerBar}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#4CAF50" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>제품 상세</Text>
+          <View style={styles.headerRight} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+        </View>
       </View>
     );
   }
@@ -484,14 +493,23 @@ const ProductDetailScreen = () => {
   // 에러가 발생한 경우 에러 메시지 표시
   if (status === 'failed') {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.errorText}>오류: {error}</Text>
-        <TouchableOpacity 
-          style={styles.retryButton}
-          onPress={() => dispatch(fetchProductById(productId))}
-        >
-          <Text style={styles.retryButtonText}>다시 시도</Text>
-        </TouchableOpacity>
+      <View style={styles.mainContainer}>
+        <View style={styles.headerBar}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#4CAF50" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>제품 상세</Text>
+          <View style={styles.headerRight} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.errorText}>오류: {error}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => dispatch(fetchProductById(productId))}
+          >
+            <Text style={styles.retryButtonText}>다시 시도</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -499,8 +517,17 @@ const ProductDetailScreen = () => {
   // 제품 데이터가 없을 경우 메시지 표시
   if (!currentProduct) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text>제품을 찾을 수 없습니다.</Text>
+      <View style={styles.mainContainer}>
+        <View style={styles.headerBar}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#4CAF50" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>제품 상세</Text>
+          <View style={styles.headerRight} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <Text>제품을 찾을 수 없습니다.</Text>
+        </View>
       </View>
     );
   }
@@ -950,6 +977,14 @@ const ProductDetailScreen = () => {
   // 제품 상세 화면 렌더링
   return (
     <View style={styles.mainContainer}>
+      {/* 헤더 */}
+      <View style={styles.headerBar}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#4CAF50" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>제품 상세</Text>
+        <View style={styles.headerRight} />
+      </View>
       {/* 탭 메뉴 */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
@@ -1063,6 +1098,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  headerRight: {
+    width: 32,
   },
   loadingContainer: {
     flex: 1,

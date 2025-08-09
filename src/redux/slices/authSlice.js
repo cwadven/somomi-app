@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { saveUserSlots, loadUserSlots, saveUserLocationTemplates, loadUserLocationTemplates } from '../../utils/storageUtils';
+import { saveUserSlots, loadUserSlots, saveUserLocationTemplates, loadUserLocationTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId } from '../../utils/storageUtils';
 import { generateId } from '../../utils/idUtils';
 
 // JWT 토큰 발급 API 호출 (실제 구현 시 서버에서 가져옴)
@@ -7,25 +7,24 @@ export const getAnonymousToken = createAsyncThunk(
   'auth/getAnonymousToken',
   async (_, { rejectWithValue }) => {
     try {
-      // 저장된 익명 토큰이 있는지 확인
-      const existingToken = localStorage.getItem('jwt_token');
-      
-      if (existingToken && existingToken.startsWith('anonymous_')) {
-        console.log('기존 익명 토큰 재사용:', existingToken);
-        return { token: existingToken };
+      // 저장된 토큰/디바이스ID 우선 로드 (AsyncStorage)
+      const storedToken = await loadJwtToken();
+      if (storedToken && typeof storedToken === 'string' && storedToken.startsWith('anonymous_')) {
+        console.log('AsyncStorage의 기존 익명 토큰 재사용:', storedToken);
+        return { token: storedToken };
       }
-      
-      // 실제 구현에서는 서버에 요청하여 익명 사용자용 JWT 토큰을 받아옴
-      // 여기서는 임시로 생성된 토큰을 반환
-      const deviceId = localStorage.getItem('device_id') || `device_${Math.random().toString(36).substring(2, 15)}`;
-      localStorage.setItem('device_id', deviceId);
-      
+
+      let deviceId = await loadDeviceId();
+      if (!deviceId) {
+        deviceId = `device_${Math.random().toString(36).substring(2, 15)}`;
+        await saveDeviceId(deviceId);
+      }
       const token = `anonymous_${deviceId}`;
       console.log('새 익명 토큰 생성:', token);
-      
-      // 토큰을 localStorage에 저장
-      localStorage.setItem('jwt_token', token);
-      
+
+      // 토큰을 AsyncStorage에 저장
+      await saveJwtToken(token);
+
       return { token };
     } catch (error) {
       return rejectWithValue(error.message);
@@ -33,13 +32,11 @@ export const getAnonymousToken = createAsyncThunk(
   }
 );
 
-// 카카오 로그인 API 호출
+// 카카오/일반 로그인 시에도 토큰을 AsyncStorage에 저장
 export const kakaoLogin = createAsyncThunk(
   'auth/kakaoLogin',
   async (kakaoToken, { rejectWithValue }) => {
     try {
-      // 실제 구현에서는 서버에 카카오 토큰을 전송하여 JWT 토큰을 받아옴
-      // 여기서는 임시로 성공 응답을 반환
       const response = {
         token: `kakao_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`,
         user: {
@@ -49,10 +46,7 @@ export const kakaoLogin = createAsyncThunk(
           profileImage: kakaoToken.profile?.profile_image_url,
         }
       };
-      
-      // 토큰을 localStorage에 저장
-      localStorage.setItem('jwt_token', response.token);
-      
+      await saveJwtToken(response.token);
       return response;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -60,13 +54,10 @@ export const kakaoLogin = createAsyncThunk(
   }
 );
 
-// 로그인 API 호출
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async (credentials, { rejectWithValue }) => {
     try {
-      // 실제 구현에서는 서버에 로그인 요청
-      // 여기서는 임시로 성공 응답을 반환
       const response = {
         token: `user_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`,
         user: {
@@ -75,10 +66,7 @@ export const loginUser = createAsyncThunk(
           email: credentials.email || 'user@example.com',
         }
       };
-      
-      // 토큰을 localStorage에 저장
-      localStorage.setItem('jwt_token', response.token);
-      
+      await saveJwtToken(response.token);
       return response;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -103,7 +91,7 @@ export const registerUser = createAsyncThunk(
       };
       
       // 토큰을 localStorage에 저장
-      localStorage.setItem('jwt_token', response.token);
+      await saveJwtToken(response.token);
       
       return response;
     } catch (error) {
@@ -117,24 +105,20 @@ export const verifyToken = createAsyncThunk(
   'auth/verifyToken',
   async (_, { rejectWithValue, getState }) => {
     try {
-      // 로컬 스토리지에서 토큰 가져오기
-      const token = localStorage.getItem('jwt_token');
+      // AsyncStorage에서 토큰 로드
+      const token = await loadJwtToken();
       
-      // 토큰이 없으면 null 반환
       if (!token) {
         console.log('저장된 토큰이 없습니다.');
         return null;
       }
       
-      // 토큰이 'anonymous'로 시작하면 익명 토큰으로 처리
       const isAnonymous = token.startsWith('anonymous_');
       
       // 저장된 템플릿 인스턴스 로드
       const savedTemplates = await loadUserLocationTemplates();
       console.log('저장된 템플릿 인스턴스:', savedTemplates);
       
-      // 실제 구현에서는 서버에 토큰 검증 요청
-      // 여기서는 임시로 토큰 형식에 따라 응답 생성
       if (isAnonymous) {
         console.log('익명 토큰 검증 성공:', token);
         
@@ -163,7 +147,7 @@ export const verifyToken = createAsyncThunk(
           templates: savedTemplates
         };
       } else {
-        // 회원 토큰인 경우 사용자 정보 포함
+        // 회원 토큰인 경우 사용자 정보 포함 (임시)
         console.log('회원 토큰 검증 성공:', token);
         return {
           token,
@@ -378,8 +362,9 @@ export const authSlice = createSlice({
         .then(() => console.log('로그아웃 후 템플릿 인스턴스 저장 성공'))
         .catch(err => console.error('로그아웃 후 템플릿 인스턴스 저장 실패:', err));
       
-      // localStorage에서 토큰 제거
-      localStorage.removeItem('jwt_token');
+      // AsyncStorage에서 토큰 제거
+      // (웹 폴리필에서는 localStorage도 함께 제거될 수 있음)
+      try { removeJwtToken(); } catch (e) {}
     },
     // 사용자 정보 업데이트
     updateUserInfo: (state, action) => {
