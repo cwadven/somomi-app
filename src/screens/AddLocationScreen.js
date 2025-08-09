@@ -15,6 +15,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { createLocation, updateLocation } from '../redux/slices/locationsSlice';
 import { markTemplateInstanceAsUsed, releaseTemplateInstance, addTemplateInstance } from '../redux/slices/authSlice';
+import { fetchProductsByLocation } from '../redux/slices/productsSlice';
 import IconSelector from '../components/IconSelector';
 import AlertModal from '../components/AlertModal';
 
@@ -28,13 +29,17 @@ const AddLocationScreen = () => {
   const locationToEdit = route.params?.location;
   
   // 템플릿 인스턴스 목록 가져오기
-  const { userLocationTemplateInstances } = useSelector(state => state.auth);
+  const { userLocationTemplateInstances, slots } = useSelector(state => state.auth);
+  const additionalProductSlots = slots?.productSlots?.additionalSlots || 0;
+  const { locationProducts } = useSelector(state => state.products);
   
   // 사용 가능한 템플릿 인스턴스만 필터링
   const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
   const currentTemplate = isEditMode && locationToEdit
     ? userLocationTemplateInstances.find(t => t.id === locationToEdit.templateInstanceId)
     : null;
+  const currentLocationProducts = isEditMode && locationToEdit ? (locationProducts?.[locationToEdit.id] || []) : [];
+  const currentProductCount = currentLocationProducts.length;
   
   // 사용자의 템플릿 인스턴스 목록 콘솔 출력 및 템플릿 부족 확인
   useEffect(() => {
@@ -67,7 +72,14 @@ const AddLocationScreen = () => {
     
     // 이 useEffect는 컴포넌트 마운트 시 한 번만 실행
   }, []);
-  
+
+  // 수정 모드일 때 현재 위치의 제품 목록을 로드하여 현재 개수 기반 검증이 가능하도록 함
+  useEffect(() => {
+    if (isEditMode && locationToEdit?.id) {
+      dispatch(fetchProductsByLocation(locationToEdit.id));
+    }
+  }, [dispatch, isEditMode, locationToEdit?.id]);
+
   // 뒤로 가기 핸들러
   const handleGoBack = () => {
     navigation.goBack();
@@ -194,6 +206,21 @@ const AddLocationScreen = () => {
         const changingTemplate = selectedEditTemplateInstance && selectedEditTemplateInstance.id !== locationToEdit.templateInstanceId;
         
         if (changingTemplate) {
+          // 선택된 새 템플릿의 허용 슬롯 계산 및 검증
+          const baseSlots = selectedEditTemplateInstance?.feature?.baseSlots;
+          const allowedSlots = baseSlots === -1 ? Number.POSITIVE_INFINITY : (baseSlots + additionalProductSlots);
+          if (currentProductCount > allowedSlots) {
+            setIsLoading(false);
+            setAlertModalConfig({
+              title: '변경 불가',
+              message: `현재 제품 ${currentProductCount}개가 새 템플릿 허용치(${baseSlots === -1 ? '무제한' : `${allowedSlots}개`})를 초과합니다. 제품을 줄이거나 다른 템플릿을 선택하세요.`,
+              buttons: [{ text: '확인' }],
+              icon: 'alert-circle',
+              iconColor: '#F44336',
+            });
+            setAlertModalVisible(true);
+            return;
+          }
           newTemplateInstanceId = selectedEditTemplateInstance.id;
           newProductId = selectedEditTemplateInstance.productId;
           newFeature = selectedEditTemplateInstance.feature;
@@ -345,24 +372,28 @@ const AddLocationScreen = () => {
                     </View>
                   </View>
                   
-                  <View style={styles.templateOptions}>
-                    {templates.map(template => (
-                      <TouchableOpacity
-                        key={template.id}
-                        style={[
-                          styles.templateOption,
-                          selectedTemplateInstance?.id === template.id && styles.selectedTemplateOption
-                        ]}
-                        onPress={() => handleTemplateSelect(template)}
-                      >
-                        <Text style={styles.templateOptionTitle}>
-                          기본 슬롯: {renderSlotCount(template.feature.baseSlots)}
-                        </Text>
-                        {selectedTemplateInstance?.id === template.id && (
-                          <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                        )}
-                      </TouchableOpacity>
-                    ))}
+                  <View style={styles.templateOptionsContainer}>
+                    <ScrollView style={styles.templateOptionsScroll} nestedScrollEnabled>
+                      <View style={styles.templateOptions}>
+                        {templates.map(template => (
+                          <TouchableOpacity
+                            key={template.id}
+                            style={[
+                              styles.templateOption,
+                              selectedTemplateInstance?.id === template.id && styles.selectedTemplateOption
+                            ]}
+                            onPress={() => handleTemplateSelect(template)}
+                          >
+                            <Text style={styles.templateOptionTitle}>
+                              기본 슬롯: {renderSlotCount(template.feature.baseSlots)}
+                            </Text>
+                            {selectedTemplateInstance?.id === template.id && (
+                              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </ScrollView>
                   </View>
                 </View>
               );
@@ -387,24 +418,42 @@ const AddLocationScreen = () => {
               <Text style={styles.sectionDescription}>현재 템플릿 정보를 불러올 수 없습니다.</Text>
             )}
             {availableTemplates.length > 0 ? (
-              <View style={styles.templateOptions}>
-                {availableTemplates.map(template => (
-                  <TouchableOpacity
-                    key={template.id}
-                    style={[
-                      styles.templateOption,
-                      selectedEditTemplateInstance?.id === template.id && styles.selectedTemplateOption
-                    ]}
-                    onPress={() => handleEditTemplateSelect(template)}
-                  >
-                    <Text style={styles.templateOptionTitle}>
-                      {template.name} · 기본 슬롯: {renderSlotCount(template.feature.baseSlots)}
-                    </Text>
-                    {selectedEditTemplateInstance?.id === template.id && (
-                      <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                    )}
-                  </TouchableOpacity>
-                ))}
+              <View style={styles.templateOptionsContainer}>
+                <ScrollView style={styles.templateOptionsScroll} nestedScrollEnabled>
+                  <View style={styles.templateOptions}>
+                    {availableTemplates.map(template => {
+                      const baseSlots = template.feature?.baseSlots;
+                      const allowedSlots = baseSlots === -1 ? Number.POSITIVE_INFINITY : (baseSlots + additionalProductSlots);
+                      const isDisabled = currentProductCount > allowedSlots;
+                      return (
+                        <TouchableOpacity
+                          key={template.id}
+                          style={[
+                            styles.templateOption,
+                            selectedEditTemplateInstance?.id === template.id && styles.selectedTemplateOption,
+                            isDisabled && styles.disabledTemplateOption
+                          ]}
+                          disabled={isDisabled}
+                          onPress={() => !isDisabled && handleEditTemplateSelect(template)}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.templateOptionTitle}>
+                              {template.name} · 기본 슬롯: {renderSlotCount(baseSlots)}
+                            </Text>
+                            {isDisabled && (
+                              <Text style={styles.templateOptionSubtitle}>
+                                현재 {currentProductCount}개 / 허용 {allowedSlots === Number.POSITIVE_INFINITY ? '무제한' : `${allowedSlots}개`}
+                              </Text>
+                            )}
+                          </View>
+                          {selectedEditTemplateInstance?.id === template.id && (
+                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
               </View>
             ) : (
               <Text style={styles.sectionDescription}>사용 가능한 템플릿이 없습니다. 상점에서 템플릿을 구매하세요.</Text>
@@ -641,6 +690,12 @@ const styles = StyleSheet.create({
   templateOptions: {
     padding: 12,
   },
+  templateOptionsContainer: {
+    maxHeight: 280,
+  },
+  templateOptionsScroll: {
+    // no-op: 스타일 확장 여지
+  },
   templateOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -651,6 +706,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
   },
+  disabledTemplateOption: {
+    opacity: 0.5,
+  },
   selectedTemplateOption: {
     borderColor: '#4CAF50',
     backgroundColor: '#e8f5e9',
@@ -658,6 +716,11 @@ const styles = StyleSheet.create({
   templateOptionTitle: {
     fontSize: 15,
     color: '#333',
+  },
+  templateOptionSubtitle: {
+    fontSize: 12,
+    color: '#777',
+    marginTop: 4,
   },
   emptyTemplates: {
     padding: 16,

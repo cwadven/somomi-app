@@ -12,7 +12,7 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance } from '../redux/slices/authSlice';
+import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance, addTemplateInstance } from '../redux/slices/authSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
@@ -69,7 +69,7 @@ const StoreScreen = () => {
       name: '영역 슬롯 1개',
       pointPrice: 2000,
       amount: 1,
-      description: '추가 영역 1개를 등록할 수 있습니다.'
+      description: '기본 제품 슬롯:\n3개'
     },
     {
       id: 'location_slot_3',
@@ -77,7 +77,7 @@ const StoreScreen = () => {
       name: '영역 슬롯 3개',
       pointPrice: 5000,
       amount: 3,
-      description: '추가 영역 3개를 등록할 수 있습니다.'
+      description: '기본 제품 슬롯:\n4개×1, 3개×2'
     },
     {
       id: 'product_slot_5',
@@ -249,7 +249,33 @@ const StoreScreen = () => {
           }));
           // 영역 템플릿도 함께 추가하여 즉시 사용 가능하도록 함
           for (let i = 0; i < selectedProduct.amount; i++) {
-            dispatch(addBasicTemplateInstance());
+            if (selectedProduct.id === 'location_slot_1') {
+              // 1개 패키지: 기본 슬롯 3개 템플릿 생성
+              dispatch(addTemplateInstance({
+                productId: 'basic_location',
+                name: '기본 영역',
+                description: '기본적인 제품 관리 기능을 제공하는 영역',
+                icon: 'cube-outline',
+                feature: { baseSlots: 3 },
+                used: false,
+                usedInLocationId: null,
+              }));
+            } else if (selectedProduct.id === 'location_slot_3') {
+              // 3개 패키지: 1개는 기본 슬롯 4개, 2개는 3개
+              const baseSlots = i === 0 ? 4 : 3;
+              dispatch(addTemplateInstance({
+                productId: 'basic_location',
+                name: '기본 영역',
+                description: '기본적인 제품 관리 기능을 제공하는 영역',
+                icon: 'cube-outline',
+                feature: { baseSlots },
+                used: false,
+                usedInLocationId: null,
+              }));
+            } else {
+              // 그 외 패키지: 기본 템플릿 생성(기존 기본값 적용)
+              dispatch(addBasicTemplateInstance());
+            }
           }
           
           // 업데이트된 슬롯 정보를 포함한 성공 메시지
@@ -549,6 +575,52 @@ const StoreScreen = () => {
     );
   };
   
+  // 영역 슬롯만 렌더링
+  const renderLocationSlotItems = () => {
+    const items = slotItems.filter((i) => i.type === 'locationSlot');
+    return (
+      <View style={styles.slotsGrid}>
+        {items.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={styles.slotCard}
+            onPress={() => handlePurchaseSlot(item)}
+          >
+            <View style={styles.slotIconContainer}>
+              <Ionicons name="grid" size={30} color="#4CAF50" />
+            </View>
+            <Text style={styles.slotName}>{item.name}</Text>
+            <Text style={styles.slotPrice}>{item.pointPrice.toLocaleString()}G</Text>
+            <Text style={styles.slotDescription}>{item.description}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+  
+  // 제품 슬롯만 렌더링
+  const renderProductSlotItems = () => {
+    const items = slotItems.filter((i) => i.type === 'productSlot');
+    return (
+      <View style={styles.slotsGrid}>
+        {items.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={styles.slotCard}
+            onPress={() => handlePurchaseSlot(item)}
+          >
+            <View style={styles.slotIconContainer}>
+              <Ionicons name="cube" size={30} color="#4CAF50" />
+            </View>
+            <Text style={styles.slotName}>{item.name}</Text>
+            <Text style={styles.slotPrice}>{item.pointPrice.toLocaleString()}G</Text>
+            <Text style={styles.slotDescription}>{item.description}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+  
   // 포인트 패키지 렌더링
   const renderPointPackages = () => {
     return (
@@ -694,10 +766,16 @@ const StoreScreen = () => {
           </View>
         </View>
         
-        {/* 슬롯 구매 섹션 */}
+        {/* 영역 슬롯 구매 섹션 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>추가 슬롯 구매</Text>
-          {renderSlotItems()}
+          <Text style={styles.sectionTitle}>영역 슬롯 구매</Text>
+          {renderLocationSlotItems()}
+        </View>
+
+        {/* 제품 슬롯 구매 섹션 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>제품 슬롯 구매</Text>
+          {renderProductSlotItems()}
         </View>
         
         {/* 포인트 충전 섹션 - 맨 아래로 이동 */}
