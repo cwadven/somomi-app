@@ -46,6 +46,63 @@ const LocationsScreen = () => {
   const [templatePickerVisible, setTemplatePickerVisible] = useState(false);
   const [templatePickerLocation, setTemplatePickerLocation] = useState(null);
   const [freeTemplates, setFreeTemplates] = useState([]);
+  const [templatePickerSelectedTemplateId, setTemplatePickerSelectedTemplateId] = useState(null);
+
+  // 템플릿 선택 모달 콘텐츠를 선택 상태에 맞게 갱신
+  useEffect(() => {
+    if (!templatePickerVisible) return;
+    const selected = freeTemplates.find(t => t.id === templatePickerSelectedTemplateId) || null;
+    const summary = selected
+      ? `선택됨: ${selected.name || '템플릿'} (기본 슬롯: ${selected.feature?.baseSlots === -1 ? '무제한' : selected.feature?.baseSlots})`
+      : '선택된 템플릿이 없습니다';
+    setAlertModalConfig(prev => ({
+      ...prev,
+      message: summary,
+      buttons: [
+        { text: '취소', style: 'cancel', onPress: () => setTemplatePickerVisible(false) },
+        {
+          text: selected ? '확인' : '확인(선택 필요)',
+          onPress: () => {
+            if (!selected || !templatePickerLocation) return;
+            dispatch({ type: 'auth/markTemplateInstanceAsUsed', payload: { templateId: selected.id, locationId: templatePickerLocation.id } });
+            setTemplatePickerVisible(false);
+            navigation.navigate('LocationDetail', { locationId: templatePickerLocation.id });
+          }
+        }
+      ],
+      content: (
+        <ScrollView style={styles.templatePickerList}>
+          {freeTemplates.map((tpl) => {
+            const isSelected = templatePickerSelectedTemplateId === tpl.id;
+            return (
+              <TouchableOpacity
+                key={tpl.id}
+                style={[styles.templatePickerItem, isSelected && styles.templatePickerItemSelected]}
+                onPress={() => setTemplatePickerSelectedTemplateId(tpl.id)}
+              >
+                <View style={styles.templatePickerLeft}>
+                  <View style={styles.templatePickerIconBox}>
+                    <Ionicons name={tpl.icon || 'cube-outline'} size={18} color="#4CAF50" />
+                  </View>
+                  <View>
+                    <Text style={styles.templatePickerTitle}>{tpl.name || '템플릿'}</Text>
+                    <Text style={styles.templatePickerDesc}>
+                      기본 슬롯: {tpl.feature?.baseSlots === -1 ? '무제한' : tpl.feature?.baseSlots}
+                    </Text>
+                  </View>
+                </View>
+                {isSelected ? (
+                  <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+                ) : (
+                  <Ionicons name="chevron-forward" size={18} color="#999" />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )
+    }));
+  }, [templatePickerVisible, templatePickerSelectedTemplateId, freeTemplates, templatePickerLocation, dispatch, navigation]);
 
   // 화면이 포커스될 때마다 영역 데이터 로드
   useEffect(() => {
@@ -172,42 +229,26 @@ const LocationsScreen = () => {
         const free = userLocationTemplateInstances.filter(t => !t.used);
         setFreeTemplates(free);
         setTemplatePickerLocation(location);
+        setTemplatePickerSelectedTemplateId(null);
         setAlertModalConfig({
           title: '템플릿 선택',
-          message: '연동할 템플릿을 선택하세요.',
+          message: '선택된 템플릿이 없습니다',
           icon: 'link-outline',
           iconColor: '#4CAF50',
           buttons: [
-            { text: '취소', style: 'cancel', onPress: () => setTemplatePickerVisible(false) }
+            { text: '취소', style: 'cancel', onPress: () => setTemplatePickerVisible(false) },
+            {
+              text: '확인',
+              onPress: () => {
+                const selected = templatePickerSelectedTemplateId;
+                if (!selected) return; // 선택 없으면 무시
+                dispatch({ type: 'auth/markTemplateInstanceAsUsed', payload: { templateId: selected, locationId: location.id } });
+                setTemplatePickerVisible(false);
+                navigation.navigate('LocationDetail', { locationId: location.id });
+              }
+            }
           ],
-          content: (
-            <View>
-              {free.map((tpl) => (
-                <TouchableOpacity
-                  key={tpl.id}
-                  style={styles.templatePickerItem}
-                  onPress={() => {
-                    dispatch({ type: 'auth/markTemplateInstanceAsUsed', payload: { templateId: tpl.id, locationId: location.id } });
-                    setTemplatePickerVisible(false);
-                    navigation.navigate('LocationDetail', { locationId: location.id });
-                  }}
-                >
-                  <View style={styles.templatePickerLeft}>
-                    <View style={styles.templatePickerIconBox}>
-                      <Ionicons name={tpl.icon || 'cube-outline'} size={18} color="#4CAF50" />
-                    </View>
-                    <View>
-                      <Text style={styles.templatePickerTitle}>{tpl.name || '템플릿'}</Text>
-                      <Text style={styles.templatePickerDesc}>
-                        기본 슬롯: {tpl.feature?.baseSlots === -1 ? '무제한' : tpl.feature?.baseSlots}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color="#999" />
-                </TouchableOpacity>
-              ))}
-            </View>
-          )
+          content: null
         });
         setTemplatePickerVisible(true);
       } else {
@@ -620,6 +661,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
     backgroundColor: '#fff',
+  },
+  templatePickerItemSelected: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#e8f5e9',
+  },
+  templatePickerList: {
+    maxHeight: 260,
   },
   templatePickerLeft: {
     flexDirection: 'row',
