@@ -159,17 +159,19 @@ export const processProductNotifications = (notifications, products, locations) 
  * @returns {Object|null} 알림 정보 객체 또는 null
  */
 export const createExpiryNotification = (product, location, daysBeforeTarget, notificationId) => {
-  const expiryDate = new Date(product.expiryDate);
   const today = new Date();
+  today.setHours(0, 0, 0, 0); // 오늘 자정 기준
+  const expiryDate = new Date(product.expiryDate);
+  const expiryEndOfDay = new Date(expiryDate);
+  expiryEndOfDay.setHours(23, 59, 59, 999); // 대상일 끝 기준
   
   // 남은 일수 계산 (트리거용 - 기존 로직 유지)
-  const rawDaysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+  const rawDaysLeft = Math.ceil((expiryEndOfDay - today) / (1000 * 60 * 60 * 24));
   
   // 알림 조건 확인
   if (rawDaysLeft <= daysBeforeTarget && rawDaysLeft >= 0) {
     // 만료 시간은 당일 23:59:59로 설정
-    const expireAt = new Date(expiryDate);
-    expireAt.setHours(23, 59, 59, 999);
+    const expireAt = expiryEndOfDay;
     
     // 표시용 남은 일수 보정: 당일 만료인 경우 1일로 표시
     const displayDaysLeft = rawDaysLeft === 0 ? 1 : rawDaysLeft;
@@ -198,17 +200,19 @@ export const createExpiryNotification = (product, location, daysBeforeTarget, no
  * @returns {Object|null} 알림 정보 객체 또는 null
  */
 export const createEstimatedNotification = (product, location, daysBeforeTarget, notificationId) => {
-  const estimatedDate = new Date(product.estimatedEndDate);
   const today = new Date();
+  today.setHours(0, 0, 0, 0); // 오늘 자정 기준
+  const estimatedDate = new Date(product.estimatedEndDate);
+  const estimatedEndOfDay = new Date(estimatedDate);
+  estimatedEndOfDay.setHours(23, 59, 59, 999); // 대상일 끝 기준
   
   // 남은 일수 계산 (트리거용 - 기존 로직 유지)
-  const rawDaysLeft = Math.ceil((estimatedDate - today) / (1000 * 60 * 60 * 24));
+  const rawDaysLeft = Math.ceil((estimatedEndOfDay - today) / (1000 * 60 * 60 * 24));
   
   // 알림 조건 확인
   if (rawDaysLeft <= daysBeforeTarget && rawDaysLeft >= 0) {
     // 만료 시간은 당일 23:59:59로 설정
-    const expireAt = new Date(estimatedDate);
-    expireAt.setHours(23, 59, 59, 999);
+    const expireAt = estimatedEndOfDay;
     
     // 표시용 남은 일수 보정: 당일인 경우 1일로 표시
     const displayDaysLeft = rawDaysLeft === 0 ? 1 : rawDaysLeft;
