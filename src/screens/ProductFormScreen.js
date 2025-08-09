@@ -144,11 +144,33 @@ const ProductFormScreen = () => {
         setEstimatedEndDate(new Date(currentProduct.estimatedEndDate));
       }
       
-      // 카테고리 설정
-      if (currentProduct.categoryId && categories.length > 0) {
-        const category = categories.find(cat => cat.id === currentProduct.categoryId);
-        if (category) {
-          setSelectedCategory(category);
+      // 카테고리 설정 (객체/문자열/ID 모두 대응)
+      if (categories.length > 0) {
+        const resolveCategory = () => {
+          // 1) 제품에 categoryId가 있는 경우
+          if (currentProduct.categoryId) {
+            return categories.find(cat => cat.id === currentProduct.categoryId);
+          }
+          const c = currentProduct.category;
+          if (!c) return null;
+          // 2) 제품에 category가 객체로 저장된 경우
+          if (typeof c === 'object') {
+            if (c.id) {
+              return categories.find(cat => cat.id === c.id) || c;
+            }
+            if (c.name) {
+              return categories.find(cat => cat.name === c.name) || c;
+            }
+          }
+          // 3) 제품에 category가 문자열(이름)로 저장된 경우
+          if (typeof c === 'string') {
+            return categories.find(cat => cat.name === c);
+          }
+          return null;
+        };
+        const resolved = resolveCategory();
+        if (resolved) {
+          setSelectedCategory(resolved);
         }
       }
       
