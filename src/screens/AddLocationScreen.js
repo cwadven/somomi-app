@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { createLocation, updateLocation } from '../redux/slices/locationsSlice';
-import { markTemplateInstanceAsUsed, addTemplateInstance } from '../redux/slices/authSlice';
+import { markTemplateInstanceAsUsed, releaseTemplateInstance, addTemplateInstance } from '../redux/slices/authSlice';
 import IconSelector from '../components/IconSelector';
 import AlertModal from '../components/AlertModal';
 
@@ -32,6 +32,9 @@ const AddLocationScreen = () => {
   
   // 사용 가능한 템플릿 인스턴스만 필터링
   const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
+  const currentTemplate = isEditMode && locationToEdit
+    ? userLocationTemplateInstances.find(t => t.id === locationToEdit.templateInstanceId)
+    : null;
   
   // 사용자의 템플릿 인스턴스 목록 콘솔 출력 및 템플릿 부족 확인
   useEffect(() => {
@@ -82,6 +85,7 @@ const AddLocationScreen = () => {
   
   // 상태 관리
   const [selectedTemplateInstance, setSelectedTemplateInstance] = useState(null);
+  const [selectedEditTemplateInstance, setSelectedEditTemplateInstance] = useState(null);
   const [locationData, setLocationData] = useState({
     title: isEditMode && locationToEdit ? locationToEdit.title : '',
     description: isEditMode && locationToEdit ? locationToEdit.description : '',
@@ -132,9 +136,13 @@ const AddLocationScreen = () => {
     setIsIconSelectorVisible(false);
   };
   
-  // 템플릿 인스턴스 선택 핸들러
+  // 템플릿 인스턴스 선택 핸들러 (생성)
   const handleTemplateSelect = (template) => {
     setSelectedTemplateInstance(template);
+  };
+  // 템플릿 인스턴스 선택 핸들러 (수정)
+  const handleEditTemplateSelect = (template) => {
+    setSelectedEditTemplateInstance(template);
   };
   
   // 영역 생성/수정 버튼 클릭 핸들러
@@ -176,8 +184,20 @@ const AddLocationScreen = () => {
         // 영역 수정 로직
         console.log('영역 수정 시작:', {
           locationData,
-          locationId: locationToEdit.id
+          locationId: locationToEdit.id,
+          selectedEditTemplateInstance
         });
+        
+        let newTemplateInstanceId = locationToEdit.templateInstanceId;
+        let newProductId = locationToEdit.productId;
+        let newFeature = locationToEdit.feature;
+        const changingTemplate = selectedEditTemplateInstance && selectedEditTemplateInstance.id !== locationToEdit.templateInstanceId;
+        
+        if (changingTemplate) {
+          newTemplateInstanceId = selectedEditTemplateInstance.id;
+          newProductId = selectedEditTemplateInstance.productId;
+          newFeature = selectedEditTemplateInstance.feature;
+        }
         
         // 영역 수정 API 호출
         const updatedLocation = await dispatch(updateLocation({
@@ -185,14 +205,21 @@ const AddLocationScreen = () => {
           title: locationData.title,
           description: locationData.description,
           icon: locationData.icon,
-          // 기존 데이터 유지
-          templateInstanceId: locationToEdit.templateInstanceId,
-          productId: locationToEdit.productId,
-          feature: locationToEdit.feature
+          templateInstanceId: newTemplateInstanceId,
+          productId: newProductId,
+          feature: newFeature
         })).unwrap();
         
         console.log('영역 수정 성공:', updatedLocation);
         
+        // 템플릿 교체 처리: 이전 템플릿 해제, 새 템플릿 사용 표시
+        if (changingTemplate) {
+          // 이전 템플릿 해제
+          dispatch(releaseTemplateInstance(locationToEdit.id));
+          // 새 템플릿 사용 표시
+          dispatch(markTemplateInstanceAsUsed({ templateId: newTemplateInstanceId, locationId: locationToEdit.id }));
+        }
+
         setIsLoading(false);
         
         // 성공 메시지 표시 후 내 영역 탭으로 이동
@@ -340,6 +367,48 @@ const AddLocationScreen = () => {
                 </View>
               );
             })}
+          </View>
+        )}
+        {/* 템플릿 변경 섹션 (수정 모드에서만 표시) */}
+        {isEditMode && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>템플릿 변경</Text>
+            {currentTemplate ? (
+              <View style={[styles.templateGroupHeader, { marginBottom: 8 }]}>
+                <View style={styles.templateIconContainer}>
+                  <Ionicons name={currentTemplate.icon || 'cube-outline'} size={24} color="#4CAF50" />
+                </View>
+                <View style={styles.templateGroupInfo}>
+                  <Text style={styles.templateGroupName}>현재 템플릿: {currentTemplate.name}</Text>
+                  <Text style={styles.templateGroupDescription}>기본 슬롯: {renderSlotCount(currentTemplate.feature?.baseSlots)}</Text>
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.sectionDescription}>현재 템플릿 정보를 불러올 수 없습니다.</Text>
+            )}
+            {availableTemplates.length > 0 ? (
+              <View style={styles.templateOptions}>
+                {availableTemplates.map(template => (
+                  <TouchableOpacity
+                    key={template.id}
+                    style={[
+                      styles.templateOption,
+                      selectedEditTemplateInstance?.id === template.id && styles.selectedTemplateOption
+                    ]}
+                    onPress={() => handleEditTemplateSelect(template)}
+                  >
+                    <Text style={styles.templateOptionTitle}>
+                      {template.name} · 기본 슬롯: {renderSlotCount(template.feature.baseSlots)}
+                    </Text>
+                    {selectedEditTemplateInstance?.id === template.id && (
+                      <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.sectionDescription}>사용 가능한 템플릿이 없습니다. 상점에서 템플릿을 구매하세요.</Text>
+            )}
           </View>
         )}
         
