@@ -4,7 +4,7 @@ import { Provider, useDispatch, useSelector } from 'react-redux';
 import { Platform, StyleSheet, Linking, AppState, View, ActivityIndicator, Text, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
-import { verifyToken, getAnonymousToken, logout, loadUserLocationTemplateInstances } from './src/redux/slices/authSlice';
+import { verifyToken, getAnonymousToken, logout, loadUserLocationTemplateInstances, loadUserProductSlotTemplateInstances } from './src/redux/slices/authSlice';
 import * as Updates from 'expo-updates';
 import Constants from 'expo-constants';
 import CodePushUpdateLoading from './src/components/CodePushUpdateLoading';
@@ -185,6 +185,8 @@ const AppContent = () => {
       
       // 사용자 영역 템플릿 인스턴스 로드
       await dispatch(loadUserLocationTemplateInstances()).unwrap();
+      // 사용자 제품 슬롯 템플릿 인스턴스 로드
+      await dispatch(loadUserProductSlotTemplateInstances()).unwrap();
       
       // 영역 데이터 로드
       await dispatch(fetchLocations()).unwrap();

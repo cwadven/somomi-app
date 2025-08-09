@@ -12,7 +12,7 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance, addTemplateInstance } from '../redux/slices/authSlice';
+import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance, addTemplateInstance, addProductSlotTemplateInstances } from '../redux/slices/authSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
@@ -20,7 +20,7 @@ import SignupPromptModal from '../components/SignupPromptModal';
 const StoreScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
-  const { isLoggedIn, isAnonymous, user, subscription, slots, points, pointHistory } = useSelector(state => state.auth);
+  const { isLoggedIn, isAnonymous, user, subscription, slots, points, pointHistory, userProductSlotTemplateInstances } = useSelector(state => state.auth);
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
   
   const [showPointHistory, setShowPointHistory] = useState(false);
@@ -282,15 +282,12 @@ const StoreScreen = () => {
           const totalLocationSlots = slots.locationSlots.baseSlots + slots.locationSlots.additionalSlots + selectedProduct.amount;
           showSuccessModal('구매 완료', `${selectedProduct.name} 구매가 완료되었습니다.\n현재 보유 영역 슬롯: ${totalLocationSlots}개`);
         } else if (selectedProduct.type === 'productSlot') {
-          dispatch(updateSlots({
-            productSlots: {
-              additionalSlots: slots.productSlots.additionalSlots + selectedProduct.amount
-            }
-          }));
-          
+          // 제품 슬롯: 템플릿 인스턴스 생성으로 전환
+          dispatch(addProductSlotTemplateInstances({ count: selectedProduct.amount }));
+           
           // 업데이트된 슬롯 정보를 포함한 성공 메시지
-          const totalProductSlots = slots.productSlots.baseSlots + slots.productSlots.additionalSlots + selectedProduct.amount;
-          showSuccessModal('구매 완료', `${selectedProduct.name} 구매가 완료되었습니다.\n현재 보유 제품 슬롯: ${totalProductSlots}개/영역`);
+          const nextTemplatesCount = (userProductSlotTemplateInstances?.length || 0) + selectedProduct.amount;
+          showSuccessModal('구매 완료', `${selectedProduct.name} 구매가 완료되었습니다.\n보유 추가 제품 슬롯: ${nextTemplatesCount}개`);
         }
         
         // 구매 내역 추가
@@ -674,7 +671,7 @@ const StoreScreen = () => {
   // 현재 슬롯 상태 표시
   const renderCurrentSlots = () => {
     const totalLocationSlots = slots.locationSlots.baseSlots + slots.locationSlots.additionalSlots;
-    const totalProductSlots = slots.productSlots.baseSlots + slots.productSlots.additionalSlots;
+    const totalProductSlots = slots.productSlots.baseSlots + (userProductSlotTemplateInstances?.length || 0);
     
     return (
       <View style={styles.currentSlotsContainer}>

@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { saveUserSlots, loadUserSlots, saveUserLocationTemplates, loadUserLocationTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId } from '../../utils/storageUtils';
+import { saveUserSlots, loadUserSlots, saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId } from '../../utils/storageUtils';
 import { generateId } from '../../utils/idUtils';
 
 // JWT 토큰 발급 API 호출 (실제 구현 시 서버에서 가져옴)
@@ -192,6 +192,19 @@ export const loadUserLocationTemplateInstances = createAsyncThunk(
   }
 );
 
+// 사용자 제품 슬롯 템플릿 인스턴스 로드
+export const loadUserProductSlotTemplateInstances = createAsyncThunk(
+  'auth/loadUserProductSlotTemplateInstances',
+  async (_, { rejectWithValue }) => {
+    try {
+      const templates = await loadUserProductSlotTemplates();
+      return templates || [];
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 // 기본 템플릿 생성 함수
 const createBasicLocationTemplate = () => ({
   id: generateId('locationTemplate'),
@@ -225,7 +238,7 @@ const initialState = {
     },
     productSlots: {
       baseSlots: 3, // 각 영역당 기본 제품 슬롯 수
-      additionalSlots: 0, // 추가 구매한 제품 슬롯 수
+      additionalSlots: 0, // (deprecated) 템플릿 기반으로 대체 예정
     }
   },
   points: {
@@ -236,7 +249,9 @@ const initialState = {
   purchaseHistory: [], // 구매 내역
   pointHistory: [], // G 내역 (충전 및 사용)
   // 사용자가 소유한 영역 템플릿 인스턴스 목록 - 비회원은 기본 템플릿 1개 제공
-  userLocationTemplateInstances: [createBasicLocationTemplate()]
+  userLocationTemplateInstances: [createBasicLocationTemplate()],
+  // 사용자가 소유한 제품 슬롯 템플릿 인스턴스 목록 (각 인스턴스는 제품 1개를 추가 허용)
+  userProductSlotTemplateInstances: []
 };
 
 export const authSlice = createSlice({
@@ -456,7 +471,109 @@ export const authSlice = createSlice({
             saveUserLocationTemplates(plainTemplates)
          .then(() => console.log('기본 템플릿 인스턴스 추가 저장 성공'))
          .catch(err => console.error('기본 템플릿 인스턴스 추가 저장 실패:', err));
-     }
+     },
+    // 제품 슬롯 템플릿 인스턴스 추가 (1개)
+    addProductSlotTemplateInstance: (state, action) => {
+      const newTemplate = {
+        id: generateId('productSlotTemplate'),
+        name: '제품 슬롯',
+        description: '제품 1개 추가 등록 가능',
+        used: false,
+        usedByProductId: null,
+        assignedLocationId: null,
+      };
+      state.userProductSlotTemplateInstances.push(newTemplate);
+      const plain = JSON.parse(JSON.stringify(state.userProductSlotTemplateInstances));
+      saveUserProductSlotTemplates(plain).catch(err => console.error('제품 슬롯 템플릿 저장 실패:', err));
+    },
+    // 제품 슬롯 템플릿 인스턴스 여러개 추가
+    addProductSlotTemplateInstances: (state, action) => {
+      const count = action.payload?.count || 1;
+      for (let i = 0; i < count; i++) {
+        state.userProductSlotTemplateInstances.push({
+          id: generateId('productSlotTemplate'),
+          name: '제품 슬롯',
+          description: '제품 1개 추가 등록 가능',
+          used: false,
+          usedByProductId: null,
+          assignedLocationId: null,
+        });
+      }
+      const plain = JSON.parse(JSON.stringify(state.userProductSlotTemplateInstances));
+      saveUserProductSlotTemplates(plain).catch(err => console.error('제품 슬롯 템플릿 저장 실패:', err));
+    },
+    // 제품 슬롯 템플릿을 특정 영역에 등록(할당)
+    assignProductSlotTemplatesToLocation: (state, action) => {
+      const { locationId, count } = action.payload;
+      if (!locationId || !count) return;
+      let remaining = count;
+      for (const t of state.userProductSlotTemplateInstances) {
+        if (remaining <= 0) break;
+        if (!t.used && !t.assignedLocationId) {
+          t.assignedLocationId = locationId;
+          remaining -= 1;
+        }
+      }
+      const plain = JSON.parse(JSON.stringify(state.userProductSlotTemplateInstances));
+      saveUserProductSlotTemplates(plain).catch(err => console.error('제품 슬롯 템플릿 할당 저장 실패:', err));
+    },
+    // 특정 영역에서 제품 슬롯 템플릿 등록 해제 (count개)
+    unassignProductSlotTemplatesFromLocation: (state, action) => {
+      const { locationId, count } = action.payload;
+      if (!locationId || !count) return;
+      let remaining = count;
+      for (const t of state.userProductSlotTemplateInstances) {
+        if (remaining <= 0) break;
+        if (!t.used && t.assignedLocationId === locationId) {
+          t.assignedLocationId = null;
+          remaining -= 1;
+        }
+      }
+      const plain = JSON.parse(JSON.stringify(state.userProductSlotTemplateInstances));
+      saveUserProductSlotTemplates(plain).catch(err => console.error('제품 슬롯 템플릿 해제 저장 실패:', err));
+    },
+    // 제품 슬롯 템플릿 사용 표시
+    markProductSlotTemplateAsUsed: (state, action) => {
+      const { templateId, productId } = action.payload;
+      const t = state.userProductSlotTemplateInstances.find(x => x.id === templateId);
+      if (t && !t.used) {
+        t.used = true;
+        t.usedByProductId = productId;
+        const plain = JSON.parse(JSON.stringify(state.userProductSlotTemplateInstances));
+        saveUserProductSlotTemplates(plain).catch(err => console.error('제품 슬롯 템플릿 사용 저장 실패:', err));
+      }
+    },
+    // 제품 슬롯 템플릿 해제 (제품 삭제 등)
+    releaseProductSlotTemplateByProduct: (state, action) => {
+      const productId = action.payload;
+      const t = state.userProductSlotTemplateInstances.find(x => x.usedByProductId === productId);
+      if (t) {
+        t.used = false;
+        t.usedByProductId = null;
+        const plain = JSON.parse(JSON.stringify(state.userProductSlotTemplateInstances));
+        saveUserProductSlotTemplates(plain).catch(err => console.error('제품 슬롯 템플릿 해제 저장 실패:', err));
+      }
+    },
+    // 특정 템플릿을 특정 영역에 등록
+    assignProductSlotTemplateToLocation: (state, action) => {
+      const { templateId, locationId } = action.payload;
+      const t = state.userProductSlotTemplateInstances.find(x => x.id === templateId);
+      if (t && !t.used) {
+        t.assignedLocationId = locationId;
+        const plain = JSON.parse(JSON.stringify(state.userProductSlotTemplateInstances));
+        saveUserProductSlotTemplates(plain).catch(err => console.error('제품 슬롯 템플릿 단건 할당 저장 실패:', err));
+      }
+    },
+    // 특정 템플릿 등록 해제
+    unassignProductSlotTemplate: (state, action) => {
+      const { templateId } = action.payload;
+      const t = state.userProductSlotTemplateInstances.find(x => x.id === templateId);
+      if (t && !t.used) {
+        t.assignedLocationId = null;
+        const plain = JSON.parse(JSON.stringify(state.userProductSlotTemplateInstances));
+        saveUserProductSlotTemplates(plain).catch(err => console.error('제품 슬롯 템플릿 단건 해제 저장 실패:', err));
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -687,6 +804,19 @@ export const authSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
         console.error('사용자 영역 템플릿 인스턴스 로드 실패:', action.payload);
+      })
+
+      // 사용자 제품 슬롯 템플릿 인스턴스 로드 처리
+      .addCase(loadUserProductSlotTemplateInstances.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(loadUserProductSlotTemplateInstances.fulfilled, (state, action) => {
+        state.loading = false;
+        state.userProductSlotTemplateInstances = action.payload || [];
+      })
+      .addCase(loadUserProductSlotTemplateInstances.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       });
   },
 });
@@ -706,7 +836,15 @@ export const {
   markTemplateInstanceAsUsed,
   releaseTemplateInstance,
   addTemplateInstance,
-  addBasicTemplateInstance
+  addBasicTemplateInstance,
+  addProductSlotTemplateInstance,
+  addProductSlotTemplateInstances,
+  assignProductSlotTemplatesToLocation,
+  unassignProductSlotTemplatesFromLocation,
+  markProductSlotTemplateAsUsed,
+  releaseProductSlotTemplateByProduct,
+  assignProductSlotTemplateToLocation,
+  unassignProductSlotTemplate,
 } = authSlice.actions;
 
 export default authSlice.reducer; 

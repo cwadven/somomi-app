@@ -20,6 +20,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { addProductAsync, updateProductAsync, fetchProducts, fetchProductById } from '../redux/slices/productsSlice';
+import { markProductSlotTemplateAsUsed } from '../redux/slices/authSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { fetchCategories } from '../redux/slices/categoriesSlice';
 import { addNotification } from '../redux/slices/notificationsSlice';
@@ -52,7 +53,7 @@ const ProductFormScreen = () => {
   const { categories, status: categoriesStatus } = useSelector(state => state.categories);
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
   const { products, currentProduct, status: productsStatus } = useSelector(state => state.products);
-  const { isLoggedIn, isAnonymous, slots } = useSelector(state => state.auth);
+  const { isLoggedIn, isAnonymous, slots, userProductSlotTemplateInstances } = useSelector(state => state.auth);
 
   // 폼 상태
   const [productName, setProductName] = useState('');
@@ -454,13 +455,17 @@ const ProductFormScreen = () => {
     
     // 영역별 슬롯 한도 확인 (baseSlots + additionalSlots, -1은 무제한)
     const baseSlots = selectedLocation?.feature?.baseSlots ?? slots?.productSlots?.baseSlots ?? 0;
-    const additionalSlots = slots?.productSlots?.additionalSlots ?? 0;
-    const totalSlots = baseSlots === -1 ? -1 : baseSlots + additionalSlots;
+    const additionalTemplates = (userProductSlotTemplateInstances || []).filter(t => t.used !== true).length; // 사용 가능 템플릿 수
+    const totalSlots = baseSlots === -1 ? -1 : baseSlots + additionalTemplates;
     const usedCount = currentLocationProducts.length;
 
     if (totalSlots !== -1 && usedCount >= totalSlots) {
-      showErrorAlert('슬롯 한도 초과', '해당 영역의 제품 슬롯이 가득 찼습니다.');
-      return false;
+      // 사용 가능한 제품 슬롯 템플릿이 있는지 확인
+      const availableProductSlot = (userProductSlotTemplateInstances || []).find(t => !t.used);
+      if (!availableProductSlot) {
+        showErrorAlert('슬롯 한도 초과', '해당 영역의 제품 슬롯이 가득 찼습니다. 상점에서 제품 슬롯을 추가 구매하세요.');
+        return false;
+      }
     }
     
     return true;
@@ -515,6 +520,15 @@ const ProductFormScreen = () => {
       } else {
         // 추가 모드
         result = await dispatch(addProductAsync(productData)).unwrap();
+        // 기본 슬롯을 초과했다면 제품 슬롯 템플릿을 하나 사용 처리
+        const productsInLocation = (products || []).filter(p => p.locationId === (locationId || selectedLocation?.id) && !p.isConsumed);
+        const usedCountAfter = (productsInLocation.length) + 1; // 방금 추가 포함
+        if (baseSlots !== -1 && usedCountAfter > baseSlots) {
+          const availableProductSlot = (userProductSlotTemplateInstances || []).find(t => !t.used);
+          if (availableProductSlot) {
+            dispatch(markProductSlotTemplateAsUsed({ templateId: availableProductSlot.id, productId: result.id }));
+          }
+        }
       }
 
       setCreatedProduct(result);

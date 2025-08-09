@@ -10,6 +10,7 @@ export const STORAGE_KEYS = {
   PROCESSED_NOTIFICATIONS: 'somomi_processed_notifications',
   USER_SLOTS: 'somomi_user_slots', // 사용자 슬롯 정보
   USER_LOCATION_TEMPLATES: 'somomi_user_location_templates', // 사용자 영역 템플릿 인스턴스
+  USER_PRODUCT_SLOT_TEMPLATES: 'somomi_user_product_slot_templates', // 사용자 제품 슬롯 템플릿 인스턴스
   JWT_TOKEN: 'somomi_jwt_token',
   DEVICE_ID: 'somomi_device_id',
 };
@@ -180,6 +181,29 @@ export const loadUserLocationTemplates = async () => {
   } catch (error) {
     console.error('사용자 영역 템플릿 인스턴스 로드 중 오류:', error);
     return null;
+  }
+};
+
+// 사용자 제품 슬롯 템플릿 인스턴스 저장/로드 함수
+export const saveUserProductSlotTemplates = async (templates) => {
+  try {
+    await saveData(STORAGE_KEYS.USER_PRODUCT_SLOT_TEMPLATES, templates);
+    console.log('사용자 제품 슬롯 템플릿 인스턴스 저장. 개수:', templates.length);
+    return true;
+  } catch (error) {
+    console.error('사용자 제품 슬롯 템플릿 인스턴스 저장 중 오류:', error);
+    return false;
+  }
+};
+
+export const loadUserProductSlotTemplates = async () => {
+  try {
+    const templates = await loadData(STORAGE_KEYS.USER_PRODUCT_SLOT_TEMPLATES);
+    console.log('사용자 제품 슬롯 템플릿 인스턴스 로드. 개수:', templates ? templates.length : 0);
+    return templates || [];
+  } catch (error) {
+    console.error('사용자 제품 슬롯 템플릿 인스턴스 로드 중 오류:', error);
+    return [];
   }
 };
 

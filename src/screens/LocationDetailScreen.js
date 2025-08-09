@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { fetchLocationById, deleteLocation } from '../redux/slices/locationsSlice';
 import { fetchProductsByLocation } from '../redux/slices/productsSlice';
 import { releaseTemplateInstance } from '../redux/slices/authSlice';
+import { useSelector as useReduxSelector } from 'react-redux';
 import ProductCard from '../components/ProductCard';
 import SlotStatusBar from '../components/SlotStatusBar';
 import SlotPlaceholder from '../components/SlotPlaceholder';
@@ -31,7 +32,7 @@ const LocationDetailScreen = () => {
   
   const { currentLocation, status, error } = useSelector(state => state.locations);
   const { products } = useSelector(state => state.products);
-  const { slots } = useSelector(state => state.auth);
+  const { slots, userProductSlotTemplateInstances } = useSelector(state => state.auth);
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [locationProducts, setLocationProducts] = useState([]);
@@ -163,10 +164,10 @@ const LocationDetailScreen = () => {
       return { used: products.length, total: 999 }; // 모든 제품 보기에서는 슬롯 제한 없음
     }
     
-    // 영역의 기본 슬롯 + 추가 슬롯
-    const baseSlots = currentLocation?.feature?.baseSlots || slots.productSlots.baseSlots;
-    const additionalSlots = slots.productSlots.additionalSlots;
-    const totalSlots = baseSlots === -1 ? -1 : (baseSlots + additionalSlots); // -1은 무제한
+    // 영역의 기본 슬롯 + 해당 영역에 등록된 추가 제품 슬롯 수
+    const baseSlots = currentLocation?.feature?.baseSlots ?? slots.productSlots.baseSlots;
+    const assignedExtra = (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locationId).length;
+    const totalSlots = baseSlots === -1 ? -1 : (baseSlots + assignedExtra); // -1은 무제한
     
     return { 
       used: locationProducts.length,

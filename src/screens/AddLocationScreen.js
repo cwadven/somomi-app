@@ -14,7 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { createLocation, updateLocation } from '../redux/slices/locationsSlice';
-import { markTemplateInstanceAsUsed, releaseTemplateInstance, addTemplateInstance } from '../redux/slices/authSlice';
+import { markTemplateInstanceAsUsed, releaseTemplateInstance, addTemplateInstance, assignProductSlotTemplatesToLocation, unassignProductSlotTemplate, releaseProductSlotTemplateByProduct } from '../redux/slices/authSlice';
+import { useSelector as useReduxSelector } from 'react-redux';
 import { fetchProductsByLocation } from '../redux/slices/productsSlice';
 import IconSelector from '../components/IconSelector';
 import AlertModal from '../components/AlertModal';
@@ -29,7 +30,7 @@ const AddLocationScreen = () => {
   const locationToEdit = route.params?.location;
   
   // 템플릿 인스턴스 목록 가져오기
-  const { userLocationTemplateInstances, slots } = useSelector(state => state.auth);
+  const { userLocationTemplateInstances, slots, userProductSlotTemplateInstances } = useSelector(state => state.auth);
   const additionalProductSlots = slots?.productSlots?.additionalSlots || 0;
   const { locationProducts } = useSelector(state => state.products);
   
@@ -40,6 +41,13 @@ const AddLocationScreen = () => {
     : null;
   const currentLocationProducts = isEditMode && locationToEdit ? (locationProducts?.[locationToEdit.id] || []) : [];
   const currentProductCount = currentLocationProducts.length;
+  const currentProductIdSet = new Set(currentLocationProducts.map(p => p.id));
+  const usedProductSlotTemplatesInThisLocation = (userProductSlotTemplateInstances || []).filter(t => t.used && currentProductIdSet.has(t.usedByProductId)).length;
+  const assignedProductSlotTemplatesForThisLocation = (isEditMode && locationToEdit)
+    ? (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locationToEdit.id)
+    : [];
+  const assignedCountForThisLocation = assignedProductSlotTemplatesForThisLocation.length;
+  const availableProductSlotTemplates = (userProductSlotTemplateInstances || []).filter(t => !t.used && !t.assignedLocationId);
   
   // 사용자의 템플릿 인스턴스 목록 콘솔 출력 및 템플릿 부족 확인
   useEffect(() => {
@@ -113,6 +121,98 @@ const AddLocationScreen = () => {
     icon: '',
     iconColor: '',
   });
+  const [quantityModalVisible, setQuantityModalVisible] = useState(false);
+  const [reserveQuantity, setReserveQuantity] = useState(1);
+
+  const openProductSlotsInfo = () => {
+    const baseSlots = (isEditMode
+      ? (selectedEditTemplateInstance?.feature?.baseSlots ?? currentTemplate?.feature?.baseSlots)
+      : selectedTemplateInstance?.feature?.baseSlots);
+    const freeTemplates = (userProductSlotTemplateInstances || []).filter(t => !t.used).length;
+    const used = isEditMode ? currentProductCount : 0;
+    const usedHere = isEditMode ? usedProductSlotTemplatesInThisLocation : 0;
+    const allowed = typeof baseSlots === 'number' && baseSlots === -1
+      ? '무제한'
+      : (typeof baseSlots === 'number' ? `${(baseSlots || 0) + freeTemplates + usedHere}개` : '-');
+
+    let message = '';
+    message += `보유 추가 제품 슬롯: ${freeTemplates}개\n`;
+    if (typeof baseSlots === 'number' && baseSlots === -1) {
+      message += `현재 템플릿은 기본 슬롯 무제한입니다. 추가 슬롯이 없어도 모든 제품을 등록할 수 있습니다.\n`;
+    } else {
+      message += `이 영역 허용치(기본+추가): ${allowed} / 현재 사용: ${used}개\n`;
+    }
+    message += `\n안내\n- 추가 슬롯은 모든 영역에 자동 적용됩니다.\n- 추가 슬롯으로 사용 중인 제품을 다른 곳으로 옮기려면, 해당 제품을 먼저 제거한 뒤 다른 영역에 다시 등록해야 합니다.`;
+
+    // 어떤 제품이 추가 슬롯을 사용 중인지(기본 초과분) 목록 표시 (수정 모드에서만 가능)
+    if (isEditMode && typeof baseSlots === 'number' && baseSlots !== -1) {
+      const overflow = Math.max(0, used - (baseSlots || 0));
+      if (overflow > 0 && currentLocationProducts && currentLocationProducts.length) {
+        const overflowProducts = currentLocationProducts.slice(-overflow);
+        const names = overflowProducts.map(p => p.name || p.title || `제품(${p.id})`).join(', ');
+        message += `\n\n추가 슬롯 사용 중인 제품: ${names}`;
+      }
+    }
+
+    setAlertModalConfig({
+      title: '제품 슬롯 안내',
+      message,
+      buttons: [
+        {
+          text: '수량 선택',
+          onPress: () => setQuantityModalVisible(true)
+        },
+        {
+          text: '상점으로 이동',
+          onPress: () => navigation.navigate('Profile', { screen: 'Store' })
+        },
+        { text: '닫기' }
+      ],
+      icon: 'information-circle',
+      iconColor: '#4CAF50'
+    });
+    setAlertModalVisible(true);
+  };
+
+  const handleAssignProductSlots = () => {
+    const freeCount = availableProductSlotTemplates.length;
+    const count = Math.max(0, Math.min(reserveQuantity, freeCount));
+    if (count <= 0) {
+      setAlertModalConfig({
+        title: '등록 불가',
+        message: '등록 가능한 추가 제품 슬롯이 없습니다. 상점에서 추가 구매해주세요.',
+        buttons: [{ text: '확인' }],
+        icon: 'alert-circle',
+        iconColor: '#F44336'
+      });
+      setAlertModalVisible(true);
+      setQuantityModalVisible(false);
+      return;
+    }
+    const locId = isEditMode && locationToEdit ? locationToEdit.id : null;
+    if (!locId) {
+      setAlertModalConfig({
+        title: '등록 불가',
+        message: '영역이 아직 생성되지 않았습니다. 먼저 영역을 생성한 후 등록해 주세요.',
+        buttons: [{ text: '확인' }],
+        icon: 'alert-circle',
+        iconColor: '#F44336'
+      });
+      setAlertModalVisible(true);
+      setQuantityModalVisible(false);
+      return;
+    }
+    dispatch(assignProductSlotTemplatesToLocation({ locationId: locId, count }));
+    setQuantityModalVisible(false);
+    setAlertModalConfig({
+      title: '등록 완료',
+      message: `추가 제품 슬롯 ${count}개를 이 영역에 등록했습니다.`,
+      buttons: [{ text: '확인' }],
+      icon: 'checkmark-circle',
+      iconColor: '#4CAF50'
+    });
+    setAlertModalVisible(true);
+  };
   
   // 선택된 템플릿이 있으면 기본 정보 설정 (생성 모드에서만)
   useEffect(() => {
@@ -208,12 +308,14 @@ const AddLocationScreen = () => {
         if (changingTemplate) {
           // 선택된 새 템플릿의 허용 슬롯 계산 및 검증
           const baseSlots = selectedEditTemplateInstance?.feature?.baseSlots;
-          const allowedSlots = baseSlots === -1 ? Number.POSITIVE_INFINITY : (baseSlots + additionalProductSlots);
+          const allowedSlots = baseSlots === -1 
+            ? Number.POSITIVE_INFINITY 
+            : (baseSlots + assignedCountForThisLocation);
           if (currentProductCount > allowedSlots) {
             setIsLoading(false);
             setAlertModalConfig({
               title: '변경 불가',
-              message: `현재 제품 ${currentProductCount}개가 새 템플릿 허용치(${baseSlots === -1 ? '무제한' : `${allowedSlots}개`})를 초과합니다. 제품을 줄이거나 다른 템플릿을 선택하세요.`,
+              message: `현재 제품 ${currentProductCount}개가 새 템플릿 허용치(${baseSlots === -1 ? '무제한' : `${allowedSlots}개`} = 기본 ${baseSlots} + 추가 사용가능 ${assignedCountForThisLocation})를 초과합니다.\n제품을 줄이거나 다른 템플릿을 선택하세요.`,
               buttons: [{ text: '확인' }],
               icon: 'alert-circle',
               iconColor: '#F44336',
@@ -326,6 +428,24 @@ const AddLocationScreen = () => {
       });
       setAlertModalVisible(true);
     }
+  };
+
+  const handleUnassignProductSlot = (templateId) => {
+    const t = (userProductSlotTemplateInstances || []).find(x => x.id === templateId);
+    if (!t) return;
+    if (t.used && t.usedByProductId) {
+      // 제품과 연결 해제 후 등록 해제
+      dispatch(releaseProductSlotTemplateByProduct(t.usedByProductId));
+    }
+    dispatch(unassignProductSlotTemplate({ templateId }));
+    setAlertModalConfig({
+      title: '등록 해제',
+      message: t.usedByProductId ? '해당 슬롯과 연결된 제품을 분리하고, 등록을 해제했습니다.' : '해당 추가 제품 슬롯의 등록을 해제했습니다.',
+      buttons: [{ text: '확인' }],
+      icon: 'information-circle',
+      iconColor: '#4CAF50'
+    });
+    setAlertModalVisible(true);
   };
   
   // baseSlots 값을 표시하는 함수
@@ -500,7 +620,83 @@ const AddLocationScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
-        
+
+        {/* 제품 슬롯 섹션 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>제품 슬롯</Text>
+          <Text style={styles.sectionDescription}>
+            {(() => {
+              const baseSlots = (isEditMode ? (selectedEditTemplateInstance?.feature?.baseSlots ?? currentTemplate?.feature?.baseSlots) : selectedTemplateInstance?.feature?.baseSlots);
+              const baseDisplay = (typeof baseSlots === 'number') ? (baseSlots === -1 ? '무제한' : `${baseSlots}개`) : '선택 필요';
+              const allowedDisplay = (typeof baseSlots === 'number' && baseSlots === -1) ? '무제한' : (typeof baseSlots === 'number' ? `${(baseSlots || 0) + (isEditMode ? assignedCountForThisLocation : 0)}개` : '-');
+              const used = isEditMode ? currentProductCount : 0;
+              return `기본 슬롯: ${baseDisplay}  |  추가 슬롯(등록됨): ${isEditMode ? assignedCountForThisLocation : 0}개  |  허용: ${allowedDisplay}  |  사용: ${used}개`;
+            })()}
+          </Text>
+
+          {/* 보유한 추가 제품 슬롯 리스트 */}
+          <View style={styles.productSlotList}>
+            <Text style={styles.productSlotSectionTitle}>보유한 추가 제품 슬롯 (미등록)</Text>
+            {availableProductSlotTemplates && availableProductSlotTemplates.length > 0 ? (
+              availableProductSlotTemplates.map(t => (
+                  <View key={t.id} style={styles.productSlotItem}>
+                    <View style={styles.productSlotInfo}>
+                      <Ionicons name="cube" size={18} color="#4CAF50" />
+                      <Text style={styles.productSlotText}>추가 제품 슬롯</Text>
+                    </View>
+                    {isEditMode && locationToEdit ? (
+                      <TouchableOpacity
+                        style={styles.assignButton}
+                        onPress={() => dispatch(assignProductSlotTemplatesToLocation({ locationId: locationToEdit.id, count: 1 }))}
+                      >
+                        <Text style={styles.assignButtonText}>이 영역에 등록</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <Text style={styles.productSlotSubText}>영역 생성 후 등록 가능</Text>
+                    )}
+                  </View>
+                ))
+            ) : (
+              <Text style={styles.emptyTemplatesText}>보유한 추가 제품 슬롯이 없습니다. 상점에서 구매하세요.</Text>
+            )}
+          </View>
+
+          {/* 이 영역에 등록된 추가 제품 슬롯 리스트 (수정 모드에서만) */}
+          {isEditMode && (
+            <View style={styles.productSlotList}>
+              <Text style={styles.productSlotSectionTitle}>이 영역에 등록된 추가 제품 슬롯</Text>
+              {assignedProductSlotTemplatesForThisLocation.length > 0 ? (
+                assignedProductSlotTemplatesForThisLocation.map(t => {
+                  const linkedProduct = t.usedByProductId ? currentLocationProducts.find(p => p.id === t.usedByProductId) : null;
+                  return (
+                  <View key={t.id} style={styles.productSlotItem}>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.productSlotInfo}>
+                        <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+                        <Text style={styles.productSlotText}>등록됨</Text>
+                      </View>
+                      {linkedProduct && (
+                        <Text style={styles.productSlotLinkedText}>연결된 제품: {linkedProduct.name || linkedProduct.title || `제품(${linkedProduct.id})`}</Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.assignButton, { backgroundColor: '#9E9E9E' }]}
+                      onPress={() => handleUnassignProductSlot(t.id)}
+                    >
+                      <Text style={styles.assignButtonText}>등록 해제</Text>
+                    </TouchableOpacity>
+                  </View>
+                  );
+                })
+              ) : (
+                <Text style={styles.emptyTemplatesText}>등록된 추가 제품 슬롯이 없습니다.</Text>
+              )}
+            </View>
+          )}
+
+
+        </View>
+
         {/* 영역 생성/수정 버튼 */}
         <TouchableOpacity
           style={styles.createButton}
@@ -534,6 +730,24 @@ const AddLocationScreen = () => {
           icon={alertModalConfig.icon}
           iconColor={alertModalConfig.iconColor}
         />
+
+        {/* 수량 선택 모달 (간단 구현: AlertModal의 content로 입력 UI 구성 가능하나, 여기서는 프리셋 버튼 제공) */}
+        {quantityModalVisible && (
+          <AlertModal
+            visible={quantityModalVisible}
+            title="추가 제품 슬롯 등록"
+            message={`등록할 수량을 선택하세요. (보유: ${(userProductSlotTemplateInstances || []).filter(t => !t.used && !t.assignedLocationId).length}개)`}
+            buttons={[
+              { text: '1개', onPress: () => { setReserveQuantity(1); handleAssignProductSlots(); } },
+              { text: '3개', onPress: () => { setReserveQuantity(3); handleAssignProductSlots(); } },
+              { text: '5개', onPress: () => { setReserveQuantity(5); handleAssignProductSlots(); } },
+              { text: '취소', onPress: () => setQuantityModalVisible(false) },
+            ]}
+            onClose={() => setQuantityModalVisible(false)}
+            icon="list"
+            iconColor="#4CAF50"
+          />
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -740,6 +954,67 @@ const styles = StyleSheet.create({
   },
   storeButtonText: {
     color: 'white',
+    fontWeight: 'bold',
+  },
+  planButton: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  planButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  productSlotSectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  productSlotList: {
+    marginTop: 16,
+  },
+  productSlotItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: '#f9f9f9',
+  },
+  productSlotInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  productSlotText: {
+    marginLeft: 8,
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '500',
+  },
+  productSlotSubText: {
+    fontSize: 13,
+    color: '#777',
+    marginTop: 4,
+  },
+  productSlotLinkedText: {
+    fontSize: 13,
+    color: '#555',
+    marginTop: 6,
+  },
+  assignButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  assignButtonText: {
+    color: 'white',
+    fontSize: 13,
     fontWeight: 'bold',
   },
 });
