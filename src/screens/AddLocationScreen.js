@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { createLocation, updateLocation } from '../redux/slices/locationsSlice';
-import { markTemplateInstanceAsUsed, releaseTemplateInstance, addTemplateInstance, assignProductSlotTemplatesToLocation, unassignProductSlotTemplate, releaseProductSlotTemplateByProduct } from '../redux/slices/authSlice';
+import { markTemplateInstanceAsUsed, releaseTemplateInstance, addTemplateInstance, unassignProductSlotTemplate, assignProductSlotTemplateToLocation } from '../redux/slices/authSlice';
 import { useSelector as useReduxSelector } from 'react-redux';
 import { fetchProductsByLocation } from '../redux/slices/productsSlice';
 import IconSelector from '../components/IconSelector';
@@ -36,8 +36,18 @@ const AddLocationScreen = () => {
   
   // 사용 가능한 템플릿 인스턴스만 필터링
   const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
-  const currentTemplate = isEditMode && locationToEdit
-    ? userLocationTemplateInstances.find(t => t.id === locationToEdit.templateInstanceId)
+  const currentTemplate = (isEditMode && locationToEdit)
+    ? (
+        userLocationTemplateInstances.find(t => t.id === locationToEdit.templateInstanceId) ||
+        userLocationTemplateInstances.find(t => t.usedInLocationId === locationToEdit.id) ||
+        (locationToEdit.feature ? {
+          id: 'derived_current_template',
+          name: locationToEdit.title || '현재 템플릿',
+          description: locationToEdit.description || '',
+          icon: locationToEdit.icon || 'cube-outline',
+          feature: locationToEdit.feature,
+        } : null)
+      )
     : null;
   const currentLocationProducts = isEditMode && locationToEdit ? (locationProducts?.[locationToEdit.id] || []) : [];
   const currentProductCount = currentLocationProducts.length;
@@ -48,6 +58,8 @@ const AddLocationScreen = () => {
     : [];
   const assignedCountForThisLocation = assignedProductSlotTemplatesForThisLocation.length;
   const availableProductSlotTemplates = (userProductSlotTemplateInstances || []).filter(t => !t.used && !t.assignedLocationId);
+ 
+  // 스테이징 계산은 아래 선언 이후에 수행됩니다.
   
   // 사용자의 템플릿 인스턴스 목록 콘솔 출력 및 템플릿 부족 확인
   useEffect(() => {
@@ -121,8 +133,19 @@ const AddLocationScreen = () => {
     icon: '',
     iconColor: '',
   });
+  // 스테이징: 등록/해제 예정 템플릿 ID 목록 (편집 모드에서만 사용)
+  const [stagedAssignTemplateIds, setStagedAssignTemplateIds] = useState([]);
+  const [stagedUnassignTemplateIds, setStagedUnassignTemplateIds] = useState([]);
   const [quantityModalVisible, setQuantityModalVisible] = useState(false);
   const [reserveQuantity, setReserveQuantity] = useState(1);
+  
+  // 스테이징 미리보기 계산 (선언 이후)
+  const stagedAssignCount = stagedAssignTemplateIds.length;
+  const stagedUnassignCount = stagedUnassignTemplateIds.length;
+  const previewAssignedCount = Math.max(0, assignedCountForThisLocation - stagedUnassignCount + stagedAssignCount);
+  const previewAvailableTemplates = availableProductSlotTemplates.filter(t => !stagedAssignTemplateIds.includes(t.id));
+  const previewAssignedTemplates = assignedProductSlotTemplatesForThisLocation.filter(t => !stagedUnassignTemplateIds.includes(t.id));
+  const stagedAssignTemplates = availableProductSlotTemplates.filter(t => stagedAssignTemplateIds.includes(t.id));
 
   const openProductSlotsInfo = () => {
     const baseSlots = (isEditMode
@@ -310,12 +333,12 @@ const AddLocationScreen = () => {
           const baseSlots = selectedEditTemplateInstance?.feature?.baseSlots;
           const allowedSlots = baseSlots === -1 
             ? Number.POSITIVE_INFINITY 
-            : (baseSlots + assignedCountForThisLocation);
+            : (baseSlots + previewAssignedCount);
           if (currentProductCount > allowedSlots) {
             setIsLoading(false);
             setAlertModalConfig({
               title: '변경 불가',
-              message: `현재 제품 ${currentProductCount}개가 새 템플릿 허용치(${baseSlots === -1 ? '무제한' : `${allowedSlots}개`} = 기본 ${baseSlots} + 추가 사용가능 ${assignedCountForThisLocation})를 초과합니다.\n제품을 줄이거나 다른 템플릿을 선택하세요.`,
+              message: `현재 제품 ${currentProductCount}개가 새 템플릿 허용치(${baseSlots === -1 ? '무제한' : `${allowedSlots}개`} = 기본 ${baseSlots} + 추가(미리보기) ${previewAssignedCount})를 초과합니다.\n제품을 줄이거나 다른 템플릿을 선택하세요.`,
               buttons: [{ text: '확인' }],
               icon: 'alert-circle',
               iconColor: '#F44336',
@@ -340,15 +363,23 @@ const AddLocationScreen = () => {
         })).unwrap();
         
         console.log('영역 수정 성공:', updatedLocation);
-        
-        // 템플릿 교체 처리: 이전 템플릿 해제, 새 템플릿 사용 표시
-        if (changingTemplate) {
-          // 이전 템플릿 해제
-          dispatch(releaseTemplateInstance(locationToEdit.id));
-          // 새 템플릿 사용 표시
-          dispatch(markTemplateInstanceAsUsed({ templateId: newTemplateInstanceId, locationId: locationToEdit.id }));
+
+        // 스테이징된 제품 슬롯 등록/해제 적용
+        try {
+          for (const templateId of stagedAssignTemplateIds) {
+            await dispatch(assignProductSlotTemplateToLocation({ templateId, locationId: locationToEdit.id }));
+          }
+          for (const templateId of stagedUnassignTemplateIds) {
+            await dispatch(unassignProductSlotTemplate({ templateId }));
+          }
+        } catch (e) {
+          console.log('제품 슬롯 스테이징 적용 중 오류:', e);
         }
 
+        // 스테이징 초기화
+        setStagedAssignTemplateIds([]);
+        setStagedUnassignTemplateIds([]);
+        
         setIsLoading(false);
         
         // 성공 메시지 표시 후 내 영역 탭으로 이동
@@ -642,21 +673,45 @@ const AddLocationScreen = () => {
         {/* 제품 슬롯 섹션 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>제품 슬롯</Text>
-          <Text style={styles.sectionDescription}>
-            {(() => {
-              const baseSlots = (isEditMode ? (selectedEditTemplateInstance?.feature?.baseSlots ?? currentTemplate?.feature?.baseSlots) : selectedTemplateInstance?.feature?.baseSlots);
-              const baseDisplay = (typeof baseSlots === 'number') ? (baseSlots === -1 ? '무제한' : `${baseSlots}개`) : '선택 필요';
-              const allowedDisplay = (typeof baseSlots === 'number' && baseSlots === -1) ? '무제한' : (typeof baseSlots === 'number' ? `${(baseSlots || 0) + (isEditMode ? assignedCountForThisLocation : 0)}개` : '-');
-              const used = isEditMode ? currentProductCount : 0;
-              return `기본 슬롯: ${baseDisplay}  |  추가 슬롯(등록됨): ${isEditMode ? assignedCountForThisLocation : 0}개  |  허용: ${allowedDisplay}  |  사용: ${used}개`;
-            })()}
-          </Text>
+          {(isEditMode && (stagedAssignCount > 0 || stagedUnassignCount > 0)) && (
+            <View style={styles.stagingNotice}>
+              <Ionicons name="information-circle" size={16} color="#4CAF50" style={{ marginRight: 6 }} />
+              <Text style={styles.stagingNoticeText}>변경 사항이 있습니다. 아래 "영역 수정"을 눌러 적용하세요.</Text>
+            </View>
+          )}
+          {(() => {
+            const baseSlots = (isEditMode ? (selectedEditTemplateInstance?.feature?.baseSlots ?? currentTemplate?.feature?.baseSlots) : selectedTemplateInstance?.feature?.baseSlots);
+            const baseDisplay = (typeof baseSlots === 'number') ? (baseSlots === -1 ? '무제한' : `${baseSlots}개`) : '선택 필요';
+            const allowedDisplay = (typeof baseSlots === 'number' && baseSlots === -1) ? '무제한' : (typeof baseSlots === 'number' ? `${(baseSlots || 0) + (isEditMode ? previewAssignedCount : 0)}개` : '-');
+            const used = isEditMode ? currentProductCount : 0;
+            const registered = isEditMode ? previewAssignedCount : 0;
+            return (
+              <View style={styles.productSlotSummary}>
+                <View style={styles.productSlotRow}>
+                  <Text style={styles.productSlotLabel}>기본 슬롯</Text>
+                  <Text style={styles.productSlotValue}>{baseDisplay}</Text>
+                </View>
+                <View style={styles.productSlotRow}>
+                  <Text style={styles.productSlotLabel}>추가 슬롯(등록됨)</Text>
+                  <Text style={styles.productSlotValue}>{registered}개</Text>
+                </View>
+                <View style={styles.productSlotRow}>
+                  <Text style={styles.productSlotLabel}>허용</Text>
+                  <Text style={styles.productSlotValue}>{allowedDisplay}</Text>
+                </View>
+                <View style={styles.productSlotRow}>
+                  <Text style={styles.productSlotLabel}>사용</Text>
+                  <Text style={styles.productSlotValue}>{used}개</Text>
+                </View>
+              </View>
+            );
+          })()}
 
           {/* 보유한 추가 제품 슬롯 리스트 */}
           <View style={styles.productSlotList}>
             <Text style={styles.productSlotSectionTitle}>보유한 추가 제품 슬롯 (미등록)</Text>
-            {availableProductSlotTemplates && availableProductSlotTemplates.length > 0 ? (
-              availableProductSlotTemplates.map(t => (
+            {previewAvailableTemplates && previewAvailableTemplates.length > 0 ? (
+              previewAvailableTemplates.map(t => (
                   <View key={t.id} style={styles.productSlotItem}>
                     <View style={styles.productSlotInfo}>
                       <Ionicons name="cube" size={18} color="#4CAF50" />
@@ -665,9 +720,9 @@ const AddLocationScreen = () => {
                     {isEditMode && locationToEdit ? (
                       <TouchableOpacity
                         style={styles.assignButton}
-                        onPress={() => dispatch(assignProductSlotTemplatesToLocation({ locationId: locationToEdit.id, count: 1 }))}
+                        onPress={() => setStagedAssignTemplateIds(prev => prev.includes(t.id) ? prev : [...prev, t.id])}
                       >
-                        <Text style={styles.assignButtonText}>이 영역에 등록</Text>
+                        <Text style={styles.assignButtonText}>등록 예정</Text>
                       </TouchableOpacity>
                     ) : (
                       <Text style={styles.productSlotSubText}>영역 생성 후 등록 가능</Text>
@@ -675,7 +730,33 @@ const AddLocationScreen = () => {
                   </View>
                 ))
             ) : (
-              <Text style={styles.emptyTemplatesText}>보유한 추가 제품 슬롯이 없습니다. 상점에서 구매하세요.</Text>
+              <View style={styles.emptySlotCard}>
+                <Ionicons name="cart-outline" size={28} color="#9E9E9E" style={{ marginBottom: 6 }} />
+                <Text style={styles.emptySlotTitle}>보유한 추가 제품 슬롯이 없습니다</Text>
+                <Text style={styles.emptySlotSubtitle}>{`상점에서 추가 제품 슬롯을 구매한 뒤\n이 영역에 등록해 사용할 수 있습니다.`}</Text>
+              </View>
+            )}
+
+            {/* 등록 예정 목록 */}
+            {(isEditMode && stagedAssignTemplates.length > 0) && (
+              <View style={[styles.emptySlotCard, { marginTop: 8 }]}> 
+                <Text style={styles.productSlotSectionTitle}>등록 예정 {stagedAssignTemplates.length}개</Text>
+                {stagedAssignTemplates.map(t => (
+                  <View key={`staged-${t.id}`} style={[styles.productSlotItem, { marginBottom: 6 }]}> 
+                    <View style={styles.productSlotInfo}>
+                      <Ionicons name="time-outline" size={18} color="#4CAF50" />
+                      <Text style={styles.productSlotText}>추가 제품 슬롯 (등록 예정)</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.assignButton, { backgroundColor: '#9E9E9E' }]}
+                      onPress={() => setStagedAssignTemplateIds(prev => prev.filter(id => id !== t.id))}
+                    >
+                      <Text style={styles.assignButtonText}>취소</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <Text style={styles.stagingHelpText}>영역 수정 버튼을 눌러 적용됩니다.</Text>
+              </View>
             )}
           </View>
 
@@ -683,8 +764,8 @@ const AddLocationScreen = () => {
           {isEditMode && (
             <View style={styles.productSlotList}>
               <Text style={styles.productSlotSectionTitle}>이 영역에 등록된 추가 제품 슬롯</Text>
-              {assignedProductSlotTemplatesForThisLocation.length > 0 ? (
-                assignedProductSlotTemplatesForThisLocation.map(t => {
+              {previewAssignedTemplates.length > 0 ? (
+                previewAssignedTemplates.map(t => {
                   const linkedProduct = t.usedByProductId ? currentLocationProducts.find(p => p.id === t.usedByProductId) : null;
                   return (
                   <View key={t.id} style={styles.productSlotItem}>
@@ -699,20 +780,48 @@ const AddLocationScreen = () => {
                     </View>
                     <TouchableOpacity
                       style={[styles.assignButton, { backgroundColor: '#9E9E9E' }]}
-                      onPress={() => handleUnassignProductSlot(t.id)}
+                      onPress={() => 
+                        (t.used && t.usedByProductId)
+                          ? handleUnassignProductSlot(t.id)
+                          : setStagedUnassignTemplateIds(prev => prev.includes(t.id) ? prev : [...prev, t.id])
+                      }
                     >
-                      <Text style={styles.assignButtonText}>등록 해제</Text>
+                      <Text style={styles.assignButtonText}>{(t.used && t.usedByProductId) ? '제품 확인' : '해제 예정'}</Text>
                     </TouchableOpacity>
                   </View>
                   );
                 })
-              ) : (
-                <Text style={styles.emptyTemplatesText}>등록된 추가 제품 슬롯이 없습니다.</Text>
+                              ) : (
+                <View style={styles.emptySlotCard}>
+                  <Ionicons name="add-circle-outline" size={28} color="#9E9E9E" style={{ marginBottom: 6 }} />
+                  <Text style={styles.emptySlotTitle}>등록된 추가 제품 슬롯이 없습니다</Text>
+                  <Text style={styles.emptySlotSubtitle}>{`위의 '보유한 추가 제품 슬롯 (미등록)'에서\n이 영역에 등록할 수 있습니다.`}</Text>
+                </View>
+               )}
+
+              {/* 해제 예정 목록 */}
+              {(isEditMode && stagedUnassignTemplateIds.length > 0) && (
+                <View style={[styles.emptySlotCard, { marginTop: 8 }]}> 
+                  <Text style={styles.productSlotSectionTitle}>해제 예정 {stagedUnassignTemplateIds.length}개</Text>
+                  {stagedUnassignTemplateIds.map(id => (
+                    <View key={`un-${id}`} style={[styles.productSlotItem, { marginBottom: 6 }]}> 
+                      <View style={styles.productSlotInfo}>
+                        <Ionicons name="time-outline" size={18} color="#9E9E9E" />
+                        <Text style={styles.productSlotText}>추가 제품 슬롯 (해제 예정)</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.assignButton}
+                        onPress={() => setStagedUnassignTemplateIds(prev => prev.filter(tid => tid !== id))}
+                      >
+                        <Text style={styles.assignButtonText}>취소</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  <Text style={styles.stagingHelpText}>영역 수정 버튼을 눌러 적용됩니다.</Text>
+                </View>
               )}
             </View>
           )}
-
-
         </View>
 
         {/* 영역 생성/수정 버튼 */}
@@ -964,6 +1073,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
+  emptySlotCard: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#fafafa',
+    borderRadius: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  emptySlotTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#444',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  emptySlotSubtitle: {
+    fontSize: 13,
+    color: '#777',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
   storeButton: {
     backgroundColor: '#FF9800',
     paddingHorizontal: 16,
@@ -992,6 +1123,31 @@ const styles = StyleSheet.create({
   },
   productSlotList: {
     marginTop: 16,
+  },
+  productSlotSummary: {
+    marginTop: 8,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  productSlotRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  productSlotLabel: {
+    fontSize: 14,
+    color: '#555',
+    fontWeight: '600',
+  },
+  productSlotValue: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '700',
   },
   productSlotItem: {
     flexDirection: 'row',
@@ -1034,6 +1190,27 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 13,
     fontWeight: 'bold',
+  },
+  stagingNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f5e9',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+  },
+  stagingNoticeText: {
+    fontSize: 12,
+    color: '#2e7d32',
+  },
+  stagingHelpText: {
+    fontSize: 12,
+    color: '#777',
+    marginTop: 6,
+    textAlign: 'center',
   },
 });
 
