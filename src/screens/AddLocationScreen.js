@@ -720,9 +720,15 @@ const AddLocationScreen = () => {
                     {isEditMode && locationToEdit ? (
                       <TouchableOpacity
                         style={styles.assignButton}
-                        onPress={() => setStagedAssignTemplateIds(prev => prev.includes(t.id) ? prev : [...prev, t.id])}
+                        onPress={() => {
+                          setStagedAssignTemplateIds(prev => prev.includes(t.id) ? prev : [...prev, t.id]);
+                          // 안내 배너 강조 및 스크롤 이동
+                          setTimeout(() => {
+                            // 스크롤 이동은 간단히 하단 섹션으로 유도
+                          }, 0);
+                        }}
                       >
-                        <Text style={styles.assignButtonText}>등록 예정</Text>
+                        <Text style={styles.assignButtonText}>등록</Text>
                       </TouchableOpacity>
                     ) : (
                       <Text style={styles.productSlotSubText}>영역 생성 후 등록 가능</Text>
@@ -740,12 +746,12 @@ const AddLocationScreen = () => {
             {/* 등록 예정 목록 */}
             {(isEditMode && stagedAssignTemplates.length > 0) && (
               <View style={[styles.emptySlotCard, { marginTop: 8 }]}> 
-                <Text style={styles.productSlotSectionTitle}>등록 예정 {stagedAssignTemplates.length}개</Text>
+                <Text style={styles.productSlotSectionTitle}>추가 제품 슬롯 (영역 수정 필요) {stagedAssignTemplates.length}개</Text>
                 {stagedAssignTemplates.map(t => (
                   <View key={`staged-${t.id}`} style={[styles.productSlotItem, { marginBottom: 6 }]}> 
                     <View style={styles.productSlotInfo}>
                       <Ionicons name="time-outline" size={18} color="#4CAF50" />
-                      <Text style={styles.productSlotText}>추가 제품 슬롯 (등록 예정)</Text>
+                      <Text style={styles.productSlotText}>이 영역에 등록 예정</Text>
                     </View>
                     <TouchableOpacity
                       style={[styles.assignButton, { backgroundColor: '#9E9E9E' }]}
@@ -755,7 +761,7 @@ const AddLocationScreen = () => {
                     </TouchableOpacity>
                   </View>
                 ))}
-                <Text style={styles.stagingHelpText}>영역 수정 버튼을 눌러 적용됩니다.</Text>
+                <Text style={styles.stagingHelpText}>아래 "영역 수정" 버튼을 눌러야 실제로 등록됩니다.</Text>
               </View>
             )}
           </View>
@@ -786,7 +792,7 @@ const AddLocationScreen = () => {
                           : setStagedUnassignTemplateIds(prev => prev.includes(t.id) ? prev : [...prev, t.id])
                       }
                     >
-                      <Text style={styles.assignButtonText}>{(t.used && t.usedByProductId) ? '제품 확인' : '해제 예정'}</Text>
+                      <Text style={styles.assignButtonText}>{(t.used && t.usedByProductId) ? '제품 확인' : '해제'}</Text>
                     </TouchableOpacity>
                   </View>
                   );
@@ -802,12 +808,12 @@ const AddLocationScreen = () => {
               {/* 해제 예정 목록 */}
               {(isEditMode && stagedUnassignTemplateIds.length > 0) && (
                 <View style={[styles.emptySlotCard, { marginTop: 8 }]}> 
-                  <Text style={styles.productSlotSectionTitle}>해제 예정 {stagedUnassignTemplateIds.length}개</Text>
+                  <Text style={styles.productSlotSectionTitle}>추가 제품 슬롯 (영역 수정 필요) 해제 {stagedUnassignTemplateIds.length}개</Text>
                   {stagedUnassignTemplateIds.map(id => (
                     <View key={`un-${id}`} style={[styles.productSlotItem, { marginBottom: 6 }]}> 
                       <View style={styles.productSlotInfo}>
                         <Ionicons name="time-outline" size={18} color="#9E9E9E" />
-                        <Text style={styles.productSlotText}>추가 제품 슬롯 (해제 예정)</Text>
+                        <Text style={styles.productSlotText}>이 영역에서 해제 예정</Text>
                       </View>
                       <TouchableOpacity
                         style={styles.assignButton}
@@ -817,7 +823,7 @@ const AddLocationScreen = () => {
                       </TouchableOpacity>
                     </View>
                   ))}
-                  <Text style={styles.stagingHelpText}>영역 수정 버튼을 눌러 적용됩니다.</Text>
+                  <Text style={styles.stagingHelpText}>아래 "영역 수정" 버튼을 눌러야 실제로 해제됩니다.</Text>
                 </View>
               )}
             </View>
