@@ -3,6 +3,48 @@ import { saveUserSlots, loadUserSlots, saveUserLocationTemplates, loadUserLocati
 import { generateId } from '../../utils/idUtils';
 import { resetLocationsState } from './locationsSlice';
 
+// 디바이스 기반 기본 템플릿 ID 생성기
+const buildDeterministicTemplateId = (deviceId) => `locationTemplate_${deviceId}`;
+// 템플릿 ID 유니크 보장 보조 함수
+const ensureUniqueTemplateId = (existingTemplates, preferredId) => {
+  if (!existingTemplates || existingTemplates.length === 0) return preferredId;
+  const exists = existingTemplates.some(t => t.id === preferredId);
+  if (!exists) return preferredId;
+  // 충돌 시 짧은 랜덤 접미사 부여
+  return `${preferredId}_${Math.random().toString(36).substring(2, 6)}`;
+};
+
+// 영역과 템플릿 사용 상태 동기화
+export const reconcileLocationTemplates = createAsyncThunk(
+  'auth/reconcileLocationTemplates',
+  async (_, { getState }) => {
+    const state = getState();
+    const templates = (state.auth.userLocationTemplateInstances || []).map(t => ({ ...t }));
+    const locations = state.locations.locations || [];
+    const linkedTemplateIds = new Set();
+    // 영역에 연결된 템플릿 적용
+    for (const loc of locations) {
+      if (loc?.templateInstanceId) {
+        const tt = templates.find(t => t.id === loc.templateInstanceId);
+        if (tt) {
+          tt.used = true;
+          tt.usedInLocationId = loc.id;
+          linkedTemplateIds.add(tt.id);
+        }
+      }
+    }
+    // 사용 안하는 템플릿 정리
+    for (const t of templates) {
+      if (!linkedTemplateIds.has(t.id)) {
+        t.used = false;
+        t.usedInLocationId = null;
+      }
+    }
+    await saveUserLocationTemplates(templates);
+    return templates;
+  }
+);
+
 // JWT 토큰 발급 API 호출 (실제 구현 시 서버에서 가져옴)
 export const getAnonymousToken = createAsyncThunk(
   'auth/getAnonymousToken',
@@ -12,7 +54,8 @@ export const getAnonymousToken = createAsyncThunk(
       const storedToken = await loadJwtToken();
       if (storedToken && typeof storedToken === 'string' && storedToken.startsWith('anonymous_')) {
         console.log('AsyncStorage의 기존 익명 토큰 재사용:', storedToken);
-        return { token: storedToken };
+        const deviceId = await loadDeviceId();
+        return { token: storedToken, deviceId };
       }
 
       let deviceId = await loadDeviceId();
@@ -26,7 +69,7 @@ export const getAnonymousToken = createAsyncThunk(
       // 토큰을 AsyncStorage에 저장
       await saveJwtToken(token);
 
-      return { token };
+      return { token, deviceId };
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -108,10 +151,11 @@ export const verifyToken = createAsyncThunk(
     try {
       // AsyncStorage에서 토큰 로드
       const token = await loadJwtToken();
+      const deviceId = await loadDeviceId();
       
       if (!token) {
         console.log('저장된 토큰이 없습니다.');
-        return null;
+        return { token: null, deviceId };
       }
       
       const isAnonymous = token.startsWith('anonymous_');
@@ -137,7 +181,8 @@ export const verifyToken = createAsyncThunk(
             return {
               token,
               isAnonymous: true,
-              templates: savedTemplates || userLocationTemplateInstances
+              templates: savedTemplates || userLocationTemplateInstances,
+              deviceId,
             };
           }
         }
@@ -145,7 +190,8 @@ export const verifyToken = createAsyncThunk(
         return {
           token,
           isAnonymous: true,
-          templates: savedTemplates
+          templates: savedTemplates,
+          deviceId,
         };
       } else {
         // 회원 토큰인 경우 사용자 정보 포함 (임시)
@@ -158,7 +204,8 @@ export const verifyToken = createAsyncThunk(
             username: '사용자',
             email: 'user@example.com',
           },
-          templates: savedTemplates
+          templates: savedTemplates,
+          deviceId,
         };
       }
     } catch (error) {
@@ -181,9 +228,15 @@ export const loadUserLocationTemplateInstances = createAsyncThunk(
         return templates;
       }
       
-      // 저장된 템플릿이 없으면 기본 템플릿 생성
+      // 저장된 템플릿이 없으면 기본 템플릿 생성(디바이스ID 기반)
       console.log('저장된 템플릿이 없어 기본 템플릿을 생성합니다.');
-      const defaultTemplate = createBasicLocationTemplate();
+      let deviceId = await loadDeviceId();
+      if (!deviceId) {
+        deviceId = `device_${Math.random().toString(36).substring(2, 15)}`;
+        await saveDeviceId(deviceId);
+      }
+      const preferredId = buildDeterministicTemplateId(deviceId);
+      const defaultTemplate = createBasicLocationTemplate(preferredId);
       await saveUserLocationTemplates([defaultTemplate]);
       return [defaultTemplate];
     } catch (error) {
@@ -207,8 +260,8 @@ export const loadUserProductSlotTemplateInstances = createAsyncThunk(
 );
 
 // 기본 템플릿 생성 함수
-const createBasicLocationTemplate = () => ({
-  id: generateId('locationTemplate'),
+const createBasicLocationTemplate = (idOverride) => ({
+  id: idOverride || generateId('locationTemplate'),
   productId: 'basic_location',
   name: '기본 영역',
   description: '기본적인 제품 관리 기능을 제공하는 영역',
@@ -225,6 +278,7 @@ const initialState = {
   user: null,
   isLoggedIn: false,
   isAnonymous: false, // 비회원 여부
+  deviceId: null,
   loading: false,
   error: null,
   subscription: {
@@ -365,6 +419,7 @@ export const authSlice = createSlice({
       state.isAnonymous = false;
       state.user = null;
       state.token = null;
+      state.deviceId = state.deviceId || null;
       state.subscription = initialState.subscription;
       state.slots = initialState.slots;
       state.points = initialState.points;
@@ -606,6 +661,7 @@ export const authSlice = createSlice({
         state.loading = false;
         state.token = action.payload.token;
         state.isAnonymous = true;
+        state.deviceId = action.payload.deviceId || state.deviceId;
         state.error = null;
         
         // 이미 사용 중인 템플릿이 있는지 확인
@@ -615,9 +671,11 @@ export const authSlice = createSlice({
           // 이미 사용 중인 템플릿이 있으면 템플릿 상태 유지
           console.log('익명 토큰 발급: 이미 사용 중인 템플릿이 있습니다. 템플릿 상태 유지:', state.userLocationTemplateInstances);
         } else {
-          // 비회원은 기본 템플릿 1개만 제공
+          // 비회원은 기본 템플릿 1개만 제공 (디바이스ID 기반 결정적 ID)
           console.log('익명 토큰 발급: 템플릿 인스턴스 초기화');
-          const template = createBasicLocationTemplate();
+          const deterministicId = buildDeterministicTemplateId(action.payload.deviceId || 'unknown');
+          const uniqueId = ensureUniqueTemplateId(state.userLocationTemplateInstances, deterministicId);
+          const template = createBasicLocationTemplate(uniqueId);
           state.userLocationTemplateInstances = [template];
           console.log('익명 토큰 발급 후 템플릿 인스턴스:', [template]);
           
@@ -735,7 +793,7 @@ export const authSlice = createSlice({
       .addCase(verifyToken.fulfilled, (state, action) => {
         state.loading = false;
         
-        if (!action.payload) {
+        if (!action.payload || !action.payload.token) {
           // 토큰이 없는 경우 초기 상태로 설정
           state.token = null;
           state.user = null;
@@ -744,7 +802,9 @@ export const authSlice = createSlice({
           state.error = null;
           // 기본 템플릿 1개 제공
           console.log('토큰 없음: 기본 템플릿 1개 제공');
-          const template = createBasicLocationTemplate();
+          const deterministicId = buildDeterministicTemplateId(action.payload?.deviceId || state.deviceId || 'unknown');
+          const uniqueId = ensureUniqueTemplateId(state.userLocationTemplateInstances, deterministicId);
+          const template = createBasicLocationTemplate(uniqueId);
           state.userLocationTemplateInstances = [template];
           console.log('토큰 없음 후 템플릿 인스턴스:', [template]);
           
@@ -758,6 +818,7 @@ export const authSlice = createSlice({
         // 공통 플래그/토큰 복원
         state.token = action.payload.token;
         state.isAnonymous = action.payload.isAnonymous;
+        state.deviceId = action.payload.deviceId || state.deviceId;
         
         // 로그인 사용자라면 로그인 상태/사용자 정보 복원 (템플릿 존재 여부와 무관하게 선행)
         if (!action.payload.isAnonymous) {
@@ -796,7 +857,9 @@ export const authSlice = createSlice({
           if (usedTemplates.length > 0) {
             console.log('익명 사용자가 이미 템플릿을 사용 중입니다. 템플릿 상태 유지:', state.userLocationTemplateInstances);
           } else if (!action.payload.templates) {
-            const template = createBasicLocationTemplate();
+            const deterministicId = buildDeterministicTemplateId(action.payload.deviceId || state.deviceId || 'unknown');
+            const uniqueId = ensureUniqueTemplateId(state.userLocationTemplateInstances, deterministicId);
+            const template = createBasicLocationTemplate(uniqueId);
             state.userLocationTemplateInstances = [template];
             console.log('토큰 검증 후 템플릿 인스턴스 (익명):', [template]);
             saveUserLocationTemplates([template])
@@ -836,6 +899,17 @@ export const authSlice = createSlice({
         state.userProductSlotTemplateInstances = action.payload || [];
       })
       .addCase(loadUserProductSlotTemplateInstances.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(reconcileLocationTemplates.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(reconcileLocationTemplates.fulfilled, (state, action) => {
+        state.loading = false;
+        state.userLocationTemplateInstances = action.payload;
+      })
+      .addCase(reconcileLocationTemplates.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

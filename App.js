@@ -5,6 +5,7 @@ import { Platform, StyleSheet, Linking, AppState, View, ActivityIndicator, Text,
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, getAnonymousToken, logout, loadUserLocationTemplateInstances, loadUserProductSlotTemplateInstances } from './src/redux/slices/authSlice';
+import { reconcileLocationTemplates } from './src/redux/slices/authSlice';
 import * as Updates from 'expo-updates';
 import Constants from 'expo-constants';
 import CodePushUpdateLoading from './src/components/CodePushUpdateLoading';
@@ -185,11 +186,15 @@ const AppContent = () => {
       
       // 사용자 영역 템플릿 인스턴스 로드
       await dispatch(loadUserLocationTemplateInstances()).unwrap();
+      // 위치 데이터 로드 후 템플릿 사용 상태 동기화
+      await dispatch(reconcileLocationTemplates());
       // 사용자 제품 슬롯 템플릿 인스턴스 로드
       await dispatch(loadUserProductSlotTemplateInstances()).unwrap();
       
       // 영역 데이터 로드
       await dispatch(fetchLocations()).unwrap();
+      // 위치 로드 후 한 번 더 동기화 (순서상 보강)
+      await dispatch(reconcileLocationTemplates());
       
       // 제품 데이터 로드
       await dispatch(fetchProducts()).unwrap();
