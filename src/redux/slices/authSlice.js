@@ -14,6 +14,17 @@ const ensureUniqueTemplateId = (existingTemplates, preferredId) => {
   return `${preferredId}_${Math.random().toString(36).substring(2, 6)}`;
 };
 
+// 비회원 기본 템플릿 2개 생성 (baseSlots=3)
+const createAnonymousDefaultTemplates = (deviceId, existing = []) => {
+  const baseId = buildDeterministicTemplateId(deviceId || 'unknown');
+  const id1 = ensureUniqueTemplateId(existing, `${baseId}_1`);
+  const t1 = createBasicLocationTemplate(id1, 3);
+  const withFirst = [...existing, t1];
+  const id2 = ensureUniqueTemplateId(withFirst, `${baseId}_2`);
+  const t2 = createBasicLocationTemplate(id2, 3);
+  return [t1, t2];
+};
+
 // 영역과 템플릿 사용 상태 동기화
 export const reconcileLocationTemplates = createAsyncThunk(
   'auth/reconcileLocationTemplates',
@@ -235,10 +246,9 @@ export const loadUserLocationTemplateInstances = createAsyncThunk(
         deviceId = `device_${Math.random().toString(36).substring(2, 15)}`;
         await saveDeviceId(deviceId);
       }
-      const preferredId = buildDeterministicTemplateId(deviceId);
-      const defaultTemplate = createBasicLocationTemplate(preferredId);
-      await saveUserLocationTemplates([defaultTemplate]);
-      return [defaultTemplate];
+      const defaults = createAnonymousDefaultTemplates(deviceId, []);
+      await saveUserLocationTemplates(defaults);
+      return defaults;
     } catch (error) {
       console.error('사용자 영역 템플릿 인스턴스 로드 오류:', error);
       return rejectWithValue(error.message);
@@ -260,14 +270,14 @@ export const loadUserProductSlotTemplateInstances = createAsyncThunk(
 );
 
 // 기본 템플릿 생성 함수
-const createBasicLocationTemplate = (idOverride) => ({
+const createBasicLocationTemplate = (idOverride, baseSlotsOverride) => ({
   id: idOverride || generateId('locationTemplate'),
   productId: 'basic_location',
   name: '기본 영역',
   description: '기본적인 제품 관리 기능을 제공하는 영역',
   icon: 'cube-outline',
   feature: {
-    baseSlots: 5
+    baseSlots: typeof baseSlotsOverride === 'number' ? baseSlotsOverride : 3
   },
   used: false,
   usedInLocationId: null
@@ -304,7 +314,7 @@ const initialState = {
   purchaseHistory: [], // 구매 내역
   pointHistory: [], // G 내역 (충전 및 사용)
   // 사용자가 소유한 영역 템플릿 인스턴스 목록 - 비회원은 기본 템플릿 1개 제공
-  userLocationTemplateInstances: [createBasicLocationTemplate()],
+  userLocationTemplateInstances: [createBasicLocationTemplate(undefined, 3)],
   // 사용자가 소유한 제품 슬롯 템플릿 인스턴스 목록 (각 인스턴스는 제품 1개를 추가 허용)
   userProductSlotTemplateInstances: []
 };
@@ -425,14 +435,14 @@ export const authSlice = createSlice({
       state.points = initialState.points;
       state.purchaseHistory = [];
       state.pointHistory = [];
-      // 템플릿 인스턴스를 비회원 상태로 초기화 (1개만 제공)
+      // 템플릿 인스턴스를 비회원 상태로 초기화
       console.log('로그아웃: 템플릿 인스턴스 초기화');
-      const template = createBasicLocationTemplate();
-      state.userLocationTemplateInstances = [template];
-      console.log('로그아웃 후 템플릿 인스턴스:', [template]);
+      const defaults = createAnonymousDefaultTemplates(state.deviceId || 'unknown', []);
+      state.userLocationTemplateInstances = defaults;
+      console.log('로그아웃 후 템플릿 인스턴스:', defaults);
       
       // AsyncStorage에 저장
-      saveUserLocationTemplates([template])
+      saveUserLocationTemplates(defaults)
         .then(() => console.log('로그아웃 후 템플릿 인스턴스 저장 성공'))
         .catch(err => console.error('로그아웃 후 템플릿 인스턴스 저장 실패:', err));
 
@@ -671,16 +681,14 @@ export const authSlice = createSlice({
           // 이미 사용 중인 템플릿이 있으면 템플릿 상태 유지
           console.log('익명 토큰 발급: 이미 사용 중인 템플릿이 있습니다. 템플릿 상태 유지:', state.userLocationTemplateInstances);
         } else {
-          // 비회원은 기본 템플릿 1개만 제공 (디바이스ID 기반 결정적 ID)
+          // 비회원은 기본 템플릿 2개 제공 (각 3 슬롯, 디바이스ID 기반 결정적 ID)
           console.log('익명 토큰 발급: 템플릿 인스턴스 초기화');
-          const deterministicId = buildDeterministicTemplateId(action.payload.deviceId || 'unknown');
-          const uniqueId = ensureUniqueTemplateId(state.userLocationTemplateInstances, deterministicId);
-          const template = createBasicLocationTemplate(uniqueId);
-          state.userLocationTemplateInstances = [template];
-          console.log('익명 토큰 발급 후 템플릿 인스턴스:', [template]);
+          const defaults = createAnonymousDefaultTemplates(action.payload.deviceId || state.deviceId || 'unknown', state.userLocationTemplateInstances);
+          state.userLocationTemplateInstances = defaults;
+          console.log('익명 토큰 발급 후 템플릿 인스턴스:', defaults);
           
           // AsyncStorage에 저장
-          saveUserLocationTemplates([template])
+          saveUserLocationTemplates(defaults)
             .then(() => console.log('익명 토큰 발급 후 템플릿 인스턴스 저장 성공'))
             .catch(err => console.error('익명 토큰 발급 후 템플릿 인스턴스 저장 실패:', err));
         }
@@ -705,9 +713,9 @@ export const authSlice = createSlice({
         // 회원은 기본 템플릿 3개 제공
         console.log('카카오 로그인 성공: 템플릿 인스턴스 초기화');
         const templates = [
-          createBasicLocationTemplate(),
-          createBasicLocationTemplate(),
-          createBasicLocationTemplate()
+          createBasicLocationTemplate(undefined, 5),
+          createBasicLocationTemplate(undefined, 5),
+          createBasicLocationTemplate(undefined, 5)
         ];
         state.userLocationTemplateInstances = templates;
         console.log('카카오 로그인 후 템플릿 인스턴스:', templates);
@@ -737,9 +745,9 @@ export const authSlice = createSlice({
         // 회원은 기본 템플릿 3개 제공
         console.log('일반 로그인 성공: 템플릿 인스턴스 초기화');
         const templates = [
-          createBasicLocationTemplate(),
-          createBasicLocationTemplate(),
-          createBasicLocationTemplate()
+          createBasicLocationTemplate(undefined, 5),
+          createBasicLocationTemplate(undefined, 5),
+          createBasicLocationTemplate(undefined, 5)
         ];
         state.userLocationTemplateInstances = templates;
         console.log('일반 로그인 후 템플릿 인스턴스:', templates);
@@ -769,9 +777,9 @@ export const authSlice = createSlice({
         // 회원은 기본 템플릿 3개 제공
         console.log('회원가입 성공: 템플릿 인스턴스 초기화');
         const templates = [
-          createBasicLocationTemplate(),
-          createBasicLocationTemplate(),
-          createBasicLocationTemplate()
+          createBasicLocationTemplate(undefined, 5),
+          createBasicLocationTemplate(undefined, 5),
+          createBasicLocationTemplate(undefined, 5)
         ];
         state.userLocationTemplateInstances = templates;
         console.log('회원가입 후 템플릿 인스턴스:', templates);
@@ -802,14 +810,12 @@ export const authSlice = createSlice({
           state.error = null;
           // 기본 템플릿 1개 제공
           console.log('토큰 없음: 기본 템플릿 1개 제공');
-          const deterministicId = buildDeterministicTemplateId(action.payload?.deviceId || state.deviceId || 'unknown');
-          const uniqueId = ensureUniqueTemplateId(state.userLocationTemplateInstances, deterministicId);
-          const template = createBasicLocationTemplate(uniqueId);
-          state.userLocationTemplateInstances = [template];
-          console.log('토큰 없음 후 템플릿 인스턴스:', [template]);
+          const defaults = createAnonymousDefaultTemplates(action.payload?.deviceId || state.deviceId || 'unknown', state.userLocationTemplateInstances);
+          state.userLocationTemplateInstances = defaults;
+          console.log('토큰 없음 후 템플릿 인스턴스:', defaults);
           
           // AsyncStorage에 저장
-          saveUserLocationTemplates([template])
+          saveUserLocationTemplates(defaults)
             .then(() => console.log('토큰 없음 후 템플릿 인스턴스 저장 성공'))
             .catch(err => console.error('토큰 없음 후 템플릿 인스턴스 저장 실패:', err));
           return;
@@ -839,9 +845,9 @@ export const authSlice = createSlice({
           // 로그인 사용자이며 저장된 템플릿이 없을 때 기본 3개 제공
           console.log('토큰 검증 (로그인 사용자): 템플릿 인스턴스 초기화');
           const templates = [
-            createBasicLocationTemplate(),
-            createBasicLocationTemplate(),
-            createBasicLocationTemplate()
+            createBasicLocationTemplate(undefined, 5),
+            createBasicLocationTemplate(undefined, 5),
+            createBasicLocationTemplate(undefined, 5)
           ];
           state.userLocationTemplateInstances = templates;
           console.log('토큰 검증 후 템플릿 인스턴스 (로그인):', templates);
@@ -857,12 +863,10 @@ export const authSlice = createSlice({
           if (usedTemplates.length > 0) {
             console.log('익명 사용자가 이미 템플릿을 사용 중입니다. 템플릿 상태 유지:', state.userLocationTemplateInstances);
           } else if (!action.payload.templates) {
-            const deterministicId = buildDeterministicTemplateId(action.payload.deviceId || state.deviceId || 'unknown');
-            const uniqueId = ensureUniqueTemplateId(state.userLocationTemplateInstances, deterministicId);
-            const template = createBasicLocationTemplate(uniqueId);
-            state.userLocationTemplateInstances = [template];
-            console.log('토큰 검증 후 템플릿 인스턴스 (익명):', [template]);
-            saveUserLocationTemplates([template])
+            const defaults = createAnonymousDefaultTemplates(action.payload.deviceId || state.deviceId || 'unknown', state.userLocationTemplateInstances);
+            state.userLocationTemplateInstances = defaults;
+            console.log('토큰 검증 후 템플릿 인스턴스 (익명):', defaults);
+            saveUserLocationTemplates(defaults)
               .then(() => console.log('토큰 검증 후 템플릿 인스턴스 (익명) 저장 성공'))
               .catch(err => console.error('토큰 검증 후 템플릿 인스턴스 (익명) 저장 실패:', err));
           }
