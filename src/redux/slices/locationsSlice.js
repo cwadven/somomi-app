@@ -135,6 +135,14 @@ const locationsSlice = createSlice({
     clearCurrentLocation: (state) => {
       state.currentLocation = null;
     },
+    resetLocationsState: (state) => {
+      state.locations = [];
+      state.currentLocation = null;
+      state.status = 'idle';
+      state.error = null;
+      // 저장소도 비웁니다
+      try { saveLocations([]); } catch (e) {}
+    },
     // 영역 생성 성공 (템플릿 인스턴스 ID 포함)
     createLocationSuccess: (state, action) => {
       state.locations.push(action.payload);
@@ -239,6 +247,7 @@ const locationsSlice = createSlice({
 
 export const { 
   clearCurrentLocation,
+  resetLocationsState,
   createLocationSuccess,
   updateLocationSuccess,
   deleteLocationSuccess

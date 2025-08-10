@@ -304,6 +304,11 @@ const AppContent = () => {
                 style={[styles.loginButton, styles.logoutBtn]}
                 onPress={() => {
                   dispatch(logout());
+                  // 영역/로컬 상태 초기화
+                  try {
+                    const { resetLocationsState } = require('./src/redux/slices/locationsSlice');
+                    dispatch(resetLocationsState());
+                  } catch (e) {}
                   addLog('로그아웃 처리됨', 'warning');
                 }}
               >

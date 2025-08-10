@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { saveUserSlots, loadUserSlots, saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId } from '../../utils/storageUtils';
+import { saveUserSlots, loadUserSlots, saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId, saveLocations, saveProducts, saveConsumedProducts } from '../../utils/storageUtils';
 import { generateId } from '../../utils/idUtils';
+import { resetLocationsState } from './locationsSlice';
 
 // JWT 토큰 발급 API 호출 (실제 구현 시 서버에서 가져옴)
 export const getAnonymousToken = createAsyncThunk(
@@ -359,7 +360,7 @@ export const authSlice = createSlice({
     },
 
     // 로그아웃 시 구독 및 슬롯 정보도 초기화
-    logout: (state) => {
+    logout: (state, action) => {
       state.isLoggedIn = false;
       state.isAnonymous = false;
       state.user = null;
@@ -379,10 +380,30 @@ export const authSlice = createSlice({
       saveUserLocationTemplates([template])
         .then(() => console.log('로그아웃 후 템플릿 인스턴스 저장 성공'))
         .catch(err => console.error('로그아웃 후 템플릿 인스턴스 저장 실패:', err));
+
+      // 사용자 제품 슬롯 템플릿 완전 초기화 (연결/등록 정보 포함 전부 제거)
+      state.userProductSlotTemplateInstances = [];
+      saveUserProductSlotTemplates([])
+        .then(() => console.log('로그아웃: 제품 슬롯 템플릿 초기화 저장 성공'))
+        .catch(err => console.error('로그아웃: 제품 슬롯 템플릿 초기화 저장 실패:', err));
+
+      // 위치/제품/소진 제품 로컬 데이터 초기화 (비회원 전환 시 사용자 데이터 제거)
+      try {
+        saveLocations([]);
+        saveProducts([]);
+        saveConsumedProducts([]);
+        console.log('로그아웃: 로컬 위치/제품/소진제품 데이터 초기화 완료');
+      } catch (e) {
+        console.error('로그아웃: 로컬 데이터 초기화 실패:', e);
+      }
       
       // AsyncStorage에서 토큰 제거
       // (웹 폴리필에서는 localStorage도 함께 제거될 수 있음)
       try { removeJwtToken(); } catch (e) {}
+      
+      // 주: 동기 리듀서에서는 다른 슬라이스 액션을 직접 디스패치할 수 없음
+      // 실제 화면에서 logout 디스패치 후 locations 초기화를 위해 컴포넌트에서 resetLocationsState를 함께 디스패치하거나,
+      // 여기에 extra thunk를 도입하는 방식을 고려 가능.
     },
     // 사용자 정보 업데이트
     updateUserInfo: (state, action) => {
