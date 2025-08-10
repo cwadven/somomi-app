@@ -453,10 +453,11 @@ const ProductFormScreen = () => {
       return false;
     }
     
-    // 영역별 슬롯 한도 확인 (baseSlots + additionalSlots, -1은 무제한)
+    // 영역별 슬롯 한도 확인: 기본 슬롯 + 해당 영역에 등록된 추가 제품 슬롯 수 (-1은 무제한)
+    const locId = locationId || (selectedLocation ? selectedLocation.id : null);
     const baseSlots = selectedLocation?.feature?.baseSlots ?? slots?.productSlots?.baseSlots ?? 0;
-    const additionalTemplates = (userProductSlotTemplateInstances || []).filter(t => t.used !== true).length; // 사용 가능 템플릿 수
-    const totalSlots = baseSlots === -1 ? -1 : baseSlots + additionalTemplates;
+    const assignedExtra = (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locId).length;
+    const totalSlots = baseSlots === -1 ? -1 : baseSlots + assignedExtra;
     const usedCount = currentLocationProducts.length;
 
     if (totalSlots !== -1 && usedCount >= totalSlots) {
@@ -520,13 +521,16 @@ const ProductFormScreen = () => {
       } else {
         // 추가 모드
         result = await dispatch(addProductAsync(productData)).unwrap();
-        // 기본 슬롯을 초과했다면 제품 슬롯 템플릿을 하나 사용 처리
-        const productsInLocation = (products || []).filter(p => p.locationId === (locationId || selectedLocation?.id) && !p.isConsumed);
+        // 기본 슬롯 초과분은 해당 영역에 등록된 추가 슬롯에서 소모 (할당된 것 중 미사용)
+        const locIdAfter = locationId || selectedLocation?.id;
+        const baseSlotsInSubmit = selectedLocation?.feature?.baseSlots ?? slots?.productSlots?.baseSlots ?? 0;
+        const productsInLocation = (products || []).filter(p => p.locationId === locIdAfter && !p.isConsumed);
         const usedCountAfter = (productsInLocation.length) + 1; // 방금 추가 포함
-        if (baseSlots !== -1 && usedCountAfter > baseSlots) {
-          const availableProductSlot = (userProductSlotTemplateInstances || []).find(t => !t.used);
-          if (availableProductSlot) {
-            dispatch(markProductSlotTemplateAsUsed({ templateId: availableProductSlot.id, productId: result.id }));
+        const assignedExtraAfter = (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locIdAfter).length;
+        if (baseSlotsInSubmit !== -1 && usedCountAfter > baseSlotsInSubmit && usedCountAfter <= baseSlotsInSubmit + assignedExtraAfter) {
+          const availableAssigned = (userProductSlotTemplateInstances || []).find(t => t.assignedLocationId === locIdAfter && !t.used);
+          if (availableAssigned) {
+            dispatch(markProductSlotTemplateAsUsed({ templateId: availableAssigned.id, productId: result.id }));
           }
         }
       }

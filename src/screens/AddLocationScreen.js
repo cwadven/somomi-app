@@ -434,13 +434,31 @@ const AddLocationScreen = () => {
     const t = (userProductSlotTemplateInstances || []).find(x => x.id === templateId);
     if (!t) return;
     if (t.used && t.usedByProductId) {
-      // 제품과 연결 해제 후 등록 해제
-      dispatch(releaseProductSlotTemplateByProduct(t.usedByProductId));
+      const linkedProduct = currentLocationProducts.find(p => p.id === t.usedByProductId);
+      setAlertModalConfig({
+        title: '등록 해제 불가',
+        message: `이 슬롯은 제품과 연결되어 있습니다.${linkedProduct ? `\n연결된 제품: ${linkedProduct.name || linkedProduct.title || `제품(${linkedProduct.id})`}` : ''}\n등록을 해제하려면 먼저 해당 제품을 처리해 주세요.`,
+        buttons: [
+          {
+            text: '제품 확인',
+            onPress: () => {
+              setAlertModalVisible(false);
+              navigation.navigate('ProductDetail', { productId: t.usedByProductId });
+            }
+          },
+          { text: '닫기' }
+        ],
+        icon: 'alert-circle',
+        iconColor: '#F44336'
+      });
+      setAlertModalVisible(true);
+      return;
     }
+    // 연결된 제품이 없으면 즉시 등록 해제
     dispatch(unassignProductSlotTemplate({ templateId }));
     setAlertModalConfig({
       title: '등록 해제',
-      message: t.usedByProductId ? '해당 슬롯과 연결된 제품을 분리하고, 등록을 해제했습니다.' : '해당 추가 제품 슬롯의 등록을 해제했습니다.',
+      message: '해당 추가 제품 슬롯의 등록을 해제했습니다.',
       buttons: [{ text: '확인' }],
       icon: 'information-circle',
       iconColor: '#4CAF50'
