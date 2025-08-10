@@ -15,6 +15,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useIsFocused, useRoute } from '@react-navigation/native';
 import { fetchLocations } from '../redux/slices/locationsSlice';
+import { updateLocation } from '../redux/slices/locationsSlice';
 import { addBasicTemplateInstance } from '../redux/slices/authSlice';
 import SignupPromptModal from '../components/SignupPromptModal';
 import { checkAnonymousLimits } from '../utils/authUtils';
@@ -64,6 +65,17 @@ const LocationsScreen = () => {
           text: selected ? '확인' : '확인(선택 필요)',
           onPress: () => {
             if (!selected || !templatePickerLocation) return;
+            // 선택된 템플릿의 feature/baseSlots를 영역에 반영
+            const selectedTpl = freeTemplates.find(t => t.id === selected.id);
+            if (selectedTpl) {
+              dispatch(updateLocation({
+                ...templatePickerLocation,
+                templateInstanceId: selectedTpl.id,
+                productId: selectedTpl.productId,
+                feature: selectedTpl.feature,
+              }));
+            }
+            // 템플릿 사용 처리
             dispatch({ type: 'auth/markTemplateInstanceAsUsed', payload: { templateId: selected.id, locationId: templatePickerLocation.id } });
             setTemplatePickerVisible(false);
             navigation.navigate('LocationDetail', { locationId: templatePickerLocation.id });
@@ -242,6 +254,15 @@ const LocationsScreen = () => {
               onPress: () => {
                 const selected = templatePickerSelectedTemplateId;
                 if (!selected) return; // 선택 없으면 무시
+                const selectedTpl = freeTemplates.find(t => t.id === selected);
+                if (selectedTpl) {
+                  dispatch(updateLocation({
+                    ...location,
+                    templateInstanceId: selectedTpl.id,
+                    productId: selectedTpl.productId,
+                    feature: selectedTpl.feature,
+                  }));
+                }
                 dispatch({ type: 'auth/markTemplateInstanceAsUsed', payload: { templateId: selected, locationId: location.id } });
                 setTemplatePickerVisible(false);
                 navigation.navigate('LocationDetail', { locationId: location.id });
