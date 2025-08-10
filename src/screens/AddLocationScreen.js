@@ -711,7 +711,8 @@ const AddLocationScreen = () => {
           <View style={styles.productSlotList}>
             <Text style={styles.productSlotSectionTitle}>보유한 추가 제품 슬롯 (미등록)</Text>
             {previewAvailableTemplates && previewAvailableTemplates.length > 0 ? (
-              previewAvailableTemplates.map(t => (
+              <ScrollView style={styles.slotScrollableList} nestedScrollEnabled>
+                {previewAvailableTemplates.map(t => (
                   <View key={t.id} style={styles.productSlotItem}>
                     <View style={styles.productSlotInfo}>
                       <Ionicons name="cube" size={18} color="#4CAF50" />
@@ -722,10 +723,7 @@ const AddLocationScreen = () => {
                         style={styles.assignButton}
                         onPress={() => {
                           setStagedAssignTemplateIds(prev => prev.includes(t.id) ? prev : [...prev, t.id]);
-                          // 안내 배너 강조 및 스크롤 이동
-                          setTimeout(() => {
-                            // 스크롤 이동은 간단히 하단 섹션으로 유도
-                          }, 0);
+                          setTimeout(() => {}, 0);
                         }}
                       >
                         <Text style={styles.assignButtonText}>등록</Text>
@@ -734,7 +732,8 @@ const AddLocationScreen = () => {
                       <Text style={styles.productSlotSubText}>영역 생성 후 등록 가능</Text>
                     )}
                   </View>
-                ))
+                ))}
+              </ScrollView>
             ) : (
               <View style={styles.emptySlotCard}>
                 <Ionicons name="cart-outline" size={28} color="#9E9E9E" style={{ marginBottom: 6 }} />
@@ -771,33 +770,35 @@ const AddLocationScreen = () => {
             <View style={styles.productSlotList}>
               <Text style={styles.productSlotSectionTitle}>이 영역에 등록된 추가 제품 슬롯</Text>
               {previewAssignedTemplates.length > 0 ? (
-                previewAssignedTemplates.map(t => {
-                  const linkedProduct = t.usedByProductId ? currentLocationProducts.find(p => p.id === t.usedByProductId) : null;
-                  return (
-                  <View key={t.id} style={styles.productSlotItem}>
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.productSlotInfo}>
-                        <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
-                        <Text style={styles.productSlotText}>등록됨</Text>
+                <ScrollView style={styles.slotScrollableList} nestedScrollEnabled>
+                  {previewAssignedTemplates.map(t => {
+                    const linkedProduct = t.usedByProductId ? currentLocationProducts.find(p => p.id === t.usedByProductId) : null;
+                    return (
+                      <View key={t.id} style={styles.productSlotItem}>
+                        <View style={{ flex: 1 }}>
+                          <View style={styles.productSlotInfo}>
+                            <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+                            <Text style={styles.productSlotText}>등록됨</Text>
+                          </View>
+                          {linkedProduct && (
+                            <Text style={styles.productSlotLinkedText}>연결된 제품: {linkedProduct.name || linkedProduct.title || `제품(${linkedProduct.id})`}</Text>
+                          )}
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.assignButton, { backgroundColor: '#9E9E9E' }]}
+                          onPress={() => 
+                            (t.used && t.usedByProductId)
+                              ? handleUnassignProductSlot(t.id)
+                              : setStagedUnassignTemplateIds(prev => prev.includes(t.id) ? prev : [...prev, t.id])
+                          }
+                        >
+                          <Text style={styles.assignButtonText}>{(t.used && t.usedByProductId) ? '제품 확인' : '해제'}</Text>
+                        </TouchableOpacity>
                       </View>
-                      {linkedProduct && (
-                        <Text style={styles.productSlotLinkedText}>연결된 제품: {linkedProduct.name || linkedProduct.title || `제품(${linkedProduct.id})`}</Text>
-                      )}
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.assignButton, { backgroundColor: '#9E9E9E' }]}
-                      onPress={() => 
-                        (t.used && t.usedByProductId)
-                          ? handleUnassignProductSlot(t.id)
-                          : setStagedUnassignTemplateIds(prev => prev.includes(t.id) ? prev : [...prev, t.id])
-                      }
-                    >
-                      <Text style={styles.assignButtonText}>{(t.used && t.usedByProductId) ? '제품 확인' : '해제'}</Text>
-                    </TouchableOpacity>
-                  </View>
-                  );
-                })
-                              ) : (
+                    );
+                  })}
+                </ScrollView>
+                               ) : (
                 <View style={styles.emptySlotCard}>
                   <Ionicons name="add-circle-outline" size={28} color="#9E9E9E" style={{ marginBottom: 6 }} />
                   <Text style={styles.emptySlotTitle}>등록된 추가 제품 슬롯이 없습니다</Text>
@@ -1129,6 +1130,9 @@ const styles = StyleSheet.create({
   },
   productSlotList: {
     marginTop: 16,
+  },
+  slotScrollableList: {
+    maxHeight: 260,
   },
   productSlotSummary: {
     marginTop: 8,
