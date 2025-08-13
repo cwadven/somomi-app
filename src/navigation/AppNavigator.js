@@ -232,10 +232,9 @@ const AppNavigator = ({ linking }) => {
             })}
             screenListeners={({ navigation, route }) => ({
               tabPress: (e) => {
-                // 내 영역 탭 클릭 시 기존 스택을 유지
-                if (route.name === 'Locations') {
-                  e.preventDefault(); // 기본 동작 방지
-                  // 현재 탭을 다시 눌렀을 때 Locations 스택의 루트로 이동
+                // '내 영역' 탭을 이미 보고 있을 때 다시 누르면 루트로 이동
+                if (route.name === 'Locations' && navigation.isFocused()) {
+                  e.preventDefault();
                   navigation.navigate('Locations', { screen: 'LocationsScreen' });
                 }
               },
