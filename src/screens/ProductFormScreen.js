@@ -65,6 +65,19 @@ const ProductFormScreen = () => {
   const [estimatedEndDate, setEstimatedEndDate] = useState(null);
   const [memo, setMemo] = useState('');
   
+  // 템플릿 만료 판단 (구독/일반 만료 모두)
+  const isTemplateExpired = (template) => {
+    if (!template) return false;
+    const exp = template.subscriptionExpiresAt || template.expiresAt || template.feature?.expiresAt;
+    return !!exp && (Date.now() >= new Date(exp).getTime());
+  };
+
+  // 특정 영역이 만료 템플릿에 연결되어 있는지
+  const isLocationExpired = (locId) => {
+    const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locId);
+    return isTemplateExpired(tpl);
+  };
+  
   // 날짜 선택기 상태
   const [showPurchaseDatePicker, setShowPurchaseDatePicker] = useState(false);
   const [showExpiryDatePicker, setShowExpiryDatePicker] = useState(false);
@@ -485,10 +498,7 @@ const ProductFormScreen = () => {
         message: '이 영역의 템플릿이 만료되어 제품을 등록/수정할 수 없습니다.',
         icon: 'alert-circle',
         iconColor: '#F44336',
-        buttons: [{ text: '확인', onPress: () => {
-          setAlertModalVisible(false);
-          navigation.reset({ index: 0, routes: [{ name: 'LocationsScreen' }] });
-        }}]
+        buttons: [{ text: '확인', onPress: () => setAlertModalVisible(false) }]
       });
       setAlertModalVisible(true);
       return;
@@ -526,7 +536,8 @@ const ProductFormScreen = () => {
         name: productName,
         brand: brand || null,
         category: selectedCategory,
-        locationId: locationId || (selectedLocation ? selectedLocation.id : null),
+        // 영역 위치 이동 반영: 수정 모드에서는 selectedLocation 우선 적용
+        locationId: isEditMode ? ((selectedLocation && selectedLocation.id) || currentProduct.locationId) : (locationId || (selectedLocation ? selectedLocation.id : null)),
         purchaseDate: purchaseDate.toISOString(),
         expiryDate: expiryDate ? expiryDate.toISOString() : null,
         estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
@@ -829,6 +840,39 @@ const ProductFormScreen = () => {
             onAddCategory={handleOpenCategoryModal}
             status={categoriesStatus}
           />
+
+          {/* 영역 이동 (수정 모드에서만 노출) */}
+          {isEditMode && (
+            <View style={styles.inputGroup}>
+              <View style={styles.labelContainer}>
+                <Text style={styles.label}>영역 위치</Text>
+              </View>
+              <LocationSelector
+                locations={locations.map(loc => ({
+                  ...loc,
+                  // 만료 라벨 용도로 title에 표시를 추가하거나 스타일은 LocationSelector에서 처리 가능
+                  title: isLocationExpired(loc.id) ? `${loc.title} (만료)` : loc.title,
+                }))}
+                selectedLocation={selectedLocation || (currentProduct && locations.find(l => l.id === currentProduct.locationId))}
+                onSelectLocation={(loc) => {
+                  if (isLocationExpired(loc.id)) {
+                    setAlertModalConfig({
+                      title: '이동 불가',
+                      message: '만료된 영역으로는 이동할 수 없습니다. 다른 영역을 선택하세요.',
+                      buttons: [{ text: '확인' }],
+                      icon: 'alert-circle',
+                      iconColor: '#F44336'
+                    });
+                    setAlertModalVisible(true);
+                    return;
+                  }
+                  setSelectedLocation(loc);
+                }}
+                hideAddButton
+                isLoading={locationsStatus === 'loading'}
+              />
+            </View>
+          )}
           
           {/* 구매일 선택 */}
           <View 

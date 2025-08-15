@@ -26,7 +26,8 @@ const LocationSelector = forwardRef(({
   onAddLocation,
   isLoading = false,
   onRetry,
-  error = ''
+  error = '',
+  hideAddButton = false,
 }, ref) => {
   return (
     <View style={styles.locationsContainer}>
@@ -70,7 +71,7 @@ const LocationSelector = forwardRef(({
                 </Text>
               </TouchableOpacity>
             )}
-            ListFooterComponent={
+            ListFooterComponent={hideAddButton ? null : (
               <TouchableOpacity
                 style={styles.addLocationChip}
                 onPress={onAddLocation}
@@ -78,7 +79,7 @@ const LocationSelector = forwardRef(({
                 <Ionicons name="add" size={18} color="#4CAF50" style={styles.addLocationIcon} />
                 <Text style={styles.addLocationText}>영역 추가</Text>
               </TouchableOpacity>
-            }
+            )}
           />
           {error ? (
             <Text style={styles.errorText}>{error}</Text>
@@ -88,12 +89,14 @@ const LocationSelector = forwardRef(({
         <View style={styles.emptyLocations}>
           <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
           <View style={styles.emptyButtonsContainer}>
-          <TouchableOpacity
-            style={styles.addLocationButton}
-            onPress={onAddLocation}
-          >
-            <Text style={styles.addLocationButtonText}>영역 추가하기</Text>
-          </TouchableOpacity>
+          {!hideAddButton && (
+            <TouchableOpacity
+              style={styles.addLocationButton}
+              onPress={onAddLocation}
+            >
+              <Text style={styles.addLocationButtonText}>영역 추가하기</Text>
+            </TouchableOpacity>
+          )}
             
             {onRetry && (
               <TouchableOpacity

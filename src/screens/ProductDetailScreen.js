@@ -67,6 +67,7 @@ const ProductDetailScreen = () => {
   
   const { productId } = route.params;
   const { currentProduct, status, error } = useSelector(state => state.products);
+  const { userLocationTemplateInstances } = useSelector(state => state.auth);
   
   // 최신 상태를 참조하기 위한 ref
   const consumptionDateRef = useRef({
@@ -1027,29 +1028,48 @@ const ProductDetailScreen = () => {
 
       {/* 하단 액션 버튼 */}
       <View style={styles.bottomActionBar}>
-        <TouchableOpacity 
-          style={styles.bottomActionButton}
-          onPress={handleEdit}
-        >
-          <Ionicons name="create-outline" size={24} color="#4CAF50" />
-          <Text style={styles.bottomActionText}>수정</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.bottomActionButton}
-          onPress={handleMarkAsConsumed}
-        >
-          <Ionicons name="checkmark-circle-outline" size={24} color="#FF9800" />
-          <Text style={styles.bottomActionText}>소진 처리</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.bottomActionButton}
-          onPress={handleDelete}
-        >
-          <Ionicons name="trash-outline" size={24} color="#F44336" />
-          <Text style={styles.bottomActionText}>삭제</Text>
-        </TouchableOpacity>
+        {(() => {
+          const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === currentProduct.locationId);
+          const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
+          const isLocationExpired = !!exp && (Date.now() >= new Date(exp).getTime());
+          const onBlocked = (msg) => {
+            setAlertModalConfig({
+              title: '불가',
+              message: msg || '이 영역 템플릿이 만료되어 이 작업을 수행할 수 없습니다. 제품 수정에서 영역 위치를 변경하세요.',
+              buttons: [{ text: '확인' }],
+              icon: 'alert-circle',
+              iconColor: '#F44336'
+            });
+            setAlertModalVisible(true);
+          };
+          return (
+            <>
+              <TouchableOpacity 
+                style={styles.bottomActionButton}
+                onPress={handleEdit}
+              >
+                <Ionicons name="create-outline" size={24} color="#4CAF50" />
+                <Text style={styles.bottomActionText}>수정</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.bottomActionButton, isLocationExpired ? { opacity: 0.5 } : null]}
+                onPress={() => isLocationExpired ? onBlocked('만료된 영역에서는 소진 처리를 할 수 없습니다.') : handleMarkAsConsumed()}
+              >
+                <Ionicons name="checkmark-circle-outline" size={24} color="#FF9800" />
+                <Text style={styles.bottomActionText}>소진 처리</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.bottomActionButton, isLocationExpired ? { opacity: 0.5 } : null]}
+                onPress={() => isLocationExpired ? onBlocked('만료된 영역에서는 제품을 삭제할 수 없습니다.') : handleDelete()}
+              >
+                <Ionicons name="trash-outline" size={24} color="#F44336" />
+                <Text style={styles.bottomActionText}>삭제</Text>
+              </TouchableOpacity>
+            </>
+          );
+        })()}
       </View>
       
       {/* 알림 모달 */}
