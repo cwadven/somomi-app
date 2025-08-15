@@ -477,11 +477,12 @@ const ProductFormScreen = () => {
     // 해당 영역에 연결된 템플릿이 구독 만료일 때만 작업 차단
     const locId = locationId || selectedLocation?.id;
     const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locId);
-    const isExpired = tpl && tpl.origin === 'subscription' && tpl.subscriptionExpiresAt && (Date.now() >= new Date(tpl.subscriptionExpiresAt).getTime());
+    const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
+    const isExpired = !!exp && (Date.now() >= new Date(exp).getTime());
     if (isExpired) {
       setAlertModalConfig({
-        title: '구독 만료',
-        message: '이 영역의 구독 템플릿이 만료되어 제품을 등록/수정할 수 없습니다.',
+        title: '템플릿 만료',
+        message: '이 영역의 템플릿이 만료되어 제품을 등록/수정할 수 없습니다.',
         icon: 'alert-circle',
         iconColor: '#F44336',
         buttons: [{ text: '확인', onPress: () => {

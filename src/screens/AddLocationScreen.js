@@ -34,10 +34,23 @@ const AddLocationScreen = () => {
   const additionalProductSlots = slots?.productSlots?.additionalSlots || 0;
   const { locationProducts } = useSelector(state => state.products);
   
-  // 만료 템플릿 판단
-  const isTemplateExpired = (t) => t && t.origin === 'subscription' && t.subscriptionExpiresAt && (Date.now() >= new Date(t.subscriptionExpiresAt).getTime());
+  // 만료 템플릿 판단 (구독 템플릿 또는 일반 영역 템플릿의 만료 필드 모두 허용)
+  const isTemplateExpired = (t) => {
+    if (!t) return false;
+    const exp = t.subscriptionExpiresAt || t.expiresAt || t.feature?.expiresAt;
+    return !!exp && (Date.now() >= new Date(exp).getTime());
+  };
   // 사용 가능 + 미만료 템플릿만 필터링
   const availableTemplates = userLocationTemplateInstances.filter(template => !template.used && !isTemplateExpired(template));
+
+  // 수정 모드에서 현재 영역에 연결된 템플릿이 만료되었는지 판단
+  const linkedTemplateInEdit = (isEditMode && locationToEdit)
+    ? (
+      (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locationToEdit.id) ||
+      ((locationToEdit.templateInstanceId && (userLocationTemplateInstances || []).find(t => t.id === locationToEdit.templateInstanceId)) || null)
+    )
+    : null;
+  const isEditLockedByExpiry = !!(linkedTemplateInEdit && isTemplateExpired(linkedTemplateInEdit));
   const currentTemplate = (isEditMode && locationToEdit)
     ? (
         userLocationTemplateInstances.find(t => t.id === locationToEdit.templateInstanceId) ||
@@ -331,6 +344,12 @@ const AddLocationScreen = () => {
         const changingTemplate = selectedEditTemplateInstance && selectedEditTemplateInstance.id !== locationToEdit.templateInstanceId;
         
         if (changingTemplate) {
+          // 이전 템플릿을 해제하여 만료된 상태 표기가 남지 않도록 정리
+          try {
+            await dispatch(releaseTemplateInstance(locationToEdit.id));
+          } catch (e) {
+            // no-op
+          }
           // 선택된 새 템플릿의 허용 슬롯 계산 및 검증
           const baseSlots = selectedEditTemplateInstance?.feature?.baseSlots;
           const allowedSlots = baseSlots === -1 
@@ -365,6 +384,12 @@ const AddLocationScreen = () => {
         })).unwrap();
         
         console.log('영역 수정 성공:', updatedLocation);
+        // 새 템플릿을 해당 영역에 사용 처리 (UI 동기화)
+        try {
+          if (changingTemplate) {
+            await dispatch(markTemplateInstanceAsUsed({ templateId: newTemplateInstanceId, locationId: locationToEdit.id }));
+          }
+        } catch (e) {}
 
         // 스테이징된 제품 슬롯 등록/해제 적용
         try {
@@ -635,6 +660,11 @@ const AddLocationScreen = () => {
         {/* 영역 정보 입력 섹션 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>영역 정보</Text>
+          {isEditMode && isEditLockedByExpiry && (
+            <View style={{ backgroundColor: '#fff8e1', borderWidth: 1, borderColor: '#ffe082', borderRadius: 8, padding: 10, marginBottom: 10 }}>
+              <Text style={{ color: '#ff6f00', fontSize: 12 }}>이 영역은 만료된 영역 템플릿에 연결되어 있어 영역 정보는 수정할 수 없습니다. 상단의 템플릿 변경 또는 아래의 제품 슬롯을 수정하세요.</Text>
+            </View>
+          )}
           
           <View style={styles.formGroup}>
             <Text style={styles.label}>이름</Text>
@@ -643,6 +673,7 @@ const AddLocationScreen = () => {
               value={locationData.title}
               onChangeText={(text) => handleInputChange('title', text)}
               placeholder={selectedTemplateInstance ? selectedTemplateInstance.name : "영역 이름을 입력하세요"}
+              editable={!(isEditMode && isEditLockedByExpiry)}
             />
         </View>
         
@@ -653,15 +684,17 @@ const AddLocationScreen = () => {
               value={locationData.description}
               onChangeText={(text) => handleInputChange('description', text)}
               placeholder={selectedTemplateInstance ? selectedTemplateInstance.description : "영역에 대한 설명을 입력하세요"}
-            multiline
-          />
+              multiline
+              editable={!(isEditMode && isEditLockedByExpiry)}
+            />
         </View>
         
           <View style={styles.formGroup}>
             <Text style={styles.label}>아이콘</Text>
             <TouchableOpacity
-              style={styles.iconSelector}
-              onPress={() => setIsIconSelectorVisible(true)}
+              style={[styles.iconSelector, (isEditMode && isEditLockedByExpiry) ? { opacity: 0.6 } : null]}
+              onPress={() => { if (!(isEditMode && isEditLockedByExpiry)) setIsIconSelectorVisible(true); }}
+              disabled={isEditMode && isEditLockedByExpiry}
             >
               <View style={styles.selectedIconContainer}>
                 <Ionicons name={locationData.icon} size={24} color="#4CAF50" />

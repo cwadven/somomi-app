@@ -53,10 +53,16 @@ const LocationsScreen = () => {
   const isLocationExpired = useCallback((loc) => {
     const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === loc.id) || null;
     if (!tpl) return false;
-    if (tpl.origin !== 'subscription') return false;
-    if (!tpl.subscriptionExpiresAt) return false;
-    return Date.now() >= new Date(tpl.subscriptionExpiresAt).getTime();
+    const exp = tpl.subscriptionExpiresAt || tpl.expiresAt || tpl.feature?.expiresAt;
+    return !!exp && (Date.now() >= new Date(exp).getTime());
   }, [userLocationTemplateInstances]);
+
+  // 템플릿 만료 판별 헬퍼
+  const isTemplateExpired = useCallback((tpl) => {
+    if (!tpl) return false;
+    const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
+    return !!exp && (Date.now() >= new Date(exp).getTime());
+  }, []);
 
   // 템플릿 선택 모달 콘텐츠를 선택 상태에 맞게 갱신
   useEffect(() => {
@@ -181,7 +187,7 @@ const LocationsScreen = () => {
   const handleAddLocation = () => {
     // 생성은 전체 정책에 따르되, 템플릿 만료는 기존 영역 접근에서만 제한함 (생성은 보유 템플릿 유효성으로 자동 제한됨)
     // 사용자의 템플릿 인스턴스 확인
-    const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
+    const availableTemplates = userLocationTemplateInstances.filter(template => !template.used && !isTemplateExpired(template));
     
     console.log('영역 추가 시도:', {
       userLocationTemplateInstances,
@@ -345,16 +351,18 @@ const LocationsScreen = () => {
   }
 
   // 템플릿 인스턴스 기준으로 사용 가능한 슬롯 계산
-  const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
-  const usedTemplates = userLocationTemplateInstances.filter(template => template.used);
-  const totalTemplates = userLocationTemplateInstances.length;
+  const nonExpiredTemplates = userLocationTemplateInstances.filter(t => !isTemplateExpired(t));
+  const availableTemplates = nonExpiredTemplates.filter(template => !template.used);
+  const usedTemplates = nonExpiredTemplates.filter(template => template.used);
+  const totalTemplates = nonExpiredTemplates.length;
   
   // 콘솔에 현재 템플릿 상태 출력
   console.log('LocationsScreen - 템플릿 상태:', {
-    총_템플릿_수: totalTemplates,
-    사용_중인_템플릿_수: usedTemplates.length,
-    사용_가능한_템플릿_수: availableTemplates.length,
-    템플릿_목록: userLocationTemplateInstances
+    totalTemplatesValid: totalTemplates,
+    usedTemplatesValid: usedTemplates.length,
+    availableTemplatesValid: availableTemplates.length,
+    expiredTemplateCount: userLocationTemplateInstances.length - nonExpiredTemplates.length,
+    templates: userLocationTemplateInstances
   });
 
   return (
@@ -425,7 +433,7 @@ const LocationsScreen = () => {
                     )}
                     {isLocationExpired(item) && (
                       <Text style={{ color: '#F44336', marginTop: 4, fontSize: 12 }}>
-                        구독 템플릿 만료됨
+                        템플릿 만료됨
                       </Text>
                     )}
                   </View>
