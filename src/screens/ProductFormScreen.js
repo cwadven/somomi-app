@@ -53,7 +53,7 @@ const ProductFormScreen = () => {
   const { categories, status: categoriesStatus } = useSelector(state => state.categories);
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
   const { products, currentProduct, status: productsStatus } = useSelector(state => state.products);
-  const { isLoggedIn, isAnonymous, slots, userProductSlotTemplateInstances } = useSelector(state => state.auth);
+  const { isLoggedIn, isAnonymous, slots, userProductSlotTemplateInstances, subscription, userLocationTemplateInstances } = useSelector(state => state.auth);
 
   // 폼 상태
   const [productName, setProductName] = useState('');
@@ -474,6 +474,24 @@ const ProductFormScreen = () => {
 
   // 제품 등록/수정 처리
   const handleSubmit = async () => {
+    // 해당 영역에 연결된 템플릿이 구독 만료일 때만 작업 차단
+    const locId = locationId || selectedLocation?.id;
+    const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locId);
+    const isExpired = tpl && tpl.origin === 'subscription' && tpl.subscriptionExpiresAt && (Date.now() >= new Date(tpl.subscriptionExpiresAt).getTime());
+    if (isExpired) {
+      setAlertModalConfig({
+        title: '구독 만료',
+        message: '이 영역의 구독 템플릿이 만료되어 제품을 등록/수정할 수 없습니다.',
+        icon: 'alert-circle',
+        iconColor: '#F44336',
+        buttons: [{ text: '확인', onPress: () => {
+          setAlertModalVisible(false);
+          navigation.reset({ index: 0, routes: [{ name: 'LocationsScreen' }] });
+        }}]
+      });
+      setAlertModalVisible(true);
+      return;
+    }
     // 폼 유효성 검사
     if (!isFormValid()) {
       // 오류가 있으면 첫 번째 오류 필드로 스크롤

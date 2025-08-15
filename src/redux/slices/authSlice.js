@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { saveUserSlots, loadUserSlots, saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId, saveLocations, saveProducts, saveConsumedProducts } from '../../utils/storageUtils';
+import { saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId, saveLocations, saveProducts, saveConsumedProducts } from '../../utils/storageUtils';
 import { generateId } from '../../utils/idUtils';
 import { resetLocationsState } from './locationsSlice';
 
@@ -365,13 +365,7 @@ export const authSlice = createSlice({
           itemType: action.payload.itemType,
         });
         
-        // 로컬 스토리지에 슬롯 정보 저장
-        try {
-          const plainSlots = JSON.parse(JSON.stringify(state.slots));
-          saveUserSlots(plainSlots);
-        } catch (error) {
-          console.error('슬롯 정보 저장 중 오류:', error);
-        }
+        // 슬롯 별도 스토리지는 사용하지 않음 (템플릿 기반으로 전환)
       }
       // 반환값 제거 - Immer 오류 해결
     },
@@ -380,13 +374,7 @@ export const authSlice = createSlice({
     updateSubscription: (state, action) => {
       state.subscription = { ...state.subscription, ...action.payload };
       
-      // 로컬 스토리지에 슬롯 정보 저장
-      try {
-        const plainSlots = JSON.parse(JSON.stringify(state.slots));
-        saveUserSlots(plainSlots);
-      } catch (error) {
-        console.error('슬롯 정보 저장 중 오류:', error);
-      }
+      // 슬롯 별도 스토리지는 사용하지 않음 (템플릿 기반으로 전환)
     },
 
     // 슬롯 정보 업데이트
@@ -406,13 +394,7 @@ export const authSlice = createSlice({
         };
       }
       
-      // 로컬 스토리지에 슬롯 정보 저장
-      try {
-        const plainSlots = JSON.parse(JSON.stringify(state.slots));
-        saveUserSlots(plainSlots);
-      } catch (error) {
-        console.error('슬롯 정보 저장 중 오류:', error);
-      }
+      // 슬롯 별도 스토리지는 사용하지 않음 (템플릿 기반으로 전환)
     },
 
     // 구매 내역 추가
@@ -558,6 +540,24 @@ export const authSlice = createSlice({
          .then(() => console.log('기본 템플릿 인스턴스 추가 저장 성공'))
          .catch(err => console.error('기본 템플릿 인스턴스 추가 저장 실패:', err));
      },
+    // 구독 플랜 적용: 템플릿 수 및 기본 슬롯 동기화
+    applySubscriptionToTemplates: (state, action) => {
+      const { locationSlots, productSlotsPerLocation, planId, expiresAt } = action.payload || {};
+      if (!locationSlots || !productSlotsPerLocation) return;
+      // 기존 템플릿은 변경하지 않고, 구독에서 제공하는 개수만큼 새 템플릿을 추가
+      for (let i = 0; i < locationSlots; i++) {
+        const newTemplate = createBasicLocationTemplate(undefined, productSlotsPerLocation);
+        newTemplate.origin = 'subscription';
+        newTemplate.subscriptionPlanId = planId || state.subscription?.plan || null;
+        newTemplate.subscriptionExpiresAt = expiresAt || state.subscription?.expiresAt || null;
+        state.userLocationTemplateInstances.push(newTemplate);
+      }
+      // 저장
+      const plainTemplates = JSON.parse(JSON.stringify(state.userLocationTemplateInstances));
+      saveUserLocationTemplates(plainTemplates)
+        .then(() => console.log('구독 적용: 템플릿 추가 저장 성공'))
+        .catch(err => console.error('구독 적용: 템플릿 추가 저장 실패:', err));
+    },
     // 제품 슬롯 템플릿 인스턴스 추가 (1개)
     addProductSlotTemplateInstance: (state, action) => {
       const newTemplate = {
@@ -944,6 +944,7 @@ export const {
   releaseProductSlotTemplateByProduct,
   assignProductSlotTemplateToLocation,
   unassignProductSlotTemplate,
+  applySubscriptionToTemplates,
 } = authSlice.actions;
 
 export default authSlice.reducer; 

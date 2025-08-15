@@ -32,11 +32,13 @@ const LocationDetailScreen = () => {
   
   const { currentLocation, status, error } = useSelector(state => state.locations);
   const { products } = useSelector(state => state.products);
-  const { slots, userProductSlotTemplateInstances } = useSelector(state => state.auth);
+  const { slots, userProductSlotTemplateInstances, subscription, userLocationTemplateInstances } = useSelector(state => state.auth);
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [locationProducts, setLocationProducts] = useState([]);
   const [activeTab, setActiveTab] = useState('products'); // 'products' 또는 'notifications'
+
+  // 만료된 구독 템플릿이어도 상세 접근은 허용. 대신 UI 상에서 편집 유도로 처리.
   
   // 영역 정보 로드
   useEffect(() => {
@@ -178,7 +180,10 @@ const LocationDetailScreen = () => {
   const { used: usedSlots, total: totalSlots } = calculateProductSlots();
   
   // 슬롯 상태에 따른 제품 추가 가능 여부
-  const canAddProduct = totalSlots === -1 || usedSlots < totalSlots;
+  // 템플릿 만료 시에는 제품 추가/삭제/변경은 막고, 상세 조회/수정 화면 진입만 허용
+  const linkedTemplate = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locationId) || null;
+  const isTemplateExpired = linkedTemplate && linkedTemplate.origin === 'subscription' && linkedTemplate.subscriptionExpiresAt && (Date.now() >= new Date(linkedTemplate.subscriptionExpiresAt).getTime());
+  const canAddProduct = !isTemplateExpired && (totalSlots === -1 || usedSlots < totalSlots);
   
   // 제품 목록 탭 렌더링
   const renderProductsTab = () => {

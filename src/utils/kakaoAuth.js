@@ -100,7 +100,7 @@ const getKakaoUserInfo = async (accessToken) => {
         email: 'kakao_user@example.com',
         profile: {
           nickname: '카카오 사용자',
-          profile_image_url: 'https://via.placeholder.com/150'
+          profile_image_url: null
         }
       }
     };

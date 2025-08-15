@@ -34,8 +34,10 @@ const AddLocationScreen = () => {
   const additionalProductSlots = slots?.productSlots?.additionalSlots || 0;
   const { locationProducts } = useSelector(state => state.products);
   
-  // 사용 가능한 템플릿 인스턴스만 필터링
-  const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
+  // 만료 템플릿 판단
+  const isTemplateExpired = (t) => t && t.origin === 'subscription' && t.subscriptionExpiresAt && (Date.now() >= new Date(t.subscriptionExpiresAt).getTime());
+  // 사용 가능 + 미만료 템플릿만 필터링
+  const availableTemplates = userLocationTemplateInstances.filter(template => !template.used && !isTemplateExpired(template));
   const currentTemplate = (isEditMode && locationToEdit)
     ? (
         userLocationTemplateInstances.find(t => t.id === locationToEdit.templateInstanceId) ||
@@ -383,7 +385,7 @@ const AddLocationScreen = () => {
         setIsLoading(false);
         
         // 성공 메시지 표시 후 내 영역 탭으로 이동
-        setAlertModalConfig({
+    setAlertModalConfig({
           title: '성공',
           message: '영역이 성공적으로 수정되었습니다.',
           buttons: [
@@ -396,9 +398,9 @@ const AddLocationScreen = () => {
             }
           ],
           icon: 'checkmark-circle',
-          iconColor: '#4CAF50'
-        });
-        setAlertModalVisible(true);
+      iconColor: '#4CAF50'
+    });
+    setAlertModalVisible(true);
       } else {
         // 영역 생성 로직
         console.log('영역 생성 시작:', {
@@ -483,8 +485,8 @@ const AddLocationScreen = () => {
         iconColor: '#F44336'
       });
       setAlertModalVisible(true);
-      return;
-    }
+        return;
+      }
     // 연결된 제품이 없으면 즉시 등록 해제
     dispatch(unassignProductSlotTemplate({ templateId }));
     setAlertModalConfig({
@@ -534,7 +536,7 @@ const AddLocationScreen = () => {
                   <View style={styles.templateGroupHeader}>
                     <View style={styles.templateIconContainer}>
                       <Ionicons name={icon} size={24} color="#4CAF50" />
-                    </View>
+          </View>
                     <View style={styles.templateGroupInfo}>
                       <Text style={styles.templateGroupName}>{name}</Text>
                       <Text style={styles.templateGroupDescription}>{description}</Text>
@@ -545,7 +547,7 @@ const AddLocationScreen = () => {
                     <ScrollView style={styles.templateOptionsScroll} nestedScrollEnabled>
                       <View style={styles.templateOptions}>
                         {templates.map(template => (
-                          <TouchableOpacity
+          <TouchableOpacity 
                             key={template.id}
                             style={[
                               styles.templateOption,
@@ -559,11 +561,11 @@ const AddLocationScreen = () => {
                             {selectedTemplateInstance?.id === template.id && (
                               <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
                             )}
-                          </TouchableOpacity>
+          </TouchableOpacity>
                         ))}
-                      </View>
+        </View>
                     </ScrollView>
-                  </View>
+      </View>
                 </View>
               );
             })}
@@ -594,7 +596,7 @@ const AddLocationScreen = () => {
                       const baseSlots = template.feature?.baseSlots;
                       const allowedSlots = baseSlots === -1 ? Number.POSITIVE_INFINITY : (baseSlots + additionalProductSlots);
                       const isDisabled = currentProductCount > allowedSlots;
-                      return (
+  return (
                         <TouchableOpacity
                           key={template.id}
                           style={[
@@ -614,7 +616,7 @@ const AddLocationScreen = () => {
                                 현재 {currentProductCount}개 / 허용 {allowedSlots === Number.POSITIVE_INFINITY ? '무제한' : `${allowedSlots}개`}
                               </Text>
                             )}
-                          </View>
+          </View>
                           {selectedEditTemplateInstance?.id === template.id && (
                             <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
                           )}
@@ -625,7 +627,7 @@ const AddLocationScreen = () => {
                 </ScrollView>
               </View>
             ) : (
-              <Text style={styles.sectionDescription}>사용 가능한 템플릿이 없습니다. 상점에서 템플릿을 구매하세요.</Text>
+              <Text style={styles.sectionDescription}>사용 가능한 템플릿이 없습니다. (만료된 템플릿은 목록에 표시되지 않습니다)</Text>
             )}
           </View>
         )}
@@ -636,25 +638,25 @@ const AddLocationScreen = () => {
           
           <View style={styles.formGroup}>
             <Text style={styles.label}>이름</Text>
-            <TextInput
+          <TextInput
               style={styles.input}
               value={locationData.title}
               onChangeText={(text) => handleInputChange('title', text)}
               placeholder={selectedTemplateInstance ? selectedTemplateInstance.name : "영역 이름을 입력하세요"}
             />
-          </View>
-          
+        </View>
+        
           <View style={styles.formGroup}>
             <Text style={styles.label}>설명 (선택사항)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
+          <TextInput
+            style={[styles.input, styles.textArea]}
               value={locationData.description}
               onChangeText={(text) => handleInputChange('description', text)}
               placeholder={selectedTemplateInstance ? selectedTemplateInstance.description : "영역에 대한 설명을 입력하세요"}
-              multiline
-            />
-          </View>
-          
+            multiline
+          />
+        </View>
+        
           <View style={styles.formGroup}>
             <Text style={styles.label}>아이콘</Text>
             <TouchableOpacity
@@ -677,7 +679,7 @@ const AddLocationScreen = () => {
             <View style={styles.stagingNotice}>
               <Ionicons name="information-circle" size={16} color="#4CAF50" style={{ marginRight: 6 }} />
               <Text style={styles.stagingNoticeText}>변경 사항이 있습니다. 아래 "영역 수정"을 눌러 적용하세요.</Text>
-            </View>
+        </View>
           )}
           {(() => {
             const baseSlots = (isEditMode ? (selectedEditTemplateInstance?.feature?.baseSlots ?? currentTemplate?.feature?.baseSlots) : selectedTemplateInstance?.feature?.baseSlots);
@@ -739,9 +741,9 @@ const AddLocationScreen = () => {
                 <Ionicons name="cart-outline" size={28} color="#9E9E9E" style={{ marginBottom: 6 }} />
                 <Text style={styles.emptySlotTitle}>보유한 추가 제품 슬롯이 없습니다</Text>
                 <Text style={styles.emptySlotSubtitle}>{`상점에서 추가 제품 슬롯을 구매한 뒤\n이 영역에 등록해 사용할 수 있습니다.`}</Text>
-              </View>
-            )}
-
+          </View>
+        )}
+        
             {/* 등록 예정 목록 */}
             {(isEditMode && stagedAssignTemplates.length > 0) && (
               <View style={[styles.emptySlotCard, { marginTop: 8 }]}> 
@@ -752,7 +754,7 @@ const AddLocationScreen = () => {
                       <Ionicons name="time-outline" size={18} color="#4CAF50" />
                       <Text style={styles.productSlotText}>이 영역에 등록 예정</Text>
                     </View>
-                    <TouchableOpacity
+        <TouchableOpacity 
                       style={[styles.assignButton, { backgroundColor: '#9E9E9E' }]}
                       onPress={() => setStagedAssignTemplateIds(prev => prev.filter(id => id !== t.id))}
                     >
@@ -855,16 +857,16 @@ const AddLocationScreen = () => {
         />
         
         {/* 알림 모달 */}
-        <AlertModal
-          visible={alertModalVisible}
-          title={alertModalConfig.title}
-          message={alertModalConfig.message}
-          buttons={alertModalConfig.buttons}
-          onClose={() => setAlertModalVisible(false)}
-          icon={alertModalConfig.icon}
-          iconColor={alertModalConfig.iconColor}
-        />
-
+      <AlertModal
+        visible={alertModalVisible}
+        title={alertModalConfig.title}
+        message={alertModalConfig.message}
+        buttons={alertModalConfig.buttons}
+        onClose={() => setAlertModalVisible(false)}
+        icon={alertModalConfig.icon}
+        iconColor={alertModalConfig.iconColor}
+      />
+      
         {/* 수량 선택 모달 (간단 구현: AlertModal의 content로 입력 UI 구성 가능하나, 여기서는 프리셋 버튼 제공) */}
         {quantityModalVisible && (
           <AlertModal

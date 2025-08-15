@@ -30,7 +30,7 @@ const LocationsScreen = () => {
   const route = useRoute();
   
   const { locations, status, error } = useSelector(state => state.locations);
-  const { isAnonymous, isLoggedIn, userLocationTemplateInstances } = useSelector(state => state.auth);
+  const { isAnonymous, isLoggedIn, userLocationTemplateInstances, subscription } = useSelector(state => state.auth);
 
   // 자동 연동 모달 제거 (요청사항)
  
@@ -48,6 +48,15 @@ const LocationsScreen = () => {
   const [templatePickerLocation, setTemplatePickerLocation] = useState(null);
   const [freeTemplates, setFreeTemplates] = useState([]);
   const [templatePickerSelectedTemplateId, setTemplatePickerSelectedTemplateId] = useState(null);
+
+  // 각 영역별로 연결된 템플릿이 구독 만료인지 계산하는 헬퍼
+  const isLocationExpired = useCallback((loc) => {
+    const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === loc.id) || null;
+    if (!tpl) return false;
+    if (tpl.origin !== 'subscription') return false;
+    if (!tpl.subscriptionExpiresAt) return false;
+    return Date.now() >= new Date(tpl.subscriptionExpiresAt).getTime();
+  }, [userLocationTemplateInstances]);
 
   // 템플릿 선택 모달 콘텐츠를 선택 상태에 맞게 갱신
   useEffect(() => {
@@ -170,6 +179,7 @@ const LocationsScreen = () => {
   }, [isFocused, navigation]);
 
   const handleAddLocation = () => {
+    // 생성은 전체 정책에 따르되, 템플릿 만료는 기존 영역 접근에서만 제한함 (생성은 보유 템플릿 유효성으로 자동 제한됨)
     // 사용자의 템플릿 인스턴스 확인
     const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
     
@@ -232,6 +242,7 @@ const LocationsScreen = () => {
   };
 
   const handleLocationPress = (location) => {
+    // 만료된 경우에도 상세 진입은 허용하되, 내부에서 수정으로 변경 유도
     // 로그인 상태에서 템플릿에 연동되지 않은 영역은 접근 차단
     const linked = userLocationTemplateInstances.some(t => t.usedInLocationId === location.id);
     const hasFreeTemplate = userLocationTemplateInstances.some(t => !t.used);
@@ -348,6 +359,8 @@ const LocationsScreen = () => {
 
   return (
     <View style={styles.container}>
+      {/* 구독 만료 배너 */}
+      {/* 전역 만료 배너 제거. 영역별로 안내 */}
       {/* 슬롯 상태 표시 바 - 템플릿 인스턴스 기준 */}
       <SlotStatusBar 
         used={usedTemplates.length} 
@@ -408,6 +421,11 @@ const LocationsScreen = () => {
                     {isLoggedIn && !userLocationTemplateInstances.some(t => t.usedInLocationId === item.id) && (
                       <Text style={{ color: '#F44336', marginTop: 4, fontSize: 12 }}>
                         템플릿 미연동(비활성화)
+                      </Text>
+                    )}
+                    {isLocationExpired(item) && (
+                      <Text style={{ color: '#F44336', marginTop: 4, fontSize: 12 }}>
+                        구독 템플릿 만료됨
                       </Text>
                     )}
                   </View>
@@ -477,6 +495,21 @@ const styles = StyleSheet.create({
   locationsContainer: {
     flex: 1,
     position: 'relative',
+  },
+  subscriptionExpiredBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffebee',
+    borderColor: '#ffcdd2',
+    borderWidth: 1,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  subscriptionExpiredText: {
+    color: '#F44336',
+    fontSize: 12,
+    flex: 1,
   },
   scrollContent: {
     paddingBottom: 80, // 하단 버튼을 위한 여백

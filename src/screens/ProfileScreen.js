@@ -146,10 +146,13 @@ const ProfileScreen = () => {
       <View style={styles.profileHeader}>
         {isLoggedIn && user ? (
           <>
-            <Image
-              source={{ uri: user.profileImage || 'https://via.placeholder.com/150' }}
-              style={styles.profileImage}
-            />
+            {user.profileImage ? (
+              <Image source={{ uri: user.profileImage }} style={styles.profileImage} />
+            ) : (
+              <View style={[styles.profileImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#e0e0e0' }]}>
+                <Ionicons name="person-circle" size={64} color="#9E9E9E" />
+              </View>
+            )}
             <View style={styles.profileInfo}>
               <Text style={styles.userName}>{user.username || user.name}</Text>
               <Text style={styles.userEmail}>{user.email}</Text>

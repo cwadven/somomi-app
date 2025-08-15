@@ -59,13 +59,14 @@ if (typeof localStorage === 'undefined') {
 // 앱 내부 컴포넌트 - 토큰 검증 및 초기화 로직을 포함
 const AppContent = () => {
   const dispatch = useDispatch();
-  const { isLoggedIn, isAnonymous, user } = useSelector(state => state.auth);
+  const { isLoggedIn, isAnonymous, user, subscription, slots } = useSelector(state => state.auth);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
   const [pushToken, setPushToken] = useState('');
   const [appState, setAppState] = useState(AppState.currentState);
   const [dataInitialized, setDataInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   
   // 디버깅 모달 상태
   const [showDebugModal, setShowDebugModal] = useState(false);
@@ -161,6 +162,25 @@ const AppContent = () => {
       pushNotificationService.requestNotificationPermission();
     }
   }, [appState]);
+
+  // 구독 만료 감시 (20초 테스트 포함)
+  useEffect(() => {
+    if (!subscription?.isSubscribed || !subscription?.expiresAt) {
+      setSubscriptionExpired(false);
+      return;
+    }
+
+    const check = () => {
+      const now = Date.now();
+      const exp = new Date(subscription.expiresAt).getTime();
+      const expired = now >= exp;
+      setSubscriptionExpired(expired);
+    };
+
+    check();
+    const interval = setInterval(check, 1000);
+    return () => clearInterval(interval);
+  }, [subscription?.isSubscribed, subscription?.expiresAt]);
   
   // 딥링크 설정
   const linking = {

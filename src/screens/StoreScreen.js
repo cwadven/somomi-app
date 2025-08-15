@@ -12,7 +12,7 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance, addTemplateInstance, addProductSlotTemplateInstances } from '../redux/slices/authSlice';
+import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance, addTemplateInstance, addProductSlotTemplateInstances, applySubscriptionToTemplates } from '../redux/slices/authSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
@@ -168,7 +168,8 @@ const StoreScreen = () => {
     }
     
     setSelectedProduct({
-      type: 'slot',
+      kind: 'slot',
+      type: item.type, // 'locationSlot' | 'productSlot'
       ...item
     });
     setPurchaseConfirmVisible(true);
@@ -199,9 +200,8 @@ const StoreScreen = () => {
           itemType: 'subscription'
         }));
         
-        // 구독 처리
-        const expiryDate = new Date();
-        expiryDate.setMonth(expiryDate.getMonth() + 1); // 1개월 구독
+        // 구독 처리 - 테스트용 20초 유효 기간
+        const expiryDate = new Date(Date.now() + 20 * 1000);
         
         dispatch(updateSubscription({
           isSubscribed: true,
@@ -218,6 +218,13 @@ const StoreScreen = () => {
             baseSlots: selectedProduct.productSlotsPerLocation,
           }
         }));
+        // 템플릿 인스턴스 동기화 (somomi_user_location_templates 최신화)
+        dispatch(applySubscriptionToTemplates({
+          locationSlots: selectedProduct.locationSlots,
+          productSlotsPerLocation: selectedProduct.productSlotsPerLocation,
+          planId: selectedProduct.id,
+          expiresAt: expiryDate.toISOString(),
+        }));
         
         // 구매 내역 추가
         dispatch(addPurchase({
@@ -231,7 +238,7 @@ const StoreScreen = () => {
         }));
         
         showSuccessModal('구독 완료', `${selectedProduct.name} 구독이 완료되었습니다. 이제 더 많은 영역과 제품을 등록할 수 있습니다.`);
-      } else if (selectedProduct.type === 'productSlot' || selectedProduct.type === 'locationSlot') {
+      } else if (selectedProduct.type === 'productSlot' || selectedProduct.type === 'locationSlot' || selectedProduct.kind === 'slot') {
         // 포인트 사용 - usePoints 액션 호출
         dispatch(usePoints({
           amount: pointCost,
@@ -411,7 +418,7 @@ const StoreScreen = () => {
                 </View>
               )}
               
-              {selectedProduct.type === 'slot' && (
+              {(selectedProduct.type === 'productSlot' || selectedProduct.type === 'locationSlot' || selectedProduct.kind === 'slot') && (
                 <Text style={styles.modalDescription}>
                   {selectedProduct.description}
                 </Text>
@@ -670,7 +677,10 @@ const StoreScreen = () => {
   
   // 현재 슬롯 상태 표시
   const renderCurrentSlots = () => {
-    const totalLocationSlots = slots.locationSlots.baseSlots + slots.locationSlots.additionalSlots;
+    const now = Date.now();
+    const isExpired = subscription?.isSubscribed && subscription?.expiresAt && now >= new Date(subscription.expiresAt).getTime();
+    const effectiveBaseLocationSlots = isExpired ? 0 : slots.locationSlots.baseSlots;
+    const totalLocationSlots = effectiveBaseLocationSlots + slots.locationSlots.additionalSlots;
     const totalProductSlots = slots.productSlots.baseSlots + (userProductSlotTemplateInstances?.length || 0);
     
     return (
@@ -697,7 +707,7 @@ const StoreScreen = () => {
               현재 구독: {subscriptionPlans.find(p => p.id === subscription.plan)?.name || '기본 구독'}
             </Text>
             <Text style={styles.subscriptionExpiry}>
-              만료일: {new Date(subscription.expiresAt).toLocaleDateString()}
+              {isExpired ? '구독 만료됨' : `만료일: ${new Date(subscription.expiresAt).toLocaleString()}`}
             </Text>
           </View>
         )}
