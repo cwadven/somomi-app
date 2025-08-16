@@ -25,7 +25,22 @@ import AlertModal from './AlertModal';
 const LocationNotificationSettings = ({ locationId, location = {} }) => {
   const dispatch = useDispatch();
   const { currentNotifications, status } = useSelector(state => state.notifications);
-  const { isAnonymous } = useSelector(state => state.auth);
+  const { isAnonymous, userLocationTemplateInstances } = useSelector(state => state.auth);
+  // 영역 템플릿 만료 여부 (LocationDetailScreen과 동일한 기준으로 판별)
+  const isLocationExpired = (() => {
+    const linkedTemplate = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locationId) || null;
+    const exp = linkedTemplate?.subscriptionExpiresAt || linkedTemplate?.expiresAt || linkedTemplate?.feature?.expiresAt || locationData?.feature?.expiresAt;
+    const expired = !!exp && (Date.now() >= new Date(exp).getTime());
+    try {
+      console.log('LocationNotificationSettings - 만료판별', {
+        locationId,
+        foundTemplateId: linkedTemplate?.id,
+        expiresAt: exp,
+        expired
+      });
+    } catch (e) {}
+    return expired;
+  })();
   const { locations } = useSelector(state => state.locations);
   
   // 영역 정보 가져오기 (props로 전달된 location이 없으면 Redux에서 찾기)
@@ -267,6 +282,12 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
       <Text style={styles.description}>
         이 영역에 있는 제품들에 대한 알림 설정을 관리합니다.
       </Text>
+      {isLocationExpired && (
+        <View style={styles.blockBanner}>
+          <Ionicons name="alert-circle" size={16} color="#F44336" style={{ marginRight: 6 }} />
+          <Text style={styles.blockBannerText}>이 영역의 템플릿이 만료되어 알림 설정을 변경할 수 없습니다. 설정되어 있어도 동작하지 않습니다.</Text>
+        </View>
+      )}
       
       {/* AI 알림 설정 */}
       <View style={styles.settingSection}>
@@ -278,9 +299,10 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
           <Text style={styles.settingText}>AI 추천 알림 활성화</Text>
           <Switch
             value={aiEnabled}
-            onValueChange={setAiEnabled}
+            onValueChange={(v) => { if (!isLocationExpired) setAiEnabled(v); }}
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={aiEnabled ? '#4630EB' : '#f4f3f4'}
+            disabled={isLocationExpired}
           />
         </View>
         <Text style={styles.settingDescription}>
@@ -301,6 +323,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
             onValueChange={setExpiryEnabled}
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={expiryEnabled ? '#4630EB' : '#f4f3f4'}
+            disabled={isLocationExpired}
           />
         </View>
         <View style={[styles.settingItem, styles.daysSettingItem]}>
@@ -312,7 +335,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
             keyboardType="number-pad"
             placeholder="7"
             maxLength={2}
-            editable={expiryEnabled}
+            editable={expiryEnabled && !isLocationExpired}
           />
           <Text style={styles.daysText}>일 전에 알림</Text>
         </View>
@@ -325,7 +348,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
             onValueChange={setIsExpiryRepeating}
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={isExpiryRepeating ? '#4630EB' : '#f4f3f4'}
-            disabled={!expiryEnabled}
+            disabled={!expiryEnabled || isLocationExpired}
           />
         </View>
         {isExpiryRepeating && (
@@ -352,6 +375,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
             onValueChange={setEstimatedEnabled}
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={estimatedEnabled ? '#4630EB' : '#f4f3f4'}
+            disabled={isLocationExpired}
           />
         </View>
         <View style={[styles.settingItem, styles.daysSettingItem]}>
@@ -363,7 +387,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
             keyboardType="number-pad"
             placeholder="7"
             maxLength={2}
-            editable={estimatedEnabled}
+            editable={estimatedEnabled && !isLocationExpired}
           />
           <Text style={styles.daysText}>일 전에 알림</Text>
         </View>
@@ -376,7 +400,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
             onValueChange={setIsEstimatedRepeating}
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={isEstimatedRepeating ? '#4630EB' : '#f4f3f4'}
-            disabled={!estimatedEnabled}
+            disabled={!estimatedEnabled || isLocationExpired}
           />
         </View>
         {isEstimatedRepeating && (
@@ -392,8 +416,22 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
       
       {/* 저장 버튼 */}
       <TouchableOpacity 
-        style={styles.saveButton}
-        onPress={saveNotificationSettings}
+        style={[styles.saveButton, isLocationExpired && styles.disabledSaveButton]}
+        onPress={() => {
+          if (isLocationExpired) {
+            setAlertModalConfig({
+              title: '저장 불가',
+              message: '이 영역의 템플릿이 만료되어 알림 설정을 저장할 수 없습니다.',
+              buttons: [{ text: '확인' }],
+              icon: 'alert-circle',
+              iconColor: '#F44336'
+            });
+            setAlertModalVisible(true);
+            return;
+          }
+          saveNotificationSettings();
+        }}
+        disabled={isLocationExpired}
       >
         <Text style={styles.saveButtonText}>설정 저장</Text>
       </TouchableOpacity>
@@ -523,11 +561,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  disabledSaveButton: {
+    backgroundColor: '#9E9E9E',
+  },
   settingDescription: {
     fontSize: 13,
     color: '#666',
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  blockBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fdecea',
+    borderColor: '#f5c6cb',
+    borderWidth: 1,
+    padding: 10,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  blockBannerText: {
+    color: '#b71c1c',
+    flex: 1,
+    fontSize: 13,
   },
 });
 

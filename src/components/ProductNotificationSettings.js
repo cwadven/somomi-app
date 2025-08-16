@@ -28,7 +28,14 @@ import AlertModal from './AlertModal';
 const ProductNotificationSettings = ({ productId, product }) => {
   const dispatch = useDispatch();
   const { currentNotifications, status } = useSelector(state => state.notifications);
-  const { isAuthenticated } = useSelector(state => state.auth);
+  const { isAuthenticated, userLocationTemplateInstances } = useSelector(state => state.auth);
+  // 영역 템플릿 만료 여부
+  const isLocationExpired = (() => {
+    const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === product?.locationId);
+    const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
+    return !!exp && (Date.now() >= new Date(exp).getTime());
+  })();
+
   
   // 알림 설정 상태
   const [expiryEnabled, setExpiryEnabled] = useState(true);
@@ -196,6 +203,12 @@ const ProductNotificationSettings = ({ productId, product }) => {
       <Text style={styles.description}>
         이 제품에 대한 알림 설정을 관리합니다.
       </Text>
+      {isLocationExpired && (
+        <View style={styles.blockBanner}>
+          <Ionicons name="alert-circle" size={16} color="#F44336" style={{ marginRight: 6 }} />
+          <Text style={styles.blockBannerText}>이 제품의 영역 템플릿이 만료되어 알림 설정을 변경할 수 없습니다. 설정되어 있어도 동작하지 않습니다.</Text>
+        </View>
+      )}
       
       {/* 유통기한 알림 설정 */}
       <View style={styles.settingSection}>
@@ -210,7 +223,7 @@ const ProductNotificationSettings = ({ productId, product }) => {
             onValueChange={setExpiryEnabled}
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={expiryEnabled ? '#4630EB' : '#f4f3f4'}
-            disabled={!product.expiryDate}
+            disabled={!product.expiryDate || isLocationExpired}
           />
         </View>
         <View style={[styles.settingItem, styles.daysSettingItem]}>
@@ -222,7 +235,7 @@ const ProductNotificationSettings = ({ productId, product }) => {
             keyboardType="number-pad"
             placeholder="7"
             maxLength={2}
-            editable={expiryEnabled && !!product.expiryDate}
+            editable={expiryEnabled && !!product.expiryDate && !isLocationExpired}
           />
           <Text style={styles.daysText}>일 전에 알림</Text>
         </View>
@@ -235,7 +248,7 @@ const ProductNotificationSettings = ({ productId, product }) => {
             onValueChange={setIsExpiryRepeating}
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={isExpiryRepeating ? '#4630EB' : '#f4f3f4'}
-            disabled={!expiryEnabled || !product.expiryDate}
+            disabled={!expiryEnabled || !product.expiryDate || isLocationExpired}
           />
         </View>
         {isExpiryRepeating && (
@@ -252,7 +265,7 @@ const ProductNotificationSettings = ({ productId, product }) => {
             onValueChange={setIgnoreLocationExpiryNotification}
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={ignoreLocationExpiryNotification ? '#4630EB' : '#f4f3f4'}
-            disabled={!expiryEnabled || !product.expiryDate}
+            disabled={!expiryEnabled || !product.expiryDate || isLocationExpired}
           />
         </View>
         {ignoreLocationExpiryNotification && (
@@ -281,7 +294,7 @@ const ProductNotificationSettings = ({ productId, product }) => {
             onValueChange={setEstimatedEnabled}
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={estimatedEnabled ? '#4630EB' : '#f4f3f4'}
-            disabled={!product.estimatedEndDate}
+            disabled={!product.estimatedEndDate || isLocationExpired}
           />
         </View>
         <View style={[styles.settingItem, styles.daysSettingItem]}>
@@ -293,7 +306,7 @@ const ProductNotificationSettings = ({ productId, product }) => {
             keyboardType="number-pad"
             placeholder="7"
             maxLength={2}
-            editable={estimatedEnabled && !!product.estimatedEndDate}
+            editable={estimatedEnabled && !!product.estimatedEndDate && !isLocationExpired}
           />
           <Text style={styles.daysText}>일 전에 알림</Text>
         </View>
@@ -306,7 +319,7 @@ const ProductNotificationSettings = ({ productId, product }) => {
             onValueChange={setIsEstimatedRepeating}
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={isEstimatedRepeating ? '#4630EB' : '#f4f3f4'}
-            disabled={!estimatedEnabled || !product.estimatedEndDate}
+            disabled={!estimatedEnabled || !product.estimatedEndDate || isLocationExpired}
           />
         </View>
         {isEstimatedRepeating && (
@@ -323,7 +336,7 @@ const ProductNotificationSettings = ({ productId, product }) => {
             onValueChange={setIgnoreLocationEstimatedNotification}
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={ignoreLocationEstimatedNotification ? '#4630EB' : '#f4f3f4'}
-            disabled={!estimatedEnabled || !product.estimatedEndDate}
+            disabled={!estimatedEnabled || !product.estimatedEndDate || isLocationExpired}
           />
         </View>
         {ignoreLocationEstimatedNotification && (
@@ -341,8 +354,22 @@ const ProductNotificationSettings = ({ productId, product }) => {
       
       {/* 저장 버튼 */}
       <TouchableOpacity 
-        style={styles.saveButton}
-        onPress={saveNotificationSettings}
+        style={[styles.saveButton, isLocationExpired && styles.disabledSaveButton]}
+        onPress={() => {
+          if (isLocationExpired) {
+            setAlertModalConfig({
+              title: '저장 불가',
+              message: '이 제품의 영역 템플릿이 만료되어 알림 설정을 저장할 수 없습니다.',
+              buttons: [{ text: '확인' }],
+              icon: 'alert-circle',
+              iconColor: '#F44336'
+            });
+            setAlertModalVisible(true);
+            return;
+          }
+          saveNotificationSettings();
+        }}
+        disabled={isLocationExpired}
       >
         <Text style={styles.saveButtonText}>설정 저장</Text>
       </TouchableOpacity>
@@ -439,6 +466,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  disabledSaveButton: {
+    backgroundColor: '#9E9E9E',
+  },
   saveButtonText: {
     color: '#fff',
     fontSize: 16,
@@ -450,6 +480,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 8,
     fontStyle: 'italic',
+  },
+  blockBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fdecea',
+    borderColor: '#f5c6cb',
+    borderWidth: 1,
+    padding: 10,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  blockBannerText: {
+    color: '#b71c1c',
+    flex: 1,
+    fontSize: 13,
   },
 });
 
