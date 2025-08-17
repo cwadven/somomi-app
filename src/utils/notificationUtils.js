@@ -24,15 +24,25 @@ import { loadData, saveData, STORAGE_KEYS, loadAppPrefs, saveData as saveAny } f
  * @param {Array} locations - 영역 목록
  * @returns {Array} 처리된 알림 정보 배열
  */
-export const processLocationNotifications = (notifications, products, locations) => {
+export const processLocationNotifications = (notifications, products, locations, templates = []) => {
   const notificationsToSend = [];
   
   // 영역 알림 필터링
   const locationNotifications = notifications.filter(n => n.type === 'location');
   
+  const isLocationTemplateExpired = (locId) => {
+    try {
+      const tpl = (templates || []).find(t => t.usedInLocationId === locId);
+      const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
+      return !!exp && (Date.now() >= new Date(exp).getTime());
+    } catch (e) { return false; }
+  };
+
   for (const locationNotif of locationNotifications) {
     const location = locations.find(loc => loc.id === locationNotif.targetId);
     if (!location) continue;
+    // 비활성화 또는 만료된 영역 제외
+    if (location.disabled === true || isLocationTemplateExpired(location.id)) continue;
     
     // 해당 영역에 속한 제품들 찾기 (소진되지 않은 제품만)
     const locationProducts = products.filter(p => 
@@ -98,18 +108,28 @@ export const processLocationNotifications = (notifications, products, locations)
  * @param {Array} locations - 영역 목록
  * @returns {Array} 처리된 알림 정보 배열
  */
-export const processProductNotifications = (notifications, products, locations) => {
+export const processProductNotifications = (notifications, products, locations, templates = []) => {
   const notificationsToSend = [];
   
   // 제품 알림 필터링
   const productNotifications = notifications.filter(n => n.type === 'product');
   
+  const isLocationTemplateExpired = (locId) => {
+    try {
+      const tpl = (templates || []).find(t => t.usedInLocationId === locId);
+      const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
+      return !!exp && (Date.now() >= new Date(exp).getTime());
+    } catch (e) { return false; }
+  };
+
   for (const productNotif of productNotifications) {
     // 소진되지 않은 제품만 처리
     const product = products.find(p => p.id === productNotif.targetId && !p.isConsumed);
     if (!product) continue;
     
     const location = locations.find(loc => loc.id === product.locationId);
+    // 비활성화 또는 만료된 영역 소속 제품 제외
+    if (!location || location.disabled === true || isLocationTemplateExpired(location.id)) continue;
     
     // 알림 타입에 따른 처리
     if (productNotif.notifyType === 'expiry' && product.expiryDate) {
@@ -243,10 +263,11 @@ export const processAllNotifications = async (skipSending = false) => {
     const notifications = await loadData(STORAGE_KEYS.NOTIFICATIONS) || [];
     const products = await loadData(STORAGE_KEYS.PRODUCTS) || [];
     const locations = await loadData(STORAGE_KEYS.LOCATIONS) || [];
+    const templates = await loadData(STORAGE_KEYS.USER_LOCATION_TEMPLATES) || [];
     
     // 2. 영역 알림과 제품 알림 처리
-    const locationNotificationsToSend = processLocationNotifications(notifications, products, locations);
-    const productNotificationsToSend = processProductNotifications(notifications, products, locations);
+    const locationNotificationsToSend = processLocationNotifications(notifications, products, locations, templates);
+    const productNotificationsToSend = processProductNotifications(notifications, products, locations, templates);
     
     // 3. 결과 합치기
     const notificationsToSend = [...locationNotificationsToSend, ...productNotificationsToSend];
