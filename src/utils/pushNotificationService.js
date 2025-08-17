@@ -154,12 +154,24 @@ class PushNotificationService {
       // 알림 ID 생성
       const notificationId = `notification_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
       
+      // data 값을 모두 문자열로 정규화
+      const normalizeData = (raw) => {
+        const result = {};
+        try {
+          Object.entries(raw || {}).forEach(([key, value]) => {
+            if (value === null || value === undefined) return;
+            result[String(key)] = String(value);
+          });
+        } catch (e) {}
+        return result;
+      };
+
       // 알림 설정 - 최소한의 필수 속성만 설정
       const notificationConfig = {
         id: notificationId,
         title: title || '알림',
         body: body || '',
-        data: data || {},
+        data: normalizeData(data),
       };
       
       // 안드로이드 설정 추가
@@ -401,12 +413,24 @@ class PushNotificationService {
       // 알림 ID 생성
       const notificationId = `notification_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
       
+      // data 값을 모두 문자열로 정규화
+      const normalizeData = (raw) => {
+        const result = {};
+        try {
+          Object.entries(raw || {}).forEach(([key, value]) => {
+            if (value === null || value === undefined) return;
+            result[String(key)] = String(value);
+          });
+        } catch (e) {}
+        return result;
+      };
+
       // 알림 설정 - 최소한의 필수 속성만 설정
       const notificationConfig = {
         id: notificationId,
         title: notification.title || '알림',
         body: notification.body || '',
-        data: data || {},
+        data: normalizeData(data),
       };
       
       // 안드로이드 설정 추가

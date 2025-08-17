@@ -384,9 +384,9 @@ export const sendNotifications = async (notifications) => {
       const body = notification.message;
       const data = {
         type: notification.notification_type,
-        productId: notification.product_id,
-        locationId: notification.location_id,
-        notificationId: notification.notification_id,
+        productId: notification.product_id ? String(notification.product_id) : '',
+        locationId: notification.location_id ? String(notification.location_id) : '',
+        notificationId: notification.notification_id ? String(notification.notification_id) : '',
         deepLink: notification.product_id ? `somomi://product/detail/${notification.product_id}` : 'somomi://notifications'
       };
       
