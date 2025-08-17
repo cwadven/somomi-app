@@ -314,42 +314,44 @@ const LocationDetailScreen = () => {
     return (
       <View style={styles.productsContainer}>
         <View style={styles.sortBar}>
-          <TouchableOpacity style={[styles.sortChip, sortKey === 'created' && styles.sortChipActive]} onPress={() => handleSortPress('created')}>
-            <Text style={[styles.sortChipText, sortKey === 'created' && styles.sortChipTextActive]}>등록순</Text>
-            {sortKey === 'created' && (
-              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.sortChip, sortKey === 'estimated' && styles.sortChipActive]} onPress={() => handleSortPress('estimated')}>
-            <Text style={[styles.sortChipText, sortKey === 'estimated' && styles.sortChipTextActive]}>소진순</Text>
-            {sortKey === 'estimated' && (
-              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.sortChip, sortKey === 'expiry' && styles.sortChipActive]} onPress={() => handleSortPress('expiry')}>
-            <Text style={[styles.sortChipText, sortKey === 'expiry' && styles.sortChipTextActive]}>유통순</Text>
-            {sortKey === 'expiry' && (
-              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.sortChip, sortKey === 'estimatedRate' && styles.sortChipActive]} onPress={() => handleSortPress('estimatedRate')}>
-            <Text style={[styles.sortChipText, sortKey === 'estimatedRate' && styles.sortChipTextActive]}>소진률%</Text>
-            {sortKey === 'estimatedRate' && (
-              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.sortChip, sortKey === 'expiryRate' && styles.sortChipActive]} onPress={() => handleSortPress('expiryRate')}>
-            <Text style={[styles.sortChipText, sortKey === 'expiryRate' && styles.sortChipTextActive]}>유통률%</Text>
-            {sortKey === 'expiryRate' && (
-              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.sortChip, sortKey === 'name' && styles.sortChipActive]} onPress={() => handleSortPress('name')}>
-            <Text style={[styles.sortChipText, sortKey === 'name' && styles.sortChipTextActive]}>이름순</Text>
-            {sortKey === 'name' && (
-              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
-            )}
-          </TouchableOpacity>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortBarContent}>
+            <TouchableOpacity style={[styles.sortChip, sortKey === 'created' && styles.sortChipActive]} onPress={() => handleSortPress('created')}>
+              <Text style={[styles.sortChipText, sortKey === 'created' && styles.sortChipTextActive]}>등록순</Text>
+              {sortKey === 'created' && (
+                <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.sortChip, sortKey === 'estimated' && styles.sortChipActive]} onPress={() => handleSortPress('estimated')}>
+              <Text style={[styles.sortChipText, sortKey === 'estimated' && styles.sortChipTextActive]}>소진순</Text>
+              {sortKey === 'estimated' && (
+                <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.sortChip, sortKey === 'expiry' && styles.sortChipActive]} onPress={() => handleSortPress('expiry')}>
+              <Text style={[styles.sortChipText, sortKey === 'expiry' && styles.sortChipTextActive]}>유통순</Text>
+              {sortKey === 'expiry' && (
+                <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.sortChip, sortKey === 'estimatedRate' && styles.sortChipActive]} onPress={() => handleSortPress('estimatedRate')}>
+              <Text style={[styles.sortChipText, sortKey === 'estimatedRate' && styles.sortChipTextActive]}>소진률%</Text>
+              {sortKey === 'estimatedRate' && (
+                <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.sortChip, sortKey === 'expiryRate' && styles.sortChipActive]} onPress={() => handleSortPress('expiryRate')}>
+              <Text style={[styles.sortChipText, sortKey === 'expiryRate' && styles.sortChipTextActive]}>유통률%</Text>
+              {sortKey === 'expiryRate' && (
+                <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.sortChip, sortKey === 'name' && styles.sortChipActive]} onPress={() => handleSortPress('name')}>
+              <Text style={[styles.sortChipText, sortKey === 'name' && styles.sortChipTextActive]}>이름순</Text>
+              {sortKey === 'name' && (
+                <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+              )}
+            </TouchableOpacity>
+          </ScrollView>
         </View>
         {locationProducts.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -663,6 +665,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+  },
+  sortBarContent: {
+    alignItems: 'center',
+    paddingRight: 8,
   },
   sortChip: {
     paddingHorizontal: 10,
