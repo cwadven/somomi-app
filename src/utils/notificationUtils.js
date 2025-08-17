@@ -292,6 +292,14 @@ export const createEstimatedNotification = (product, location, daysBeforeTarget,
  */
 export const processAllNotifications = async (skipSending = false) => {
   try {
+    const addLog = (msg, type = 'info') => {
+      try {
+        if (pushNotificationService && typeof pushNotificationService.addDebugLog === 'function') {
+          pushNotificationService.addDebugLog(msg, type);
+        }
+      } catch (e) {}
+    };
+    addLog('[9시 리마인더] 알림 후보 계산 시작', 'info');
     // 1. 필요한 데이터 로드
     const notifications = await loadData(STORAGE_KEYS.NOTIFICATIONS) || [];
     const products = await loadData(STORAGE_KEYS.PRODUCTS) || [];
@@ -304,6 +312,7 @@ export const processAllNotifications = async (skipSending = false) => {
     
     // 3. 결과 합치기
     const notificationsToSend = [...locationNotificationsToSend, ...productNotificationsToSend];
+    addLog(`[9시 리마인더] 후보 합계: ${notificationsToSend.length}건`, notificationsToSend.length > 0 ? 'success' : 'warning');
     
     // 4. 처리된 알림을 오늘 날짜 기준으로 저장
     if (notificationsToSend.length > 0) {
@@ -311,13 +320,22 @@ export const processAllNotifications = async (skipSending = false) => {
       
       // 웹 환경이 아니고 skipSending이 false인 경우에만 알림 전송
       if (Platform.OS !== 'web' && !skipSending) {
-        await sendNotifications(notificationsToSend);
+        const results = await sendNotifications(notificationsToSend);
+        addLog(`[9시 리마인더] 전송 완료: ${results?.length || 0}건`, 'success');
       }
+    }
+    else {
+      addLog('[9시 리마인더] 전송할 알림이 없습니다.', 'warning');
     }
     
     return notificationsToSend;
   } catch (error) {
     console.error('알림 처리 중 오류 발생:', error);
+    try {
+      if (pushNotificationService && typeof pushNotificationService.addDebugLog === 'function') {
+        pushNotificationService.addDebugLog(`[오류] 알림 처리 실패: ${error?.message || String(error)}`, 'error');
+      }
+    } catch (e) {}
     return [];
   }
 };
