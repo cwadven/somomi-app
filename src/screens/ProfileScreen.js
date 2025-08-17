@@ -16,7 +16,6 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { logout } from '../redux/slices/authSlice';
 import KakaoLoginButton from '../components/KakaoLoginButton';
-import PushNotificationTest from '../components/PushNotificationTest';
 import NotificationSettings from '../components/NotificationSettings';
 import { clearAllData, loadAppPrefs, saveAppPrefs, loadSyncQueue } from '../utils/storageUtils';
 import { processSyncQueueIfOnline } from '../utils/syncManager';
@@ -231,15 +230,10 @@ const ProfileScreen = () => {
         )}
       </View>
 
-      {/* 앱푸시 테스트 섹션 - 모든 사용자에게 표시 */}
-      {Platform.OS !== 'web' && (
-        <View style={styles.pushTestSection}>
-          <PushNotificationTest />
-        </View>
-      )}
+      {/* 앱푸시 테스트 섹션 제거 */}
 
-      {/* 로그인 한 경우에만 앱 설정 표시 */}
-      {isLoggedIn && user && (
+      {/* 앱 설정: 비회원(anonymous)도 표시 */}
+      {(isLoggedIn && user) || isAnonymous ? (
         <>
           {/* 설정 섹션 */}
           <View style={styles.settingsSection}>
@@ -260,7 +254,7 @@ const ProfileScreen = () => {
             )}
           </View>
         </>
-      )}
+      ) : null}
 
       {/* 정보 섹션은 항상 표시 */}
       <View style={styles.settingsSection}>
@@ -570,10 +564,6 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     color: '#999',
-  },
-  pushTestSection: {
-    marginHorizontal: 16,
-    marginBottom: 16,
   },
   notificationDebuggerContainer: {
     padding: 16,
