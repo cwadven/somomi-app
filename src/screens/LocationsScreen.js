@@ -251,11 +251,11 @@ const LocationsScreen = () => {
     // 만료된 경우에도 상세 진입은 허용하되, 내부에서 수정으로 변경 유도
     // 로그인 상태에서 템플릿에 연동되지 않은 영역은 접근 차단
     const linked = userLocationTemplateInstances.some(t => t.usedInLocationId === location.id);
-    const hasFreeTemplate = userLocationTemplateInstances.some(t => !t.used);
+    const hasFreeTemplate = userLocationTemplateInstances.some(t => !t.used && !isTemplateExpired(t));
     if (isLoggedIn && !linked) {
       if (hasFreeTemplate) {
         // 템플릿 선택 목록 구성
-        const free = userLocationTemplateInstances.filter(t => !t.used);
+        const free = userLocationTemplateInstances.filter(t => !t.used && !isTemplateExpired(t));
         setFreeTemplates(free);
         setTemplatePickerLocation(location);
         setTemplatePickerSelectedTemplateId(null);
