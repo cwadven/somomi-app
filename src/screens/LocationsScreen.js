@@ -88,6 +88,7 @@ const LocationsScreen = () => {
                 templateInstanceId: selectedTpl.id,
                 productId: selectedTpl.productId,
                 feature: selectedTpl.feature,
+                disabled: false, // 템플릿 연동 시 활성화
               }));
             }
             // 템플릿 사용 처리
@@ -278,6 +279,7 @@ const LocationsScreen = () => {
                     templateInstanceId: selectedTpl.id,
                     productId: selectedTpl.productId,
                     feature: selectedTpl.feature,
+                    disabled: false, // 템플릿 연동 시 활성화
                   }));
                 }
                 dispatch({ type: 'auth/markTemplateInstanceAsUsed', payload: { templateId: selected, locationId: location.id } });

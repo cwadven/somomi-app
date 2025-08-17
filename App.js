@@ -217,6 +217,8 @@ const AppContent = () => {
       await dispatch(reconcileLocationTemplates());
       // 템플릿 미연동을 disabled=true로 반영
       await dispatch(reconcileLocationsDisabled()).unwrap();
+      // 연동 상태가 바뀌었을 수 있으니 한 번 더 저장된 locations 로드
+      await dispatch(fetchLocations()).unwrap();
       
       // 제품 데이터 로드
       await dispatch(fetchProducts()).unwrap();
