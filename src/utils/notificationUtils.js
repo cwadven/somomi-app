@@ -355,20 +355,22 @@ export const sendNotifications = async (notifications) => {
   
   const results = [];
 
-  // 1) 소진예상 알림은 대표 1개만 전송하도록 축약
+  // 1) 유통기한/소진예상 알림이 하나라도 존재하면 대표 1건만 전송
   //    나머지 유형은 기존대로 유지
   let finalNotifications = notifications;
   try {
+    const expiryList = notifications.filter(n => n.notification_type === '유통기한');
     const estimatedList = notifications.filter(n => n.notification_type === '소진 예상');
-    const others = notifications.filter(n => n.notification_type !== '소진 예상');
-    if (estimatedList.length > 1) {
+    const combinedCount = expiryList.length + estimatedList.length;
+    const others = notifications.filter(n => n.notification_type !== '유통기한' && n.notification_type !== '소진 예상');
+    if (combinedCount >= 1) {
       const consolidated = {
-        notification_type: '소진 예상',
-        message: '소진예상 알림이 있습니다. 알림 목록에서 확인하세요.',
+        notification_type: '리마인더',
+        message: '곧 소진 및 유통 기한 만료될 제품이 있습니다. 확인해주세요~',
         expire_at: new Date().toISOString(),
         location_id: null,
         product_id: null,
-        notification_id: 'estimated_consolidated_' + Date.now(),
+        notification_id: 'general_consolidated_' + Date.now(),
       };
       finalNotifications = [...others, consolidated];
     } else {
@@ -387,7 +389,7 @@ export const sendNotifications = async (notifications) => {
         productId: notification.product_id ? String(notification.product_id) : '',
         locationId: notification.location_id ? String(notification.location_id) : '',
         notificationId: notification.notification_id ? String(notification.notification_id) : '',
-        deepLink: notification.product_id ? `somomi://product/detail/${notification.product_id}` : 'somomi://notifications'
+        deepLink: 'somomi://notifications'
       };
       
       const notificationId = await sendImmediateNotification(title, body, data);
@@ -421,7 +423,8 @@ export const scheduleDailyReminderIfNeeded = async () => {
   try {
     const prefs = await loadAppPrefs();
     const enabled = prefs?.notificationsEnabled === true;
-    if (!enabled) return;
+    const allow9am = prefs?.remindExpiryEnabled !== false; // 기본 허용, 사용자가 끄면 false
+    if (!enabled || !allow9am) return;
 
     // 오늘 이미 보냈는지 체크
     const sentMap = (await loadData(STORAGE_KEYS.DAILY_REMINDER_SENT)) || {};
@@ -440,7 +443,7 @@ export const scheduleDailyReminderIfNeeded = async () => {
     const delaySec = Math.max(0, Math.floor((trigger.getTime() - now.getTime()) / 1000));
 
     const title = '리마인더 알림';
-    const body = '확인할 알림이 있습니다. 알림 목록에서 확인하세요.';
+    const body = '곧 소진 및 유통 기한 만료될 제품이 있습니다. 확인해주세요~';
     const data = { type: 'reminder', deepLink: 'somomi://notifications' };
 
     if (delaySec === 0) {
@@ -468,7 +471,8 @@ export const scheduleDailyUpdateReminderIfNeeded = async () => {
   try {
     const prefs = await loadAppPrefs();
     const enabled = prefs?.notificationsEnabled === true;
-    if (!enabled) return;
+    const allow8pm = prefs?.remindAddEnabled !== false; // 기본 허용, 사용자가 끄면 false
+    if (!enabled || !allow8pm) return;
 
     const sentMap = (await loadData(STORAGE_KEYS.DAILY_UPDATE_REMINDER_SENT)) || {};
     const todayKey = new Date().toISOString().split('T')[0];
@@ -481,7 +485,7 @@ export const scheduleDailyUpdateReminderIfNeeded = async () => {
     const delaySec = Math.max(0, Math.floor((trigger.getTime() - now.getTime()) / 1000));
 
     const title = '작성 리마인드';
-    const body = '최신화 하셨나요? 오늘의 제품 상태를 업데이트해 주세요.';
+    const body = '최신화 하셨나요? 오늘 구매하거나 배치한 제품을 추가해 주세요.';
     const data = { type: 'update_reminder', deepLink: 'somomi://notifications' };
 
     if (delaySec === 0) {

@@ -13,7 +13,7 @@ if (Platform.OS !== 'web') {
 }
 
 import { requestNotificationPermissions, scheduleDailyReminderIfNeeded } from '../utils/notificationUtils';
-import { saveAppPrefs } from '../utils/storageUtils';
+import { saveAppPrefs, loadAppPrefs } from '../utils/storageUtils';
 
 const NotificationSettings = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -22,6 +22,8 @@ const NotificationSettings = () => {
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState('');
   const [modalAction, setModalAction] = useState(null);
+  const [remindExpiryEnabled, setRemindExpiryEnabled] = useState(true); // 9시 리마인더
+  const [remindAddEnabled, setRemindAddEnabled] = useState(true); // 20시 리마인더
 
   // 알림 권한 상태 확인
   const checkNotificationPermission = async () => {
@@ -124,9 +126,16 @@ const NotificationSettings = () => {
     }
   };
 
-  // 컴포넌트 마운트 시 권한 확인
+  // 컴포넌트 마운트 시 권한/설정 확인
   useEffect(() => {
-    checkNotificationPermission();
+    (async () => {
+      checkNotificationPermission();
+      const prefs = await loadAppPrefs();
+      if (prefs) {
+        if (typeof prefs.remindExpiryEnabled === 'boolean') setRemindExpiryEnabled(prefs.remindExpiryEnabled);
+        if (typeof prefs.remindAddEnabled === 'boolean') setRemindAddEnabled(prefs.remindAddEnabled);
+      }
+    })();
     // 설정 로드 후 스케줄 확인
     scheduleDailyReminderIfNeeded();
     
@@ -174,6 +183,39 @@ const NotificationSettings = () => {
           ? '알림이 활성화되어 있습니다. 제품 유통기한 알림 및 기타 중요 정보를 받을 수 있습니다.'
           : '알림이 비활성화되어 있습니다. 제품 유통기한 알림 및 기타 중요 정보를 받으려면 알림을 활성화하세요.'}
       </Text>
+
+      {/* 9시 리마인더 (소진/유통기한) */}
+      <View style={styles.settingItem}>
+        <Text style={styles.settingText}>제품 소진 리마인더 알림 (오전 9시)</Text>
+        <Switch
+          value={remindExpiryEnabled}
+          onValueChange={async (v) => {
+            setRemindExpiryEnabled(v);
+            await saveAppPrefs({ remindExpiryEnabled: v });
+            scheduleDailyReminderIfNeeded();
+          }}
+          disabled={!notificationsEnabled}
+          trackColor={{ false: '#767577', true: '#81b0ff' }}
+          thumbColor={remindExpiryEnabled ? '#4630EB' : '#f4f3f4'}
+        />
+      </View>
+      {/* 20시 리마인더 (제품 추가) */}
+      <View style={styles.settingItem}>
+        <Text style={styles.settingText}>제품 추가 리마인더 알림 (오후 8시)</Text>
+        <Switch
+          value={remindAddEnabled}
+          onValueChange={async (v) => {
+            setRemindAddEnabled(v);
+            await saveAppPrefs({ remindAddEnabled: v });
+            // 별도 스케줄러 호출
+            const { scheduleDailyUpdateReminderIfNeeded } = require('../utils/notificationUtils');
+            scheduleDailyUpdateReminderIfNeeded();
+          }}
+          disabled={!notificationsEnabled}
+          trackColor={{ false: '#767577', true: '#81b0ff' }}
+          thumbColor={remindAddEnabled ? '#4630EB' : '#f4f3f4'}
+        />
+      </View>
       
       <AlertModal
         visible={modalVisible}
