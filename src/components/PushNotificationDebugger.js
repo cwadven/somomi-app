@@ -7,7 +7,7 @@ import {
   clearPushNotificationLogs, 
   setPushNotificationDebugCallback 
 } from '../utils/pushNotificationService';
-import { processAllNotifications, sendImmediateNotification, scheduleDailyReminderIfNeeded, scheduleDailyUpdateReminderIfNeeded } from '../utils/notificationUtils';
+import { processAllNotifications, sendImmediateNotification } from '../utils/notificationUtils';
 
 /**
  * 푸시 알림 디버깅을 위한 컴포넌트
@@ -102,10 +102,7 @@ const PushNotificationDebugger = () => {
               <Ionicons name="alarm-outline" size={18} color="#fff" />
               <Text style={styles.qaButtonText}>20시 작성 리마인더 즉시 발송</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.qaButton, running && styles.qaButtonDisabled]} onPress={async ()=>{setRunning(true); await scheduleDailyUpdateReminderIfNeeded(); setRunning(false);}} disabled={running}>
-              <Ionicons name="time" size={18} color="#fff" />
-              <Text style={styles.qaButtonText}>20시 작성 리마인더</Text>
-            </TouchableOpacity>
+            {/* 20시 작성 리마인더 스케줄 버튼 제거 */}
           </View>
         )}
       />

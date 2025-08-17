@@ -26,6 +26,13 @@ import { loadData, saveData, STORAGE_KEYS, loadAppPrefs, saveData as saveAny } f
  */
 export const processLocationNotifications = (notifications, products, locations, templates = []) => {
   const notificationsToSend = [];
+  const addLog = (msg, type = 'info') => {
+    try {
+      if (pushNotificationService && typeof pushNotificationService.addDebugLog === 'function') {
+        pushNotificationService.addDebugLog(msg, type);
+      }
+    } catch (e) {}
+  };
   
   // 영역 알림 필터링
   const locationNotifications = notifications.filter(n => n.type === 'location');
@@ -42,7 +49,14 @@ export const processLocationNotifications = (notifications, products, locations,
     const location = locations.find(loc => loc.id === locationNotif.targetId);
     if (!location) continue;
     // 비활성화 또는 만료된 영역 제외
-    if (location.disabled === true || isLocationTemplateExpired(location.id)) continue;
+    if (location.disabled === true) {
+      addLog(`[SKIP] 영역 비활성화: ${location.title} (${location.id})`, 'warning');
+      continue;
+    }
+    if (isLocationTemplateExpired(location.id)) {
+      addLog(`[SKIP] 영역 템플릿 만료: ${location.title} (${location.id})`, 'warning');
+      continue;
+    }
     
     // 해당 영역에 속한 제품들 찾기 (소진되지 않은 제품만)
     const locationProducts = products.filter(p => 
@@ -71,6 +85,7 @@ export const processLocationNotifications = (notifications, products, locations,
         );
         
         if (notification) {
+          addLog(`[INCLUDE] 유통기한 알림 대상 제품: ${product.name} (${product.id}) @ ${location.title} (${location.id})`, 'success');
           // 알림 유형 정보 추가
           notification.source_type = 'location';
           notification.source_id = location.id;
@@ -87,6 +102,7 @@ export const processLocationNotifications = (notifications, products, locations,
         );
         
         if (notification) {
+          addLog(`[INCLUDE] 소진예상 알림 대상 제품: ${product.name} (${product.id}) @ ${location.title} (${location.id})`, 'success');
           // 알림 유형 정보 추가
           notification.source_type = 'location';
           notification.source_id = location.id;
@@ -110,6 +126,13 @@ export const processLocationNotifications = (notifications, products, locations,
  */
 export const processProductNotifications = (notifications, products, locations, templates = []) => {
   const notificationsToSend = [];
+  const addLog = (msg, type = 'info') => {
+    try {
+      if (pushNotificationService && typeof pushNotificationService.addDebugLog === 'function') {
+        pushNotificationService.addDebugLog(msg, type);
+      }
+    } catch (e) {}
+  };
   
   // 제품 알림 필터링
   const productNotifications = notifications.filter(n => n.type === 'product');
@@ -129,7 +152,15 @@ export const processProductNotifications = (notifications, products, locations, 
     
     const location = locations.find(loc => loc.id === product.locationId);
     // 비활성화 또는 만료된 영역 소속 제품 제외
-    if (!location || location.disabled === true || isLocationTemplateExpired(location.id)) continue;
+    if (!location) continue;
+    if (location.disabled === true) {
+      addLog(`[SKIP] 영역 비활성화(제품 제외): ${product.name} (${product.id}) @ ${product.locationId}`, 'warning');
+      continue;
+    }
+    if (isLocationTemplateExpired(location.id)) {
+      addLog(`[SKIP] 영역 템플릿 만료(제품 제외): ${product.name} (${product.id}) @ ${location.title} (${location.id})`, 'warning');
+      continue;
+    }
     
     // 알림 타입에 따른 처리
     if (productNotif.notifyType === 'expiry' && product.expiryDate) {
@@ -141,6 +172,7 @@ export const processProductNotifications = (notifications, products, locations, 
       );
       
       if (notification) {
+        addLog(`[INCLUDE] 유통기한 알림 대상 제품(개별): ${product.name} (${product.id}) @ ${location.title} (${location.id})`, 'success');
         // 알림 유형 정보 추가
         notification.source_type = 'product';
         notification.source_id = product.id;
@@ -157,6 +189,7 @@ export const processProductNotifications = (notifications, products, locations, 
       );
       
       if (notification) {
+        addLog(`[INCLUDE] 소진예상 알림 대상 제품(개별): ${product.name} (${product.id}) @ ${location.title} (${location.id})`, 'success');
         // 알림 유형 정보 추가
         notification.source_type = 'product';
         notification.source_id = product.id;
