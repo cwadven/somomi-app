@@ -7,6 +7,7 @@ import {
   clearPushNotificationLogs, 
   setPushNotificationDebugCallback 
 } from '../utils/pushNotificationService';
+import { processAllNotifications, sendImmediateNotification, scheduleDailyReminderIfNeeded, scheduleDailyUpdateReminderIfNeeded } from '../utils/notificationUtils';
 
 /**
  * 푸시 알림 디버깅을 위한 컴포넌트
@@ -16,6 +17,7 @@ const PushNotificationDebugger = () => {
   const [showModal, setShowModal] = useState(false);
   const [logs, setLogs] = useState([]);
   const [hasNewLogs, setHasNewLogs] = useState(false);
+  const [running, setRunning] = useState(false);
 
   useEffect(() => {
     // 초기 로그 로드
@@ -48,6 +50,35 @@ const PushNotificationDebugger = () => {
     clearPushNotificationLogs();
     setLogs([]);
   };
+
+  // 즉시 알림 후보 생성 및 전송 테스트
+  const handleTestGenerateAndSend = async () => {
+    try {
+      setRunning(true);
+      const notifications = await processAllNotifications(false); // 생성 + 즉시 전송
+      setRunning(false);
+      setShowModal(true);
+    } catch (e) {
+      setRunning(false);
+    }
+  };
+
+  // 알림 목록으로 가는 리마인더 푸시 즉시 전송
+  const handleSendReminderNow = async () => {
+    try {
+      setRunning(true);
+      await sendImmediateNotification('리마인더 알림(디버그)', '확인할 알림이 있습니다. 알림 목록에서 확인하세요.', { type: 'reminder', deepLink: 'somomi://notifications' });
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  // 오전 9시 리마인더 예약 테스트 (바로 스케줄 체크)
+  const handleScheduleDailyReminder = async () => {
+    setRunning(true);
+    await scheduleDailyReminderIfNeeded();
+    setRunning(false);
+  };
   
   return (
     <>
@@ -70,6 +101,26 @@ const PushNotificationDebugger = () => {
         onClose={handleCloseModal}
         onClear={handleClearLogs}
       />
+
+      {/* 빠른 테스트 버튼들 */}
+      <View style={styles.quickActions}>
+        <TouchableOpacity style={[styles.qaButton, running && styles.qaButtonDisabled]} onPress={handleTestGenerateAndSend} disabled={running}>
+          <Ionicons name="paper-plane-outline" size={18} color="#fff" />
+          <Text style={styles.qaButtonText}>알림 즉시 생성/전송</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.qaButton, running && styles.qaButtonDisabled]} onPress={handleSendReminderNow} disabled={running}>
+          <Ionicons name="alarm-outline" size={18} color="#fff" />
+          <Text style={styles.qaButtonText}>리마인더 즉시 발송</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.qaButton, running && styles.qaButtonDisabled]} onPress={handleScheduleDailyReminder} disabled={running}>
+          <Ionicons name="time-outline" size={18} color="#fff" />
+          <Text style={styles.qaButtonText}>9시 리마인더 스케줄</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.qaButton, running && styles.qaButtonDisabled]} onPress={async ()=>{setRunning(true); await scheduleDailyUpdateReminderIfNeeded(); setRunning(false);}} disabled={running}>
+          <Ionicons name="time" size={18} color="#fff" />
+          <Text style={styles.qaButtonText}>20시 작성 리마인더</Text>
+        </TouchableOpacity>
+      </View>
     </>
   );
 };
@@ -111,6 +162,30 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  quickActions: {
+    position: 'absolute',
+    left: 80,
+    bottom: 80,
+    flexDirection: 'row',
+  },
+  qaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  qaButtonDisabled: {
+    backgroundColor: '#9E9E9E',
+  },
+  qaButtonText: {
+    color: '#fff',
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 

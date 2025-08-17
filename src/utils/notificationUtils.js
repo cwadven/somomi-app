@@ -15,7 +15,7 @@ if (Platform.OS !== 'web') {
 }
 
 // 알림 데이터 처리를 위한 import 추가
-import { loadData, saveData, STORAGE_KEYS } from './storageUtils';
+import { loadData, saveData, STORAGE_KEYS, loadAppPrefs, saveData as saveAny } from './storageUtils';
 
 /**
  * 영역 알림을 처리하는 함수
@@ -385,6 +385,93 @@ export const sendNotifications = async (notifications) => {
   }
   
   return results;
+};
+
+/**
+ * 매일 오전 9시에 리마인드 푸시를 보내는 스케줄러
+ * - 앱 설정의 알림이 활성화되어 있고
+ * - 오늘 보낼 수 있는 알림 후보가 하나라도 있을 때
+ * - 중복 발송 방지: 하루 1회 기록
+ */
+export const scheduleDailyReminderIfNeeded = async () => {
+  if (Platform.OS === 'web') return;
+  try {
+    const prefs = await loadAppPrefs();
+    const enabled = prefs?.notificationsEnabled === true;
+    if (!enabled) return;
+
+    // 오늘 이미 보냈는지 체크
+    const sentMap = (await loadData(STORAGE_KEYS.DAILY_REMINDER_SENT)) || {};
+    const todayKey = new Date().toISOString().split('T')[0];
+    if (sentMap[todayKey]) return;
+
+    // 오늘 보낼 수 있는 알림 후보 계산
+    const notifications = await processAllNotifications(true); // 생성만, 전송은 하지 않음
+    if (!notifications || notifications.length === 0) return;
+
+    // 오전 9시로 트리거 시간 설정
+    const now = new Date();
+    const trigger = new Date();
+    trigger.setHours(9, 0, 0, 0);
+    // 9시가 이미 지난 경우 즉시 전송
+    const delaySec = Math.max(0, Math.floor((trigger.getTime() - now.getTime()) / 1000));
+
+    const title = '리마인더 알림';
+    const body = '확인할 알림이 있습니다. 알림 목록에서 확인하세요.';
+    const data = { type: 'reminder', deepLink: 'somomi://notifications' };
+
+    if (delaySec === 0) {
+      await sendImmediateNotification(title, body, data);
+    } else {
+      await pushNotificationService.sendLocalNotification(title, body, data, delaySec);
+    }
+
+    // 발송 기록 저장
+    sentMap[todayKey] = true;
+    await saveAny(STORAGE_KEYS.DAILY_REMINDER_SENT, sentMap);
+  } catch (error) {
+    console.error('리마인더 스케줄링 오류:', error);
+  }
+};
+
+/**
+ * 매일 오후 8시에 작성 리마인드 푸시
+ * - 앱 설정의 알림이 활성화되어 있을 때
+ * - 중복 발송 방지: 하루 1회 기록
+ * - 메시지: "최신화 하셨나요? 오늘의 제품 상태를 업데이트해 주세요."
+ */
+export const scheduleDailyUpdateReminderIfNeeded = async () => {
+  if (Platform.OS === 'web') return;
+  try {
+    const prefs = await loadAppPrefs();
+    const enabled = prefs?.notificationsEnabled === true;
+    if (!enabled) return;
+
+    const sentMap = (await loadData(STORAGE_KEYS.DAILY_UPDATE_REMINDER_SENT)) || {};
+    const todayKey = new Date().toISOString().split('T')[0];
+    if (sentMap[todayKey]) return;
+
+    // 오후 8시 트리거
+    const now = new Date();
+    const trigger = new Date();
+    trigger.setHours(20, 0, 0, 0);
+    const delaySec = Math.max(0, Math.floor((trigger.getTime() - now.getTime()) / 1000));
+
+    const title = '작성 리마인드';
+    const body = '최신화 하셨나요? 오늘의 제품 상태를 업데이트해 주세요.';
+    const data = { type: 'update_reminder', deepLink: 'somomi://notifications' };
+
+    if (delaySec === 0) {
+      await sendImmediateNotification(title, body, data);
+    } else {
+      await pushNotificationService.sendLocalNotification(title, body, data, delaySec);
+    }
+
+    sentMap[todayKey] = true;
+    await saveAny(STORAGE_KEYS.DAILY_UPDATE_REMINDER_SENT, sentMap);
+  } catch (error) {
+    console.error('작성 리마인더 스케줄링 오류:', error);
+  }
 };
 
 /**

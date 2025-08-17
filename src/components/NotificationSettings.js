@@ -12,7 +12,8 @@ if (Platform.OS !== 'web') {
   }
 }
 
-import { requestNotificationPermissions } from '../utils/notificationUtils';
+import { requestNotificationPermissions, scheduleDailyReminderIfNeeded } from '../utils/notificationUtils';
+import { saveAppPrefs } from '../utils/storageUtils';
 
 const NotificationSettings = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -100,6 +101,11 @@ const NotificationSettings = () => {
         // 권한 요청
         const granted = await requestNotificationPermissions();
         setNotificationsEnabled(granted);
+        if (granted) {
+          await saveAppPrefs({ notificationsEnabled: true });
+          // 리마인더 스케줄링 (앱 진입 시점 기준)
+          scheduleDailyReminderIfNeeded();
+        }
         
         if (!granted) {
           // 권한 거부된 경우 설정으로 이동 안내
@@ -121,6 +127,8 @@ const NotificationSettings = () => {
   // 컴포넌트 마운트 시 권한 확인
   useEffect(() => {
     checkNotificationPermission();
+    // 설정 로드 후 스케줄 확인
+    scheduleDailyReminderIfNeeded();
     
     // 웹 환경이 아니고 messaging이 있을 때만 실행
     if (Platform.OS !== 'web' && messaging) {

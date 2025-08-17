@@ -13,6 +13,9 @@ export const STORAGE_KEYS = {
   USER_PRODUCT_SLOT_TEMPLATES: 'somomi_user_product_slot_templates', // 사용자 제품 슬롯 템플릿 인스턴스
   JWT_TOKEN: 'somomi_jwt_token',
   DEVICE_ID: 'somomi_device_id',
+  APP_PREFS: 'somomi_app_prefs', // 앱 설정(알림 등)
+  DAILY_REMINDER_SENT: 'somomi_daily_reminder_sent', // 일자별 리마인더 발송 기록
+  DAILY_UPDATE_REMINDER_SENT: 'somomi_daily_update_reminder_sent', // 일자별 작성 리마인더 발송 기록
 };
 
 // 데이터 저장 함수
@@ -49,6 +52,29 @@ export const removeData = async (key) => {
   } catch (error) {
     console.error(`Error removing data for key ${key}:`, error);
     return false;
+  }
+};
+
+// 앱 설정 저장/로드
+export const saveAppPrefs = async (prefs) => {
+  try {
+    const current = (await loadData(STORAGE_KEYS.APP_PREFS)) || {};
+    const merged = { ...current, ...prefs };
+    await saveData(STORAGE_KEYS.APP_PREFS, merged);
+    return true;
+  } catch (error) {
+    console.error('앱 설정 저장 오류:', error);
+    return false;
+  }
+};
+
+export const loadAppPrefs = async () => {
+  try {
+    const prefs = await loadData(STORAGE_KEYS.APP_PREFS);
+    return prefs || {};
+  } catch (error) {
+    console.error('앱 설정 로드 오류:', error);
+    return {};
   }
 };
 
