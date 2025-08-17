@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { saveLocations, loadLocations } from '../../utils/storageUtils';
-import { createEntity, updateEntity, deleteEntity, ENTITY_TYPES } from '../../api/syncApi';
+import { ENTITY_TYPES } from '../../api/syncApi';
+import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
 
 // 영역 목록 가져오기
 export const fetchLocations = createAsyncThunk(
@@ -71,7 +72,7 @@ export const createLocation = createAsyncThunk(
         // SyncMeta 기본값 추가는 syncApi에서 수행
       };
       // sync 게이트웨이 적용
-      const newLocation = await createEntity(ENTITY_TYPES.LOCATION, { ...base, localId: base.id }, {
+      const newLocation = await commitCreate(ENTITY_TYPES.LOCATION, { ...base, localId: base.id }, {
         deviceId: getState().auth?.deviceId,
         ownerUserId: getState().auth?.user?.id,
       });
@@ -97,7 +98,7 @@ export const updateLocation = createAsyncThunk(
     try {
       // 실제 구현에서는 API 호출
       // 여기서는 수정된 데이터 그대로 반환
-      const enriched = await updateEntity(ENTITY_TYPES.LOCATION, {
+      const enriched = await commitUpdate(ENTITY_TYPES.LOCATION, {
         ...locationData,
         templateInstanceLocalId: locationData.templateInstanceLocalId || locationData.templateInstanceId,
       }, {
@@ -124,7 +125,7 @@ export const deleteLocation = createAsyncThunk(
   async (locationId, { rejectWithValue, getState }) => {
     try {
       // sync 게이트웨이 적용 (tombstone는 상위에서 관리 가능)
-      await deleteEntity(ENTITY_TYPES.LOCATION, { id: locationId, localId: locationId }, {
+      await commitDelete(ENTITY_TYPES.LOCATION, { id: locationId, localId: locationId }, {
         deviceId: getState().auth?.deviceId,
         ownerUserId: getState().auth?.user?.id,
       });

@@ -76,11 +76,13 @@ const LocationDetailScreen = () => {
       );
       const filtered = (products || []).filter(p => {
         const key = p.locationLocalId || p.locationId;
-        return !!key && activeLocIds.has(key);
+        return !!key && activeLocIds.has(key) && p.syncStatus !== 'deleted' && !p.isConsumed;
       });
       setLocationProducts(filtered);
     } else {
-      const filteredProducts = products.filter(product => product.locationId === locationId);
+      const filteredProducts = (products || []).filter(product => 
+        product.locationId === locationId && product.syncStatus !== 'deleted' && !product.isConsumed
+      );
       setLocationProducts(filteredProducts);
     }
   }, [products, locationId, isAllProductsView, locations, isLocExpired]);

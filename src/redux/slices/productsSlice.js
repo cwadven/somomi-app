@@ -9,7 +9,8 @@ import {
   fetchConsumedProductsApi,
   restoreConsumedProductApi
 } from '../../api/productsApi';
-import { createEntity, updateEntity, deleteEntity, ENTITY_TYPES } from '../../api/syncApi';
+import { ENTITY_TYPES } from '../../api/syncApi';
+import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
 import { deleteLocation } from './locationsSlice';
 import { saveProducts, loadProducts, saveConsumedProducts, loadConsumedProducts } from '../../utils/storageUtils';
 
@@ -102,7 +103,7 @@ export const addProductAsync = createAsyncThunk(
         // 메타는 syncApi에서 보강
         localId: product.localId || product.id || undefined,
       };
-      const enriched = await createEntity(ENTITY_TYPES.PRODUCT, base, {
+      const enriched = await commitCreate(ENTITY_TYPES.PRODUCT, base, {
         deviceId: getState().auth?.deviceId || 'unknown',
         ownerUserId: getState().auth?.user?.id,
       });
@@ -126,7 +127,7 @@ export const updateProductAsync = createAsyncThunk(
   'products/updateProduct',
   async (product, { rejectWithValue, getState }) => {
     try {
-      const enriched = await updateEntity(ENTITY_TYPES.PRODUCT, {
+      const enriched = await commitUpdate(ENTITY_TYPES.PRODUCT, {
         ...product,
         locationLocalId: product.locationLocalId || product.locationId,
         locationId: product.locationId || product.locationLocalId,
@@ -153,7 +154,7 @@ export const deleteProductAsync = createAsyncThunk(
   'products/deleteProduct',
   async (id, { rejectWithValue, getState }) => {
     try {
-      await deleteEntity(ENTITY_TYPES.PRODUCT, { id, localId: id }, {
+      await commitDelete(ENTITY_TYPES.PRODUCT, { id, localId: id }, {
         deviceId: getState().auth?.deviceId,
         ownerUserId: getState().auth?.user?.id,
       });
@@ -175,6 +176,16 @@ export const markProductAsConsumedAsync = createAsyncThunk(
   async ({ id, consumptionDate }, { rejectWithValue, getState }) => {
     try {
       const response = await markProductAsConsumedApi(id, consumptionDate);
+      // 동기화 큐에 업데이트 기록(소진 처리)
+      try {
+        await commitUpdate(ENTITY_TYPES.PRODUCT, {
+          ...response,
+          isConsumed: true,
+        }, {
+          deviceId: getState().auth?.deviceId || 'unknown',
+          ownerUserId: getState().auth?.user?.id,
+        });
+      } catch (e) {}
       
       // 제품이 소진된 후 전체 제품 목록과 소진된 제품 목록을 AsyncStorage에 저장
       const { products, consumedProducts } = getState().products;
@@ -233,6 +244,16 @@ export const restoreConsumedProductAsync = createAsyncThunk(
     try {
       console.log('소진 철회 액션 시작:', { id, locationId });
       const response = await restoreConsumedProductApi(id, locationId);
+      // 동기화 큐에 업데이트 기록(소진 철회)
+      try {
+        await commitUpdate(ENTITY_TYPES.PRODUCT, {
+          ...response,
+          isConsumed: false,
+        }, {
+          deviceId: getState().auth?.deviceId || 'unknown',
+          ownerUserId: getState().auth?.user?.id,
+        });
+      } catch (e) {}
       
       // 소진 철회 후 전체 제품 목록과 소진된 제품 목록을 AsyncStorage에 저장
       const { products, consumedProducts } = getState().products;
