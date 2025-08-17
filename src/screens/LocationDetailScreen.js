@@ -39,6 +39,8 @@ const LocationDetailScreen = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [locationProducts, setLocationProducts] = useState([]);
   const [activeTab, setActiveTab] = useState('products'); // 'products' 또는 'notifications'
+  const [sortKey, setSortKey] = useState('created'); // null | 'estimated' | 'expiry' | 'created' | 'name' | 'estimatedRate' | 'expiryRate'
+  const [sortDesc, setSortDesc] = useState(true); // 등록순 기본: 내림차순(가장 최근이 위)
 
   // 만료된 구독 템플릿이어도 상세 접근은 허용. 대신 UI 상에서 편집 유도로 처리.
   
@@ -86,6 +88,101 @@ const LocationDetailScreen = () => {
       setLocationProducts(filteredProducts);
     }
   }, [products, locationId, isAllProductsView, locations, isLocExpired]);
+
+  // 비율 계산 헬퍼
+  const computeRate = useCallback((startIso, endIso) => {
+    try {
+      const now = Date.now();
+      const start = startIso ? new Date(startIso).getTime() : null;
+      const end = endIso ? new Date(endIso).getTime() : null;
+      if (!end || !isFinite(end)) return null;
+      const s = start && isFinite(start) ? start : null;
+      // 시작이 없으면 종료 30일 전을 가정(보수적 기본치)
+      const assumedStart = s || (end - 30 * 24 * 60 * 60 * 1000);
+      const total = end - assumedStart;
+      if (total <= 0) return null;
+      const elapsed = Math.max(0, Math.min(total, now - assumedStart));
+      return Math.round((elapsed / total) * 100);
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const getExpiryRate = useCallback((p) => {
+    // 유통률: purchaseDate(있으면) 또는 createdAt ~ expiryDate 진행률
+    return computeRate(p.purchaseDate || p.createdAt, p.expiryDate);
+  }, [computeRate]);
+
+  const getEstimatedRate = useCallback((p) => {
+    // 소진률: purchaseDate(있으면) 또는 createdAt ~ estimatedEndDate 진행률
+    return computeRate(p.purchaseDate || p.createdAt, p.estimatedEndDate);
+  }, [computeRate]);
+
+  // 정렬 로직
+  const sortProducts = useCallback((list) => {
+    const arr = [...(list || [])];
+    if (!sortKey) return arr; // 정렬 취소 시 원본 순서 유지
+    const dir = sortDesc ? -1 : 1;
+    arr.sort((a, b) => {
+      const getName = (x) => (x?.name || x?.title || '').toString();
+      const getTime = (v) => (v ? new Date(v).getTime() : 0);
+      const cmpNum = (av, bv) => (av === bv ? 0 : (av > bv ? dir : -dir));
+      if (sortKey === 'estimated') {
+        const av = getTime(a.estimatedEndDate);
+        const bv = getTime(b.estimatedEndDate);
+        if (av === bv) return getName(a).localeCompare(getName(b));
+        return cmpNum(av, bv);
+      }
+      if (sortKey === 'expiry') {
+        const av = getTime(a.expiryDate);
+        const bv = getTime(b.expiryDate);
+        if (av === bv) return getName(a).localeCompare(getName(b));
+        return cmpNum(av, bv);
+      }
+      if (sortKey === 'estimatedRate') {
+        const av = getEstimatedRate(a);
+        const bv = getEstimatedRate(b);
+        if (av == null && bv == null) return getName(a).localeCompare(getName(b));
+        if (av == null) return 1; // 정보 없는 항목 뒤로
+        if (bv == null) return -1;
+        if (av === bv) return getName(a).localeCompare(getName(b));
+        return cmpNum(av, bv);
+      }
+      if (sortKey === 'expiryRate') {
+        const av = getExpiryRate(a);
+        const bv = getExpiryRate(b);
+        if (av == null && bv == null) return getName(a).localeCompare(getName(b));
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (av === bv) return getName(a).localeCompare(getName(b));
+        return cmpNum(av, bv);
+      }
+      if (sortKey === 'created') {
+        const av = getTime(a.createdAt);
+        const bv = getTime(b.createdAt);
+        if (av === bv) return getName(a).localeCompare(getName(b));
+        return cmpNum(av, bv);
+      }
+      // name
+      return getName(a).localeCompare(getName(b)) * (sortDesc ? -1 : 1);
+    });
+    return arr;
+  }, [sortKey, sortDesc, getEstimatedRate, getExpiryRate]);
+
+  // 정렬 칩 클릭 시: 내림차순 → 오름차순 → 정렬 해제 순환
+  const handleSortPress = useCallback((key) => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDesc(true); // 새 키는 기본 내림차순
+      return;
+    }
+    if (sortDesc) {
+      setSortDesc(false); // 오름차순
+      return;
+    }
+    // 정렬 해제
+    setSortKey(null);
+  }, [sortKey, sortDesc]);
   
   // 뒤로가기 핸들러
   const handleGoBack = () => {
@@ -216,6 +313,44 @@ const LocationDetailScreen = () => {
   const renderProductsTab = () => {
     return (
       <View style={styles.productsContainer}>
+        <View style={styles.sortBar}>
+          <TouchableOpacity style={[styles.sortChip, sortKey === 'created' && styles.sortChipActive]} onPress={() => handleSortPress('created')}>
+            <Text style={[styles.sortChipText, sortKey === 'created' && styles.sortChipTextActive]}>등록순</Text>
+            {sortKey === 'created' && (
+              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.sortChip, sortKey === 'estimated' && styles.sortChipActive]} onPress={() => handleSortPress('estimated')}>
+            <Text style={[styles.sortChipText, sortKey === 'estimated' && styles.sortChipTextActive]}>소진순</Text>
+            {sortKey === 'estimated' && (
+              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.sortChip, sortKey === 'expiry' && styles.sortChipActive]} onPress={() => handleSortPress('expiry')}>
+            <Text style={[styles.sortChipText, sortKey === 'expiry' && styles.sortChipTextActive]}>유통순</Text>
+            {sortKey === 'expiry' && (
+              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.sortChip, sortKey === 'estimatedRate' && styles.sortChipActive]} onPress={() => handleSortPress('estimatedRate')}>
+            <Text style={[styles.sortChipText, sortKey === 'estimatedRate' && styles.sortChipTextActive]}>소진률%</Text>
+            {sortKey === 'estimatedRate' && (
+              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.sortChip, sortKey === 'expiryRate' && styles.sortChipActive]} onPress={() => handleSortPress('expiryRate')}>
+            <Text style={[styles.sortChipText, sortKey === 'expiryRate' && styles.sortChipTextActive]}>유통률%</Text>
+            {sortKey === 'expiryRate' && (
+              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.sortChip, sortKey === 'name' && styles.sortChipActive]} onPress={() => handleSortPress('name')}>
+            <Text style={[styles.sortChipText, sortKey === 'name' && styles.sortChipTextActive]}>이름순</Text>
+            {sortKey === 'name' && (
+              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+            )}
+          </TouchableOpacity>
+        </View>
         {locationProducts.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
@@ -227,7 +362,7 @@ const LocationDetailScreen = () => {
           </View>
         ) : (
           <FlatList
-            data={locationProducts}
+            data={sortProducts(locationProducts)}
             keyExtractor={(item) => String(item.localId || item.id)}
             renderItem={({ item }) => (
               <ProductCard 
@@ -519,6 +654,44 @@ const styles = StyleSheet.create({
   productsContainer: {
     flex: 1,
     position: 'relative',
+  },
+  sortBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  sortChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: '#f1f8e9',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#c5e1a5',
+    flexDirection: 'row', // Added for arrow alignment
+    alignItems: 'center', // Added for arrow alignment
+  },
+  sortChipActive: {
+    backgroundColor: '#c8e6c9',
+    borderColor: '#81c784',
+  },
+  sortChipText: {
+    fontSize: 12,
+    color: '#4CAF50',
+  },
+  sortChipTextActive: {
+    fontWeight: '600',
+  },
+  sortDirBtn: {
+    marginLeft: 'auto',
+    padding: 6,
+  },
+  sortChipArrow: {
+    marginLeft: 4,
   },
   notificationsContainer: {
     flex: 1,

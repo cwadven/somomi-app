@@ -5,6 +5,8 @@ import {
   cancelNotification 
 } from '../../utils/notificationUtils';
 import { loadData, saveData, STORAGE_KEYS } from '../../utils/storageUtils';
+import { ENTITY_TYPES } from '../../api/syncApi';
+import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
 
 // 샘플 데이터 - 실제 구현 시 API 연동 필요
 const initialSampleNotifications = [];
@@ -154,6 +156,11 @@ export const addNotification = createAsyncThunk(
         ownerUserId: undefined,
         deletedAt: undefined,
       };
+
+      // 동기화 큐 적재
+      try {
+        await commitCreate(ENTITY_TYPES.NOTIFICATION, newNotification, {});
+      } catch (e) {}
       
       // 메모리 및 AsyncStorage에 저장
       const updatedNotifications = [...sampleNotifications, newNotification];
@@ -190,6 +197,11 @@ export const updateNotification = createAsyncThunk(
         ...data,
         updatedAt: new Date().toISOString()
       };
+
+      // 동기화 큐 적재
+      try {
+        await commitUpdate(ENTITY_TYPES.NOTIFICATION, updatedNotification, {});
+      } catch (e) {}
       
       // 메모리 및 AsyncStorage에 저장
       const updatedNotifications = [
@@ -222,7 +234,12 @@ export const deleteNotification = createAsyncThunk(
       await cancelNotification(id);
       
       // tombstone 적용
-      const updatedNotifications = sampleNotifications.map(n => n.id === id ? { ...n, syncStatus: 'deleted', deletedAt: new Date().toISOString() } : n);
+      const tomb = { id, localId: id, syncStatus: 'deleted', deletedAt: new Date().toISOString() };
+      // 동기화 큐 적재
+      try {
+        await commitDelete(ENTITY_TYPES.NOTIFICATION, tomb, {});
+      } catch (e) {}
+      const updatedNotifications = sampleNotifications.map(n => n.id === id ? { ...n, ...tomb } : n);
       sampleNotifications = updatedNotifications;
       await saveData(STORAGE_KEYS.NOTIFICATIONS, updatedNotifications);
       
