@@ -71,10 +71,13 @@ export const saveAppPrefs = async (prefs) => {
 export const loadAppPrefs = async () => {
   try {
     const prefs = await loadData(STORAGE_KEYS.APP_PREFS);
-    return prefs || {};
+    // 기본값: 오프라인 모드 활성화
+    const defaults = { offlineMode: true, syncMode: 'offline' };
+    return { ...defaults, ...(prefs || {}) };
   } catch (error) {
     console.error('앱 설정 로드 오류:', error);
-    return {};
+    // 오류 시에도 기본값 반환
+    return { offlineMode: true, syncMode: 'offline' };
   }
 };
 

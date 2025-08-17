@@ -24,6 +24,7 @@ const NotificationSettings = () => {
   const [modalAction, setModalAction] = useState(null);
   const [remindExpiryEnabled, setRemindExpiryEnabled] = useState(true); // 9시 리마인더
   const [remindAddEnabled, setRemindAddEnabled] = useState(true); // 20시 리마인더
+  const [offlineMode, setOfflineMode] = useState(false); // 수동 오프라인 모드
 
   // 알림 권한 상태 확인
   const checkNotificationPermission = async () => {
@@ -134,6 +135,7 @@ const NotificationSettings = () => {
       if (prefs) {
         if (typeof prefs.remindExpiryEnabled === 'boolean') setRemindExpiryEnabled(prefs.remindExpiryEnabled);
         if (typeof prefs.remindAddEnabled === 'boolean') setRemindAddEnabled(prefs.remindAddEnabled);
+        if (typeof prefs.offlineMode === 'boolean') setOfflineMode(prefs.offlineMode);
       }
     })();
     // 설정 로드 후 스케줄 확인
@@ -168,6 +170,25 @@ const NotificationSettings = () => {
 
   return (
     <View style={styles.container}>
+      {/* 오프라인 모드 (수동 전환) */}
+      <View style={styles.settingItem}>
+        <Text style={styles.settingText}>오프라인 모드</Text>
+        <Switch
+          value={offlineMode}
+          onValueChange={async (v) => {
+            setOfflineMode(v);
+            await saveAppPrefs({ offlineMode: v, syncMode: v ? 'offline' : 'online' });
+          }}
+          trackColor={{ false: '#767577', true: '#81b0ff' }}
+          thumbColor={offlineMode ? '#4630EB' : '#f4f3f4'}
+        />
+      </View>
+      <Text style={styles.description}>
+        {offlineMode
+          ? '오프라인 모드입니다. 서버와 통신하지 않고 이 기기의 데이터만 사용합니다.'
+          : '온라인 모드입니다. 서버와 데이터를 동기화할 수 있습니다.'}
+      </Text>
+
       <View style={styles.settingItem}>
         <Text style={styles.settingText}>알림 허용</Text>
         <Switch

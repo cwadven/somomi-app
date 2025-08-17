@@ -8,7 +8,8 @@ import {
   ScrollView,
   Platform,
   Modal,
-  Linking
+  Linking,
+  Switch
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -17,7 +18,7 @@ import { logout } from '../redux/slices/authSlice';
 import KakaoLoginButton from '../components/KakaoLoginButton';
 import PushNotificationTest from '../components/PushNotificationTest';
 import NotificationSettings from '../components/NotificationSettings';
-import { clearAllData } from '../utils/storageUtils';
+import { clearAllData, loadAppPrefs, saveAppPrefs } from '../utils/storageUtils';
 import { initializeData } from '../api/productsApi';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
@@ -27,6 +28,7 @@ const ProfileScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user, isLoggedIn, isAnonymous, loading, error } = useSelector(state => state.auth);
+  const [offlineMode, setOfflineMode] = useState(true);
 
   // route.params로 전달된 initialMode가 있으면 해당 모드로 설정
   useEffect(() => {
@@ -34,6 +36,16 @@ const ProfileScreen = () => {
       // 모드 관련 처리가 필요한 경우 여기에 구현
     }
   }, [route.params]);
+
+  // 오프라인 모드 초기값 로드
+  useEffect(() => {
+    (async () => {
+      const prefs = await loadAppPrefs();
+      if (prefs && typeof prefs.offlineMode === 'boolean') {
+        setOfflineMode(prefs.offlineMode);
+      }
+    })();
+  }, []);
 
   // 안드로이드 시스템 알림 설정으로 이동하는 함수
   const openAndroidNotificationSettings = () => {
@@ -240,6 +252,26 @@ const ProfileScreen = () => {
           onPress={() => navigation.navigate('Notifications')}
         />
 
+        {/* 오프라인 모드 스위치 */}
+        <View style={styles.settingItem}>
+          <View style={styles.settingItemLeft}>
+            <Ionicons name="cloud-offline-outline" size={24} color="#4CAF50" style={styles.settingIcon} />
+            <Text style={styles.settingTitle}>오프라인 모드</Text>
+          </View>
+          <Switch
+            value={offlineMode}
+            onValueChange={async (v) => {
+              setOfflineMode(v);
+              await saveAppPrefs({ offlineMode: v, syncMode: v ? 'offline' : 'online' });
+            }}
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={offlineMode ? '#4630EB' : '#f4f3f4'}
+          />
+        </View>
+        <Text style={styles.settingDescription}>
+          {offlineMode ? '오프라인 모드: 서버와 통신하지 않고 이 기기의 데이터만 사용합니다.' : '온라인 모드: 서버와 데이터를 동기화할 수 있습니다.'}
+        </Text>
+
         <SettingItem
           icon="cart-outline"
           title="상점"
@@ -419,6 +451,12 @@ const styles = StyleSheet.create({
   settingItemRight: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  settingDescription: {
+    fontSize: 13,
+    color: '#666',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
   badge: {
     width: 8,
