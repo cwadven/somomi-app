@@ -15,7 +15,10 @@ import { fetchLocations } from '../redux/slices/locationsSlice';
 const LocationSelectionModal = ({ visible, onClose, onSelectLocation }) => {
   const dispatch = useDispatch();
   const { locations, status } = useSelector(state => state.locations);
+  const { products } = useSelector(state => state.products);
+  const { userProductSlotTemplateInstances, userLocationTemplateInstances } = useSelector(state => state.auth);
   const [loading, setLoading] = useState(true);
+  const [selectedLocationId, setSelectedLocationId] = useState(null);
 
   // 모달이 표시될 때 영역 데이터 로드
   useEffect(() => {
@@ -25,32 +28,76 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation }) => {
         .unwrap()
         .then(() => setLoading(false))
         .catch(() => setLoading(false));
+      setSelectedLocationId(null);
     }
   }, [visible, dispatch]);
 
   const handleSelectLocation = (location) => {
-    onSelectLocation(location);
-    onClose();
+    setSelectedLocationId(location.id);
+  };
+
+  const isLocationExpired = (locId) => {
+    const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locId);
+    const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
+    return !!exp && (Date.now() >= new Date(exp).getTime());
+  };
+
+  const getCapacityInfo = (locId) => {
+    const location = (locations || []).find(l => l.id === locId);
+    const baseSlots = location?.feature?.baseSlots ?? 0;
+    const assignedExtra = (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locId).length;
+    const total = baseSlots === -1 ? -1 : baseSlots + assignedExtra;
+    const used = (products || []).filter(p => p.locationId === locId && !p.isConsumed).length;
+    const isFull = total !== -1 && used >= total;
+    return { used, total, isFull };
   };
 
   const renderLocationItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.locationItem}
-      onPress={() => handleSelectLocation(item)}
-    >
-      <View style={styles.locationIconContainer}>
-        <Ionicons name={item.icon || 'cube-outline'} size={24} color="#4CAF50" />
-      </View>
-      <View style={styles.locationInfo}>
-        <Text style={styles.locationTitle}>{item.title}</Text>
-        {item.description && (
-          <Text style={styles.locationDescription} numberOfLines={1}>
-            {item.description}
-          </Text>
-        )}
-      </View>
-      <Ionicons name="chevron-forward" size={20} color="#999" />
-    </TouchableOpacity>
+    (() => {
+      const { used, total, isFull } = getCapacityInfo(item.id);
+      const expired = isLocationExpired(item.id);
+      const disabled = expired || isFull;
+      const selected = selectedLocationId === item.id;
+      return (
+        <TouchableOpacity
+          style={[styles.locationItem, disabled && styles.locationItemDisabled, selected && styles.locationItemSelected]}
+          onPress={() => !disabled && handleSelectLocation(item)}
+          disabled={disabled}
+        >
+          <View style={styles.locationIconContainer}>
+            <Ionicons name={item.icon || 'cube-outline'} size={24} color={disabled ? '#9E9E9E' : '#4CAF50'} />
+          </View>
+          <View style={styles.locationInfo}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={[styles.locationTitle, disabled && { color: '#999' }]}>{item.title}</Text>
+              {expired && (
+                <View style={styles.badgeExpired}>
+                  <Text style={styles.badgeText}>만료</Text>
+                </View>
+              )}
+              {isFull && (
+                <View style={styles.badgeFull}>
+                  <Text style={styles.badgeText}>가득 참</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.capacityText}>
+              {total === -1 ? `사용 ${used} / 무제한` : `사용 ${used} / 총 ${total}`}
+            </Text>
+            {item.description && (
+              <Text style={styles.locationDescription} numberOfLines={1}>
+                {item.description}
+              </Text>
+            )}
+          </View>
+          {selected ? (
+            <Ionicons name="checkmark-circle" size={22} color="#4CAF50" />
+          ) : (
+            <Ionicons name="chevron-forward" size={20} color={disabled ? '#ccc' : '#999'} />
+          )}
+        </TouchableOpacity>
+      );
+    })()
   );
 
   return (
@@ -71,7 +118,7 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation }) => {
 
           <View style={styles.modalBody}>
             <Text style={styles.modalDescription}>
-              제품을 추가할 영역을 선택하세요.
+              복원할 제품을 넣을 영역을 선택하세요.
             </Text>
 
             {loading || status === 'loading' ? (
@@ -94,6 +141,29 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation }) => {
                 </Text>
               </View>
             )}
+          </View>
+
+          {/* 하단 확인/취소 버튼 */}
+          <View style={styles.footerButtons}>
+            <TouchableOpacity style={[styles.footerButton, styles.footerCancel]} onPress={onClose}>
+              <Text style={styles.footerCancelText}>취소</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.footerButton, styles.footerConfirm, !selectedLocationId && styles.footerConfirmDisabled]}
+              onPress={() => {
+                if (!selectedLocationId) return;
+                const selected = locations.find(l => l.id === selectedLocationId);
+                if (!selected) return;
+                const { isFull } = getCapacityInfo(selectedLocationId);
+                const expired = isLocationExpired(selectedLocationId);
+                if (isFull || expired) return;
+                onSelectLocation(selected);
+                onClose();
+              }}
+              disabled={!selectedLocationId}
+            >
+              <Text style={styles.footerConfirmText}>확인</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -133,6 +203,35 @@ const styles = StyleSheet.create({
     padding: 16,
     maxHeight: 400,
   },
+  footerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  footerButton: {
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginLeft: 8,
+  },
+  footerCancel: {
+    backgroundColor: '#F5F5F5',
+  },
+  footerConfirm: {
+    backgroundColor: '#4CAF50',
+  },
+  footerConfirmDisabled: {
+    backgroundColor: '#A5D6A7',
+  },
+  footerCancelText: {
+    color: '#757575',
+    fontWeight: '600',
+  },
+  footerConfirmText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
   modalDescription: {
     fontSize: 14,
     color: '#666',
@@ -155,6 +254,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
+  locationItemDisabled: {
+    opacity: 0.6,
+  },
+  locationItemSelected: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#F1FAF3',
+  },
   locationIconContainer: {
     width: 40,
     height: 40,
@@ -172,9 +278,36 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 2,
   },
+  capacityText: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
   locationDescription: {
     fontSize: 14,
     color: '#666',
+  },
+  badgeExpired: {
+    marginLeft: 8,
+    backgroundColor: '#fdecea',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#f5c6cb',
+  },
+  badgeFull: {
+    marginLeft: 6,
+    backgroundColor: '#fff3cd',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#ffeeba',
+  },
+  badgeText: {
+    fontSize: 10,
+    color: '#b71c1c',
   },
   emptyContainer: {
     padding: 20,

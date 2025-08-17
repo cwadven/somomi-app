@@ -83,44 +83,9 @@ const ConsumedProductDetailScreen = () => {
     return categoryIcons[categoryName] || 'cube-outline';
   };
   
-  // 소진 철회 처리 함수
+  // 소진 철회 처리 함수: 항상 대상 영역을 선택하도록 모달 표시
   const handleRestoreProduct = () => {
-    // 제품에 영역 정보가 있는지 확인
-    if (currentProduct.locationId) {
-      // 소진 철회 전에 현재 제품 정보 저장
-      const productName = currentProduct.name;
-      
-      // 영역 정보가 있으면 바로 소진 철회 처리
-      setAlertModalConfig({
-        title: '소진 철회',
-        message: '이 제품을 소진 철회하시겠습니까?\n제품이 원래 있던 영역으로 복원됩니다.',
-        icon: 'refresh-circle',
-        iconColor: '#2196F3',
-        buttons: [
-          { text: '취소', style: 'cancel' },
-          { 
-            text: '소진 철회', 
-            onPress: () => {
-              setIsRestoring(true);
-              dispatch(restoreConsumedProductAsync({ id: currentProduct.id }))
-                .unwrap()
-                .then(() => {
-                  // 성공 시 바로 이전 화면으로 이동
-                  navigation.goBack();
-                })
-                .catch((error) => {
-                  setIsRestoring(false);
-                  showErrorModal(`소진 철회 중 오류가 발생했습니다: ${error.message}`);
-                });
-            }
-          }
-        ]
-      });
-      setAlertModalVisible(true);
-    } else {
-      // 영역 정보가 없으면 영역 선택 모달 표시
-      setLocationSelectionVisible(true);
-    }
+    setLocationSelectionVisible(true);
   };
   
   // 영역 선택 후 소진 철회 처리
