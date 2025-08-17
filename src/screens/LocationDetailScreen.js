@@ -31,7 +31,7 @@ const LocationDetailScreen = () => {
   const { locationId, isAllProducts } = route.params;
   const isAllProductsView = isAllProducts || locationId === 'all';
   
-  const { currentLocation, status, error } = useSelector(state => state.locations);
+  const { currentLocation, status, error, locations } = useSelector(state => state.locations);
   const { products } = useSelector(state => state.products);
   const { slots, userProductSlotTemplateInstances, subscription, userLocationTemplateInstances } = useSelector(state => state.auth);
   
@@ -54,15 +54,36 @@ const LocationDetailScreen = () => {
     dispatch(fetchProductsByLocation(isAllProductsView ? 'all' : locationId));
   }, [dispatch, locationId, isAllProductsView]);
   
+  // 활성화/만료 상태 헬퍼 (영역)
+  const isLocExpired = useCallback((loc) => {
+    try {
+      const locKey = loc?.id;
+      const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locKey) || null;
+      if (!tpl) return false;
+      const exp = tpl.subscriptionExpiresAt || tpl.expiresAt || tpl.feature?.expiresAt;
+      return !!exp && (Date.now() >= new Date(exp).getTime());
+    } catch (e) { return false; }
+  }, [userLocationTemplateInstances]);
+
   // 제품 목록 필터링
   useEffect(() => {
     if (isAllProductsView) {
-      setLocationProducts(products);
+      // 활성화된 영역(비활성/만료 제외)에 속한 제품만 표시
+      const activeLocIds = new Set(
+        (locations || [])
+          .filter(loc => loc && loc.disabled !== true && !isLocExpired(loc))
+          .map(loc => loc.id)
+      );
+      const filtered = (products || []).filter(p => {
+        const key = p.locationLocalId || p.locationId;
+        return !!key && activeLocIds.has(key);
+      });
+      setLocationProducts(filtered);
     } else {
       const filteredProducts = products.filter(product => product.locationId === locationId);
       setLocationProducts(filteredProducts);
     }
-  }, [products, locationId, isAllProductsView]);
+  }, [products, locationId, isAllProductsView, locations, isLocExpired]);
   
   // 뒤로가기 핸들러
   const handleGoBack = () => {
