@@ -23,6 +23,7 @@ const ConsumedProductDetailScreen = () => {
   
   const { productId } = route.params;
   const { consumedProducts, consumedStatus, status, error } = useSelector(state => state.products);
+  const { locations } = useSelector(state => state.locations);
   const [locationSelectionVisible, setLocationSelectionVisible] = useState(false);
   
   // 제품 정보를 로컬 상태로 관리
@@ -82,6 +83,11 @@ const ConsumedProductDetailScreen = () => {
       
     return categoryIcons[categoryName] || 'cube-outline';
   };
+
+  // 소진 당시 영역 이름 결정 (현재 사용자의 영역 목록에서 id로 매칭)
+  const consumedFromLocation = currentProduct && locations
+    ? (locations.find(loc => loc.id === currentProduct.locationId) || null)
+    : null;
   
   // 소진 철회 처리 함수: 항상 대상 영역을 선택하도록 모달 표시
   const handleRestoreProduct = () => {
@@ -215,14 +221,10 @@ const ConsumedProductDetailScreen = () => {
               </Text>
             )}
             
-            {currentProduct.location && (
+            {consumedFromLocation && (
               <View style={styles.locationBadge}>
                 <Ionicons name="location-outline" size={12} color="#9E9E9E" />
-                <Text style={styles.locationText}>
-                  {typeof currentProduct.location === 'object' 
-                    ? currentProduct.location.title 
-                    : currentProduct.location}
-                </Text>
+                <Text style={styles.locationText}>{consumedFromLocation.title}</Text>
               </View>
             )}
           </View>
@@ -272,6 +274,18 @@ const ConsumedProductDetailScreen = () => {
             label="가격" 
             value={currentProduct.price ? `${currentProduct.price.toLocaleString()}원` : '정보 없음'} 
             icon="cash-outline" 
+          />
+
+          <InfoItem 
+            label="소진처리일" 
+            value={currentProduct.processedAt ? formatDate(currentProduct.processedAt) : null} 
+            icon="time-outline" 
+          />
+
+          <InfoItem 
+            label="소진 당시 영역"
+            value={consumedFromLocation ? consumedFromLocation.title : null}
+            icon="location-outline"
           />
           
           {currentProduct.memo && (

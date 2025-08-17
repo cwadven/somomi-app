@@ -145,7 +145,11 @@ export const markProductAsConsumedAsync = createAsyncThunk(
       // 제품이 소진된 후 전체 제품 목록과 소진된 제품 목록을 AsyncStorage에 저장
       const { products, consumedProducts } = getState().products;
       const updatedProducts = products.filter(p => p.id !== id);
-      const updatedConsumedProducts = [...consumedProducts, response];
+      const updatedConsumedProducts = [...consumedProducts, response].sort((a, b) => {
+        const ta = a.processedAt ? new Date(a.processedAt).getTime() : (a.consumedAt ? new Date(a.consumedAt).getTime() : 0);
+        const tb = b.processedAt ? new Date(b.processedAt).getTime() : (b.consumedAt ? new Date(b.consumedAt).getTime() : 0);
+        return tb - ta;
+      });
       
       await saveProducts(updatedProducts);
       await saveConsumedProducts(updatedConsumedProducts);
@@ -172,7 +176,11 @@ export const fetchConsumedProducts = createAsyncThunk(
       if (currentConsumedProducts.length === 0) {
         const storedConsumedProducts = await loadConsumedProducts();
         console.log('AsyncStorage에서 로드한 소진된 제품 목록:', storedConsumedProducts);
-        return storedConsumedProducts;
+        return (storedConsumedProducts || []).slice().sort((a, b) => {
+          const ta = a.consumedAt ? new Date(a.consumedAt).getTime() : 0;
+          const tb = b.consumedAt ? new Date(b.consumedAt).getTime() : 0;
+          return tb - ta;
+        });
       }
       
       // 이미 소진된 제품 목록이 있으면 그대로 반환
@@ -356,6 +364,11 @@ export const productsSlice = createSlice({
         // 소진 처리된 제품 목록에 추가 (이미 있는 경우 중복 방지)
         if (!state.consumedProducts.some(p => p.id === action.payload.id)) {
           state.consumedProducts.push(action.payload);
+          state.consumedProducts.sort((a, b) => {
+            const ta = a.processedAt ? new Date(a.processedAt).getTime() : (a.consumedAt ? new Date(a.consumedAt).getTime() : 0);
+            const tb = b.processedAt ? new Date(b.processedAt).getTime() : (b.consumedAt ? new Date(b.consumedAt).getTime() : 0);
+            return tb - ta;
+          });
         }
         // 현재 제품 상태 유지 (null로 설정하지 않음)
         
@@ -377,7 +390,11 @@ export const productsSlice = createSlice({
       })
       .addCase(fetchConsumedProducts.fulfilled, (state, action) => {
         state.consumedStatus = 'succeeded';
-        state.consumedProducts = action.payload;
+        state.consumedProducts = (action.payload || []).slice().sort((a, b) => {
+          const ta = a.processedAt ? new Date(a.processedAt).getTime() : (a.consumedAt ? new Date(a.consumedAt).getTime() : 0);
+          const tb = b.processedAt ? new Date(b.processedAt).getTime() : (b.consumedAt ? new Date(b.consumedAt).getTime() : 0);
+          return tb - ta;
+        });
       })
       .addCase(fetchConsumedProducts.rejected, (state, action) => {
         state.consumedStatus = 'failed';

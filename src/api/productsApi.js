@@ -216,8 +216,10 @@ export const markProductAsConsumedApi = async (id, consumptionDate = null) => {
       const product = { ...sampleProducts[index] };
       
       // 소진 처리 정보 추가
-      // 소진 날짜가 제공되면 해당 날짜 사용, 아니면 현재 날짜 사용
+      // 소진 날짜가 제공되면 해당 날짜 사용, 아니면 현재 날짜 사용(소진일)
       product.consumedAt = consumptionDate || new Date().toISOString();
+      // 소진처리일(목록 이동 시각) 별도 기록
+      product.processedAt = new Date().toISOString();
       product.isConsumed = true;
       
       console.log('소진 처리된 제품:', product);
@@ -259,10 +261,10 @@ export const fetchConsumedProductsApi = async () => {
       consumedProducts = storedConsumedProducts;
     }
     
-    // 소진 처리일(consumedAt) 기준으로 최신순 정렬
+    // 소진처리일(processedAt) 기준으로 최신순 정렬, 없으면 consumedAt로 대체
     const sortedConsumedProducts = [...consumedProducts].sort((a, b) => {
-      const dateA = a.consumedAt ? new Date(a.consumedAt).getTime() : 0;
-      const dateB = b.consumedAt ? new Date(b.consumedAt).getTime() : 0;
+      const dateA = a.processedAt ? new Date(a.processedAt).getTime() : (a.consumedAt ? new Date(a.consumedAt).getTime() : 0);
+      const dateB = b.processedAt ? new Date(b.processedAt).getTime() : (b.consumedAt ? new Date(b.consumedAt).getTime() : 0);
       return dateB - dateA; // 내림차순 정렬 (최신순)
     });
     
