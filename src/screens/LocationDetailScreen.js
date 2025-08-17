@@ -8,7 +8,8 @@ import {
   ScrollView, 
   ActivityIndicator,
   FlatList,
-  Modal
+  Modal,
+  TextInput
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -35,6 +36,7 @@ const LocationDetailScreen = () => {
   const { slots, userProductSlotTemplateInstances, subscription, userLocationTemplateInstances } = useSelector(state => state.auth);
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [locationProducts, setLocationProducts] = useState([]);
   const [activeTab, setActiveTab] = useState('products'); // 'products' 또는 'notifications'
 
@@ -75,6 +77,7 @@ const LocationDetailScreen = () => {
   // 영역 삭제 실행
   const handleDeleteConfirm = async () => {
     setShowDeleteConfirm(false);
+    setDeleteConfirmText('');
     
     try {
       // 영역 삭제
@@ -343,6 +346,15 @@ const LocationDetailScreen = () => {
             <Text style={styles.modalMessage}>
               이 영역을 삭제하시겠습니까? 영역 내의 모든 제품 정보도 함께 삭제됩니다.
             </Text>
+            <Text style={styles.modalWarning}>안전한 삭제를 위해 아래에 "삭제하기"를 입력하세요.</Text>
+            <TextInput
+              style={styles.confirmInput}
+              value={deleteConfirmText}
+              onChangeText={setDeleteConfirmText}
+              placeholder="삭제하기"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
             <View style={styles.modalButtons}>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]}
@@ -351,8 +363,9 @@ const LocationDetailScreen = () => {
                 <Text style={styles.cancelButtonText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.modalButton, styles.confirmButton]}
+                style={[styles.modalButton, styles.confirmButton, deleteConfirmText.trim() !== '삭제하기' && styles.confirmButtonDisabled]}
                 onPress={handleDeleteConfirm}
+                disabled={deleteConfirmText.trim() !== '삭제하기'}
               >
                 <Text style={styles.confirmButtonText}>삭제</Text>
               </TouchableOpacity>
@@ -552,6 +565,20 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 20,
   },
+  modalWarning: {
+    fontSize: 13,
+    color: '#F44336',
+    marginBottom: 10,
+  },
+  confirmInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 12,
+    backgroundColor: '#fff',
+  },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -567,6 +594,9 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     backgroundColor: '#F44336',
+  },
+  confirmButtonDisabled: {
+    backgroundColor: '#F8BBD0',
   },
   cancelButtonText: {
     color: '#333',
