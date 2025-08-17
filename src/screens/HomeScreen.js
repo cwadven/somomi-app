@@ -164,7 +164,7 @@ const HomeScreen = ({ navigation }) => {
             showsHorizontalScrollIndicator={false}
             data={banners}
             renderItem={renderBanner}
-            keyExtractor={item => item.id}
+            keyExtractor={item => String(item.id)}
             pagingEnabled
             snapToAlignment="center"
             onScroll={handleBannerScroll}
@@ -201,7 +201,7 @@ const HomeScreen = ({ navigation }) => {
               showsHorizontalScrollIndicator={false}
               data={popularProducts}
               renderItem={renderRecommendedProduct}
-              keyExtractor={item => item.id}
+              keyExtractor={item => String(item.localId || item.id)}
               contentContainerStyle={styles.recommendedProductsList}
             />
           )}
@@ -215,7 +215,7 @@ const HomeScreen = ({ navigation }) => {
           <FlatList
             data={tips}
             renderItem={renderTip}
-            keyExtractor={item => item.id}
+            keyExtractor={item => String(item.id)}
             scrollEnabled={false}
             contentContainerStyle={styles.tipsList}
           />

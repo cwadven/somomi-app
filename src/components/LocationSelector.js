@@ -42,7 +42,7 @@ const LocationSelector = forwardRef(({
             ref={ref}
             horizontal
             data={locations}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => String(item.localId || item.id)}
             showsHorizontalScrollIndicator={true}
             style={styles.locationFlatList}
             contentContainerStyle={styles.locationsList}

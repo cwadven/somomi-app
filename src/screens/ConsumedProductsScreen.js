@@ -138,7 +138,7 @@ const ConsumedProductsScreen = () => {
         <FlatList
           data={consumedProducts}
           renderItem={renderItem}
-          keyExtractor={item => `consumed-${item.id}-${item.consumedAt || Date.now()}`}
+          keyExtractor={item => `consumed-${String(item.localId || item.id)}-${item.processedAt || item.consumedAt || ''}`}
           ListEmptyComponent={renderEmptyList}
           contentContainerStyle={styles.listContent}
         />

@@ -12,6 +12,7 @@ import CodePushUpdateLoading from './src/components/CodePushUpdateLoading';
 import { Ionicons } from '@expo/vector-icons';
 // 알림 관련 코드는 pushNotificationService로 통합
 import { initializeData } from './src/api/productsApi';
+import { migrateLocalIdsAndMeta } from './src/utils/migration';
 import { initializeNotificationsData } from './src/redux/slices/notificationsSlice';
 import { loadCategories } from './src/redux/slices/categoriesSlice';
 import PushNotificationDebugger from './src/components/PushNotificationDebugger';
@@ -20,6 +21,8 @@ import { pushNotificationService } from './src/utils/pushNotificationService';
 import { loginUser } from './src/redux/slices/authSlice';
 import { fetchLocations, reconcileLocationsDisabled } from './src/redux/slices/locationsSlice';
 import { fetchProducts, fetchConsumedProducts } from './src/redux/slices/productsSlice';
+import { processSyncQueueIfOnline } from './src/utils/syncManager';
+import { loadAppPrefs } from './src/utils/storageUtils';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
@@ -200,6 +203,8 @@ const AppContent = () => {
   const initializeApp = async () => {
     try {
       setIsLoading(true);
+      // 7단계: 1회 마이그레이션 수행 (id/localId/메타 보강)
+      await migrateLocalIdsAndMeta();
       
       // 토큰 검증
       await dispatch(verifyToken()).unwrap();
@@ -288,6 +293,25 @@ const AppContent = () => {
       checkForUpdates();
     }
   }, [dispatch, checkForUpdates, handleAppStateChange]);
+
+  // 오프라인/온라인 모드 전환 시 동기화 큐 처리
+  useEffect(() => {
+    let interval;
+    (async () => {
+      // 최초 진입 시 한 번 처리
+      await processSyncQueueIfOnline(dispatch, store.getState);
+      // 주기적으로 모드 변경/큐 여부를 확인(가벼운 작업)
+      interval = setInterval(async () => {
+        const prefs = await loadAppPrefs();
+        if (prefs?.syncMode === 'online' || prefs?.offlineMode === false) {
+          await processSyncQueueIfOnline(dispatch, store.getState);
+        }
+      }, 2000);
+    })();
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [dispatch]);
   
   // 업데이트 디버깅 모달
   const UpdateDebugModal = () => (

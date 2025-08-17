@@ -129,7 +129,7 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation }) => {
               <FlatList
                 data={locations}
                 renderItem={renderLocationItem}
-                keyExtractor={(item) => item.id.toString()}
+                keyExtractor={(item) => String(item.localId || item.id)}
                 contentContainerStyle={styles.listContainer}
               />
             ) : (

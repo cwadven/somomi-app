@@ -18,7 +18,9 @@ import { logout } from '../redux/slices/authSlice';
 import KakaoLoginButton from '../components/KakaoLoginButton';
 import PushNotificationTest from '../components/PushNotificationTest';
 import NotificationSettings from '../components/NotificationSettings';
-import { clearAllData, loadAppPrefs, saveAppPrefs } from '../utils/storageUtils';
+import { clearAllData, loadAppPrefs, saveAppPrefs, loadSyncQueue } from '../utils/storageUtils';
+import { processSyncQueueIfOnline } from '../utils/syncManager';
+import store from '../redux/store';
 import { initializeData } from '../api/productsApi';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
@@ -29,6 +31,8 @@ const ProfileScreen = () => {
   const route = useRoute();
   const { user, isLoggedIn, isAnonymous, loading, error } = useSelector(state => state.auth);
   const [offlineMode, setOfflineMode] = useState(true);
+  const [syncQueueCount, setSyncQueueCount] = useState(0);
+  const [isOnlineMode, setIsOnlineMode] = useState(false);
 
   // route.params로 전달된 initialMode가 있으면 해당 모드로 설정
   useEffect(() => {
@@ -44,7 +48,29 @@ const ProfileScreen = () => {
       if (prefs && typeof prefs.offlineMode === 'boolean') {
         setOfflineMode(prefs.offlineMode);
       }
+      const online = (prefs?.syncMode === 'online') || (prefs && prefs.offlineMode === false);
+      setIsOnlineMode(!!online);
+      try {
+        const q = await loadSyncQueue();
+        setSyncQueueCount(Array.isArray(q) ? q.length : 0);
+      } catch (e) {}
     })();
+  }, []);
+
+  useEffect(() => {
+    let interval;
+    (async () => {
+      interval = setInterval(async () => {
+        try {
+          const prefs = await loadAppPrefs();
+          const online = (prefs?.syncMode === 'online') || (prefs && prefs.offlineMode === false);
+          setIsOnlineMode(!!online);
+          const q = await loadSyncQueue();
+          setSyncQueueCount(Array.isArray(q) ? q.length : 0);
+        } catch (e) {}
+      }, 1500);
+    })();
+    return () => { if (interval) clearInterval(interval); };
   }, []);
 
   // 안드로이드 시스템 알림 설정으로 이동하는 함수
@@ -252,6 +278,44 @@ const ProfileScreen = () => {
           onPress={() => navigation.navigate('Notifications')}
         />
 
+        {/* 동기화 상태 및 즉시 동기화 */}
+        <View style={styles.settingItem}>
+          <View style={styles.settingItemLeft}>
+            <Ionicons name="cloud-outline" size={24} color="#4CAF50" style={styles.settingIcon} />
+            <Text style={styles.settingTitle}>동기화 상태</Text>
+          </View>
+          <View style={styles.syncRightBox}>
+            <View style={[styles.syncBadge, syncQueueCount > 0 ? styles.syncBadgePending : styles.syncBadgeIdle]}>
+              <Text style={styles.syncBadgeText}>{`대기 ${syncQueueCount}건`}</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.syncNowBtn, !isOnlineMode && styles.syncNowBtnDisabled]}
+              onPress={async () => {
+                if (!isOnlineMode) {
+                  setModalTitle('동기화 불가');
+                  setModalMessage('오프라인 모드에서는 동기화할 수 없습니다. 온라인 모드로 전환하세요.');
+                  setModalAction(null);
+                  setModalVisible(true);
+                  return;
+                }
+                await processSyncQueueIfOnline(dispatch, store.getState);
+                const q = await loadSyncQueue();
+                setSyncQueueCount(Array.isArray(q) ? q.length : 0);
+                setModalTitle('동기화 완료');
+                setModalMessage('대기 중이던 작업 동기화를 완료했습니다.');
+                setModalAction(null);
+                setModalVisible(true);
+              }}
+              disabled={!isOnlineMode}
+            >
+              <Text style={styles.syncNowBtnText}>지금 동기화</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <Text style={styles.settingDescription}>
+          {isOnlineMode ? '온라인 모드: 대기 중 작업을 서버와 동기화할 수 있습니다.' : '오프라인 모드: 작업은 로컬에 저장되며, 온라인으로 전환 시 동기화됩니다.'}
+        </Text>
+
         {/* 오프라인 모드 스위치 */}
         <View style={styles.settingItem}>
           <View style={styles.settingItemLeft}>
@@ -457,6 +521,40 @@ const styles = StyleSheet.create({
     color: '#666',
     paddingHorizontal: 16,
     paddingBottom: 8,
+  },
+  syncRightBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  syncBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    marginRight: 8,
+  },
+  syncBadgePending: {
+    backgroundColor: '#FFD54F',
+  },
+  syncBadgeIdle: {
+    backgroundColor: '#E0E0E0',
+  },
+  syncBadgeText: {
+    fontSize: 12,
+    color: '#333',
+  },
+  syncNowBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#4CAF50',
+    borderRadius: 6,
+  },
+  syncNowBtnDisabled: {
+    backgroundColor: '#BDBDBD',
+  },
+  syncNowBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   badge: {
     width: 8,

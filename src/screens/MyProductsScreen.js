@@ -52,7 +52,7 @@ const MyProductsScreen = ({ navigation }) => {
         <FlatList
           data={products}
           renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => String(item.localId || item.id)}
           contentContainerStyle={styles.listContainer}
         />
       )}

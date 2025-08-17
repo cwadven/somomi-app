@@ -9,6 +9,7 @@ import {
   fetchConsumedProductsApi,
   restoreConsumedProductApi
 } from '../../api/productsApi';
+import { createEntity, updateEntity, deleteEntity, ENTITY_TYPES } from '../../api/syncApi';
 import { deleteLocation } from './locationsSlice';
 import { saveProducts, loadProducts, saveConsumedProducts, loadConsumedProducts } from '../../utils/storageUtils';
 
@@ -26,12 +27,13 @@ export const fetchProducts = createAsyncThunk(
       // 제품 목록이 비어있으면 AsyncStorage에서 로드
       if (currentProducts.length === 0) {
         const storedProducts = await loadProducts();
-        console.log('AsyncStorage에서 로드한 제품 목록:', storedProducts);
-        return storedProducts;
+        const filtered = (storedProducts || []).filter(p => p?.syncStatus !== 'deleted');
+        console.log('AsyncStorage에서 로드한 제품 목록:', filtered);
+        return filtered;
       }
       
       // 이미 제품 목록이 있으면 그대로 반환
-      return currentProducts;
+      return currentProducts.filter(p => p?.syncStatus !== 'deleted');
     } catch (error) {
       console.error('제품 목록 가져오기 오류:', error);
       return rejectWithValue(error.message);
@@ -64,7 +66,9 @@ export const fetchProductsByLocation = createAsyncThunk(
         if (locationId === 'all') {
           return products;
         } else {
-          return products.filter(product => product.locationId === locationId);
+          return products.filter(product => 
+            product.locationLocalId === locationId || product.locationId === locationId
+          );
         }
       }
       
@@ -74,7 +78,9 @@ export const fetchProductsByLocation = createAsyncThunk(
       if (locationId === 'all') {
         return storedProducts;
       } else {
-        return storedProducts.filter(product => product.locationId === locationId);
+        return storedProducts.filter(product => 
+          product.locationLocalId === locationId || product.locationId === locationId
+        );
       }
     } catch (error) {
       return rejectWithValue(error.message);
@@ -86,7 +92,24 @@ export const addProductAsync = createAsyncThunk(
   'products/addProduct',
   async (product, { rejectWithValue, getState }) => {
     try {
-      const response = await addProductApi(product);
+      const nowIso = new Date().toISOString();
+      const locationLocalId = product.locationLocalId || product.locationId;
+      const base = {
+        ...product,
+        locationLocalId,
+        // 호환을 위해 locationId도 유지
+        locationId: product.locationId || locationLocalId,
+        // 메타는 syncApi에서 보강
+        localId: product.localId || product.id || undefined,
+      };
+      const enriched = await createEntity(ENTITY_TYPES.PRODUCT, base, {
+        deviceId: getState().auth?.deviceId || 'unknown',
+        ownerUserId: getState().auth?.user?.id,
+      });
+      const response = await addProductApi(enriched);
+      // id가 생성되면 localId 초기화(마이그레이션 정책)
+      response.localId = response.localId || response.id;
+      response.locationLocalId = response.locationLocalId || response.locationId;
       
       // 새 제품이 추가된 후 전체 제품 목록을 AsyncStorage에 저장
       const updatedProducts = [...getState().products.products, response];
@@ -103,7 +126,15 @@ export const updateProductAsync = createAsyncThunk(
   'products/updateProduct',
   async (product, { rejectWithValue, getState }) => {
     try {
-      const response = await updateProductApi(product);
+      const enriched = await updateEntity(ENTITY_TYPES.PRODUCT, {
+        ...product,
+        locationLocalId: product.locationLocalId || product.locationId,
+        locationId: product.locationId || product.locationLocalId,
+      }, {
+        deviceId: getState().auth?.deviceId || product.deviceId || 'unknown',
+        ownerUserId: getState().auth?.user?.id || product.ownerUserId,
+      });
+      const response = await updateProductApi(enriched);
       
       // 제품 수정 후 전체 제품 목록을 AsyncStorage에 저장
       const updatedProducts = getState().products.products.map(p => 
@@ -122,10 +153,13 @@ export const deleteProductAsync = createAsyncThunk(
   'products/deleteProduct',
   async (id, { rejectWithValue, getState }) => {
     try {
-      await deleteProductApi(id);
-      
-      // 제품 삭제 후 전체 제품 목록을 AsyncStorage에 저장
-      const updatedProducts = getState().products.products.filter(p => p.id !== id);
+      await deleteEntity(ENTITY_TYPES.PRODUCT, { id, localId: id }, {
+        deviceId: getState().auth?.deviceId,
+        ownerUserId: getState().auth?.user?.id,
+      });
+      // tombstone 적용: 저장에는 남기고 상태에서만 제거
+      const nowIso = new Date().toISOString();
+      const updatedProducts = getState().products.products.map(p => p.id === id ? { ...p, syncStatus: 'deleted', deletedAt: nowIso } : p);
       await saveProducts(updatedProducts);
       
       return id;
@@ -293,7 +327,7 @@ export const productsSlice = createSlice({
         state.products.push(action.payload);
         
         // 영역별 제품 목록 캐시 업데이트
-        const locationId = action.payload.locationId;
+        const locationId = action.payload.locationLocalId || action.payload.locationId;
         if (state.locationProducts[locationId]) {
           state.locationProducts[locationId].push(action.payload);
         }
@@ -433,11 +467,15 @@ export const productsSlice = createSlice({
       .addCase(deleteLocation.fulfilled, (state, action) => {
         const deletedLocationId = action.payload;
         // 일반 제품 목록에서 해당 영역의 제품 제거
-        state.products = state.products.filter(product => product.locationId !== deletedLocationId);
+        state.products = state.products.filter(product => 
+          product.locationId !== deletedLocationId && product.locationLocalId !== deletedLocationId
+        );
         // 소진 처리된 제품 목록에서도 해당 영역의 제품 제거
-        state.consumedProducts = state.consumedProducts.filter(product => product.locationId !== deletedLocationId);
+        state.consumedProducts = state.consumedProducts.filter(product => 
+          product.locationId !== deletedLocationId && product.locationLocalId !== deletedLocationId
+        );
         // 현재 제품이 해당 영역의 제품이면 초기화
-        if (state.currentProduct && state.currentProduct.locationId === deletedLocationId) {
+        if (state.currentProduct && (state.currentProduct.locationId === deletedLocationId || state.currentProduct.locationLocalId === deletedLocationId)) {
           state.currentProduct = null;
         }
         
@@ -449,7 +487,7 @@ export const productsSlice = createSlice({
         // 'all' 캐시 업데이트
         if (state.locationProducts['all']) {
           state.locationProducts['all'] = state.locationProducts['all'].filter(
-            product => product.locationId !== deletedLocationId
+            product => product.locationId !== deletedLocationId && product.locationLocalId !== deletedLocationId
           );
         }
       });

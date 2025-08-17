@@ -411,7 +411,7 @@ const LocationsScreen = () => {
         ) : (
           <FlatList
             data={locations}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => String(item.localId || item.id)}
             renderItem={({ item }) => (
               <TouchableOpacity 
                 style={styles.locationListItem}

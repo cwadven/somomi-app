@@ -38,7 +38,7 @@ export const fetchNotifications = createAsyncThunk(
       if (storedNotifications) {
         sampleNotifications = storedNotifications;
       }
-      return [...sampleNotifications];
+      return sampleNotifications.filter(n => n?.syncStatus !== 'deleted');
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -142,7 +142,17 @@ export const addNotification = createAsyncThunk(
       const newNotification = {
         id: notificationId,
         ...notificationData,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        // SyncMeta 기본값
+        localId: notificationId,
+        remoteId: undefined,
+        syncStatus: 'dirty',
+        updatedAt: new Date().toISOString(),
+        lastSyncedAt: undefined,
+        version: undefined,
+        deviceId: null,
+        ownerUserId: undefined,
+        deletedAt: undefined,
       };
       
       // 메모리 및 AsyncStorage에 저장
@@ -211,17 +221,8 @@ export const deleteNotification = createAsyncThunk(
       // 알림 취소
       await cancelNotification(id);
       
-      // 해당 알림 찾기
-      const index = sampleNotifications.findIndex(notification => notification.id === id);
-      if (index === -1) {
-        return rejectWithValue('알림을 찾을 수 없습니다.');
-      }
-      
-      // 메모리 및 AsyncStorage에서 삭제
-      const updatedNotifications = [
-        ...sampleNotifications.slice(0, index),
-        ...sampleNotifications.slice(index + 1)
-      ];
+      // tombstone 적용
+      const updatedNotifications = sampleNotifications.map(n => n.id === id ? { ...n, syncStatus: 'deleted', deletedAt: new Date().toISOString() } : n);
       sampleNotifications = updatedNotifications;
       await saveData(STORAGE_KEYS.NOTIFICATIONS, updatedNotifications);
       

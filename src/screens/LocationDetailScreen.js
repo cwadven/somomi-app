@@ -205,7 +205,7 @@ const LocationDetailScreen = () => {
         ) : (
           <FlatList
             data={locationProducts}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => String(item.localId || item.id)}
             renderItem={({ item }) => (
               <ProductCard 
                 product={item} 

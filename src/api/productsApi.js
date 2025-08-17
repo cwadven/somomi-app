@@ -427,9 +427,9 @@ export const fetchProductsByLocationApi = async (locationId) => {
       sampleProducts = storedProducts;
     }
     
-    // 해당 영역의 제품만 필터링
+    // 해당 영역의 제품만 필터링 (localId 우선)
     const locationProducts = sampleProducts.filter(
-      product => product.locationId === locationId && !product.isConsumed
+      product => (product.locationLocalId === locationId || product.locationId === locationId) && !product.isConsumed
           );
     
     return [...locationProducts]; // 배열 복사본 반환

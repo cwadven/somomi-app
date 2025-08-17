@@ -30,16 +30,17 @@ export const reconcileLocationTemplates = createAsyncThunk(
   'auth/reconcileLocationTemplates',
   async (_, { getState }) => {
     const state = getState();
-    const templates = (state.auth.userLocationTemplateInstances || []).map(t => ({ ...t }));
+    const templates = (state.auth.userLocationTemplateInstances || []).map(t => ({ ...t, localId: t.localId || t.id }));
     const locations = state.locations.locations || [];
     const linkedTemplateIds = new Set();
     // 영역에 연결된 템플릿 적용
     for (const loc of locations) {
-      if (loc?.templateInstanceId) {
-        const tt = templates.find(t => t.id === loc.templateInstanceId);
+      const templateKey = loc?.templateInstanceLocalId || loc?.templateInstanceId;
+      if (templateKey) {
+        const tt = templates.find(t => t.id === templateKey || t.localId === templateKey);
         if (tt) {
           tt.used = true;
-          tt.usedInLocationId = loc.id;
+          tt.usedInLocationId = loc.localId || loc.id;
           linkedTemplateIds.add(tt.id);
         }
       }
@@ -270,18 +271,35 @@ export const loadUserProductSlotTemplateInstances = createAsyncThunk(
 );
 
 // 기본 템플릿 생성 함수
-const createBasicLocationTemplate = (idOverride, baseSlotsOverride) => ({
-  id: idOverride || generateId('locationTemplate'),
-  productId: 'basic_location',
-  name: '기본 영역',
-  description: '기본적인 제품 관리 기능을 제공하는 영역',
-  icon: 'cube-outline',
-  feature: {
-    baseSlots: typeof baseSlotsOverride === 'number' ? baseSlotsOverride : 3
-  },
-  used: false,
-  usedInLocationId: null
-});
+const createBasicLocationTemplate = (idOverride, baseSlotsOverride, extraMeta = {}) => {
+  const nowIso = new Date().toISOString();
+  const obj = {
+    id: idOverride || generateId('locationTemplate'),
+    productId: 'basic_location',
+    name: '기본 영역',
+    description: '기본적인 제품 관리 기능을 제공하는 영역',
+    icon: 'cube-outline',
+    feature: {
+      baseSlots: typeof baseSlotsOverride === 'number' ? baseSlotsOverride : 3
+    },
+    used: false,
+    usedInLocationId: null,
+    // SyncMeta 기본값
+    localId: undefined, // 아래에서 id로 세팅
+    remoteId: undefined,
+    syncStatus: 'synced',
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    lastSyncedAt: undefined,
+    version: undefined,
+    deviceId: null,
+    ownerUserId: undefined,
+    deletedAt: undefined,
+    ...extraMeta,
+  };
+  obj.localId = obj.id;
+  return obj;
+};
 
 const initialState = {
   token: null,

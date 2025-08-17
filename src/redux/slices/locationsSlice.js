@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { saveLocations, loadLocations } from '../../utils/storageUtils';
+import { createEntity, updateEntity, deleteEntity, ENTITY_TYPES } from '../../api/syncApi';
 
 // 영역 목록 가져오기
 export const fetchLocations = createAsyncThunk(
@@ -9,18 +10,19 @@ export const fetchLocations = createAsyncThunk(
       console.log('fetchLocations 시작');
       
       // 현재 상태에서 영역 목록 가져오기
-      const currentLocations = getState().locations.locations;
+      let currentLocations = getState().locations.locations;
       console.log('현재 저장된 영역 목록:', currentLocations);
       
       // 영역 목록이 비어있으면 AsyncStorage에서 로드
       if (currentLocations.length === 0) {
         const storedLocations = await loadLocations();
-        console.log('AsyncStorage에서 로드한 영역 목록:', storedLocations);
-        return storedLocations;
+        const filtered = (storedLocations || []).filter(l => l?.syncStatus !== 'deleted');
+        console.log('AsyncStorage에서 로드한 영역 목록:', filtered);
+        return filtered;
       }
       
       // 이미 영역 목록이 있으면 그대로 반환
-      return currentLocations;
+      return currentLocations.filter(l => l?.syncStatus !== 'deleted');
     } catch (error) {
       console.error('영역 목록 가져오기 오류:', error);
       return rejectWithValue(error.message || '영역 목록을 불러오는 중 오류가 발생했습니다.');
@@ -59,12 +61,20 @@ export const createLocation = createAsyncThunk(
       
       // 실제 구현에서는 API 호출
       // 여기서는 임시 ID 생성 후 반환
-      const newLocation = {
+      const base = {
         ...locationData,
         id: `loc_${Date.now()}`,
+        // 관계 필드(localId) 호환
+        templateInstanceLocalId: locationData.templateInstanceLocalId || locationData.templateInstanceId,
         // templateInstanceId, productId, feature는 locationData에서 전달받음
         disabled: false,
+        // SyncMeta 기본값 추가는 syncApi에서 수행
       };
+      // sync 게이트웨이 적용
+      const newLocation = await createEntity(ENTITY_TYPES.LOCATION, { ...base, localId: base.id }, {
+        deviceId: getState().auth?.deviceId,
+        ownerUserId: getState().auth?.user?.id,
+      });
       
       console.log('생성된 영역:', newLocation);
       
@@ -87,14 +97,21 @@ export const updateLocation = createAsyncThunk(
     try {
       // 실제 구현에서는 API 호출
       // 여기서는 수정된 데이터 그대로 반환
+      const enriched = await updateEntity(ENTITY_TYPES.LOCATION, {
+        ...locationData,
+        templateInstanceLocalId: locationData.templateInstanceLocalId || locationData.templateInstanceId,
+      }, {
+        deviceId: getState().auth?.deviceId || locationData.deviceId || 'unknown',
+        ownerUserId: getState().auth?.user?.id || locationData.ownerUserId,
+      });
       
       // 영역 수정 후 전체 영역 목록을 AsyncStorage에 저장
       const updatedLocations = getState().locations.locations.map(location => 
-        location.id === locationData.id ? locationData : location
+        location.id === enriched.id ? enriched : location
       );
       await saveLocations(updatedLocations);
       
-      return locationData;
+      return enriched;
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -106,12 +123,20 @@ export const deleteLocation = createAsyncThunk(
   'locations/deleteLocation',
   async (locationId, { rejectWithValue, getState }) => {
     try {
-      // 실제 구현에서는 API 호출
+      // sync 게이트웨이 적용 (tombstone는 상위에서 관리 가능)
+      await deleteEntity(ENTITY_TYPES.LOCATION, { id: locationId, localId: locationId }, {
+        deviceId: getState().auth?.deviceId,
+        ownerUserId: getState().auth?.user?.id,
+      });
       
-      // 영역 삭제 후 전체 영역 목록을 AsyncStorage에 저장
-      const updatedLocations = getState().locations.locations.filter(
-        location => location.id !== locationId
-      );
+      // tombstone: 저장소에는 남기되 상태는 제거
+      const nowIso = new Date().toISOString();
+      const updatedLocations = getState().locations.locations.map(loc => {
+        if (loc.id === locationId) {
+          return { ...loc, syncStatus: 'deleted', deletedAt: nowIso };
+        }
+        return loc;
+      });
       await saveLocations(updatedLocations);
       
       return locationId;
@@ -130,7 +155,8 @@ export const reconcileLocationsDisabled = createAsyncThunk(
       const locations = state.locations.locations || [];
       const templates = state.auth.userLocationTemplateInstances || [];
       const updated = locations.map(loc => {
-        const linked = templates.some(t => t.usedInLocationId === loc.id);
+        const locKey = loc.localId || loc.id;
+        const linked = templates.some(t => t.usedInLocationId === locKey);
         return { ...loc, disabled: !linked };
       });
       await saveLocations(updated);

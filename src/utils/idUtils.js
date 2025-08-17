@@ -28,3 +28,50 @@ export const generateId = (type) => {
   
   return `item-${timestamp}-${randomStr}`;
 }; 
+
+/**
+ * 간단한 ULID 유사 ID 생성기 (의존성 없이 사용)
+ * 실제 ULID 규격은 아니지만, 시간/랜덤 조합으로 충분히 고유합니다.
+ */
+export const generateUlid = () => {
+  const time = Date.now().toString(36);
+  const rand = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
+  return `${time}${rand}`.substring(0, 26);
+};
+
+/**
+ * 로컬(오프라인) 전용 ID 생성기
+ * 형식: `${type}-local-${deviceId}-${ulid}`
+ */
+export const generateLocalId = (type, deviceId) => {
+  const safeType = type || 'item';
+  const ulid = generateUlid();
+  const safeDeviceId = deviceId || 'dev';
+  return `${safeType}-local-${safeDeviceId}-${ulid}`;
+};
+
+/**
+ * 비동기 로컬 ID 생성기 (AsyncStorage에서 deviceId 로드)
+ */
+export const generateLocalIdAsync = async (type) => {
+  try {
+    const { loadDeviceId } = await import('./storageUtils');
+    const deviceId = await loadDeviceId();
+    return generateLocalId(type, deviceId || 'dev');
+  } catch (e) {
+    // 폴백: 기존 ID 생성 사용
+    return generateId(type);
+  }
+};
+
+/**
+ * 주어진 ID가 로컬(오프라인) ID인지 판별
+ */
+export const isLocalId = (id, deviceId) => {
+  if (!id || typeof id !== 'string') return false;
+  if (id.includes('-local-')) {
+    if (!deviceId) return true;
+    return id.includes(`-local-${deviceId}-`);
+  }
+  return false;
+};

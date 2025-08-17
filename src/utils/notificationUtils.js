@@ -46,22 +46,24 @@ export const processLocationNotifications = (notifications, products, locations,
   };
 
   for (const locationNotif of locationNotifications) {
-    const location = locations.find(loc => loc.id === locationNotif.targetId);
+    const location = locations.find(loc => (loc.localId === locationNotif.targetId) || (loc.id === locationNotif.targetId));
     if (!location) continue;
     // 비활성화 또는 만료된 영역 제외
     if (location.disabled === true) {
       addLog(`[SKIP] 영역 비활성화: ${location.title} (${location.id})`, 'warning');
       continue;
     }
-    if (isLocationTemplateExpired(location.id)) {
+    const locKey = location.localId || location.id;
+    if (isLocationTemplateExpired(locKey)) {
       addLog(`[SKIP] 영역 템플릿 만료: ${location.title} (${location.id})`, 'warning');
       continue;
     }
     
     // 해당 영역에 속한 제품들 찾기 (소진되지 않은 제품만)
-    const locationProducts = products.filter(p => 
-      p.locationId === locationNotif.targetId && !p.isConsumed
-    );
+    const locationProducts = products.filter(p => {
+      const pLocKey = p.locationLocalId || p.locationId;
+      return pLocKey === locKey && !p.isConsumed;
+    });
     
     for (const product of locationProducts) {
       // 제품 알림 설정 확인
@@ -85,10 +87,10 @@ export const processLocationNotifications = (notifications, products, locations,
         );
         
         if (notification) {
-          addLog(`[INCLUDE] 유통기한 알림 대상 제품: ${product.name} (${product.id}) @ ${location.title} (${location.id})`, 'success');
+          addLog(`[INCLUDE] 유통기한 알림 대상 제품: ${product.name} (${product.id}) @ ${location.title} (${locKey})`, 'success');
           // 알림 유형 정보 추가
           notification.source_type = 'location';
-          notification.source_id = location.id;
+          notification.source_id = locKey;
           notification.source_name = location.title;
           
           notificationsToSend.push(notification);
@@ -102,10 +104,10 @@ export const processLocationNotifications = (notifications, products, locations,
         );
         
         if (notification) {
-          addLog(`[INCLUDE] 소진예상 알림 대상 제품: ${product.name} (${product.id}) @ ${location.title} (${location.id})`, 'success');
+          addLog(`[INCLUDE] 소진예상 알림 대상 제품: ${product.name} (${product.id}) @ ${location.title} (${locKey})`, 'success');
           // 알림 유형 정보 추가
           notification.source_type = 'location';
-          notification.source_id = location.id;
+          notification.source_id = locKey;
           notification.source_name = location.title;
           
           notificationsToSend.push(notification);
@@ -146,19 +148,21 @@ export const processProductNotifications = (notifications, products, locations, 
   };
 
   for (const productNotif of productNotifications) {
-    // 소진되지 않은 제품만 처리
-    const product = products.find(p => p.id === productNotif.targetId && !p.isConsumed);
+    // 소진되지 않은 제품만 처리 (localId 우선)
+    const product = products.find(p => (p.localId === productNotif.targetId || p.id === productNotif.targetId) && !p.isConsumed);
     if (!product) continue;
     
-    const location = locations.find(loc => loc.id === product.locationId);
+    const locKey = product.locationLocalId || product.locationId;
+    const location = locations.find(loc => (loc.localId === locKey) || (loc.id === locKey));
     // 비활성화 또는 만료된 영역 소속 제품 제외
     if (!location) continue;
     if (location.disabled === true) {
       addLog(`[SKIP] 영역 비활성화(제품 제외): ${product.name} (${product.id}) @ ${product.locationId}`, 'warning');
       continue;
     }
-    if (isLocationTemplateExpired(location.id)) {
-      addLog(`[SKIP] 영역 템플릿 만료(제품 제외): ${product.name} (${product.id}) @ ${location.title} (${location.id})`, 'warning');
+    const lkey = location.localId || location.id;
+    if (isLocationTemplateExpired(lkey)) {
+      addLog(`[SKIP] 영역 템플릿 만료(제품 제외): ${product.name} (${product.id}) @ ${location.title} (${lkey})`, 'warning');
       continue;
     }
     
@@ -172,10 +176,10 @@ export const processProductNotifications = (notifications, products, locations, 
       );
       
       if (notification) {
-        addLog(`[INCLUDE] 유통기한 알림 대상 제품(개별): ${product.name} (${product.id}) @ ${location.title} (${location.id})`, 'success');
+        addLog(`[INCLUDE] 유통기한 알림 대상 제품(개별): ${product.name} (${product.id}) @ ${location.title} (${lkey})`, 'success');
         // 알림 유형 정보 추가
         notification.source_type = 'product';
-        notification.source_id = product.id;
+        notification.source_id = product.localId || product.id;
         notification.source_name = product.name;
         
         notificationsToSend.push(notification);
@@ -189,10 +193,10 @@ export const processProductNotifications = (notifications, products, locations, 
       );
       
       if (notification) {
-        addLog(`[INCLUDE] 소진예상 알림 대상 제품(개별): ${product.name} (${product.id}) @ ${location.title} (${location.id})`, 'success');
+        addLog(`[INCLUDE] 소진예상 알림 대상 제품(개별): ${product.name} (${product.id}) @ ${location.title} (${lkey})`, 'success');
         // 알림 유형 정보 추가
         notification.source_type = 'product';
-        notification.source_id = product.id;
+        notification.source_id = product.localId || product.id;
         notification.source_name = product.name;
         
         notificationsToSend.push(notification);
@@ -235,8 +239,8 @@ export const createExpiryNotification = (product, location, daysBeforeTarget, no
       notification_type: '유통기한',
       message: `${product.name}의 유통기한이 ${displayDaysLeft}일 남았습니다.`,
       expire_at: expireAt.toISOString(),
-      location_id: location ? location.id : null,
-      product_id: product.id,
+      location_id: location ? (location.localId || location.id) : null,
+      product_id: product.localId || product.id,
       notification_id: notificationId
     };
   }
@@ -276,8 +280,8 @@ export const createEstimatedNotification = (product, location, daysBeforeTarget,
       notification_type: '소진 예상',
       message: `${product.name}의 소진예상일이 ${displayDaysLeft}일 남았습니다.`,
       expire_at: expireAt.toISOString(),
-      location_id: location ? location.id : null,
-      product_id: product.id,
+      location_id: location ? (location.localId || location.id) : null,
+      product_id: product.localId || product.id,
       notification_id: notificationId
     };
   }
