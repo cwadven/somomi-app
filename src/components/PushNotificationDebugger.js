@@ -100,27 +100,27 @@ const PushNotificationDebugger = () => {
         logs={logs}
         onClose={handleCloseModal}
         onClear={handleClearLogs}
+        extra={(
+          <View style={styles.quickActionsInline}>
+            <TouchableOpacity style={[styles.qaButton, running && styles.qaButtonDisabled]} onPress={handleTestGenerateAndSend} disabled={running}>
+              <Ionicons name="paper-plane-outline" size={18} color="#fff" />
+              <Text style={styles.qaButtonText}>알림 즉시 생성/전송</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.qaButton, running && styles.qaButtonDisabled]} onPress={handleSendReminderNow} disabled={running}>
+              <Ionicons name="alarm-outline" size={18} color="#fff" />
+              <Text style={styles.qaButtonText}>리마인더 즉시 발송</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.qaButton, running && styles.qaButtonDisabled]} onPress={handleScheduleDailyReminder} disabled={running}>
+              <Ionicons name="time-outline" size={18} color="#fff" />
+              <Text style={styles.qaButtonText}>9시 리마인더 스케줄</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.qaButton, running && styles.qaButtonDisabled]} onPress={async ()=>{setRunning(true); await scheduleDailyUpdateReminderIfNeeded(); setRunning(false);}} disabled={running}>
+              <Ionicons name="time" size={18} color="#fff" />
+              <Text style={styles.qaButtonText}>20시 작성 리마인더</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       />
-
-      {/* 빠른 테스트 버튼들 */}
-      <View style={styles.quickActions}>
-        <TouchableOpacity style={[styles.qaButton, running && styles.qaButtonDisabled]} onPress={handleTestGenerateAndSend} disabled={running}>
-          <Ionicons name="paper-plane-outline" size={18} color="#fff" />
-          <Text style={styles.qaButtonText}>알림 즉시 생성/전송</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.qaButton, running && styles.qaButtonDisabled]} onPress={handleSendReminderNow} disabled={running}>
-          <Ionicons name="alarm-outline" size={18} color="#fff" />
-          <Text style={styles.qaButtonText}>리마인더 즉시 발송</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.qaButton, running && styles.qaButtonDisabled]} onPress={handleScheduleDailyReminder} disabled={running}>
-          <Ionicons name="time-outline" size={18} color="#fff" />
-          <Text style={styles.qaButtonText}>9시 리마인더 스케줄</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.qaButton, running && styles.qaButtonDisabled]} onPress={async ()=>{setRunning(true); await scheduleDailyUpdateReminderIfNeeded(); setRunning(false);}} disabled={running}>
-          <Ionicons name="time" size={18} color="#fff" />
-          <Text style={styles.qaButtonText}>20시 작성 리마인더</Text>
-        </TouchableOpacity>
-      </View>
     </>
   );
 };
@@ -168,6 +168,11 @@ const styles = StyleSheet.create({
     left: 80,
     bottom: 80,
     flexDirection: 'row',
+  },
+  quickActionsInline: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 8,
   },
   qaButton: {
     flexDirection: 'row',

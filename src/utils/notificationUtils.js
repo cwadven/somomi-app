@@ -354,8 +354,31 @@ export const sendNotifications = async (notifications) => {
   }
   
   const results = [];
+
+  // 1) 소진예상 알림은 대표 1개만 전송하도록 축약
+  //    나머지 유형은 기존대로 유지
+  let finalNotifications = notifications;
+  try {
+    const estimatedList = notifications.filter(n => n.notification_type === '소진 예상');
+    const others = notifications.filter(n => n.notification_type !== '소진 예상');
+    if (estimatedList.length > 1) {
+      const consolidated = {
+        notification_type: '소진 예상',
+        message: '소진예상 알림이 있습니다. 알림 목록에서 확인하세요.',
+        expire_at: new Date().toISOString(),
+        location_id: null,
+        product_id: null,
+        notification_id: 'estimated_consolidated_' + Date.now(),
+      };
+      finalNotifications = [...others, consolidated];
+    } else {
+      finalNotifications = notifications;
+    }
+  } catch (e) {
+    finalNotifications = notifications;
+  }
   
-  for (const notification of notifications) {
+  for (const notification of finalNotifications) {
     try {
       const title = `${notification.notification_type} 알림`;
       const body = notification.message;
@@ -364,7 +387,7 @@ export const sendNotifications = async (notifications) => {
         productId: notification.product_id,
         locationId: notification.location_id,
         notificationId: notification.notification_id,
-        deepLink: `somomi://product/detail/${notification.product_id}`
+        deepLink: notification.product_id ? `somomi://product/detail/${notification.product_id}` : 'somomi://notifications'
       };
       
       const notificationId = await sendImmediateNotification(title, body, data);

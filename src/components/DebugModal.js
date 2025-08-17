@@ -17,7 +17,8 @@ const DebugModal = ({
   title = '디버깅 정보', 
   logs = [], 
   onClose,
-  onClear
+  onClear,
+  extra = null, // 모달 내부에 추가 컨트롤을 렌더링할 때 사용
 }) => {
   const [autoScroll, setAutoScroll] = useState(true);
   
@@ -57,6 +58,12 @@ const DebugModal = ({
               </Text>
             </TouchableOpacity>
           </View>
+
+          {extra ? (
+            <View style={styles.extraContainer}>
+              {extra}
+            </View>
+          ) : null}
           
           <ScrollView 
             style={styles.logsContainer}
@@ -160,6 +167,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     padding: 10,
     marginBottom: 15,
+  },
+  extraContainer: {
+    marginBottom: 12,
   },
   emptyText: {
     fontStyle: 'italic',
