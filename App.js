@@ -18,7 +18,7 @@ import PushNotificationDebugger from './src/components/PushNotificationDebugger'
 import AlertModal from './src/components/AlertModal';
 import { pushNotificationService } from './src/utils/pushNotificationService';
 import { loginUser } from './src/redux/slices/authSlice';
-import { fetchLocations } from './src/redux/slices/locationsSlice';
+import { fetchLocations, reconcileLocationsDisabled } from './src/redux/slices/locationsSlice';
 import { fetchProducts, fetchConsumedProducts } from './src/redux/slices/productsSlice';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
@@ -215,6 +215,8 @@ const AppContent = () => {
       await dispatch(fetchLocations()).unwrap();
       // 위치 로드 후 한 번 더 동기화 (순서상 보강)
       await dispatch(reconcileLocationTemplates());
+      // 템플릿 미연동을 disabled=true로 반영
+      await dispatch(reconcileLocationsDisabled()).unwrap();
       
       // 제품 데이터 로드
       await dispatch(fetchProducts()).unwrap();

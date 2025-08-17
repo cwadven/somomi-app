@@ -121,6 +121,26 @@ export const deleteLocation = createAsyncThunk(
   }
 );
 
+// 템플릿 미연동(usedInLocationId 없음)인 영역을 disabled=true로 동기화
+export const reconcileLocationsDisabled = createAsyncThunk(
+  'locations/reconcileLocationsDisabled',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const state = getState();
+      const locations = state.locations.locations || [];
+      const templates = state.auth.userLocationTemplateInstances || [];
+      const updated = locations.map(loc => {
+        const linked = templates.some(t => t.usedInLocationId === loc.id);
+        return { ...loc, disabled: !linked };
+      });
+      await saveLocations(updated);
+      return updated;
+    } catch (error) {
+      return rejectWithValue(error.message || 'disabled 동기화 오류');
+    }
+  }
+);
+
 const initialState = {
   locations: [],
   currentLocation: null,
@@ -242,6 +262,21 @@ const locationsSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       });
+      
+      // disabled 동기화
+      builder
+        .addCase(reconcileLocationsDisabled.pending, (state) => {
+          state.status = 'loading';
+        })
+        .addCase(reconcileLocationsDisabled.fulfilled, (state, action) => {
+          state.status = 'succeeded';
+          state.locations = action.payload;
+          state.error = null;
+        })
+        .addCase(reconcileLocationsDisabled.rejected, (state, action) => {
+          state.status = 'failed';
+          state.error = action.payload;
+        });
   }
 });
 
