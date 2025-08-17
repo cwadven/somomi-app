@@ -58,6 +58,8 @@ const ProductFormScreen = () => {
   // 폼 상태
   const [productName, setProductName] = useState('');
   const [brand, setBrand] = useState('');
+  const [purchasePlace, setPurchasePlace] = useState('');
+  const [price, setPrice] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [purchaseDate, setPurchaseDate] = useState(new Date());
@@ -143,6 +145,12 @@ const ProductFormScreen = () => {
     if (isEditMode && currentProduct) {
       setProductName(currentProduct.name || '');
       setBrand(currentProduct.brand || '');
+      setPurchasePlace(currentProduct.purchasePlace || '');
+      setPrice(
+        typeof currentProduct.price === 'number' && !isNaN(currentProduct.price)
+          ? String(currentProduct.price)
+          : ''
+      );
       setMemo(currentProduct.memo || '');
       
       // 날짜 설정
@@ -536,6 +544,8 @@ const ProductFormScreen = () => {
         name: productName,
         brand: brand || null,
         category: selectedCategory,
+        purchasePlace: purchasePlace ? purchasePlace : null,
+        price: price && price.trim() !== '' ? parseInt(price.replace(/[^0-9]/g, ''), 10) : null,
         // 영역 위치 이동 반영: 수정 모드에서는 selectedLocation 우선 적용
         locationId: isEditMode ? ((selectedLocation && selectedLocation.id) || currentProduct.locationId) : (locationId || (selectedLocation ? selectedLocation.id : null)),
         purchaseDate: purchaseDate.toISOString(),
@@ -584,6 +594,8 @@ const ProductFormScreen = () => {
       setProductName('');
       setSelectedCategory(null);
       setBrand('');
+      setPurchasePlace('');
+      setPrice('');
       setPurchaseDate(new Date());
       setExpiryDate(null);
       setEstimatedEndDate(null);
@@ -828,6 +840,29 @@ const ProductFormScreen = () => {
               value={brand}
               onChangeText={setBrand}
               placeholder="브랜드명을 입력하세요"
+            />
+          </View>
+
+          {/* 구매처 입력 */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>구매처 (선택)</Text>
+            <TextInput
+              style={styles.input}
+              value={purchasePlace}
+              onChangeText={setPurchasePlace}
+              placeholder="구매처를 입력하세요"
+            />
+          </View>
+
+          {/* 가격 입력 */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>가격 (선택)</Text>
+            <TextInput
+              style={styles.input}
+              value={price}
+              onChangeText={(text) => setPrice(text.replace(/[^0-9]/g, ''))}
+              keyboardType="number-pad"
+              placeholder="숫자만 입력"
             />
           </View>
           
