@@ -23,6 +23,7 @@ import { fetchLocations, reconcileLocationsDisabled } from './src/redux/slices/l
 import { fetchProducts, fetchConsumedProducts } from './src/redux/slices/productsSlice';
 import { processSyncQueueIfOnline } from './src/utils/syncManager';
 import { loadAppPrefs } from './src/utils/storageUtils';
+import { scheduleDailyReminderIfNeeded, scheduleDailyUpdateReminderIfNeeded } from './src/utils/notificationUtils';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
@@ -163,6 +164,9 @@ const AppContent = () => {
     // 앱이 백그라운드에서 포그라운드로 돌아올 때 알림 권한 확인
     if (appState.match(/inactive|background/) && nextAppState === 'active' && Platform.OS !== 'web') {
       pushNotificationService.requestNotificationPermission();
+      // 포그라운드 전환 시 스케줄 재검사/예약
+      try { scheduleDailyReminderIfNeeded(); } catch (e) { }
+      try { scheduleDailyUpdateReminderIfNeeded(); } catch (e) { }
     }
   }, [appState]);
 
@@ -243,6 +247,9 @@ const AppContent = () => {
         if (token) {
           setPushToken(token);
         }
+        // 일일 리마인더/작성 리마인더 스케줄링 시도
+        try { await scheduleDailyReminderIfNeeded(); } catch (e) { }
+        try { await scheduleDailyUpdateReminderIfNeeded(); } catch (e) { }
       }
       
       setDataInitialized(true);
