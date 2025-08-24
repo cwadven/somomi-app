@@ -740,7 +740,7 @@ const AddLocationScreen = () => {
               style={styles.input}
               value={locationData.title}
               onChangeText={(text) => handleInputChange('title', text)}
-              placeholder={selectedTemplateInstance ? selectedTemplateInstance.name : "영역 이름을 입력하세요"}
+              placeholder="영역 이름 입력..."
               editable={!(isEditMode && isEditLockedByExpiry)}
             />
         </View>

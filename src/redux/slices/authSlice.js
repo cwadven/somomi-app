@@ -558,23 +558,79 @@ export const authSlice = createSlice({
          .then(() => console.log('기본 템플릿 인스턴스 추가 저장 성공'))
          .catch(err => console.error('기본 템플릿 인스턴스 추가 저장 실패:', err));
      },
-    // 구독 플랜 적용: 템플릿 수 및 기본 슬롯 동기화
+    // 구독 플랜 적용: 새로운 스키마(locationTemplate/productTemplate)와 구 스키마(locationSlots/productSlotsPerLocation) 모두 지원
     applySubscriptionToTemplates: (state, action) => {
-      const { locationSlots, productSlotsPerLocation, planId, expiresAt } = action.payload || {};
+      const payload = action.payload || {};
+      const planId = payload.planId || state.subscription?.plan || null;
+      const fallbackExpiresAt = payload.expiresAt || state.subscription?.expiresAt || null;
+
+      // 1) 신 스키마 처리: locationTemplate[], productTemplate[]
+      const hasNewSchema = Array.isArray(payload.locationTemplate) || Array.isArray(payload.productTemplate);
+      if (hasNewSchema) {
+        const nowMs = Date.now();
+        let mutatedLocTemplates = false;
+
+        if (Array.isArray(payload.locationTemplate)) {
+          for (const lt of payload.locationTemplate) {
+            const baseSlots = (lt && typeof lt.baseSlots === 'number') ? lt.baseSlots : 3;
+            const newTemplate = createBasicLocationTemplate(undefined, baseSlots);
+            if (lt && lt.locationTemplateName) newTemplate.name = lt.locationTemplateName;
+            if (lt && lt.locationTemplateId) newTemplate.productId = lt.locationTemplateId;
+            newTemplate.origin = 'subscription';
+            newTemplate.subscriptionPlanId = planId;
+            // 만료 처리: 템플릿 지정 우선 → 페이로드 공통 → 구독 상태
+            if (lt && typeof lt.durationDays === 'number') {
+              const expIso = new Date(nowMs + lt.durationDays * 24 * 60 * 60 * 1000).toISOString();
+              newTemplate.feature = { ...newTemplate.feature, expiresAt: expIso };
+              newTemplate.subscriptionExpiresAt = expIso;
+            } else if (fallbackExpiresAt) {
+              newTemplate.subscriptionExpiresAt = fallbackExpiresAt;
+            }
+            state.userLocationTemplateInstances.push(newTemplate);
+            mutatedLocTemplates = true;
+          }
+        }
+
+        if (mutatedLocTemplates) {
+          const plainTemplates = JSON.parse(JSON.stringify(state.userLocationTemplateInstances));
+          saveUserLocationTemplates(plainTemplates)
+            .then(() => console.log('구독 적용(신 스키마): 영역 템플릿 추가 저장 성공'))
+            .catch(err => console.error('구독 적용(신 스키마): 영역 템플릿 추가 저장 실패:', err));
+        }
+
+        if (Array.isArray(payload.productTemplate)) {
+          for (const _pt of payload.productTemplate) {
+            state.userProductSlotTemplateInstances.push({
+              id: generateId('productSlotTemplate'),
+              name: '제품 슬롯',
+              description: '제품 1개 추가 등록 가능',
+              used: false,
+              usedByProductId: null,
+              assignedLocationId: null,
+            });
+          }
+          const plain = JSON.parse(JSON.stringify(state.userProductSlotTemplateInstances));
+          saveUserProductSlotTemplates(plain)
+            .then(() => console.log('구독 적용(신 스키마): 제품 슬롯 템플릿 추가 저장 성공'))
+            .catch(err => console.error('구독 적용(신 스키마): 제품 슬롯 템플릿 추가 저장 실패:', err));
+        }
+        return;
+      }
+
+      // 2) 구 스키마 처리: locationSlots, productSlotsPerLocation
+      const { locationSlots, productSlotsPerLocation } = payload;
       if (!locationSlots || !productSlotsPerLocation) return;
-      // 기존 템플릿은 변경하지 않고, 구독에서 제공하는 개수만큼 새 템플릿을 추가
       for (let i = 0; i < locationSlots; i++) {
         const newTemplate = createBasicLocationTemplate(undefined, productSlotsPerLocation);
         newTemplate.origin = 'subscription';
-        newTemplate.subscriptionPlanId = planId || state.subscription?.plan || null;
-        newTemplate.subscriptionExpiresAt = expiresAt || state.subscription?.expiresAt || null;
+        newTemplate.subscriptionPlanId = planId;
+        newTemplate.subscriptionExpiresAt = fallbackExpiresAt;
         state.userLocationTemplateInstances.push(newTemplate);
       }
-      // 저장
       const plainTemplates = JSON.parse(JSON.stringify(state.userLocationTemplateInstances));
       saveUserLocationTemplates(plainTemplates)
-        .then(() => console.log('구독 적용: 템플릿 추가 저장 성공'))
-        .catch(err => console.error('구독 적용: 템플릿 추가 저장 실패:', err));
+        .then(() => console.log('구독 적용(구 스키마): 템플릿 추가 저장 성공'))
+        .catch(err => console.error('구독 적용(구 스키마): 템플릿 추가 저장 실패:', err));
     },
     // 제품 슬롯 템플릿 인스턴스 추가 (1개)
     addProductSlotTemplateInstance: (state, action) => {

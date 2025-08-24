@@ -130,17 +130,10 @@ const StoreScreen = () => {
           expiresAt: expiryDate.toISOString()
         }));
         
-        // 슬롯 업데이트
-        dispatch(updateSlots({
-          locationSlots: {
-            baseSlots: item.locationSlots,
-          },
-          productSlots: {
-            baseSlots: item.productSlotsPerLocation,
-          }
-        }));
-        // 템플릿 인스턴스 동기화 (somomi_user_location_templates 최신화)
+        // 템플릿 인스턴스 동기화: 신 스키마(locationTemplate/productTemplate) 우선 적용, 없으면 구 스키마도 처리됨
         dispatch(applySubscriptionToTemplates({
+          locationTemplate: Array.isArray(item.locationTemplate) ? item.locationTemplate : undefined,
+          productTemplate: Array.isArray(item.productTemplate) ? item.productTemplate : undefined,
           locationSlots: item.locationSlots,
           productSlotsPerLocation: item.productSlotsPerLocation,
           planId: item.id,
@@ -153,7 +146,7 @@ const StoreScreen = () => {
           type: 'subscription',
           planId: item.id,
           planName: item.name,
-          price: item.pointPrice,
+          price: item.realPointPrice ?? item.pointPrice,
           pointsUsed: pointCost,
           expiresAt: expiryDate.toISOString()
         }));
@@ -470,9 +463,9 @@ const StoreScreen = () => {
 
         {/* 요약 칩 */}
         {(() => {
-          const locationCount = Array.isArray(plan.locationTemplate) ? plan.locationTemplate.length : 0;
-          const durationDays = Array.isArray(plan.locationTemplate) && plan.locationTemplate[0]?.durationDays ? plan.locationTemplate[0].durationDays : null;
-          const perLocSlots = Array.isArray(plan.productTemplate) ? plan.productTemplate.reduce((acc, t) => acc + (t.countPerLocation || 0), 0) : 0;
+          const locationCount = Array.isArray(plan.locationTemplate) ? plan.locationTemplate.length : (plan.locationSlots || 0);
+          const durationDays = Array.isArray(plan.locationTemplate) && plan.locationTemplate[0]?.durationDays ? plan.locationTemplate[0].durationDays : plan.durationDays || null;
+          const perLocSlots = Array.isArray(plan.productTemplate) ? plan.productTemplate.length : (plan.productSlotsPerLocation || 0);
           return (
             <View style={styles.summaryChipsRow}>
               <View style={styles.chip}><Ionicons name="grid" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`영역 ${locationCount}개`}</Text></View>
