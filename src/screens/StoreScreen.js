@@ -44,7 +44,8 @@ const StoreScreen = () => {
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [purchaseConfirmVisible, setPurchaseConfirmVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [activeTab, setActiveTab] = useState('shop'); // 'shop' 또는 'points'
+  // 상점 탭 (제품 슬롯, 영역 슬롯, 구독 플랜, G 충전)
+  const [activeShopTab, setActiveShopTab] = useState('productSlot'); // 'productSlot' | 'locationSlot' | 'subscription' | 'points'
   const [pointPurchaseConfirmVisible, setPointPurchaseConfirmVisible] = useState(false);
   const [selectedPointPackage, setSelectedPointPackage] = useState(null);
   
@@ -144,7 +145,7 @@ const StoreScreen = () => {
       if (isAnonymous) {
         setShowSignupPrompt(true);
       } else {
-        navigation.navigate('Profile');
+        goToProfileTab();
       }
       return;
     }
@@ -162,7 +163,7 @@ const StoreScreen = () => {
       if (isAnonymous) {
         setShowSignupPrompt(true);
       } else {
-        navigation.navigate('Profile');
+        goToProfileTab();
       }
       return;
     }
@@ -322,7 +323,7 @@ const StoreScreen = () => {
       if (isAnonymous) {
         setShowSignupPrompt(true);
       } else {
-        navigation.navigate('Profile');
+        goToProfileTab();
       }
       return;
     }
@@ -719,6 +720,19 @@ const StoreScreen = () => {
   const goToPointScreen = () => {
     navigation.navigate('Point');
   };
+
+  // 프로필 메인 탭으로 이동 (탭 포커스)
+  const goToProfileTab = () => {
+    try {
+      const parentNav = navigation.getParent && navigation.getParent();
+      if (parentNav && typeof parentNav.navigate === 'function') {
+        parentNav.navigate('Profile');
+        return;
+      }
+    } catch (e) {}
+    // 폴백
+    navigation.navigate('Profile');
+  };
   
   return (
     <View style={styles.container}>
@@ -745,7 +759,7 @@ const StoreScreen = () => {
             </Text>
             <TouchableOpacity 
               style={styles.loginButton}
-              onPress={() => navigation.navigate('Profile')}
+              onPress={goToProfileTab}
             >
               <Text style={styles.loginButtonText}>로그인 화면으로 이동</Text>
             </TouchableOpacity>
@@ -764,63 +778,96 @@ const StoreScreen = () => {
         
         {/* 현재 슬롯 상태 */}
         {isLoggedIn && renderCurrentSlots()}
-        
-        {/* 구독 섹션 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>구독 플랜</Text>
-          <View style={styles.plansContainer}>
-            {renderSubscriptionPlans()}
+
+        {/* 상점 탭 (사용자 기본 정보 아래) */}
+        <View style={styles.shopTabsContainer}>
+          <View style={styles.shopTabs}>
+            <TouchableOpacity
+              style={[styles.shopTabItem, activeShopTab === 'productSlot' && styles.shopTabItemActive]}
+              onPress={() => setActiveShopTab('productSlot')}
+            >
+              <Text style={[styles.shopTabText, activeShopTab === 'productSlot' && styles.shopTabTextActive]}>제품 슬롯</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.shopTabItem, activeShopTab === 'locationSlot' && styles.shopTabItemActive]}
+              onPress={() => setActiveShopTab('locationSlot')}
+            >
+              <Text style={[styles.shopTabText, activeShopTab === 'locationSlot' && styles.shopTabTextActive]}>영역 슬롯</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.shopTabItem, activeShopTab === 'subscription' && styles.shopTabItemActive]}
+              onPress={() => setActiveShopTab('subscription')}
+            >
+              <Text style={[styles.shopTabText, activeShopTab === 'subscription' && styles.shopTabTextActive]}>구독 플랜</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.shopTabItem, activeShopTab === 'points' && styles.shopTabItemActive]}
+              onPress={() => setActiveShopTab('points')}
+            >
+              <Text style={[styles.shopTabText, activeShopTab === 'points' && styles.shopTabTextActive]}>G 충전</Text>
+            </TouchableOpacity>
           </View>
         </View>
-        
-        {/* 영역 슬롯 구매 섹션 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>영역 슬롯 구매</Text>
-          {renderLocationSlotItems()}
-        </View>
 
-        {/* 제품 슬롯 구매 섹션 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>제품 슬롯 구매</Text>
-          {renderProductSlotItems()}
-        </View>
-        
-        {/* 포인트 충전 섹션 - 맨 아래로 이동 */}
-        <View style={[styles.section, styles.pointChargeSection]}>
-          <Text style={styles.sectionTitle}>G 충전</Text>
-          {renderPointPackages()}
-          
-          {/* G 내역 보기 버튼 */}
-          {isLoggedIn && pointHistory.length > 0 && (
-            <TouchableOpacity 
-              style={styles.historyToggleButton}
-              onPress={() => setShowPointHistory(!showPointHistory)}
-            >
-              <Text style={styles.historyToggleText}>
-                {showPointHistory ? '내역 접기' : 'G 내역 자세히 보기'}
-              </Text>
-              <Ionicons 
-                name={showPointHistory ? 'chevron-up' : 'chevron-down'} 
-                size={16} 
-                color="#4CAF50" 
-              />
-            </TouchableOpacity>
-          )}
-          
-          {/* 포인트 내역 섹션 - 자세히 버튼 클릭 시에만 표시 */}
-          {isLoggedIn && pointHistory.length > 0 && showPointHistory && (
-            <View style={styles.historyContainer}>
-              <Text style={styles.historyTitle}>G 내역</Text>
-              <FlatList
-                data={pointHistory}
-                renderItem={renderPointHistoryItem}
-                keyExtractor={item => item.id}
-                scrollEnabled={false}
-                style={styles.historyList}
-              />
+        {/* 탭 내용 */}
+        {activeShopTab === 'productSlot' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>제품 슬롯</Text>
+            {renderProductSlotItems()}
+          </View>
+        )}
+
+        {activeShopTab === 'locationSlot' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>영역 슬롯</Text>
+            {renderLocationSlotItems()}
+          </View>
+        )}
+
+        {activeShopTab === 'subscription' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>구독 플랜</Text>
+            <View style={styles.plansContainer}>
+              {renderSubscriptionPlans()}
             </View>
-          )}
-        </View>
+          </View>
+        )}
+
+        {activeShopTab === 'points' && (
+          <View style={[styles.section, styles.pointChargeSection]}>
+            <Text style={styles.sectionTitle}>G 충전</Text>
+            {renderPointPackages()}
+
+            {isLoggedIn && pointHistory.length > 0 && (
+              <TouchableOpacity 
+                style={styles.historyToggleButton}
+                onPress={() => setShowPointHistory(!showPointHistory)}
+              >
+                <Text style={styles.historyToggleText}>
+                  {showPointHistory ? '내역 접기' : 'G 내역 자세히 보기'}
+                </Text>
+                <Ionicons 
+                  name={showPointHistory ? 'chevron-up' : 'chevron-down'} 
+                  size={16} 
+                  color="#4CAF50" 
+                />
+              </TouchableOpacity>
+            )}
+
+            {isLoggedIn && pointHistory.length > 0 && showPointHistory && (
+              <View style={styles.historyContainer}>
+                <Text style={styles.historyTitle}>G 내역</Text>
+                <FlatList
+                  data={pointHistory}
+                  renderItem={renderPointHistoryItem}
+                  keyExtractor={item => item.id}
+                  scrollEnabled={false}
+                  style={styles.historyList}
+                />
+              </View>
+            )}
+          </View>
+        )}
         
         {/* 포인트 내역 섹션 - 제거 */}
       </ScrollView>
@@ -1599,6 +1646,37 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 12,
     color: '#333',
+  },
+  // 상점 탭 스타일
+  shopTabsContainer: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+  },
+  shopTabs: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    overflow: 'hidden',
+  },
+  shopTabItem: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  shopTabItemActive: {
+    backgroundColor: '#E8F5E9',
+  },
+  shopTabText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '600',
+  },
+  shopTabTextActive: {
+    color: '#4CAF50',
   },
 });
 

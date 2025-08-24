@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -19,6 +19,7 @@ import { useSelector as useReduxSelector } from 'react-redux';
 import { fetchProductsByLocation } from '../redux/slices/productsSlice';
 import IconSelector from '../components/IconSelector';
 import AlertModal from '../components/AlertModal';
+import { saveData, loadData, removeData, STORAGE_KEYS } from '../utils/storageUtils';
 
 const AddLocationScreen = () => {
   const navigation = useNavigation();
@@ -153,6 +154,7 @@ const AddLocationScreen = () => {
   const [stagedUnassignTemplateIds, setStagedUnassignTemplateIds] = useState([]);
   const [quantityModalVisible, setQuantityModalVisible] = useState(false);
   const [reserveQuantity, setReserveQuantity] = useState(1);
+  const draftTimerRef = useRef(null);
   
   // 스테이징 미리보기 계산 (선언 이후)
   const stagedAssignCount = stagedAssignTemplateIds.length;
@@ -268,6 +270,46 @@ const AddLocationScreen = () => {
       setSelectedTemplateInstance(availableTemplates[0]);
     }
   }, [availableTemplates, selectedTemplateInstance, isEditMode]);
+  
+  // 초안 로드 (생성 모드에서만)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (isEditMode) return;
+      try {
+        const draft = await loadData(STORAGE_KEYS.LOCATION_FORM_DRAFT);
+        if (mounted && draft) {
+          setLocationData({
+            title: draft.title || '',
+            description: draft.description || '',
+            icon: draft.icon || 'cube-outline',
+          });
+          // 템플릿 복원
+          if (draft.selectedTemplateId) {
+            const found = availableTemplates.find(t => t.id === draft.selectedTemplateId);
+            if (found) setSelectedTemplateInstance(found);
+          }
+        }
+      } catch (e) {}
+    })();
+    return () => { mounted = false; };
+  }, [isEditMode, availableTemplates]);
+
+  // 초안 저장 (생성 모드에서만, 400ms 디바운스)
+  useEffect(() => {
+    if (isEditMode) return;
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      const draft = {
+        title: locationData.title,
+        description: locationData.description,
+        icon: locationData.icon,
+        selectedTemplateId: selectedTemplateInstance?.id || null,
+      };
+      saveData(STORAGE_KEYS.LOCATION_FORM_DRAFT, draft);
+    }, 400);
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
+  }, [isEditMode, locationData.title, locationData.description, locationData.icon, selectedTemplateInstance?.id]);
   
   // 입력값 변경 핸들러
   const handleInputChange = (key, value) => {
@@ -471,6 +513,8 @@ const AddLocationScreen = () => {
           iconColor: '#4CAF50'
         });
         setAlertModalVisible(true);
+        // 성공 시 초안 삭제
+        try { await removeData(STORAGE_KEYS.LOCATION_FORM_DRAFT); } catch (e) {}
       }
     } catch (error) {
       setIsLoading(false);

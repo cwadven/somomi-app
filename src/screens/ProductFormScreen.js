@@ -24,6 +24,7 @@ import { markProductSlotTemplateAsUsed } from '../redux/slices/authSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { fetchCategories } from '../redux/slices/categoriesSlice';
 import { addNotification } from '../redux/slices/notificationsSlice';
+import { saveData, loadData, removeData, STORAGE_KEYS } from '../utils/storageUtils';
 import CategoryAddModal from '../components/CategoryAddModal';
 import CategorySelector from '../components/CategorySelector';
 import LocationSelector from '../components/LocationSelector';
@@ -66,6 +67,8 @@ const ProductFormScreen = () => {
   const [expiryDate, setExpiryDate] = useState(null);
   const [estimatedEndDate, setEstimatedEndDate] = useState(null);
   const [memo, setMemo] = useState('');
+  // 초안 저장용 디바운스 타이머
+  const draftTimerRef = useRef(null);
   
   // 템플릿 만료 판단 (구독/일반 만료 모두)
   const isTemplateExpired = (template) => {
@@ -132,6 +135,52 @@ const ProductFormScreen = () => {
       dispatch(fetchLocations());
     dispatch(fetchProducts());
   }, [dispatch]);
+
+  // 초안 로드 (추가 모드에서만 적용)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (isEditMode) return;
+      try {
+        const draft = await loadData(STORAGE_KEYS.PRODUCT_FORM_DRAFT);
+        if (mounted && draft) {
+          setProductName(draft.productName || '');
+          setBrand(draft.brand || '');
+          setPurchasePlace(draft.purchasePlace || '');
+          setPrice(draft.price || '');
+          setSelectedCategory(draft.selectedCategory || null);
+          setSelectedLocation(draft.selectedLocation || null);
+          setPurchaseDate(draft.purchaseDate ? new Date(draft.purchaseDate) : new Date());
+          setExpiryDate(draft.expiryDate ? new Date(draft.expiryDate) : null);
+          setEstimatedEndDate(draft.estimatedEndDate ? new Date(draft.estimatedEndDate) : null);
+          setMemo(draft.memo || '');
+        }
+      } catch (e) {}
+    })();
+    return () => { mounted = false; };
+  }, [isEditMode]);
+
+  // 초안 저장 (추가 모드에서만, 400ms 디바운스)
+  useEffect(() => {
+    if (isEditMode) return;
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      const draft = {
+        productName,
+        brand,
+        purchasePlace,
+        price,
+        selectedCategory,
+        selectedLocation,
+        purchaseDate: purchaseDate ? purchaseDate.toISOString() : null,
+        expiryDate: expiryDate ? expiryDate.toISOString() : null,
+        estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
+        memo,
+      };
+      saveData(STORAGE_KEYS.PRODUCT_FORM_DRAFT, draft);
+    }, 400);
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
+  }, [isEditMode, productName, brand, purchasePlace, price, selectedCategory, selectedLocation, purchaseDate, expiryDate, estimatedEndDate, memo]);
 
   // 수정 모드인 경우 제품 데이터 로드
   useEffect(() => {
@@ -577,6 +626,10 @@ const ProductFormScreen = () => {
 
       setCreatedProduct(result);
       setShowSuccessModal(true);
+      // 성공 시 초안 제거 (추가 모드)
+      if (!isEditMode) {
+        try { await removeData(STORAGE_KEYS.PRODUCT_FORM_DRAFT); } catch (e) {}
+      }
     } catch (error) {
       showErrorAlert('오류', `제품 ${isEditMode ? '수정' : '등록'} 중 오류가 발생했습니다: ${error.message}`);
     }
