@@ -155,6 +155,7 @@ const AddLocationScreen = () => {
   const [quantityModalVisible, setQuantityModalVisible] = useState(false);
   const [reserveQuantity, setReserveQuantity] = useState(1);
   const draftTimerRef = useRef(null);
+  const didCreateRef = useRef(false);
   
   // 스테이징 미리보기 계산 (선언 이후)
   const stagedAssignCount = stagedAssignTemplateIds.length;
@@ -514,7 +515,7 @@ const AddLocationScreen = () => {
         });
         setAlertModalVisible(true);
         // 성공 시 초안 삭제
-        try { await removeData(STORAGE_KEYS.LOCATION_FORM_DRAFT); } catch (e) {}
+        try { await removeData(STORAGE_KEYS.LOCATION_FORM_DRAFT); didCreateRef.current = true; } catch (e) {}
       }
     } catch (error) {
       setIsLoading(false);

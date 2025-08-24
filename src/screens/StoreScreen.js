@@ -726,12 +726,17 @@ const StoreScreen = () => {
     try {
       const parentNav = navigation.getParent && navigation.getParent();
       if (parentNav && typeof parentNav.navigate === 'function') {
-        parentNav.navigate('Profile');
+        // 탭 포커스 + 프로필 스택의 루트로 이동
+        parentNav.navigate('Profile', { screen: 'ProfileScreen' });
         return;
       }
     } catch (e) {}
     // 폴백
-    navigation.navigate('Profile');
+    try {
+      navigation.navigate('ProfileScreen');
+    } catch (e) {
+      navigation.navigate('Profile');
+    }
   };
   
   return (

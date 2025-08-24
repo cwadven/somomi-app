@@ -97,6 +97,7 @@ const ProductFormScreen = () => {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [createdProduct, setCreatedProduct] = useState(null);
+  const didSubmitRef = useRef(false);
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [alertModalConfig, setAlertModalConfig] = useState({
     title: '',
@@ -181,6 +182,16 @@ const ProductFormScreen = () => {
     }, 400);
     return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
   }, [isEditMode, productName, brand, purchasePlace, price, selectedCategory, selectedLocation, purchaseDate, expiryDate, estimatedEndDate, memo]);
+
+  // 뒤로가기로 화면을 떠날 때(추가 모드, 미제출) 초안 삭제
+  useEffect(() => {
+    if (isEditMode) return;
+    const unsubscribe = navigation.addListener('beforeRemove', async (e) => {
+      if (didSubmitRef.current) return; // 제출된 경우 보존 처리 이미 끝남
+      try { await removeData(STORAGE_KEYS.PRODUCT_FORM_DRAFT); } catch (err) {}
+    });
+    return unsubscribe;
+  }, [navigation, isEditMode]);
 
   // 수정 모드인 경우 제품 데이터 로드
   useEffect(() => {
@@ -629,6 +640,7 @@ const ProductFormScreen = () => {
       // 성공 시 초안 제거 (추가 모드)
       if (!isEditMode) {
         try { await removeData(STORAGE_KEYS.PRODUCT_FORM_DRAFT); } catch (e) {}
+        didSubmitRef.current = true;
       }
     } catch (error) {
       showErrorAlert('오류', `제품 ${isEditMode ? '수정' : '등록'} 중 오류가 발생했습니다: ${error.message}`);
