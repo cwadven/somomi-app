@@ -13,6 +13,10 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance, addTemplateInstance, addProductSlotTemplateInstances, applySubscriptionToTemplates } from '../redux/slices/authSlice';
+import productTemplateData from '../storeTemplateData/productTemplateData';
+import locationTemplateData from '../storeTemplateData/locationTemplateData';
+import subscriptionTemplateData from '../storeTemplateData/subscriptionTemplateData';
+import pointPackageData from '../storeTemplateData/pointPackageData';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
@@ -43,101 +47,20 @@ const StoreScreen = () => {
   });
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [purchaseConfirmVisible, setPurchaseConfirmVisible] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  // 상점 탭 (제품 슬롯, 영역 슬롯, 구독 플랜, G 충전)
+  const [selectedProduct, setSelectedProduct] = useState(null); // kept for compatibility
+  const [selectedItem, setSelectedItem] = useState(null); // new generic selected item
   const [activeShopTab, setActiveShopTab] = useState('productSlot'); // 'productSlot' | 'locationSlot' | 'subscription' | 'points'
   const [pointPurchaseConfirmVisible, setPointPurchaseConfirmVisible] = useState(false);
   const [selectedPointPackage, setSelectedPointPackage] = useState(null);
   
-  // 구독 플랜 정보
-  const subscriptionPlans = [
-    {
-      id: 'standard',
-      name: '스탠다드 플랜',
-      pointPrice: 2900,
-      locationSlots: 3,
-      productSlotsPerLocation: 10,
-      description: '일반 사용자를 위한 플랜. 본 상품은 구매일로부터 30일간 유지됩니다.',
-      features: ['영역 3개 (영역당 제품 10개)', '제품 슬롯 10개']
-    }
-  ];
+  // 구독 플랜 정보 (외부 데이터)
+  const subscriptionPlans = subscriptionTemplateData;
   
-  // 슬롯 아이템 정보
-  const slotItems = [
-    {
-      id: 'location_slot_1',
-      type: 'locationSlot',
-      name: '영역 슬롯 1개',
-      pointPrice: 2000,
-      amount: 1,
-      description: '기본 제품 슬롯:\n3개'
-    },
-    {
-      id: 'location_slot_3',
-      type: 'locationSlot',
-      name: '영역 슬롯 3개',
-      pointPrice: 5000,
-      amount: 3,
-      description: '기본 제품 슬롯:\n4개×1, 3개×2'
-    },
-    {
-      id: 'product_slot_5',
-      type: 'productSlot',
-      name: '제품 슬롯 5개',
-      pointPrice: 1000,
-      amount: 5,
-      description: '영역당 추가 제품 5개를 등록할 수 있습니다.'
-    },
-    {
-      id: 'product_slot_10',
-      type: 'productSlot',
-      name: '제품 슬롯 10개',
-      pointPrice: 1800,
-      amount: 10,
-      description: '영역당 추가 제품 10개를 등록할 수 있습니다.'
-    }
-  ];
+  // 데이터 주도 방식 카탈로그 (외부 데이터)
+  const storeCatalog = [...productTemplateData, ...locationTemplateData];
   
   // 포인트 패키지 정보
-  const pointPackages = [
-    {
-      id: 'point_1000',
-      name: '1,000 G',
-      points: 1000,
-      price: '1,000원',
-      description: '기본 젬 패키지'
-    },
-    {
-      id: 'point_5000',
-      name: '5,000 G',
-      points: 5000,
-      price: '5,000원',
-      description: '인기 젬 패키지'
-    },
-    {
-      id: 'point_10000',
-      name: '10,000 G',
-      points: 10000,
-      price: '10,000원',
-      description: '가성비 젬 패키지'
-    },
-    {
-      id: 'point_30000',
-      name: '30,000 G',
-      points: 30000,
-      price: '30,000원',
-      description: '대용량 젬 패키지',
-      bonus: 3000
-    },
-    {
-      id: 'point_50000',
-      name: '50,000 G',
-      points: 50000,
-      price: '50,000원',
-      description: '프리미엄 젬 패키지',
-      bonus: 7500
-    }
-  ];
+  const pointPackages = pointPackageData;
   
   // 구독 구매 처리
   const handleSubscribe = (plan) => {
@@ -157,8 +80,8 @@ const StoreScreen = () => {
     setPurchaseConfirmVisible(true);
   };
   
-  // 슬롯 구매 처리
-  const handlePurchaseSlot = (item) => {
+  // 카탈로그 아이템 구매 처리(슬롯/스페셜/번들 등 확장형)
+  const handlePurchaseItem = (item) => {
     if (!isLoggedIn) {
       if (isAnonymous) {
         setShowSignupPrompt(true);
@@ -168,11 +91,7 @@ const StoreScreen = () => {
       return;
     }
     
-    setSelectedProduct({
-      kind: 'slot',
-      type: item.type, // 'locationSlot' | 'productSlot'
-      ...item
-    });
+    setSelectedItem(item);
     setPurchaseConfirmVisible(true);
   };
   
@@ -180,11 +99,12 @@ const StoreScreen = () => {
   const confirmPurchase = () => {
     setPurchaseConfirmVisible(false);
     
-    if (!selectedProduct) return;
+    const item = selectedItem || selectedProduct;
+    if (!item) return;
     
     try {
       // 포인트 차감
-      const pointCost = selectedProduct.pointPrice;
+      const pointCost = item.realPointPrice ?? item.pointPrice;
       
       // 포인트가 부족한 경우
       if (points.balance < pointCost) {
@@ -192,12 +112,12 @@ const StoreScreen = () => {
         return;
       }
       
-      if (selectedProduct.type === 'subscription') {
+      if (item.category === 'subscription') {
         // 포인트 사용 - usePoints 액션 호출
         dispatch(usePoints({
           amount: pointCost,
-          description: `${selectedProduct.name} 구독 구매`,
-          itemId: selectedProduct.id,
+          description: `${item.name} 구독 구매`,
+          itemId: item.id,
           itemType: 'subscription'
         }));
         
@@ -206,24 +126,24 @@ const StoreScreen = () => {
         
         dispatch(updateSubscription({
           isSubscribed: true,
-          plan: selectedProduct.id,
+          plan: item.id,
           expiresAt: expiryDate.toISOString()
         }));
         
         // 슬롯 업데이트
         dispatch(updateSlots({
           locationSlots: {
-            baseSlots: selectedProduct.locationSlots,
+            baseSlots: item.locationSlots,
           },
           productSlots: {
-            baseSlots: selectedProduct.productSlotsPerLocation,
+            baseSlots: item.productSlotsPerLocation,
           }
         }));
         // 템플릿 인스턴스 동기화 (somomi_user_location_templates 최신화)
         dispatch(applySubscriptionToTemplates({
-          locationSlots: selectedProduct.locationSlots,
-          productSlotsPerLocation: selectedProduct.productSlotsPerLocation,
-          planId: selectedProduct.id,
+          locationSlots: item.locationSlots,
+          productSlotsPerLocation: item.productSlotsPerLocation,
+          planId: item.id,
           expiresAt: expiryDate.toISOString(),
         }));
         
@@ -231,85 +151,73 @@ const StoreScreen = () => {
         dispatch(addPurchase({
           id: `sub_${Date.now()}`,
           type: 'subscription',
-          planId: selectedProduct.id,
-          planName: selectedProduct.name,
-          price: selectedProduct.pointPrice,
+          planId: item.id,
+          planName: item.name,
+          price: item.pointPrice,
           pointsUsed: pointCost,
           expiresAt: expiryDate.toISOString()
         }));
         
-        showSuccessModal('구독 완료', `${selectedProduct.name} 구독이 완료되었습니다. 이제 더 많은 영역과 제품을 등록할 수 있습니다.`);
-      } else if (selectedProduct.type === 'productSlot' || selectedProduct.type === 'locationSlot' || selectedProduct.kind === 'slot') {
+        showSuccessModal('구독 완료', `${item.name} 구독이 완료되었습니다. 이제 더 많은 영역과 제품을 등록할 수 있습니다.`);
+      } else if (item.category === 'productSlot' || item.category === 'locationTemplateBundle' || item.category === 'locationTemplateSpecial') {
         // 포인트 사용 - usePoints 액션 호출
         dispatch(usePoints({
           amount: pointCost,
-          description: `${selectedProduct.name} 구매`,
-          itemId: selectedProduct.id,
+          description: `${item.name} 구매`,
+          itemId: item.id,
           itemType: 'slot'
         }));
         
-        // 슬롯 구매 처리
-        if (selectedProduct.type === 'locationSlot') {
-          dispatch(updateSlots({
-            locationSlots: {
-              additionalSlots: slots.locationSlots.additionalSlots + selectedProduct.amount
-            }
-          }));
-          // 영역 템플릿도 함께 추가하여 즉시 사용 가능하도록 함
-          for (let i = 0; i < selectedProduct.amount; i++) {
-            if (selectedProduct.id === 'location_slot_1') {
-              // 1개 패키지: 기본 슬롯 3개 템플릿 생성
-              dispatch(addTemplateInstance({
-                productId: 'basic_location',
-                name: '기본 영역',
-                description: '기본적인 제품 관리 기능을 제공하는 영역',
-                icon: 'cube-outline',
-                feature: { baseSlots: 3 },
-                used: false,
-                usedInLocationId: null,
-              }));
-            } else if (selectedProduct.id === 'location_slot_3') {
-              // 3개 패키지: 1개는 기본 슬롯 4개, 2개는 3개
-              const baseSlots = i === 0 ? 4 : 3;
-              dispatch(addTemplateInstance({
-                productId: 'basic_location',
-                name: '기본 영역',
-                description: '기본적인 제품 관리 기능을 제공하는 영역',
-                icon: 'cube-outline',
-                feature: { baseSlots },
-                used: false,
-                usedInLocationId: null,
-              }));
-            } else {
-              // 그 외 패키지: 기본 템플릿 생성(기존 기본값 적용)
-              dispatch(addBasicTemplateInstance());
-            }
-          }
-          
-          // 업데이트된 슬롯 정보를 포함한 성공 메시지
-          const totalLocationSlots = slots.locationSlots.baseSlots + slots.locationSlots.additionalSlots + selectedProduct.amount;
-          showSuccessModal('구매 완료', `${selectedProduct.name} 구매가 완료되었습니다.\n현재 보유 영역 슬롯: ${totalLocationSlots}개`);
-        } else if (selectedProduct.type === 'productSlot') {
-          // 제품 슬롯: 템플릿 인스턴스 생성으로 전환
-          dispatch(addProductSlotTemplateInstances({ count: selectedProduct.amount }));
-           
-          // 업데이트된 슬롯 정보를 포함한 성공 메시지
-          const nextTemplatesCount = (userProductSlotTemplateInstances?.length || 0) + selectedProduct.amount;
-          showSuccessModal('구매 완료', `${selectedProduct.name} 구매가 완료되었습니다.\n보유 추가 제품 슬롯: ${nextTemplatesCount}개`);
+        // 슬롯/템플릿 구매 처리 (데이터주도)
+        if (item.category === 'productSlot') {
+          const slotTemplate = Array.isArray(item.templates) && item.templates[0] ? item.templates[0] : null;
+          const count = slotTemplate?.count || 0;
+          dispatch(addProductSlotTemplateInstances({ count }));
+          const nextTemplatesCount = (userProductSlotTemplateInstances?.length || 0) + count;
+          showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.\n보유 추가 제품 슬롯: ${nextTemplatesCount}개`);
+          dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: count }));
         }
-        
-        // 구매 내역 추가
-        dispatch(addPurchase({
-          id: `slot_${Date.now()}`,
-          type: 'slot',
-          itemId: selectedProduct.id,
-          itemName: selectedProduct.name,
-          price: selectedProduct.pointPrice,
-          pointsUsed: pointCost,
-          amount: selectedProduct.amount
-        }));
-        
-        // showSuccessModal('구매 완료', `${selectedProduct.name} 구매가 완료되었습니다.`); // 이 부분은 위에서 대체됨
+        if (item.category === 'locationTemplateBundle') {
+          const templates = Array.isArray(item.templates) ? item.templates : [];
+          const count = templates.length;
+          // slots counter 업데이트
+          dispatch(updateSlots({ locationSlots: { additionalSlots: slots.locationSlots.additionalSlots + count } }));
+          for (const t of templates) {
+            const baseSlots = t?.baseSlots != null ? t.baseSlots : 3;
+            const displayName = t?.locationTemplateName || '기본 영역';
+            dispatch(addTemplateInstance({
+              productId: t?.locationTemplateId || 'basic_location',
+              name: displayName,
+              description: '기본적인 제품 관리 기능을 제공하는 영역',
+              icon: 'cube-outline',
+              feature: { baseSlots },
+              used: false,
+              usedInLocationId: null,
+            }));
+          }
+          const totalLocationSlots = slots.locationSlots.baseSlots + slots.locationSlots.additionalSlots + count;
+          showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.\n현재 보유 영역 슬롯: ${totalLocationSlots}개`);
+          dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: count }));
+        }
+        if (item.category === 'locationTemplateSpecial') {
+          const specialTemplate = Array.isArray(item.templates) && item.templates[0] ? item.templates[0] : null;
+          const days = specialTemplate?.durationDays || 30;
+          const baseSlots = specialTemplate?.baseSlots != null ? specialTemplate.baseSlots : -1;
+          const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+          // slots counter 업데이트(스페셜 영역도 하나의 추가 영역으로 카운트)
+          dispatch(updateSlots({ locationSlots: { additionalSlots: slots.locationSlots.additionalSlots + 1 } }));
+          dispatch(addTemplateInstance({
+            productId: specialTemplate?.locationTemplateId || 'special_location',
+            name: specialTemplate?.locationTemplateName || '스페셜 영역',
+            description: `${days}일 유효 / 제품 슬롯 무제한`,
+            icon: 'star',
+            feature: { baseSlots, expiresAt },
+            used: false,
+            usedInLocationId: null,
+          }));
+          showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.\n유효기간: ${days}일, 제품 슬롯: 무제한`);
+          dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: 1 }));
+        }
       }
     } catch (error) {
       console.log('error', error);
@@ -384,7 +292,8 @@ const StoreScreen = () => {
   
   // 구매 확인 모달
   const PurchaseConfirmModal = () => {
-    if (!selectedProduct) return null;
+    const item = selectedItem || selectedProduct;
+    if (!item) return null;
     
     return (
       <Modal
@@ -405,12 +314,19 @@ const StoreScreen = () => {
             </View>
             
             <View style={styles.modalContent}>
-              <Text style={styles.modalProductName}>{selectedProduct.name}</Text>
-              <Text style={styles.modalProductPrice}>{selectedProduct.pointPrice.toLocaleString()}G</Text>
+              <Text style={styles.modalProductName}>{item.name}</Text>
+              {(item.originalPointPrice != null && item.realPointPrice != null && item.originalPointPrice !== item.realPointPrice) ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[styles.modalProductPriceOriginal, styles.strike]}>{item.originalPointPrice.toLocaleString()}G</Text>
+                  <Text style={styles.modalProductPriceReal}>{item.realPointPrice.toLocaleString()}G</Text>
+                </View>
+              ) : (
+                <Text style={styles.modalProductPrice}>{(item.originalPointPrice ?? item.realPointPrice ?? item.pointPrice).toLocaleString()}G</Text>
+              )}
               
-              {selectedProduct.type === 'subscription' && (
+              {item.category === 'subscription' && (
                 <View style={styles.modalFeatures}>
-                  {selectedProduct.features.map((feature, index) => (
+                  {item.features.map((feature, index) => (
                     <View key={index} style={styles.modalFeatureItem}>
                       <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
                       <Text style={styles.modalFeatureText}>{feature}</Text>
@@ -419,16 +335,16 @@ const StoreScreen = () => {
                 </View>
               )}
               
-              {(selectedProduct.type === 'productSlot' || selectedProduct.type === 'locationSlot' || selectedProduct.kind === 'slot') && (
+              {(item.category === 'productSlot' || item.category === 'locationTemplateBundle' || item.category === 'locationTemplateSpecial') && (
                 <Text style={styles.modalDescription}>
-                  {selectedProduct.description}
+                  {item.description}
                 </Text>
               )}
               
               <View style={styles.pointInfoInModal}>
                 <Text style={styles.pointInfoText}>현재 젬: {points.balance.toLocaleString()}G</Text>
                 <Text style={styles.pointInfoText}>
-                  구매 후 젬: {Math.max(0, points.balance - selectedProduct.pointPrice).toLocaleString()}G
+                  구매 후 젬: {Math.max(0, points.balance - (item.realPointPrice ?? item.pointPrice)).toLocaleString()}G
                 </Text>
               </View>
               
@@ -440,7 +356,7 @@ const StoreScreen = () => {
                   <Text style={styles.modalCancelButtonText}>취소</Text>
                 </TouchableOpacity>
                 
-                {points.balance >= selectedProduct.pointPrice ? (
+                {points.balance >= (item.realPointPrice ?? item.pointPrice) ? (
                   <TouchableOpacity 
                     style={[styles.modalButton, styles.modalConfirmButton]}
                     onPress={confirmPurchase}
@@ -527,10 +443,47 @@ const StoreScreen = () => {
         style={styles.planCard}
         onPress={() => handleSubscribe(plan)}
       >
-        <Text style={styles.planName}>{plan.name}</Text>
-        <Text style={styles.planPrice}>
-          {plan.pointPrice === 0 ? '무료' : `${plan.pointPrice.toLocaleString()}G`}
-        </Text>
+        {/* 헤더: 이름 + 세일 배지 */}
+        <View style={styles.planHeaderRow}>
+          <Text style={styles.planName}>{plan.name}</Text>
+          {(plan.originalPointPrice != null && plan.realPointPrice != null && plan.originalPointPrice !== plan.realPointPrice) && (
+            <View style={styles.saleBadge}>
+              <Ionicons name="pricetag" size={12} color="#fff" />
+              <Text style={styles.saleBadgeText}>
+                {`-${Math.max(0, Math.round((1 - (plan.realPointPrice / plan.originalPointPrice)) * 100))}%`}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* 가격 표시 */}
+        {(plan.originalPointPrice != null && plan.realPointPrice != null && plan.originalPointPrice !== plan.realPointPrice) ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={[styles.planPriceOriginal, styles.strike]}>{plan.originalPointPrice.toLocaleString()}G</Text>
+            <Text style={styles.planPriceReal}>{plan.realPointPrice.toLocaleString()}G</Text>
+          </View>
+        ) : (
+          <Text style={styles.planPrice}>
+            {(plan.originalPointPrice ?? plan.realPointPrice ?? 0) === 0 ? '무료' : `${(plan.originalPointPrice ?? plan.realPointPrice ?? 0).toLocaleString()}G`}
+          </Text>
+        )}
+
+        {/* 요약 칩 */}
+        {(() => {
+          const locationCount = Array.isArray(plan.locationTemplate) ? plan.locationTemplate.length : 0;
+          const durationDays = Array.isArray(plan.locationTemplate) && plan.locationTemplate[0]?.durationDays ? plan.locationTemplate[0].durationDays : null;
+          const perLocSlots = Array.isArray(plan.productTemplate) ? plan.productTemplate.reduce((acc, t) => acc + (t.countPerLocation || 0), 0) : 0;
+          return (
+            <View style={styles.summaryChipsRow}>
+              <View style={styles.chip}><Ionicons name="grid" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`영역 ${locationCount}개`}</Text></View>
+              {durationDays != null && (
+                <View style={styles.chip}><Ionicons name="time" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`${durationDays}일`}</Text></View>
+              )}
+              <View style={styles.chip}><Ionicons name="cube" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`제품 슬롯/영역 ${perLocSlots}개`}</Text></View>
+            </View>
+          );
+        })()}
+ 
         <Text style={styles.planDescription}>{plan.description}</Text>
         <View style={styles.planFeatures}>
           {plan.features.map((feature, index) => (
@@ -546,7 +499,7 @@ const StoreScreen = () => {
             onPress={() => handleSubscribe(plan)}
           >
             <Text style={styles.planButtonText}>
-              {plan.pointPrice === 0 ? '시작하기' : '구독하기'}
+              {plan.realPointPrice === 0 ? '시작하기' : '구독하기'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -558,21 +511,30 @@ const StoreScreen = () => {
   const renderSlotItems = () => {
     return (
       <View style={styles.slotsGrid}>
-        {slotItems.map((item) => (
+        {storeCatalog.map((item) => (
           <TouchableOpacity 
             key={item.id} 
             style={styles.slotCard}
-            onPress={() => handlePurchaseSlot(item)}
+            onPress={() => handlePurchaseItem(item)}
           >
             <View style={styles.slotIconContainer}>
               <Ionicons 
-                name={item.type === 'locationSlot' ? 'grid' : 'cube'} 
+                name={item.category === 'locationTemplateSpecial' ? 'star' : item.category === 'locationTemplateBundle' ? 'grid' : 'cube'} 
                 size={30} 
                 color="#4CAF50" 
               />
             </View>
             <Text style={styles.slotName}>{item.name}</Text>
-            <Text style={styles.slotPrice}>{item.pointPrice.toLocaleString()}G</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              {(item.originalPointPrice != null && item.realPointPrice != null && item.originalPointPrice !== item.realPointPrice) ? (
+                <>
+                  <Text style={[styles.slotPriceOriginal, styles.strike]}>{item.originalPointPrice.toLocaleString()}G</Text>
+                  <Text style={styles.slotPriceReal}>{item.realPointPrice.toLocaleString()}G</Text>
+                </>
+              ) : (
+                <Text style={styles.slotPrice}>{(item.originalPointPrice ?? item.realPointPrice ?? item.pointPrice).toLocaleString()}G</Text>
+              )}
+            </View>
             <Text style={styles.slotDescription}>{item.description}</Text>
           </TouchableOpacity>
         ))}
@@ -582,22 +544,64 @@ const StoreScreen = () => {
   
   // 영역 슬롯만 렌더링
   const renderLocationSlotItems = () => {
-    const items = slotItems.filter((i) => i.type === 'locationSlot');
+    const items = storeCatalog.filter((i) => i.category === 'locationTemplateBundle' || i.category === 'locationTemplateSpecial');
     return (
       <View style={styles.slotsGrid}>
         {items.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.slotCard}
-            onPress={() => handlePurchaseSlot(item)}
-          >
-            <View style={styles.slotIconContainer}>
-              <Ionicons name="grid" size={30} color="#4CAF50" />
+          <View key={item.id} style={styles.slotTile}>
+            {/* 좌측 아이콘 */}
+            <View style={styles.slotTileLeft}>
+              <View style={styles.slotTileIconWrap}>
+                <Ionicons name={item.category === 'locationTemplateSpecial' ? 'star' : 'grid'} size={22} color="#4CAF50" />
+              </View>
             </View>
-            <Text style={styles.slotName}>{item.name}</Text>
-            <Text style={styles.slotPrice}>{item.pointPrice.toLocaleString()}G</Text>
-            <Text style={styles.slotDescription}>{item.description}</Text>
-          </TouchableOpacity>
+            {/* 중앙: 제목/칩/설명 */}
+            <View style={styles.slotTileCenter}>
+              <View style={styles.slotTileTitleRow}>
+                <Text style={styles.slotTileTitle}>{item.name}</Text>
+                {(item.originalPointPrice != null && item.realPointPrice != null && item.originalPointPrice !== item.realPointPrice) && (
+                  <View style={[styles.saleBadge, { marginLeft: 6 }]}>
+                    <Ionicons name="pricetag" size={12} color="#fff" />
+                    <Text style={styles.saleBadgeText}>
+                      {`-${Math.max(0, Math.round((1 - (item.realPointPrice / item.originalPointPrice)) * 100))}%`}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              {(() => {
+                const templates = Array.isArray(item.templates) ? item.templates : [];
+                const templateCount = templates.length;
+                const isSpecial = item.category === 'locationTemplateSpecial';
+                const durationDays = isSpecial ? (templates[0]?.durationDays || null) : null;
+                const baseSlotsLabel = isSpecial ? (templates[0]?.baseSlots === -1 ? '무제한' : `${templates[0]?.baseSlots}개`) : templates.map(t => t.baseSlots).join('/');
+                return (
+                  <View style={styles.summaryChipsRow}>
+                    <View style={styles.chip}><Ionicons name="layers" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`템플릿 ${templateCount}개`}</Text></View>
+                    {durationDays != null && (
+                      <View style={styles.chip}><Ionicons name="time" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`${durationDays}일`}</Text></View>
+                    )}
+                    <View style={styles.chip}><Ionicons name="cube" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`기본 슬롯 ${baseSlotsLabel}`}</Text></View>
+                  </View>
+                );
+              })()}
+              <Text style={styles.slotTileSubtitle} numberOfLines={2}>{item.description}</Text>
+            </View>
+            {/* 우측: 가격/버튼 */}
+            <View style={styles.slotTileRight}>
+              {(item.originalPointPrice != null && item.realPointPrice != null && item.originalPointPrice !== item.realPointPrice) ? (
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[styles.slotPriceOriginal, styles.strike]}>{item.originalPointPrice.toLocaleString()}G</Text>
+                  <Text style={styles.slotPriceReal}>{item.realPointPrice.toLocaleString()}G</Text>
+                </View>
+              ) : (
+                <Text style={styles.slotPrice}>{(item.originalPointPrice ?? item.realPointPrice ?? item.pointPrice).toLocaleString()}G</Text>
+              )}
+              <TouchableOpacity style={[styles.slotBuyButton, { marginTop: 6 }]} onPress={() => handlePurchaseItem(item)}>
+                <Ionicons name="cart" size={16} color="#fff" />
+                <Text style={styles.slotBuyButtonText}>구매</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         ))}
       </View>
     );
@@ -605,22 +609,54 @@ const StoreScreen = () => {
   
   // 제품 슬롯만 렌더링
   const renderProductSlotItems = () => {
-    const items = slotItems.filter((i) => i.type === 'productSlot');
+    const items = storeCatalog.filter((i) => i.category === 'productSlot');
     return (
       <View style={styles.slotsGrid}>
         {items.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.slotCard}
-            onPress={() => handlePurchaseSlot(item)}
-          >
-            <View style={styles.slotIconContainer}>
-              <Ionicons name="cube" size={30} color="#4CAF50" />
+          <View key={item.id} style={styles.slotTile}>
+            <View style={styles.slotTileLeft}>
+              <View style={styles.slotTileIconWrap}>
+                <Ionicons name="cube" size={22} color="#4CAF50" />
+              </View>
             </View>
-            <Text style={styles.slotName}>{item.name}</Text>
-            <Text style={styles.slotPrice}>{item.pointPrice.toLocaleString()}G</Text>
-            <Text style={styles.slotDescription}>{item.description}</Text>
-          </TouchableOpacity>
+            <View style={styles.slotTileCenter}>
+              <View style={styles.slotTileTitleRow}>
+                <Text style={styles.slotTileTitle}>{item.name}</Text>
+                {(item.originalPointPrice != null && item.realPointPrice != null && item.originalPointPrice !== item.realPointPrice) && (
+                  <View style={[styles.saleBadge, { marginLeft: 6 }]}>
+                    <Ionicons name="pricetag" size={12} color="#fff" />
+                    <Text style={styles.saleBadgeText}>
+                      {`-${Math.max(0, Math.round((1 - (item.realPointPrice / item.originalPointPrice)) * 100))}%`}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              {(() => {
+                const tpl = Array.isArray(item.templates) && item.templates[0] ? item.templates[0] : null;
+                const count = tpl?.count || tpl?.countPerLocation || 0;
+                return (
+                  <View style={styles.summaryChipsRow}>
+                    <View style={styles.chip}><Ionicons name="add-circle" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`추가 슬롯 ${count}개`}</Text></View>
+                  </View>
+                );
+              })()}
+              <Text style={styles.slotTileSubtitle} numberOfLines={2}>{item.description}</Text>
+            </View>
+            <View style={styles.slotTileRight}>
+              {(item.originalPointPrice != null && item.realPointPrice != null && item.originalPointPrice !== item.realPointPrice) ? (
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[styles.slotPriceOriginal, styles.strike]}>{item.originalPointPrice.toLocaleString()}G</Text>
+                  <Text style={styles.slotPriceReal}>{item.realPointPrice.toLocaleString()}G</Text>
+                </View>
+              ) : (
+                <Text style={styles.slotPrice}>{(item.originalPointPrice ?? item.realPointPrice ?? item.pointPrice).toLocaleString()}G</Text>
+              )}
+              <TouchableOpacity style={[styles.slotBuyButton, { marginTop: 6 }]} onPress={() => handlePurchaseItem(item)}>
+                <Ionicons name="cart" size={16} color="#fff" />
+                <Text style={styles.slotBuyButtonText}>구매</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         ))}
       </View>
     );
@@ -964,10 +1000,62 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  planHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  saleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E53935',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  saleBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 2,
+  },
   planPrice: {
     fontSize: 16,
     fontWeight: '600',
     color: '#4CAF50',
+  },
+  planPriceOriginal: {
+    fontSize: 14,
+    color: '#999',
+    marginRight: 6,
+  },
+  planPriceReal: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4CAF50',
+  },
+  summaryChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginRight: 6,
+    marginBottom: 6,
+    backgroundColor: '#FAFAFA',
+  },
+  chipText: {
+    fontSize: 12,
+    color: '#444',
   },
   planFeatures: {
     marginTop: 10,
@@ -1001,20 +1089,76 @@ const styles = StyleSheet.create({
   slotsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   slotCard: {
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 16,
     marginBottom: 16,
-    width: '48%',
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+  },
+  slotTile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  slotTileLeft: {
+    width: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  slotTileIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E8F5E9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  slotTileCenter: {
+    flex: 1,
+    paddingHorizontal: 8,
+  },
+  slotTileRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    minWidth: 90,
+  },
+  slotTileTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  slotTileTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#333',
+  },
+  slotTileSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   slotIconContainer: {
     width: 60,
@@ -1029,14 +1173,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: 'left',
     color: '#333',
+  },
+  slotHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
   },
   slotPrice: {
     fontSize: 14,
     fontWeight: '600',
     color: '#4CAF50',
     marginBottom: 8,
+  },
+  slotPriceOriginal: {
+    fontSize: 13,
+    color: '#999',
+    marginRight: 6,
+  },
+  slotPriceReal: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4CAF50',
+  },
+  strike: {
+    textDecorationLine: 'line-through',
   },
   slotDescription: {
     fontSize: 12,
@@ -1682,6 +1844,24 @@ const styles = StyleSheet.create({
   },
   shopTabTextActive: {
     color: '#4CAF50',
+  },
+  slotBuyContainer: {
+    marginTop: 10,
+    width: '100%',
+    alignItems: 'flex-end',
+  },
+  slotBuyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  slotBuyButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    marginLeft: 6,
   },
 });
 

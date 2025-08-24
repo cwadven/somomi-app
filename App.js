@@ -22,14 +22,26 @@ import { loginUser } from './src/redux/slices/authSlice';
 import { fetchLocations, reconcileLocationsDisabled } from './src/redux/slices/locationsSlice';
 import { fetchProducts, fetchConsumedProducts } from './src/redux/slices/productsSlice';
 import { processSyncQueueIfOnline } from './src/utils/syncManager';
-import { loadAppPrefs } from './src/utils/storageUtils';
+import { loadAppPrefs, loadData, saveData, STORAGE_KEYS } from './src/utils/storageUtils';
 import { scheduleDailyReminderIfNeeded, scheduleDailyUpdateReminderIfNeeded } from './src/utils/notificationUtils';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
+let FileSystem;
+let DocumentPicker;
 if (Platform.OS !== 'web') {
   try {
     messaging = require('@react-native-firebase/messaging').default;
+    try {
+      FileSystem = require('expo-file-system');
+    } catch (e) {
+      console.warn('expo-file-system 로드 실패:', e?.message || String(e));
+    }
+    try {
+      DocumentPicker = require('expo-document-picker');
+    } catch (e) {
+      console.warn('expo-document-picker 로드 실패:', e?.message || String(e));
+    }
     
     // 백그라운드 메시지 핸들러 설정 (앱이 로드되기 전에 설정해야 함)
     messaging().setBackgroundMessageHandler(async remoteMessage => {
@@ -350,6 +362,93 @@ const AppContent = () => {
             </View>
           </View>
           
+          {/* 데이터 내보내기 섹션 */}
+          <View style={{ marginBottom: 12 }}>
+            <Text style={styles.infoLabel}>데이터 내보내기 (JSON)</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
+              <TouchableOpacity
+                style={[styles.button, styles.checkButton, { minWidth: 120, marginBottom: 8 }]}
+                onPress={async () => {
+                  try {
+                    const data = await loadData(STORAGE_KEYS.LOCATIONS) || [];
+                    await exportJsonFile('locations', data);
+                  } catch (e) {
+                    addLog(`영역 export 실패: ${e?.message || String(e)}`, 'error');
+                  }
+                }}
+              >
+                <Text style={styles.buttonText}>영역 export</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.checkButton, { minWidth: 120, marginBottom: 8 }]}
+                onPress={async () => {
+                  try {
+                    const data = await loadData(STORAGE_KEYS.PRODUCTS) || [];
+                    await exportJsonFile('products', data);
+                  } catch (e) {
+                    addLog(`제품 export 실패: ${e?.message || String(e)}`, 'error');
+                  }
+                }}
+              >
+                <Text style={styles.buttonText}>제품 export</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.checkButton, { minWidth: 120, marginBottom: 8 }]}
+                onPress={async () => {
+                  try {
+                    const data = await loadData(STORAGE_KEYS.CONSUMED_PRODUCTS) || [];
+                    await exportJsonFile('consumed_products', data);
+                  } catch (e) {
+                    addLog(`소진된 제품 export 실패: ${e?.message || String(e)}`, 'error');
+                  }
+                }}
+              >
+                <Text style={styles.buttonText}>소진된 제품 export</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* 데이터 가져오기 섹션 */}
+          <View style={{ marginBottom: 12 }}>
+            <Text style={styles.infoLabel}>데이터 가져오기 (JSON)</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
+              <TouchableOpacity
+                style={[styles.button, styles.closeButton, { minWidth: 120, marginBottom: 8 }]}
+                onPress={async () => {
+                  await importJsonFromPicker('영역', STORAGE_KEYS.LOCATIONS, async () => {
+                    try { await dispatch(fetchLocations()).unwrap(); addLog('영역 데이터 새로고침 완료', 'success'); } catch (e) {}
+                  });
+                }}
+              >
+                <Text style={styles.buttonText}>영역 import</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.closeButton, { minWidth: 120, marginBottom: 8 }]}
+                onPress={async () => {
+                  await importJsonFromPicker('제품', STORAGE_KEYS.PRODUCTS, async () => {
+                    try { await dispatch(fetchProducts()).unwrap(); addLog('제품 데이터 새로고침 완료', 'success'); } catch (e) {}
+                  });
+                }}
+              >
+                <Text style={styles.buttonText}>제품 import</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.closeButton, { minWidth: 120, marginBottom: 8 }]}
+                onPress={async () => {
+                  await importJsonFromPicker('소진된 제품', STORAGE_KEYS.CONSUMED_PRODUCTS, async () => {
+                    try { await dispatch(fetchConsumedProducts()).unwrap(); addLog('소진된 제품 데이터 새로고침 완료', 'success'); } catch (e) {}
+                  });
+                }}
+              >
+                <Text style={styles.buttonText}>소진된 제품 import</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+ 
           {isLoggedIn && user && (
             <View style={styles.userInfoContainer}>
               <Text style={styles.userInfoText}>
@@ -481,6 +580,76 @@ const AppContent = () => {
       </View>
     </Modal>
   );
+
+  // JSON 내보내기 헬퍼
+  const exportJsonFile = async (baseName, data) => {
+    try {
+      const json = JSON.stringify(data, null, 2);
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileName = `somomi_export_${baseName}_${ts}.json`;
+      if (Platform.OS !== 'web' && FileSystem && FileSystem.documentDirectory) {
+        const uri = FileSystem.documentDirectory + fileName;
+        await FileSystem.writeAsStringAsync(uri, json, { encoding: FileSystem.EncodingType.UTF8 });
+        addLog(`내보내기 완료: ${fileName}\n경로: ${uri}`, 'success');
+        return uri;
+      }
+      // 웹 또는 파일 시스템 없음: 콘솔/로그로 대체
+      console.log(`[EXPORT:${baseName}]`, json);
+      addLog(`파일 시스템을 사용할 수 없어 로그로 내보냈습니다. [${baseName}]`, 'warning');
+      return null;
+    } catch (e) {
+      addLog(`내보내기 실패(${baseName}): ${e?.message || String(e)}`, 'error');
+      return null;
+    }
+  };
+
+  // JSON 가져오기 헬퍼 (파일 선택 → 저장 → 후처리)
+  const importJsonFromPicker = async (label, storageKey, afterSave) => {
+    try {
+      if (Platform.OS === 'web' || !DocumentPicker || !FileSystem) {
+        addLog(`${label} import는 현재 플랫폼에서 지원되지 않습니다. (웹/모듈 미존재)`, 'warning');
+        return;
+      }
+
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/json',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result?.type !== 'success') {
+        addLog(`${label} import 취소됨`, 'info');
+        return;
+      }
+
+      const fileUri = result.assets?.[0]?.uri || result.uri;
+      if (!fileUri) {
+        addLog(`${label} import 실패: 파일 경로를 확인할 수 없습니다.`, 'error');
+        return;
+      }
+
+      const content = await FileSystem.readAsStringAsync(fileUri, { encoding: FileSystem.EncodingType.UTF8 });
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch (e) {
+        addLog(`${label} JSON 파싱 실패: ${e?.message || String(e)}`, 'error');
+        return;
+      }
+
+      if (!Array.isArray(parsed)) {
+        addLog(`${label} import 실패: 최상위 구조는 배열이어야 합니다.`, 'error');
+        return;
+      }
+
+      await saveData(storageKey, parsed);
+      addLog(`${label} import 완료: ${parsed.length}건 저장`, 'success');
+      if (typeof afterSave === 'function') {
+        await afterSave();
+      }
+    } catch (e) {
+      addLog(`${label} import 중 오류: ${e?.message || String(e)}`, 'error');
+    }
+  };
   
   // 업데이트 로딩 중이거나 데이터 초기화 중이면 로딩 화면 표시
   if (isUpdating) {
