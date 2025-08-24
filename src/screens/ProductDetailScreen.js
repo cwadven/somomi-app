@@ -108,6 +108,40 @@ const ProductDetailScreen = () => {
   const [tempMonth, setTempMonth] = useState(selectedMonth);
   const [tempDay, setTempDay] = useState(selectedDay);
   
+  // 날짜 선택 스크롤 중앙 정렬을 위한 참조 및 상수
+  const yearScrollRef = useRef(null);
+  const monthScrollRef = useRef(null);
+  const dayScrollRef = useRef(null);
+  const ITEM_HEIGHT = 40; // styles.datePickerOption.height
+  const VISIBLE_HEIGHT = 150; // styles.datePickerScroll.height
+  const CENTER_OFFSET = (VISIBLE_HEIGHT - ITEM_HEIGHT) / 2;
+
+  // 모달이 열릴 때 현재 선택값이 중앙에 오도록 스크롤
+  useEffect(() => {
+    if (!datePickerVisible) return;
+    try {
+      const years = generateYearOptions();
+      const yearIndex = Math.max(0, years.findIndex((y) => y === tempYear));
+      const monthIndex = Math.max(0, tempMonth);
+      const dayIndex = Math.max(0, (tempDay || 1) - 1);
+
+      const safeScrollTo = (ref, index) => {
+        if (!ref?.current || index < 0) return;
+        const y = Math.max(0, index * ITEM_HEIGHT - CENTER_OFFSET);
+        try {
+          ref.current.scrollTo({ y, animated: false });
+        } catch (e) {}
+      };
+
+      // 다음 프레임에서 스크롤 수행(렌더 보장)
+      setTimeout(() => {
+        safeScrollTo(yearScrollRef, yearIndex);
+        safeScrollTo(monthScrollRef, monthIndex);
+        safeScrollTo(dayScrollRef, dayIndex);
+      }, 0);
+    } catch (e) {}
+  }, [datePickerVisible, tempYear, tempMonth, tempDay]);
+
   // 소진 처리에 사용할 날짜 상태 (별도로 관리)
   const [consumptionDate, setConsumptionDate] = useState({
     year: new Date().getFullYear(),
@@ -349,6 +383,7 @@ const ProductDetailScreen = () => {
                 <Text style={styles.datePickerLabel}>년도</Text>
                 <View style={styles.datePickerScrollWrapper}>
                   <ScrollView 
+                    ref={yearScrollRef}
                     style={styles.datePickerScroll}
                     showsVerticalScrollIndicator={false}
                   >
@@ -381,6 +416,7 @@ const ProductDetailScreen = () => {
                 <Text style={styles.datePickerLabel}>월</Text>
                 <View style={styles.datePickerScrollWrapper}>
                   <ScrollView 
+                    ref={monthScrollRef}
                     style={styles.datePickerScroll}
                     showsVerticalScrollIndicator={false}
                   >
@@ -420,6 +456,7 @@ const ProductDetailScreen = () => {
                 <Text style={styles.datePickerLabel}>일</Text>
                 <View style={styles.datePickerScrollWrapper}>
                   <ScrollView 
+                    ref={dayScrollRef}
                     style={styles.datePickerScroll}
                     showsVerticalScrollIndicator={false}
                   >
