@@ -500,16 +500,17 @@ export const scheduleDailyReminderIfNeeded = async () => {
     const prefs = await loadAppPrefs();
     const enabled = prefs?.notificationsEnabled === true;
     const allow9am = prefs?.remindExpiryEnabled !== false; // 기본 허용, 사용자가 끄면 false
-    if (!enabled || !allow9am) return;
+    try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 스케줄 시도 - enabled=${enabled}, allow9am=${allow9am}`); } catch (e) {}
+    if (!enabled || !allow9am) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[9시] 스킵: 설정 비활성화', 'warning'); } catch (e) {}; return; }
 
     // 오늘 이미 보냈는지 체크
     const sentMap = (await loadData(STORAGE_KEYS.DAILY_REMINDER_SENT)) || {};
     const todayKey = new Date().toISOString().split('T')[0];
-    if (sentMap[todayKey]) return;
+    if (sentMap[todayKey]) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[9시] 스킵: 이미 예약/발송 기록 있음', 'warning'); } catch (e) {}; return; }
 
     // 오늘 보낼 수 있는 알림 후보 계산
     const notifications = await processAllNotifications(true); // 생성만, 전송은 하지 않음
-    if (!notifications || notifications.length === 0) return;
+    if (!notifications || notifications.length === 0) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[9시] 스킵: 후보 없음', 'warning'); } catch (e) {}; return; }
 
     // 오전 9시로 트리거 시간 설정
     const now = new Date();
@@ -522,15 +523,22 @@ export const scheduleDailyReminderIfNeeded = async () => {
     const body = '곧 소진 및 유통 기한 만료될 제품이 있습니다. 확인해주세요~';
     const data = { type: 'reminder', deepLink: 'somomi://notifications' };
 
+    let notifId = null;
     if (delaySec === 0) {
-      await sendImmediateNotification(title, body, data);
+      notifId = await sendImmediateNotification(title, body, data);
+      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 즉시 발송 결과 id=${notifId}`); } catch (e) {}
     } else {
-      await pushNotificationService.sendLocalNotification(title, body, data, delaySec);
+      notifId = await pushNotificationService.sendLocalNotification(title, body, data, delaySec);
+      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 예약 완료 delaySec=${delaySec}, id=${notifId}`); } catch (e) {}
     }
 
     // 발송 기록 저장
-    sentMap[todayKey] = true;
-    await saveAny(STORAGE_KEYS.DAILY_REMINDER_SENT, sentMap);
+    if (notifId) {
+      sentMap[todayKey] = true;
+      await saveAny(STORAGE_KEYS.DAILY_REMINDER_SENT, sentMap);
+    } else {
+      try { if (pushNotificationService) pushNotificationService.addDebugLog('[9시] 예약/발송 실패: 기록 저장 안함', 'error'); } catch (e) {}
+    }
   } catch (error) {
     console.error('리마인더 스케줄링 오류:', error);
   }
@@ -548,11 +556,12 @@ export const scheduleDailyUpdateReminderIfNeeded = async () => {
     const prefs = await loadAppPrefs();
     const enabled = prefs?.notificationsEnabled === true;
     const allow8pm = prefs?.remindAddEnabled !== false; // 기본 허용, 사용자가 끄면 false
-    if (!enabled || !allow8pm) return;
+    try { if (pushNotificationService) pushNotificationService.addDebugLog(`[20시] 스케줄 시도 - enabled=${enabled}, allow8pm=${allow8pm}`); } catch (e) {}
+    if (!enabled || !allow8pm) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[20시] 스킵: 설정 비활성화', 'warning'); } catch (e) {}; return; }
 
     const sentMap = (await loadData(STORAGE_KEYS.DAILY_UPDATE_REMINDER_SENT)) || {};
     const todayKey = new Date().toISOString().split('T')[0];
-    if (sentMap[todayKey]) return;
+    if (sentMap[todayKey]) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[20시] 스킵: 이미 예약/발송 기록 있음', 'warning'); } catch (e) {}; return; }
 
     // 오후 8시 트리거
     const now = new Date();
@@ -564,14 +573,21 @@ export const scheduleDailyUpdateReminderIfNeeded = async () => {
     const body = '최신화 하셨나요? 오늘 구매하거나 배치한 제품을 추가해 주세요.';
     const data = { type: 'update_reminder', deepLink: 'somomi://notifications' };
 
+    let notifId = null;
     if (delaySec === 0) {
-      await sendImmediateNotification(title, body, data);
+      notifId = await sendImmediateNotification(title, body, data);
+      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[20시] 즉시 발송 결과 id=${notifId}`); } catch (e) {}
     } else {
-      await pushNotificationService.sendLocalNotification(title, body, data, delaySec);
+      notifId = await pushNotificationService.sendLocalNotification(title, body, data, delaySec);
+      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[20시] 예약 완료 delaySec=${delaySec}, id=${notifId}`); } catch (e) {}
     }
 
-    sentMap[todayKey] = true;
-    await saveAny(STORAGE_KEYS.DAILY_UPDATE_REMINDER_SENT, sentMap);
+    if (notifId) {
+      sentMap[todayKey] = true;
+      await saveAny(STORAGE_KEYS.DAILY_UPDATE_REMINDER_SENT, sentMap);
+    } else {
+      try { if (pushNotificationService) pushNotificationService.addDebugLog('[20시] 예약/발송 실패: 기록 저장 안함', 'error'); } catch (e) {}
+    }
   } catch (error) {
     console.error('작성 리마인더 스케줄링 오류:', error);
   }
