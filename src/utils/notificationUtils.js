@@ -821,6 +821,27 @@ export const cancelAllNotifications = async () => {
 };
 
 /**
+ * 디버깅용: 5초마다 로컬 알림을 예약합니다.
+ * - durationSeconds 동안 5초 간격으로 예약(백그라운드에서도 발송)
+ * - 너무 많은 예약을 방지하기 위해 최대 300개로 제한
+ */
+export const scheduleDebugEveryFiveSeconds = async (durationSeconds = 300) => {
+  if (Platform.OS === 'web' || !pushNotificationService) return;
+  try {
+    const total = Math.min(300, Math.floor(durationSeconds / 5));
+    for (let i = 1; i <= total; i++) {
+      const delay = i * 5; // seconds
+      const title = '디버그 알림';
+      const body = `5초 주기 테스트 (${i}/${total})`;
+      const data = { type: 'debug', index: i, deepLink: 'somomi://notifications' };
+      await pushNotificationService.sendLocalNotification(title, body, data, delay);
+    }
+  } catch (e) {
+    console.error('디버그 알림 예약 실패:', e);
+  }
+};
+
+/**
  * 알림 설정 초기화 함수
  */
 export const initializeNotifications = () => {

@@ -7,7 +7,7 @@ import {
   clearPushNotificationLogs, 
   setPushNotificationDebugCallback 
 } from '../utils/pushNotificationService';
-import { processAllNotifications, sendImmediateNotification } from '../utils/notificationUtils';
+import { processAllNotifications, sendImmediateNotification, scheduleDebugEveryFiveSeconds } from '../utils/notificationUtils';
 
 /**
  * 푸시 알림 디버깅을 위한 컴포넌트
@@ -103,6 +103,14 @@ const PushNotificationDebugger = () => {
               <Text style={styles.qaButtonText}>20시 작성 리마인더 즉시 발송</Text>
             </TouchableOpacity>
             {/* 20시 작성 리마인더 스케줄 버튼 제거 */}
+            <TouchableOpacity
+              style={{ backgroundColor: '#2196F3', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, marginRight: 8, marginBottom: 8 }}
+              onPress={async () => {
+                await scheduleDebugEveryFiveSeconds(60);
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700' }}>5초 주기(1분) 디버그</Text>
+            </TouchableOpacity>
           </View>
         )}
       />
