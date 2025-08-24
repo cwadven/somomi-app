@@ -348,234 +348,230 @@ const AppContent = () => {
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
           </View>
-          
-          {/* 로그인 상태 표시 및 전환 버튼 */}
-          <View style={styles.loginStatusContainer}>
-            <Text style={styles.statusLabel}>로그인 상태:</Text>
-            <View style={[
-              styles.statusBadge, 
-              isLoggedIn ? styles.status_ready : (isAnonymous ? styles.status_checking : styles.status_idle)
-            ]}>
-              <Text style={styles.statusText}>
-                {isLoggedIn ? '로그인됨' : (isAnonymous ? '비회원' : '로그아웃됨')}
-              </Text>
+          <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent} nestedScrollEnabled>
+            {/* 로그인 상태 표시 및 전환 버튼 */}
+            <View style={styles.loginStatusContainer}>
+              <Text style={styles.statusLabel}>로그인 상태:</Text>
+              <View style={[
+                styles.statusBadge, 
+                isLoggedIn ? styles.status_ready : (isAnonymous ? styles.status_checking : styles.status_idle)
+              ]}>
+                <Text style={styles.statusText}>
+                  {isLoggedIn ? '로그인됨' : (isAnonymous ? '비회원' : '로그아웃됨')}
+                </Text>
+              </View>
             </View>
-          </View>
-          
-          {/* 데이터 내보내기 섹션 */}
-          <View style={{ marginBottom: 12 }}>
-            <Text style={styles.infoLabel}>데이터 내보내기 (JSON)</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
-              <TouchableOpacity
-                style={[styles.button, styles.checkButton, { minWidth: 120, marginBottom: 8 }]}
-                onPress={async () => {
-                  try {
-                    const data = await loadData(STORAGE_KEYS.LOCATIONS) || [];
-                    await exportJsonFile('locations', data);
-                  } catch (e) {
-                    addLog(`영역 export 실패: ${e?.message || String(e)}`, 'error');
-                  }
-                }}
-              >
-                <Text style={styles.buttonText}>영역 export</Text>
-              </TouchableOpacity>
+            
+            {/* 데이터 내보내기 섹션 */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={styles.infoLabel}>데이터 내보내기 (JSON)</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
+                <TouchableOpacity
+                  style={[styles.button, styles.checkButton, { minWidth: 120, marginBottom: 8 }]}
+                  onPress={async () => {
+                    try {
+                      const data = await loadData(STORAGE_KEYS.LOCATIONS) || [];
+                      await exportJsonFile('locations', data);
+                    } catch (e) {
+                      addLog(`영역 export 실패: ${e?.message || String(e)}`, 'error');
+                    }
+                  }}
+                >
+                  <Text style={styles.buttonText}>영역 export</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.button, styles.checkButton, { minWidth: 120, marginBottom: 8 }]}
-                onPress={async () => {
-                  try {
-                    const data = await loadData(STORAGE_KEYS.PRODUCTS) || [];
-                    await exportJsonFile('products', data);
-                  } catch (e) {
-                    addLog(`제품 export 실패: ${e?.message || String(e)}`, 'error');
-                  }
-                }}
-              >
-                <Text style={styles.buttonText}>제품 export</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.checkButton, { minWidth: 120, marginBottom: 8 }]}
+                  onPress={async () => {
+                    try {
+                      const data = await loadData(STORAGE_KEYS.PRODUCTS) || [];
+                      await exportJsonFile('products', data);
+                    } catch (e) {
+                      addLog(`제품 export 실패: ${e?.message || String(e)}`, 'error');
+                    }
+                  }}
+                >
+                  <Text style={styles.buttonText}>제품 export</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.button, styles.checkButton, { minWidth: 120, marginBottom: 8 }]}
-                onPress={async () => {
-                  try {
-                    const data = await loadData(STORAGE_KEYS.CONSUMED_PRODUCTS) || [];
-                    await exportJsonFile('consumed_products', data);
-                  } catch (e) {
-                    addLog(`소진된 제품 export 실패: ${e?.message || String(e)}`, 'error');
-                  }
-                }}
-              >
-                <Text style={styles.buttonText}>소진된 제품 export</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.checkButton, { minWidth: 120, marginBottom: 8 }]}
+                  onPress={async () => {
+                    try {
+                      const data = await loadData(STORAGE_KEYS.CONSUMED_PRODUCTS) || [];
+                      await exportJsonFile('consumed_products', data);
+                    } catch (e) {
+                      addLog(`소진된 제품 export 실패: ${e?.message || String(e)}`, 'error');
+                    }
+                  }}
+                >
+                  <Text style={styles.buttonText}>소진된 제품 export</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
 
-          {/* 데이터 가져오기 섹션 */}
-          <View style={{ marginBottom: 12 }}>
-            <Text style={styles.infoLabel}>데이터 가져오기 (JSON)</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
-              <TouchableOpacity
-                style={[styles.button, styles.closeButton, { minWidth: 120, marginBottom: 8 }]}
-                onPress={async () => {
-                  await importJsonFromPicker('영역', STORAGE_KEYS.LOCATIONS, async () => {
-                    try { await dispatch(fetchLocations()).unwrap(); addLog('영역 데이터 새로고침 완료', 'success'); } catch (e) {}
-                  });
-                }}
-              >
-                <Text style={styles.buttonText}>영역 import</Text>
-              </TouchableOpacity>
+            {/* 데이터 가져오기 섹션 */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={styles.infoLabel}>데이터 가져오기 (JSON)</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
+                <TouchableOpacity
+                  style={[styles.button, styles.closeButton, { minWidth: 120, marginBottom: 8 }]}
+                  onPress={async () => {
+                    await importJsonFromPicker('영역', STORAGE_KEYS.LOCATIONS, async () => {
+                      try { await dispatch(fetchLocations()).unwrap(); addLog('영역 데이터 새로고침 완료', 'success'); } catch (e) {}
+                    });
+                  }}
+                >
+                  <Text style={styles.buttonText}>영역 import</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.button, styles.closeButton, { minWidth: 120, marginBottom: 8 }]}
-                onPress={async () => {
-                  await importJsonFromPicker('제품', STORAGE_KEYS.PRODUCTS, async () => {
-                    try { await dispatch(fetchProducts()).unwrap(); addLog('제품 데이터 새로고침 완료', 'success'); } catch (e) {}
-                  });
-                }}
-              >
-                <Text style={styles.buttonText}>제품 import</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.closeButton, { minWidth: 120, marginBottom: 8 }]}
+                  onPress={async () => {
+                    await importJsonFromPicker('제품', STORAGE_KEYS.PRODUCTS, async () => {
+                      try { await dispatch(fetchProducts()).unwrap(); addLog('제품 데이터 새로고침 완료', 'success'); } catch (e) {}
+                    });
+                  }}
+                >
+                  <Text style={styles.buttonText}>제품 import</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.button, styles.closeButton, { minWidth: 120, marginBottom: 8 }]}
-                onPress={async () => {
-                  await importJsonFromPicker('소진된 제품', STORAGE_KEYS.CONSUMED_PRODUCTS, async () => {
-                    try { await dispatch(fetchConsumedProducts()).unwrap(); addLog('소진된 제품 데이터 새로고침 완료', 'success'); } catch (e) {}
-                  });
-                }}
-              >
-                <Text style={styles.buttonText}>소진된 제품 import</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.closeButton, { minWidth: 120, marginBottom: 8 }]}
+                  onPress={async () => {
+                    await importJsonFromPicker('소진된 제품', STORAGE_KEYS.CONSUMED_PRODUCTS, async () => {
+                      try { await dispatch(fetchConsumedProducts()).unwrap(); addLog('소진된 제품 데이터 새로고침 완료', 'success'); } catch (e) {}
+                    });
+                  }}
+                >
+                  <Text style={styles.buttonText}>소진된 제품 import</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
  
-          {isLoggedIn && user && (
-            <View style={styles.userInfoContainer}>
-              <Text style={styles.userInfoText}>
-                사용자: {user.username || user.name || '알 수 없음'}
-              </Text>
-            </View>
-          )}
-          
-          <View style={styles.loginButtonsContainer}>
-            {isLoggedIn ? (
-              <TouchableOpacity 
-                style={[styles.loginButton, styles.logoutBtn]}
-                onPress={() => {
-                  dispatch(logout());
-                  // 영역/로컬 상태 초기화
-                  try {
-                    const { resetLocationsState } = require('./src/redux/slices/locationsSlice');
-                    dispatch(resetLocationsState());
-                  } catch (e) {}
-                  addLog('로그아웃 처리됨', 'warning');
-                }}
-              >
-                <Text style={styles.loginButtonText}>로그아웃</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity 
-                style={[styles.loginButton, styles.loginBtn]}
-                onPress={async () => {
-                  try {
-                    console.log('디버그 로그인 시작');
-                    // 디버깅 목적으로 간단한 로그인 처리
-                    // 실제 앱에서는 이 부분을 실제 로그인 프로세스로 대체해야 함
-                    const mockCredentials = {
-                      username: '디버그 사용자',
-                      email: 'debug@example.com'
-                    };
-                    
-                    // loginUser 액션을 사용하여 로그인 처리
-                    const result = await dispatch(loginUser(mockCredentials)).unwrap();
-                    console.log('디버그 로그인 성공:', result);
-                    
-                    addLog('디버그 사용자로 로그인됨', 'success');
-                  } catch (error) {
-                    console.error('디버그 로그인 실패:', error);
-                    addLog(`로그인 실패: ${error.message}`, 'error');
-                  }
-                }}
-              >
-                <Text style={styles.loginButtonText}>디버그 로그인</Text>
-              </TouchableOpacity>
+            {isLoggedIn && user && (
+              <View style={styles.userInfoContainer}>
+                <Text style={styles.userInfoText}>
+                  사용자: {user.username || user.name || '알 수 없음'}
+                </Text>
+              </View>
             )}
             
-            {!isAnonymous && !isLoggedIn && (
-              <TouchableOpacity 
-                style={[styles.loginButton, styles.anonymousBtn]}
-                onPress={async () => {
-                  try {
-                    await dispatch(getAnonymousToken()).unwrap();
-                    addLog('익명 사용자로 전환됨', 'info');
-                  } catch (error) {
-                    addLog(`익명 로그인 실패: ${error.message}`, 'error');
-                  }
-                }}
-              >
-                <Text style={styles.loginButtonText}>익명 사용자 전환</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          
-          <View style={styles.statusContainer}>
-            <Text style={styles.statusLabel}>업데이트 상태:</Text>
-            <View style={[styles.statusBadge, styles[`status_${updateStatus}`]]}>
-              <Text style={styles.statusText}>
-                {updateStatus === 'idle' && '대기 중'}
-                {updateStatus === 'checking' && '확인 중'}
-                {updateStatus === 'downloading' && '다운로드 중'}
-                {updateStatus === 'ready' && '준비 완료'}
-                {updateStatus === 'error' && '오류 발생'}
+            <View style={styles.loginButtonsContainer}>
+              {isLoggedIn ? (
+                <TouchableOpacity 
+                  style={[styles.loginButton, styles.logoutBtn]}
+                  onPress={() => {
+                    dispatch(logout());
+                    // 영역/로컬 상태 초기화
+                    try {
+                      const { resetLocationsState } = require('./src/redux/slices/locationsSlice');
+                      dispatch(resetLocationsState());
+                    } catch (e) {}
+                    addLog('로그아웃 처리됨', 'warning');
+                  }}
+                >
+                  <Text style={styles.loginButtonText}>로그아웃</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity 
+                  style={[styles.loginButton, styles.loginBtn]}
+                  onPress={async () => {
+                    try {
+                      console.log('디버그 로그인 시작');
+                      const mockCredentials = {
+                        username: '디버그 사용자',
+                        email: 'debug@example.com'
+                      };
+                      const result = await dispatch(loginUser(mockCredentials)).unwrap();
+                      console.log('디버그 로그인 성공:', result);
+                      addLog('디버그 사용자로 로그인됨', 'success');
+                    } catch (error) {
+                      console.error('디버그 로그인 실패:', error);
+                      addLog(`로그인 실패: ${error.message}`, 'error');
+                    }
+                  }}
+                >
+                  <Text style={styles.loginButtonText}>디버그 로그인</Text>
+                </TouchableOpacity>
+              )}
+              
+              {!isAnonymous && !isLoggedIn && (
+                <TouchableOpacity 
+                  style={[styles.loginButton, styles.anonymousBtn]}
+                  onPress={async () => {
+                    try {
+                      await dispatch(getAnonymousToken()).unwrap();
+                      addLog('익명 사용자로 전환됨', 'info');
+                    } catch (error) {
+                      addLog(`익명 로그인 실패: ${error.message}`, 'error');
+                    }
+                  }}
+                >
+                  <Text style={styles.loginButtonText}>익명 사용자 전환</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            
+            <View style={styles.statusContainer}>
+              <Text style={styles.statusLabel}>업데이트 상태:</Text>
+              <View style={[styles.statusBadge, styles[`status_${updateStatus}`]]}>
+                <Text style={styles.statusText}>
+                  {updateStatus === 'idle' && '대기 중'}
+                  {updateStatus === 'checking' && '확인 중'}
+                  {updateStatus === 'downloading' && '다운로드 중'}
+                  {updateStatus === 'ready' && '준비 완료'}
+                  {updateStatus === 'error' && '오류 발생'}
+                </Text>
+              </View>
+            </View>
+            
+            {/* 기존 코드 유지 */}
+            <View style={styles.infoContainer}>
+              <Text style={styles.infoLabel}>Runtime Version:</Text>
+              <Text style={styles.infoValue}>{Constants.expoConfig?.runtimeVersion?.policy || '알 수 없음'}</Text>
+            </View>
+            
+            <View style={styles.infoContainer}>
+              <Text style={styles.infoLabel}>Update URL:</Text>
+              <Text style={styles.infoValue} numberOfLines={1}>
+                {Constants.expoConfig?.updates?.url || '알 수 없음'}
               </Text>
             </View>
-          </View>
-          
-          {/* 기존 코드 유지 */}
-          <View style={styles.infoContainer}>
-            <Text style={styles.infoLabel}>Runtime Version:</Text>
-            <Text style={styles.infoValue}>{Constants.expoConfig?.runtimeVersion?.policy || '알 수 없음'}</Text>
-          </View>
-          
-          <View style={styles.infoContainer}>
-            <Text style={styles.infoLabel}>Update URL:</Text>
-            <Text style={styles.infoValue} numberOfLines={1}>
-              {Constants.expoConfig?.updates?.url || '알 수 없음'}
-            </Text>
-          </View>
-          
-          <Text style={styles.logTitle}>업데이트 로그:</Text>
-          
-          <ScrollView style={styles.logContainer}>
-            {updateLogs.length === 0 ? (
-              <Text style={styles.emptyLogText}>로그가 없습니다.</Text>
-            ) : (
-              updateLogs.map((log, index) => (
-                <View key={index} style={styles.logItem}>
-                  <Text style={styles.logTimestamp}>{log.timestamp}</Text>
-                  <Text style={[styles.logMessage, styles[`log_${log.type}`]]}>
-                    {log.message}
-                  </Text>
-                </View>
-              ))
-            )}
+            
+            <Text style={styles.logTitle}>업데이트 로그:</Text>
+            
+            <ScrollView style={styles.logContainer} nestedScrollEnabled>
+              {updateLogs.length === 0 ? (
+                <Text style={styles.emptyLogText}>로그가 없습니다.</Text>
+              ) : (
+                updateLogs.map((log, index) => (
+                  <View key={index} style={styles.logItem}>
+                    <Text style={styles.logTimestamp}>{log.timestamp}</Text>
+                    <Text style={[styles.logMessage, styles[`log_${log.type}`]]}>
+                      {log.message}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity 
+                style={[styles.button, styles.checkButton]} 
+                onPress={checkForUpdates}
+              >
+                <Text style={styles.buttonText}>업데이트 확인</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.button, styles.closeButton]} 
+                onPress={() => setShowDebugModal(false)}
+              >
+                <Text style={styles.buttonText}>닫기</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
-          
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity 
-              style={[styles.button, styles.checkButton]} 
-              onPress={checkForUpdates}
-            >
-              <Text style={styles.buttonText}>업데이트 확인</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.button, styles.closeButton]} 
-              onPress={() => setShowDebugModal(false)}
-            >
-              <Text style={styles.buttonText}>닫기</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
     </Modal>
@@ -777,6 +773,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 5,
+  },
+  modalScroll: {
+    maxHeight: '100%',
+  },
+  modalScrollContent: {
+    paddingBottom: 20,
   },
   modalHeader: {
     flexDirection: 'row',
