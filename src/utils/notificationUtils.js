@@ -498,10 +498,11 @@ export const scheduleDailyReminderIfNeeded = async () => {
   if (Platform.OS === 'web') return;
   try {
     const prefs = await loadAppPrefs();
-    const enabled = prefs?.notificationsEnabled === true;
+    // 강제 활성화: notificationsEnabled와 무관하게 스케줄 진행
+    const enabled = true;
     const allow9am = prefs?.remindExpiryEnabled !== false; // 기본 허용, 사용자가 끄면 false
-    try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 스케줄 시도 - enabled=${enabled}, allow9am=${allow9am}`); } catch (e) {}
-    if (!enabled || !allow9am) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[9시] 스킵: 설정 비활성화', 'warning'); } catch (e) {}; return; }
+    try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 스케줄 시도 - enabled(forced)=${enabled}, allow9am=${allow9am}`); } catch (e) {}
+    if (!allow9am) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[9시] 스킵: 9시 리마인더 스위치 OFF', 'warning'); } catch (e) {}; return; }
 
     // 오늘 이미 보냈는지 체크
     const sentMap = (await loadData(STORAGE_KEYS.DAILY_REMINDER_SENT)) || {};
@@ -554,10 +555,11 @@ export const scheduleDailyUpdateReminderIfNeeded = async () => {
   if (Platform.OS === 'web') return;
   try {
     const prefs = await loadAppPrefs();
-    const enabled = prefs?.notificationsEnabled === true;
+    // 강제 활성화: notificationsEnabled와 무관하게 스케줄 진행
+    const enabled = true;
     const allow8pm = prefs?.remindAddEnabled !== false; // 기본 허용, 사용자가 끄면 false
-    try { if (pushNotificationService) pushNotificationService.addDebugLog(`[20시] 스케줄 시도 - enabled=${enabled}, allow8pm=${allow8pm}`); } catch (e) {}
-    if (!enabled || !allow8pm) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[20시] 스킵: 설정 비활성화', 'warning'); } catch (e) {}; return; }
+    try { if (pushNotificationService) pushNotificationService.addDebugLog(`[20시] 스케줄 시도 - enabled(forced)=${enabled}, allow8pm=${allow8pm}`); } catch (e) {}
+    if (!allow8pm) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[20시] 스킵: 20시 리마인더 스위치 OFF', 'warning'); } catch (e) {}; return; }
 
     const sentMap = (await loadData(STORAGE_KEYS.DAILY_UPDATE_REMINDER_SENT)) || {};
     const todayKey = new Date().toISOString().split('T')[0];
