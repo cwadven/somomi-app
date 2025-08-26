@@ -7,7 +7,8 @@ import notifee, {
   AndroidStyle, 
   EventType,
   TriggerType,
-  TimeUnit 
+  TimeUnit,
+  RepeatFrequency,
 } from '@notifee/react-native';
 
 // 웹 환경에서는 PermissionsAndroid를 조건부로 가져옴
@@ -236,6 +237,70 @@ class PushNotificationService {
       return notificationId;
     } catch (error) {
       addDebugLog(`알림 전송 오류: ${error.message}`, 'error');
+      return null;
+    }
+  }
+
+  // 매일 특정 시각에 반복 알림 예약 (OS가 백그라운드에서도 처리)
+  async scheduleDailyLocalNotification(title, body, data = {}, hour = 9, minute = 0) {
+    if (Platform.OS === 'web') {
+      addDebugLog('웹 환경에서는 알림을 지원하지 않습니다.', 'info');
+      return null;
+    }
+    try {
+      await this.createNotificationChannels();
+      const channelId = 'default';
+      const notificationId = `daily_${hour}_${minute}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+
+      const normalizeData = (raw) => {
+        const result = {};
+        try {
+          Object.entries(raw || {}).forEach(([key, value]) => {
+            if (value === null || value === undefined) return;
+            result[String(key)] = String(value);
+          });
+        } catch (e) {}
+        return result;
+      };
+
+      const notificationConfig = {
+        id: notificationId,
+        title: title || '알림',
+        body: body || '',
+        data: normalizeData(data),
+      };
+
+      if (Platform.OS === 'android') {
+        notificationConfig.android = {
+          channelId,
+          smallIcon: 'ic_launcher',
+          pressAction: { id: 'default' },
+          importance: AndroidImportance.HIGH,
+        };
+      }
+      if (Platform.OS === 'ios') {
+        notificationConfig.ios = { sound: 'default' };
+      }
+
+      // 다음 발생 시각 계산
+      const now = new Date();
+      const next = new Date(now);
+      next.setHours(hour, minute, 0, 0);
+      if (next.getTime() <= now.getTime()) {
+        next.setDate(next.getDate() + 1);
+      }
+
+      const trigger = {
+        type: TriggerType.TIMESTAMP,
+        timestamp: next.getTime(),
+        repeatFrequency: RepeatFrequency.DAILY,
+      };
+
+      await notifee.createTriggerNotification(notificationConfig, trigger);
+      addDebugLog(`매일 알림 예약 완료: ${hour}:${minute.toString().padStart(2, '0')} id=${notificationId}`, 'success');
+      return notificationId;
+    } catch (error) {
+      addDebugLog(`매일 알림 예약 오류: ${error.message}`, 'error');
       return null;
     }
   }

@@ -526,13 +526,18 @@ export const scheduleDailyReminderIfNeeded = async () => {
 
     let notifId = null;
     if (delaySec === 0) {
+      // 9시가 이미 지난 경우에는 즉시 1회 발송
       notifId = await sendImmediateNotification(title, body, data);
       try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 즉시 발송 결과 id=${notifId}`); } catch (e) {}
-    } else {
-      notifId = await pushNotificationService.sendLocalNotification(title, body, data, delaySec);
-      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 예약 완료 delaySec=${delaySec}, id=${notifId}`); } catch (e) {}
     }
-
+    // 다음 9시에 매일 반복 예약 (OS가 백그라운드에서도 처리)
+    try {
+      const dailyId = await pushNotificationService.scheduleDailyLocalNotification(title, body, data, 9, 0);
+      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 매일 반복 예약 완료 id=${dailyId}`); } catch (e) {}
+      // 예약 성공 시 notifId를 dailyId로 간주하여 기록 저장 판단에 활용
+      if (!notifId) notifId = dailyId;
+    } catch (e) {}
+ 
     // 발송 기록 저장
     if (notifId) {
       sentMap[todayKey] = true;
@@ -577,13 +582,17 @@ export const scheduleDailyUpdateReminderIfNeeded = async () => {
 
     let notifId = null;
     if (delaySec === 0) {
+      // 20시가 이미 지난 경우에는 즉시 1회 발송
       notifId = await sendImmediateNotification(title, body, data);
       try { if (pushNotificationService) pushNotificationService.addDebugLog(`[20시] 즉시 발송 결과 id=${notifId}`); } catch (e) {}
-    } else {
-      notifId = await pushNotificationService.sendLocalNotification(title, body, data, delaySec);
-      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[20시] 예약 완료 delaySec=${delaySec}, id=${notifId}`); } catch (e) {}
     }
-
+    // 다음 20시에 매일 반복 예약 (OS가 백그라운드에서도 처리)
+    try {
+      const dailyId = await pushNotificationService.scheduleDailyLocalNotification(title, body, data, 20, 0);
+      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[20시] 매일 반복 예약 완료 id=${dailyId}`); } catch (e) {}
+      if (!notifId) notifId = dailyId;
+    } catch (e) {}
+ 
     if (notifId) {
       sentMap[todayKey] = true;
       await saveAny(STORAGE_KEYS.DAILY_UPDATE_REMINDER_SENT, sentMap);
