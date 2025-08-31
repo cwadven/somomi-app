@@ -120,52 +120,101 @@ const LocationDetailScreen = () => {
 
   // 정렬 로직
   const sortProducts = useCallback((list) => {
-    const arr = [...(list || [])];
-    if (!sortKey) return arr; // 정렬 취소 시 원본 순서 유지
-    const dir = sortDesc ? -1 : 1;
-    arr.sort((a, b) => {
-      const getName = (x) => (x?.name || x?.title || '').toString();
-      const getTime = (v) => (v ? new Date(v).getTime() : 0);
-      const cmpNum = (av, bv) => (av === bv ? 0 : (av > bv ? dir : -dir));
-      if (sortKey === 'estimated') {
-        const av = getTime(a.estimatedEndDate);
-        const bv = getTime(b.estimatedEndDate);
+    const input = list || [];
+    if (!sortKey) return [...input]; // 정렬 취소 시 원본 순서 유지
+
+    const dir = sortDesc ? -1 : 1; // 내림차순: -1, 오름차순: 1
+    const getName = (x) => (x?.name || x?.title || '').toString();
+    const cmpByName = (a, b) => getName(a).localeCompare(getName(b)) * (sortDesc ? -1 : 1);
+    const cmpNum = (av, bv) => (av === bv ? 0 : (av > bv ? dir : -dir));
+    const normalizeRate = (r) => {
+      if (r == null) return null;
+      const n = Number(r);
+      if (!isFinite(n)) return null;
+      return Math.max(0, Math.min(100, Math.round(n)));
+    };
+
+    // 1) 소진순: 소진예상 없음 → 끝으로 보냄(원래 순서 유지)
+    if (sortKey === 'estimated') {
+      const present = input.filter(p => !!p.estimatedEndDate);
+      const missing = input.filter(p => !p.estimatedEndDate);
+      present.sort((a, b) => {
+        const av = new Date(a.estimatedEndDate).getTime();
+        const bv = new Date(b.estimatedEndDate).getTime();
         if (av === bv) return getName(a).localeCompare(getName(b));
         return cmpNum(av, bv);
-      }
-      if (sortKey === 'expiry') {
-        const av = getTime(a.expiryDate);
-        const bv = getTime(b.expiryDate);
+      });
+      return [...present, ...missing];
+    }
+
+    // 2) 유통순: 유통기한 없음 → 끝으로 보냄(원래 순서 유지)
+    if (sortKey === 'expiry') {
+      const present = input.filter(p => !!p.expiryDate);
+      const missing = input.filter(p => !p.expiryDate);
+      present.sort((a, b) => {
+        const av = new Date(a.expiryDate).getTime();
+        const bv = new Date(b.expiryDate).getTime();
         if (av === bv) return getName(a).localeCompare(getName(b));
         return cmpNum(av, bv);
-      }
-      if (sortKey === 'estimatedRate') {
-        const av = getEstimatedRate(a);
-        const bv = getEstimatedRate(b);
-        if (av == null && bv == null) return getName(a).localeCompare(getName(b));
-        if (av == null) return 1; // 정보 없는 항목 뒤로
-        if (bv == null) return -1;
+      });
+      return [...present, ...missing];
+    }
+
+    // 3) 소진률%: 계산 불가(null) → 끝으로 보냄(원래 순서 유지), 소진예상 있는 항목 우선
+    if (sortKey === 'estimatedRate') {
+      const present = input.filter(p => !!p.estimatedEndDate);
+      const missing = input.filter(p => !p.estimatedEndDate);
+      present.sort((a, b) => {
+        const ra = normalizeRate(getEstimatedRate(a));
+        const rb = normalizeRate(getEstimatedRate(b));
+        const av = ra == null ? 0 : ra;
+        const bv = rb == null ? 0 : rb;
+        if (av === bv) {
+          const ad = new Date(a.estimatedEndDate).getTime();
+          const bd = new Date(b.estimatedEndDate).getTime();
+          if (ad !== bd) return cmpNum(ad, bd);
+          return getName(a).localeCompare(getName(b));
+        }
+        return cmpNum(av, bv);
+      });
+      return [...present, ...missing];
+    }
+
+    // 4) 유통률%: 계산 불가(null) → 끝으로 보냄(원래 순서 유지), 유통기한 있는 항목 우선
+    if (sortKey === 'expiryRate') {
+      const present = input.filter(p => !!p.expiryDate);
+      const missing = input.filter(p => !p.expiryDate);
+      present.sort((a, b) => {
+        const ra = normalizeRate(getExpiryRate(a));
+        const rb = normalizeRate(getExpiryRate(b));
+        const av = ra == null ? 0 : ra;
+        const bv = rb == null ? 0 : rb;
+        if (av === bv) {
+          const ad = new Date(a.expiryDate).getTime();
+          const bd = new Date(b.expiryDate).getTime();
+          if (ad !== bd) return cmpNum(ad, bd);
+          return getName(a).localeCompare(getName(b));
+        }
+        return cmpNum(av, bv);
+      });
+      return [...present, ...missing];
+    }
+
+    // 5) 등록순 / 이름순 기존 동작 유지
+    if (sortKey === 'created') {
+      const arr = [...input];
+      arr.sort((a, b) => {
+        const av = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bv = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         if (av === bv) return getName(a).localeCompare(getName(b));
         return cmpNum(av, bv);
-      }
-      if (sortKey === 'expiryRate') {
-        const av = getExpiryRate(a);
-        const bv = getExpiryRate(b);
-        if (av == null && bv == null) return getName(a).localeCompare(getName(b));
-        if (av == null) return 1;
-        if (bv == null) return -1;
-        if (av === bv) return getName(a).localeCompare(getName(b));
-        return cmpNum(av, bv);
-      }
-      if (sortKey === 'created') {
-        const av = getTime(a.createdAt);
-        const bv = getTime(b.createdAt);
-        if (av === bv) return getName(a).localeCompare(getName(b));
-        return cmpNum(av, bv);
-      }
-      // name
-      return getName(a).localeCompare(getName(b)) * (sortDesc ? -1 : 1);
-    });
+      });
+      return arr;
+    }
+
+    // name
+    const arr = [...input];
+    arr.sort(cmpByName);
     return arr;
   }, [sortKey, sortDesc, getEstimatedRate, getExpiryRate]);
 
