@@ -164,6 +164,7 @@ const ProductFormScreen = () => {
   // 초안 저장 (추가 모드에서만, 400ms 디바운스)
   useEffect(() => {
     if (isEditMode) return;
+    if (didSubmitRef.current) return; // 생성 성공 후에는 초안 저장 중단
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
     draftTimerRef.current = setTimeout(() => {
       const draft = {
