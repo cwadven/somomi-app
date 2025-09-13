@@ -8,8 +8,7 @@ import {
   ScrollView,
   Platform,
   Modal,
-  Linking,
-  Switch
+  Linking
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -17,9 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { logout } from '../redux/slices/authSlice';
 import KakaoLoginButton from '../components/KakaoLoginButton';
 import NotificationSettings from '../components/NotificationSettings';
-import { clearAllData, loadAppPrefs, loadSyncQueue } from '../utils/storageUtils';
-import { processSyncQueueIfOnline } from '../utils/syncManager';
-import store from '../redux/store';
+import { clearAllData, loadSyncQueue } from '../utils/storageUtils';
 import { initializeData } from '../api/productsApi';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
@@ -261,32 +258,7 @@ const ProfileScreen = () => {
           onPress={() => navigation.navigate('Notifications')}
         />
 
-        {/* 동기화 상태 및 즉시 동기화 */}
-        <View style={styles.settingItem}>
-          <View style={styles.settingItemLeft}>
-            <Ionicons name="cloud-outline" size={24} color="#4CAF50" style={styles.settingIcon} />
-            <Text style={styles.settingTitle}>동기화 상태</Text>
-          </View>
-          <View style={styles.syncRightBox}>
-            <View style={[styles.syncBadge, syncQueueCount > 0 ? styles.syncBadgePending : styles.syncBadgeIdle]}>
-              <Text style={styles.syncBadgeText}>{`대기 ${syncQueueCount}건`}</Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.syncNowBtn]}
-              onPress={async () => {
-                await processSyncQueueIfOnline(dispatch, store.getState);
-                const q = await loadSyncQueue();
-                setSyncQueueCount(Array.isArray(q) ? q.length : 0);
-                setModalTitle('동기화 완료');
-                setModalMessage('대기 중이던 작업 동기화를 완료했습니다.');
-                setModalAction(null);
-                setModalVisible(true);
-              }}
-            >
-              <Text style={styles.syncNowBtnText}>지금 동기화</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* 동기화 상태 UI 제거 */}
         
 
         <SettingItem
