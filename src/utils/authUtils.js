@@ -1,65 +1,7 @@
 import { store } from '../redux/store';
 import { getAnonymousToken, verifyToken } from '../redux/slices/authSlice';
 
-// JWT 토큰 가져오기
-export const getToken = async () => {
-  try {
-    const token = localStorage.getItem('jwt_token');
-    return token;
-  } catch (error) {
-    console.error('토큰 가져오기 실패:', error);
-    return null;
-  }
-};
-
-// JWT 토큰 설정 (헤더에 추가)
-export const setAuthHeader = async () => {
-  try {
-    const token = await getToken();
-    
-    if (token) {
-      return {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      };
-    }
-    
-    return {
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    };
-  } catch (error) {
-    console.error('인증 헤더 설정 실패:', error);
-    return {
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    };
-  }
-};
-
-// 토큰 검증 및 필요시 익명 토큰 발급
-export const ensureToken = async () => {
-  const state = store.getState();
-  const { token, isAnonymous } = state.auth;
-  
-  // 토큰이 없는 경우
-  if (!token) {
-    // 토큰 검증 시도
-    await store.dispatch(verifyToken());
-    
-    // 검증 후에도 토큰이 없으면 익명 토큰 발급
-    const updatedState = store.getState();
-    if (!updatedState.auth.token) {
-      await store.dispatch(getAnonymousToken());
-    }
-  }
-  
-  return store.getState().auth;
-};
+// 사용되지 않는 getToken/setAuthHeader/ensureToken 제거됨
 
 // 비회원 제한 확인
 export const checkAnonymousLimits = async (type, locationId = null) => {

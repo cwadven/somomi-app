@@ -13,8 +13,7 @@ export const ENTITY_TYPES = {
   NOTIFICATION: 'notification',
 };
 
-// 동기화 모드 제거: 항상 온라인 커밋이 없으므로 로컬 큐 적재 경로만 사용
-export const getSyncMode = async () => 'online';
+// 동기화 모드 제거됨
 
 const nowIso = () => new Date().toISOString();
 

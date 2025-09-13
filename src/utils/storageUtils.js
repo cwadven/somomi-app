@@ -8,7 +8,6 @@ export const STORAGE_KEYS = {
   NOTIFICATIONS: 'somomi_notifications',
   CONSUMED_PRODUCTS: 'somomi_consumed_products',
   PROCESSED_NOTIFICATIONS: 'somomi_processed_notifications',
-  USER_SLOTS: 'somomi_user_slots', // 사용자 슬롯 정보
   USER_LOCATION_TEMPLATES: 'somomi_user_location_templates', // 사용자 영역 템플릿 인스턴스
   USER_PRODUCT_SLOT_TEMPLATES: 'somomi_user_product_slot_templates', // 사용자 제품 슬롯 템플릿 인스턴스
   JWT_TOKEN: 'somomi_jwt_token',
@@ -16,7 +15,6 @@ export const STORAGE_KEYS = {
   APP_PREFS: 'somomi_app_prefs', // 앱 설정(알림 등)
   DAILY_REMINDER_SENT: 'somomi_daily_reminder_sent', // 일자별 리마인더 발송 기록
   DAILY_UPDATE_REMINDER_SENT: 'somomi_daily_update_reminder_sent', // 일자별 작성 리마인더 발송 기록
-  ID_MAP: 'somomi_id_map', // remoteId -> localId 매핑
   PRODUCT_FORM_DRAFT: 'somomi_product_form_draft', // 제품 등록 초안
   LOCATION_FORM_DRAFT: 'somomi_location_form_draft', // 영역 생성 초안
 };
@@ -97,55 +95,8 @@ export const clearAllData = async () => {
 }; 
 
 // =====================
-// 동기화 보조 스토리지 (큐 제거)
+// 동기화 보조 스토리지 관련 항목 제거됨
 // =====================
-
-// ID 매핑 저장/로드 (remoteId -> localId)
-export const saveIdMap = async (idMap) => {
-  try {
-    await saveData(STORAGE_KEYS.ID_MAP, idMap || {});
-    return true;
-  } catch (error) {
-    console.error('ID 맵 저장 오류:', error);
-    return false;
-  }
-};
-
-export const loadIdMap = async () => {
-  try {
-    const map = await loadData(STORAGE_KEYS.ID_MAP);
-    return map || {};
-  } catch (error) {
-    console.error('ID 맵 로드 오류:', error);
-    return {};
-  }
-};
-
-// 큐 관련 API 제거됨
-
-// 사용자 슬롯 정보 저장 함수
-export const saveUserSlots = async (slots) => {
-  try {
-    await saveData(STORAGE_KEYS.USER_SLOTS, slots);
-    console.log('사용자 슬롯 정보가 저장되었습니다:', slots);
-    return true;
-  } catch (error) {
-    console.error('사용자 슬롯 정보 저장 중 오류:', error);
-    return false;
-  }
-};
-
-// 사용자 슬롯 정보 로드 함수
-export const loadUserSlots = async () => {
-  try {
-    const slots = await loadData(STORAGE_KEYS.USER_SLOTS);
-    console.log('사용자 슬롯 정보 로드:', slots);
-    return slots;
-  } catch (error) {
-    console.error('사용자 슬롯 정보 로드 중 오류:', error);
-    return null;
-  }
-};
 
 // 영역 데이터 저장 함수
 export const saveLocations = async (locations) => {
