@@ -11,8 +11,9 @@ import { Ionicons } from '@expo/vector-icons';
  * @param {Function} props.onDetailPress - 자세히 버튼 클릭 시 호출될 함수
  */
 const SlotStatusBar = ({ used, total, type = 'product', onDetailPress }) => {
-  // 사용률 계산 (0으로 나누기 방지)
-  const usagePercent = total > 0 ? (used / total) * 100 : 0;
+  const isUnlimited = total === -1;
+  // 사용률 계산 (무제한이면 0으로 처리)
+  const usagePercent = isUnlimited ? 0 : (total > 0 ? (used / total) * 100 : 0);
   
   // 사용률에 따른 색상 설정
   const getStatusColor = () => {
@@ -26,13 +27,13 @@ const SlotStatusBar = ({ used, total, type = 'product', onDetailPress }) => {
   
   // 사용 중인 슬롯과 전체 슬롯 수를 안전하게 표시
   const safeUsed = isNaN(used) ? 0 : used;
-  const safeTotal = isNaN(total) || total <= 0 ? 1 : total;
+  const safeTotal = isUnlimited ? -1 : (isNaN(total) || total <= 0 ? 1 : total);
   
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
         <Text style={styles.statusText}>
-          사용 중: {safeUsed}/{safeTotal} {typeText}
+          {safeTotal === -1 ? '무한 슬롯' : `사용 중: ${safeUsed}/${safeTotal} ${typeText}`}
         </Text>
         {onDetailPress && (
           <TouchableOpacity 
