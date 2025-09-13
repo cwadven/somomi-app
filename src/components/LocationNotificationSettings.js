@@ -16,6 +16,7 @@ import {
   addNotification
 } from '../redux/slices/notificationsSlice';
 import AlertModal from './AlertModal';
+import { isLocationExpired as isLocationExpiredUtil } from '../utils/locationUtils';
 
 /**
  * 영역별 알림 설정 컴포넌트
@@ -26,27 +27,15 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
   const dispatch = useDispatch();
   const { currentNotifications, status } = useSelector(state => state.notifications);
   const { isAnonymous, userLocationTemplateInstances } = useSelector(state => state.auth);
-  // 영역 템플릿 만료 여부 (LocationDetailScreen과 동일한 기준으로 판별)
-  const isLocationExpired = (() => {
-    const linkedTemplate = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locationId) || null;
-    const exp = linkedTemplate?.subscriptionExpiresAt || linkedTemplate?.expiresAt || linkedTemplate?.feature?.expiresAt || locationData?.feature?.expiresAt;
-    const expired = !!exp && (Date.now() >= new Date(exp).getTime());
-    try {
-      console.log('LocationNotificationSettings - 만료판별', {
-        locationId,
-        foundTemplateId: linkedTemplate?.id,
-        expiresAt: exp,
-        expired
-      });
-    } catch (e) {}
-    return expired;
-  })();
   const { locations } = useSelector(state => state.locations);
-  
+
   // 영역 정보 가져오기 (props로 전달된 location이 없으면 Redux에서 찾기)
   const locationData = location && Object.keys(location).length > 0 
     ? location 
     : locations.find(loc => loc.id === locationId) || {};
+
+  // 영역 템플릿 만료 여부 (공용 유틸 사용)
+  const isLocationExpired = isLocationExpiredUtil(locationId, { userLocationTemplateInstances, locations });
   
   // 디버그 로그
   useEffect(() => {

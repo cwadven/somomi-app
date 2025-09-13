@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { calculateExpiryPercentage, calculateConsumptionPercentage, getCategoryIconName } from '../utils/productUtils';
 
 // HP 바 컴포넌트
 const HPBar = ({ percentage, type }) => {
@@ -35,109 +36,8 @@ const HPBar = ({ percentage, type }) => {
 };
 
 const ProductCard = ({ product, onPress, locationName, showLocation = false }) => {
-  // 유통기한 남은 수명 계산 (%)
-  const calculateExpiryPercentage = () => {
-    if (!product.expiryDate) return null;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // 오늘 날짜의 시작(자정)으로 설정
-    
-    const expiryDate = new Date(product.expiryDate);
-    expiryDate.setHours(23, 59, 59, 999); // 만료일의 끝(23:59:59.999)으로 설정
-    
-    // purchaseDate가 없는 경우 오늘 날짜를 기준으로 계산
-    const purchaseDate = product.purchaseDate ? new Date(product.purchaseDate) : new Date();
-    purchaseDate.setHours(0, 0, 0, 0); // 구매일의 시작(자정)으로 설정
-    
-    // 날짜가 유효한지 확인
-    if (isNaN(expiryDate.getTime()) || isNaN(purchaseDate.getTime())) {
-      return {
-        percentage: 100,
-        remainingDays: 0
-      };
-    }
-    
-    const totalDays = (expiryDate - purchaseDate) / (1000 * 60 * 60 * 24);
-    
-    // totalDays가 0이거나 음수인 경우 처리
-    if (totalDays <= 0) {
-      return {
-        percentage: 0,
-        remainingDays: 0
-      };
-    }
-    
-    const remainingDays = (expiryDate - today) / (1000 * 60 * 60 * 24);
-    
-    // 유통기한이 가까워질수록 HP바가 줄어들도록 변경
-    // 남은 일수의 비율을 직접 사용 (구매일부터 유통기한까지의 총 기간 중 남은 비율)
-    const percentage = Math.max(0, Math.min(100, (remainingDays / totalDays) * 100));
-    return {
-      percentage: Math.round(percentage),
-      remainingDays: Math.ceil(remainingDays)
-    };
-  };
-
-  // 소진 예상일 남은 수명 계산 (%)
-  const calculateConsumptionPercentage = () => {
-    if (!product.estimatedEndDate) return null;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // 오늘 날짜의 시작(자정)으로 설정
-    
-    const endDate = new Date(product.estimatedEndDate);
-    endDate.setHours(23, 59, 59, 999); // 소진 예상일의 끝(23:59:59.999)으로 설정
-    
-    // purchaseDate가 없는 경우 오늘 날짜를 기준으로 계산
-    const purchaseDate = product.purchaseDate ? new Date(product.purchaseDate) : new Date();
-    purchaseDate.setHours(0, 0, 0, 0); // 구매일의 시작(자정)으로 설정
-    
-    // 날짜가 유효한지 확인
-    if (isNaN(endDate.getTime()) || isNaN(purchaseDate.getTime())) {
-      return {
-        percentage: 100,
-        remainingDays: 0
-      };
-    }
-    
-    const totalDays = (endDate - purchaseDate) / (1000 * 60 * 60 * 24);
-    
-    // totalDays가 0이거나 음수인 경우 처리
-    if (totalDays <= 0) {
-      return {
-        percentage: 0,
-        remainingDays: 0
-      };
-    }
-    
-    const remainingDays = (endDate - today) / (1000 * 60 * 60 * 24);
-    
-    // 소진예상일이 가까워질수록 HP바가 줄어들도록 변경
-    // 남은 일수의 비율을 직접 사용 (구매일부터 소진예상일까지의 총 기간 중 남은 비율)
-    const percentage = Math.max(0, Math.min(100, (remainingDays / totalDays) * 100));
-    return {
-      percentage: Math.round(percentage),
-      remainingDays: Math.ceil(remainingDays)
-    };
-  };
-
-  // 카테고리에 맞는 아이콘 선택
-  const getCategoryIcon = () => {
-    const categoryIcons = {
-      '식품': 'fast-food',
-      '화장품': 'color-palette',
-      '세제': 'water',
-      '욕실용품': 'water-outline',
-      '주방용품': 'restaurant',
-    };
-    
-    // category가 객체인 경우 name 속성 사용
-    const categoryName = product.category?.name || product.category;
-    return categoryIcons[categoryName] || 'cube-outline';
-  };
-
-  const expiryResult = calculateExpiryPercentage();
-  const consumptionResult = calculateConsumptionPercentage();
+  const expiryResult = calculateExpiryPercentage(product);
+  const consumptionResult = calculateConsumptionPercentage(product);
   
   const expiryPercentage = expiryResult?.percentage;
   const expiryDaysLeft = expiryResult?.remainingDays;
@@ -184,7 +84,7 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
           isZeroHP && styles.zeroHPImageContainer
         ]}>
           <Ionicons 
-            name={getCategoryIcon()} 
+            name={getCategoryIconName(product)} 
             size={40} 
             color={isZeroHP ? "#888" : "#4CAF50"} 
           />

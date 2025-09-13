@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
 import { fetchLocations } from '../redux/slices/locationsSlice';
+import { isLocationExpired as isLocationExpiredUtil, getLocationCapacityInfo } from '../utils/locationUtils';
 
 const LocationSelectionModal = ({ visible, onClose, onSelectLocation }) => {
   const dispatch = useDispatch();
@@ -36,26 +37,10 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation }) => {
     setSelectedLocationId(location.id);
   };
 
-  const isLocationExpired = (locId) => {
-    const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locId);
-    const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
-    return !!exp && (Date.now() >= new Date(exp).getTime());
-  };
-
-  const getCapacityInfo = (locId) => {
-    const location = (locations || []).find(l => l.id === locId);
-    const baseSlots = location?.feature?.baseSlots ?? 0;
-    const assignedExtra = (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locId).length;
-    const total = baseSlots === -1 ? -1 : baseSlots + assignedExtra;
-    const used = (products || []).filter(p => p.locationId === locId && !p.isConsumed).length;
-    const isFull = total !== -1 && used >= total;
-    return { used, total, isFull };
-  };
-
   const renderLocationItem = ({ item }) => (
     (() => {
-      const { used, total, isFull } = getCapacityInfo(item.id);
-      const expired = isLocationExpired(item.id);
+      const { used, total, isFull } = getLocationCapacityInfo(item.id, { locations, products, userProductSlotTemplateInstances });
+      const expired = isLocationExpiredUtil(item.id, { userLocationTemplateInstances });
       const disabled = expired || isFull;
       const selected = selectedLocationId === item.id;
       return (
@@ -154,8 +139,8 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation }) => {
                 if (!selectedLocationId) return;
                 const selected = locations.find(l => l.id === selectedLocationId);
                 if (!selected) return;
-                const { isFull } = getCapacityInfo(selectedLocationId);
-                const expired = isLocationExpired(selectedLocationId);
+                const { isFull } = getLocationCapacityInfo(selectedLocationId, { locations, products, userProductSlotTemplateInstances });
+                const expired = isLocationExpiredUtil(selectedLocationId, { userLocationTemplateInstances });
                 if (isFull || expired) return;
                 onSelectLocation(selected);
                 onClose();

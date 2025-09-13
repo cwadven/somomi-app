@@ -19,6 +19,7 @@ import {
   cancelNotification
 } from '../utils/notificationUtils';
 import AlertModal from './AlertModal';
+import { isLocationExpired as isLocationExpiredUtil } from '../utils/locationUtils';
 
 /**
  * 제품별 알림 설정 컴포넌트
@@ -29,12 +30,9 @@ const ProductNotificationSettings = ({ productId, product }) => {
   const dispatch = useDispatch();
   const { currentNotifications, status } = useSelector(state => state.notifications);
   const { isAuthenticated, userLocationTemplateInstances } = useSelector(state => state.auth);
-  // 영역 템플릿 만료 여부
-  const isLocationExpired = (() => {
-    const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === product?.locationId);
-    const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
-    return !!exp && (Date.now() >= new Date(exp).getTime());
-  })();
+
+  // 영역 템플릿 만료 여부 (공용 유틸 사용)
+  const isLocationExpired = isLocationExpiredUtil(product?.locationId, { userLocationTemplateInstances });
 
   
   // 알림 설정 상태
