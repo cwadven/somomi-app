@@ -28,7 +28,6 @@ import { scheduleDailyReminderIfNeeded, scheduleDailyUpdateReminderIfNeeded } fr
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
 let FileSystem;
-let DocumentPicker;
 let Sharing;
 if (Platform.OS !== 'web') {
   try {
@@ -37,11 +36,6 @@ if (Platform.OS !== 'web') {
       FileSystem = require('expo-file-system');
     } catch (e) {
       console.warn('expo-file-system 로드 실패:', e?.message || String(e));
-    }
-    try {
-      DocumentPicker = require('expo-document-picker');
-    } catch (e) {
-      console.warn('expo-document-picker 로드 실패:', e?.message || String(e));
     }
     try {
       Sharing = require('expo-sharing');
@@ -368,9 +362,9 @@ const AppContent = () => {
             {/* 데이터 내보내기 섹션 */}
             <View style={{ marginBottom: 12 }}>
               <Text style={styles.infoLabel}>데이터 내보내기 (JSON)</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
+              <View style={{ flexDirection: 'column', marginTop: 8 }}>
                 <TouchableOpacity
-                  style={[styles.button, styles.checkButton, { minWidth: 120, marginBottom: 8 }]}
+                  style={[styles.button, styles.checkButton, { marginBottom: 8 }]}
                   onPress={async () => {
                     try {
                       const data = await loadData(STORAGE_KEYS.LOCATIONS) || [];
@@ -384,7 +378,7 @@ const AppContent = () => {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.button, styles.checkButton, { minWidth: 120, marginBottom: 8 }]}
+                  style={[styles.button, styles.checkButton, { marginBottom: 8 }]}
                   onPress={async () => {
                     try {
                       const data = await loadData(STORAGE_KEYS.PRODUCTS) || [];
@@ -398,7 +392,7 @@ const AppContent = () => {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.button, styles.checkButton, { minWidth: 120, marginBottom: 8 }]}
+                  style={[styles.button, styles.checkButton]}
                   onPress={async () => {
                     try {
                       const data = await loadData(STORAGE_KEYS.CONSUMED_PRODUCTS) || [];
@@ -413,44 +407,7 @@ const AppContent = () => {
               </View>
             </View>
 
-            {/* 데이터 가져오기 섹션 */}
-            <View style={{ marginBottom: 12 }}>
-              <Text style={styles.infoLabel}>데이터 가져오기 (JSON)</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
-                <TouchableOpacity
-                  style={[styles.button, styles.closeButton, { minWidth: 120, marginBottom: 8 }]}
-                  onPress={async () => {
-                    await importJsonFromPicker('영역', STORAGE_KEYS.LOCATIONS, async () => {
-                      try { await dispatch(fetchLocations()).unwrap(); addLog('영역 데이터 새로고침 완료', 'success'); } catch (e) {}
-                    });
-                  }}
-                >
-                  <Text style={styles.buttonText}>영역 import</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.button, styles.closeButton, { minWidth: 120, marginBottom: 8 }]}
-                  onPress={async () => {
-                    await importJsonFromPicker('제품', STORAGE_KEYS.PRODUCTS, async () => {
-                      try { await dispatch(fetchProducts()).unwrap(); addLog('제품 데이터 새로고침 완료', 'success'); } catch (e) {}
-                    });
-                  }}
-                >
-                  <Text style={styles.buttonText}>제품 import</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.button, styles.closeButton, { minWidth: 120, marginBottom: 8 }]}
-                  onPress={async () => {
-                    await importJsonFromPicker('소진된 제품', STORAGE_KEYS.CONSUMED_PRODUCTS, async () => {
-                      try { await dispatch(fetchConsumedProducts()).unwrap(); addLog('소진된 제품 데이터 새로고침 완료', 'success'); } catch (e) {}
-                    });
-                  }}
-                >
-                  <Text style={styles.buttonText}>소진된 제품 import</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            {/* 데이터 가져오기 섹션 제거됨 */}
  
             {isLoggedIn && user && (
               <View style={styles.userInfoContainer}>
