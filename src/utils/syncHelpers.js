@@ -7,7 +7,6 @@ export const ensureCreateMeta = (payload = {}, { deviceId, ownerUserId } = {}) =
   if (!meta.localId) meta.localId = meta.id;
   if (!meta.createdAt) meta.createdAt = nowIso();
   meta.updatedAt = nowIso();
-  meta.syncStatus = meta.syncStatus || 'dirty';
   if (!meta.deviceId && deviceId) meta.deviceId = deviceId;
   if (!meta.ownerUserId && ownerUserId) meta.ownerUserId = ownerUserId;
   return meta;
@@ -16,7 +15,6 @@ export const ensureCreateMeta = (payload = {}, { deviceId, ownerUserId } = {}) =
 export const ensureUpdateMeta = (payload = {}, { deviceId, ownerUserId } = {}) => {
   const meta = { ...payload };
   meta.updatedAt = nowIso();
-  meta.syncStatus = 'dirty';
   if (!meta.deviceId && deviceId) meta.deviceId = deviceId;
   if (!meta.ownerUserId && ownerUserId) meta.ownerUserId = ownerUserId;
   return meta;
@@ -25,7 +23,6 @@ export const ensureUpdateMeta = (payload = {}, { deviceId, ownerUserId } = {}) =
 export const ensureDeleteMeta = (payload = {}, { deviceId, ownerUserId } = {}) => {
   const meta = { ...payload };
   meta.updatedAt = nowIso();
-  meta.syncStatus = 'deleted';
   meta.deletedAt = nowIso();
   if (!meta.deviceId && deviceId) meta.deviceId = deviceId;
   if (!meta.ownerUserId && ownerUserId) meta.ownerUserId = ownerUserId;

@@ -29,13 +29,12 @@ export const fetchProducts = createAsyncThunk(
       // 제품 목록이 비어있으면 AsyncStorage에서 로드
       if (currentProducts.length === 0) {
         const storedProducts = await loadProducts();
-        const filtered = (storedProducts || []).filter(p => p?.syncStatus !== 'deleted');
-        console.log('AsyncStorage에서 로드한 제품 목록:', filtered);
-        return filtered;
+        console.log('AsyncStorage에서 로드한 제품 목록:', storedProducts);
+        return storedProducts || [];
       }
       
       // 이미 제품 목록이 있으면 그대로 반환
-      return currentProducts.filter(p => p?.syncStatus !== 'deleted');
+      return currentProducts;
     } catch (error) {
       console.error('제품 목록 가져오기 오류:', error);
       return rejectWithValue(error.message);
@@ -161,9 +160,8 @@ export const deleteProductAsync = createAsyncThunk(
         deviceId: getState().auth?.deviceId,
         ownerUserId: getState().auth?.user?.id,
       });
-      // tombstone 적용: 저장에는 남기고 상태에서만 제거
-      const nowIso = new Date().toISOString();
-      const updatedProducts = getState().products.products.map(p => p.id === id ? { ...p, syncStatus: 'deleted', deletedAt: nowIso } : p);
+      // 즉시 영구 삭제(로컬 저장소 업데이트)
+      const updatedProducts = getState().products.products.filter(p => p.id !== id);
       await saveProducts(updatedProducts);
       
       try { await refreshAfterMutation(dispatch); } catch (e) {}

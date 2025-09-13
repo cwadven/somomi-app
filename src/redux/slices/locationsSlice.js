@@ -18,13 +18,12 @@ export const fetchLocations = createAsyncThunk(
       // 영역 목록이 비어있으면 AsyncStorage에서 로드
       if (currentLocations.length === 0) {
         const storedLocations = await loadLocations();
-        const filtered = (storedLocations || []).filter(l => l?.syncStatus !== 'deleted');
-        console.log('AsyncStorage에서 로드한 영역 목록:', filtered);
-        return filtered;
+        console.log('AsyncStorage에서 로드한 영역 목록:', storedLocations);
+        return storedLocations || [];
       }
       
       // 이미 영역 목록이 있으면 그대로 반환
-      return currentLocations.filter(l => l?.syncStatus !== 'deleted');
+      return currentLocations;
     } catch (error) {
       console.error('영역 목록 가져오기 오류:', error);
       return rejectWithValue(error.message || '영역 목록을 불러오는 중 오류가 발생했습니다.');

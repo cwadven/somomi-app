@@ -29,6 +29,7 @@ import { scheduleDailyReminderIfNeeded, scheduleDailyUpdateReminderIfNeeded } fr
 let messaging;
 let FileSystem;
 let DocumentPicker;
+let Sharing;
 if (Platform.OS !== 'web') {
   try {
     messaging = require('@react-native-firebase/messaging').default;
@@ -41,6 +42,11 @@ if (Platform.OS !== 'web') {
       DocumentPicker = require('expo-document-picker');
     } catch (e) {
       console.warn('expo-document-picker 로드 실패:', e?.message || String(e));
+    }
+    try {
+      Sharing = require('expo-sharing');
+    } catch (e) {
+      console.warn('expo-sharing 로드 실패:', e?.message || String(e));
     }
     
     // 백그라운드 메시지 핸들러 설정 (앱이 로드되기 전에 설정해야 함)
@@ -580,13 +586,75 @@ const AppContent = () => {
       const json = JSON.stringify(data, null, 2);
       const ts = new Date().toISOString().replace(/[:.]/g, '-');
       const fileName = `somomi_export_${baseName}_${ts}.json`;
+      // 1) 웹: 브라우저 다운로드 처리
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        try {
+          const blob = new Blob([json], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          addLog(`다운로드 시작(웹): ${fileName}`, 'success');
+          return fileName;
+        } catch (e) {
+          console.error('웹 다운로드 실패:', e);
+          addLog(`웹 다운로드 실패: ${e?.message || String(e)}`, 'error');
+        }
+      }
+
+      // 2) Android: SAF로 Downloads 등에 저장 시도
+      if (Platform.OS === 'android' && FileSystem && FileSystem.StorageAccessFramework) {
+        try {
+          const { granted, directoryUri } = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+          if (granted && directoryUri) {
+            const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+              directoryUri,
+              fileName,
+              'application/json'
+            );
+            await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
+            addLog(`다운로드 완료(안드로이드 SAF): ${fileName}`, 'success');
+            return fileUri;
+          } else {
+            addLog('디렉토리 권한이 거부되어 공유 시트로 전환합니다.', 'warning');
+          }
+        } catch (safErr) {
+          console.warn('SAF 저장 실패:', safErr?.message || String(safErr));
+          addLog(`SAF 저장 실패: ${safErr?.message || String(safErr)}`, 'error');
+        }
+      }
+
+      // 3) iOS 또는 SAF 실패 시: 문서 디렉토리에 저장 후 공유 시트
       if (Platform.OS !== 'web' && FileSystem && FileSystem.documentDirectory) {
         const uri = FileSystem.documentDirectory + fileName;
         await FileSystem.writeAsStringAsync(uri, json, { encoding: FileSystem.EncodingType.UTF8 });
-        addLog(`내보내기 완료: ${fileName}\n경로: ${uri}`, 'success');
+        addLog(`파일 저장 완료: ${fileName}\n경로: ${uri}`, 'success');
+        if (Sharing && typeof Sharing.isAvailableAsync === 'function') {
+          try {
+            const available = await Sharing.isAvailableAsync();
+            if (available && typeof Sharing.shareAsync === 'function') {
+              await Sharing.shareAsync(uri, {
+                mimeType: 'application/json',
+                dialogTitle: `${baseName} JSON 내보내기`,
+                UTI: 'public.json',
+              });
+              addLog('공유 시트 표시 완료', 'info');
+            } else {
+              addLog('공유 시트를 사용할 수 없습니다. 파일은 앱 문서 디렉토리에 저장되었습니다.', 'warning');
+            }
+          } catch (shareErr) {
+            console.warn('공유 시트 표시 실패:', shareErr?.message || String(shareErr));
+            addLog(`공유 시트 표시 실패: ${shareErr?.message || String(shareErr)}`, 'error');
+          }
+        }
         return uri;
       }
-      // 웹 또는 파일 시스템 없음: 콘솔/로그로 대체
+
+      // 4) 마지막 수단: 콘솔 로그
       console.log(`[EXPORT:${baseName}]`, json);
       addLog(`파일 시스템을 사용할 수 없어 로그로 내보냈습니다. [${baseName}]`, 'warning');
       return null;
