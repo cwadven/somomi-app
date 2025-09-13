@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { saveLocations, loadLocations } from '../../utils/storageUtils';
+import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { ENTITY_TYPES } from '../../api/syncApi';
 import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
 
@@ -83,6 +84,8 @@ export const createLocation = createAsyncThunk(
       const updatedLocations = [...getState().locations.locations, newLocation];
       await saveLocations(updatedLocations);
       
+      // 변경 직후 한 번 최신화(서버 도입 시 활성)
+      try { await refreshAfterMutation(dispatch); } catch (e) {}
       return newLocation;
     } catch (error) {
       console.error('영역 생성 오류:', error);
@@ -94,7 +97,7 @@ export const createLocation = createAsyncThunk(
 // 영역 수정
 export const updateLocation = createAsyncThunk(
   'locations/updateLocation',
-  async (locationData, { rejectWithValue, getState }) => {
+  async (locationData, { rejectWithValue, getState, dispatch }) => {
     try {
       // 실제 구현에서는 API 호출
       // 여기서는 수정된 데이터 그대로 반환
@@ -112,6 +115,7 @@ export const updateLocation = createAsyncThunk(
       );
       await saveLocations(updatedLocations);
       
+      try { await refreshAfterMutation(dispatch); } catch (e) {}
       return enriched;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -122,7 +126,7 @@ export const updateLocation = createAsyncThunk(
 // 영역 삭제
 export const deleteLocation = createAsyncThunk(
   'locations/deleteLocation',
-  async (locationId, { rejectWithValue, getState }) => {
+  async (locationId, { rejectWithValue, getState, dispatch }) => {
     try {
       // sync 게이트웨이 적용 (tombstone는 상위에서 관리 가능)
       await commitDelete(ENTITY_TYPES.LOCATION, { id: locationId, localId: locationId }, {
@@ -140,6 +144,7 @@ export const deleteLocation = createAsyncThunk(
       });
       await saveLocations(updatedLocations);
       
+      try { await refreshAfterMutation(dispatch); } catch (e) {}
       return locationId;
     } catch (error) {
       return rejectWithValue(error.message);

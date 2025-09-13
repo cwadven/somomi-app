@@ -12,6 +12,7 @@ import {
 import { ENTITY_TYPES } from '../../api/syncApi';
 import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
 import { deleteLocation } from './locationsSlice';
+import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { saveProducts, loadProducts, saveConsumedProducts, loadConsumedProducts } from '../../utils/storageUtils';
 
 // 비동기 액션 생성
@@ -91,7 +92,7 @@ export const fetchProductsByLocation = createAsyncThunk(
 
 export const addProductAsync = createAsyncThunk(
   'products/addProduct',
-  async (product, { rejectWithValue, getState }) => {
+  async (product, { rejectWithValue, getState, dispatch }) => {
     try {
       const nowIso = new Date().toISOString();
       const locationLocalId = product.locationLocalId || product.locationId;
@@ -116,6 +117,7 @@ export const addProductAsync = createAsyncThunk(
       const updatedProducts = [...getState().products.products, response];
       await saveProducts(updatedProducts);
       
+      try { await refreshAfterMutation(dispatch); } catch (e) {}
       return response;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -125,7 +127,7 @@ export const addProductAsync = createAsyncThunk(
 
 export const updateProductAsync = createAsyncThunk(
   'products/updateProduct',
-  async (product, { rejectWithValue, getState }) => {
+  async (product, { rejectWithValue, getState, dispatch }) => {
     try {
       const enriched = await commitUpdate(ENTITY_TYPES.PRODUCT, {
         ...product,
@@ -143,6 +145,7 @@ export const updateProductAsync = createAsyncThunk(
       );
       await saveProducts(updatedProducts);
       
+      try { await refreshAfterMutation(dispatch); } catch (e) {}
       return response;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -152,7 +155,7 @@ export const updateProductAsync = createAsyncThunk(
 
 export const deleteProductAsync = createAsyncThunk(
   'products/deleteProduct',
-  async (id, { rejectWithValue, getState }) => {
+  async (id, { rejectWithValue, getState, dispatch }) => {
     try {
       await commitDelete(ENTITY_TYPES.PRODUCT, { id, localId: id }, {
         deviceId: getState().auth?.deviceId,
@@ -163,6 +166,7 @@ export const deleteProductAsync = createAsyncThunk(
       const updatedProducts = getState().products.products.map(p => p.id === id ? { ...p, syncStatus: 'deleted', deletedAt: nowIso } : p);
       await saveProducts(updatedProducts);
       
+      try { await refreshAfterMutation(dispatch); } catch (e) {}
       return id;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -173,7 +177,7 @@ export const deleteProductAsync = createAsyncThunk(
 // 소진 처리 액션
 export const markProductAsConsumedAsync = createAsyncThunk(
   'products/markProductAsConsumed',
-  async ({ id, consumptionDate }, { rejectWithValue, getState }) => {
+  async ({ id, consumptionDate }, { rejectWithValue, getState, dispatch }) => {
     try {
       const response = await markProductAsConsumedApi(id, consumptionDate);
       // 동기화 큐에 업데이트 기록(소진 처리)
@@ -199,6 +203,7 @@ export const markProductAsConsumedAsync = createAsyncThunk(
       await saveProducts(updatedProducts);
       await saveConsumedProducts(updatedConsumedProducts);
       
+      try { await refreshAfterMutation(dispatch); } catch (e) {}
       return response;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -240,7 +245,7 @@ export const fetchConsumedProducts = createAsyncThunk(
 // 소진 철회 액션
 export const restoreConsumedProductAsync = createAsyncThunk(
   'products/restoreConsumedProduct',
-  async ({ id, locationId = null }, { rejectWithValue, getState }) => {
+  async ({ id, locationId = null }, { rejectWithValue, getState, dispatch }) => {
     try {
       console.log('소진 철회 액션 시작:', { id, locationId });
       const response = await restoreConsumedProductApi(id, locationId);
@@ -264,6 +269,7 @@ export const restoreConsumedProductAsync = createAsyncThunk(
       await saveConsumedProducts(updatedConsumedProducts);
       
       console.log('소진 철회 성공:', response);
+      try { await refreshAfterMutation(dispatch); } catch (e) {}
       return response;
     } catch (error) {
       console.error('소진 철회 실패:', error);
