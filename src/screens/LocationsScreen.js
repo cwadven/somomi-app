@@ -352,20 +352,22 @@ const LocationsScreen = () => {
     return loadingOrErrorComponent;
   }
 
-  // 템플릿 인스턴스 기준으로 사용 가능한 슬롯 계산
-  const nonExpiredTemplates = userLocationTemplateInstances.filter(t => !isTemplateExpired(t));
-  const availableTemplates = nonExpiredTemplates.filter(template => !template.used);
-  const usedTemplates = nonExpiredTemplates.filter(template => template.used);
+  // 템플릿 인스턴스 기준으로 사용 가능한 슬롯 계산 (메모이제이션)
+  const nonExpiredTemplates = useMemo(() => userLocationTemplateInstances.filter(t => !isTemplateExpired(t)), [userLocationTemplateInstances, isTemplateExpired]);
+  const availableTemplates = useMemo(() => nonExpiredTemplates.filter(template => !template.used), [nonExpiredTemplates]);
+  const usedTemplates = useMemo(() => nonExpiredTemplates.filter(template => template.used), [nonExpiredTemplates]);
   const totalTemplates = nonExpiredTemplates.length;
   
-  // 콘솔에 현재 템플릿 상태 출력
-  console.log('LocationsScreen - 템플릿 상태:', {
-    totalTemplatesValid: totalTemplates,
-    usedTemplatesValid: usedTemplates.length,
-    availableTemplatesValid: availableTemplates.length,
-    expiredTemplateCount: userLocationTemplateInstances.length - nonExpiredTemplates.length,
-    templates: userLocationTemplateInstances
-  });
+  // 템플릿 상태 변경시에만 로그 출력
+  useEffect(() => {
+    console.log('LocationsScreen - 템플릿 상태:', {
+      totalTemplatesValid: totalTemplates,
+      usedTemplatesValid: usedTemplates.length,
+      availableTemplatesValid: availableTemplates.length,
+      expiredTemplateCount: userLocationTemplateInstances.length - nonExpiredTemplates.length,
+      templates: userLocationTemplateInstances
+    });
+  }, [totalTemplates, usedTemplates.length, availableTemplates.length, userLocationTemplateInstances.length, nonExpiredTemplates.length]);
 
   return (
     <View style={styles.container}>

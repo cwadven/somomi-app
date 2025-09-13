@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { logout } from '../redux/slices/authSlice';
 import KakaoLoginButton from '../components/KakaoLoginButton';
 import NotificationSettings from '../components/NotificationSettings';
-import { clearAllData, loadAppPrefs, saveAppPrefs, loadSyncQueue } from '../utils/storageUtils';
+import { clearAllData, loadAppPrefs, loadSyncQueue } from '../utils/storageUtils';
 import { processSyncQueueIfOnline } from '../utils/syncManager';
 import store from '../redux/store';
 import { initializeData } from '../api/productsApi';
@@ -29,9 +29,7 @@ const ProfileScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user, isLoggedIn, isAnonymous, loading, error } = useSelector(state => state.auth);
-  const [offlineMode, setOfflineMode] = useState(true);
   const [syncQueueCount, setSyncQueueCount] = useState(0);
-  const [isOnlineMode, setIsOnlineMode] = useState(false);
 
   // route.params로 전달된 initialMode가 있으면 해당 모드로 설정
   useEffect(() => {
@@ -40,15 +38,9 @@ const ProfileScreen = () => {
     }
   }, [route.params]);
 
-  // 오프라인 모드 초기값 로드
+  // 초기 큐 상태 로드
   useEffect(() => {
     (async () => {
-      const prefs = await loadAppPrefs();
-      if (prefs && typeof prefs.offlineMode === 'boolean') {
-        setOfflineMode(prefs.offlineMode);
-      }
-      const online = (prefs?.syncMode === 'online') || (prefs && prefs.offlineMode === false);
-      setIsOnlineMode(!!online);
       try {
         const q = await loadSyncQueue();
         setSyncQueueCount(Array.isArray(q) ? q.length : 0);
@@ -61,9 +53,6 @@ const ProfileScreen = () => {
     (async () => {
       interval = setInterval(async () => {
         try {
-          const prefs = await loadAppPrefs();
-          const online = (prefs?.syncMode === 'online') || (prefs && prefs.offlineMode === false);
-          setIsOnlineMode(!!online);
           const q = await loadSyncQueue();
           setSyncQueueCount(Array.isArray(q) ? q.length : 0);
         } catch (e) {}
@@ -283,15 +272,8 @@ const ProfileScreen = () => {
               <Text style={styles.syncBadgeText}>{`대기 ${syncQueueCount}건`}</Text>
             </View>
             <TouchableOpacity
-              style={[styles.syncNowBtn, !isOnlineMode && styles.syncNowBtnDisabled]}
+              style={[styles.syncNowBtn]}
               onPress={async () => {
-                if (!isOnlineMode) {
-                  setModalTitle('동기화 불가');
-                  setModalMessage('오프라인 모드에서는 동기화할 수 없습니다. 온라인 모드로 전환하세요.');
-                  setModalAction(null);
-                  setModalVisible(true);
-                  return;
-                }
                 await processSyncQueueIfOnline(dispatch, store.getState);
                 const q = await loadSyncQueue();
                 setSyncQueueCount(Array.isArray(q) ? q.length : 0);
@@ -300,35 +282,12 @@ const ProfileScreen = () => {
                 setModalAction(null);
                 setModalVisible(true);
               }}
-              disabled={!isOnlineMode}
             >
               <Text style={styles.syncNowBtnText}>지금 동기화</Text>
             </TouchableOpacity>
           </View>
         </View>
-        <Text style={styles.settingDescription}>
-          {isOnlineMode ? '온라인 모드: 대기 중 작업을 서버와 동기화할 수 있습니다.' : '오프라인 모드: 작업은 로컬에 저장되며, 온라인으로 전환 시 동기화됩니다.'}
-        </Text>
-
-        {/* 오프라인 모드 스위치 */}
-        <View style={styles.settingItem}>
-          <View style={styles.settingItemLeft}>
-            <Ionicons name="cloud-offline-outline" size={24} color="#4CAF50" style={styles.settingIcon} />
-            <Text style={styles.settingTitle}>오프라인 모드</Text>
-          </View>
-          <Switch
-            value={offlineMode}
-            onValueChange={async (v) => {
-              setOfflineMode(v);
-              await saveAppPrefs({ offlineMode: v, syncMode: v ? 'offline' : 'online' });
-            }}
-            trackColor={{ false: '#767577', true: '#81b0ff' }}
-            thumbColor={offlineMode ? '#4630EB' : '#f4f3f4'}
-          />
-        </View>
-        <Text style={styles.settingDescription}>
-          {offlineMode ? '오프라인 모드: 서버와 통신하지 않고 이 기기의 데이터만 사용합니다.' : '온라인 모드: 서버와 데이터를 동기화할 수 있습니다.'}
-        </Text>
+        
 
         <SettingItem
           icon="cart-outline"

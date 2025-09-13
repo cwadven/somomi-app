@@ -22,7 +22,7 @@ import { loginUser } from './src/redux/slices/authSlice';
 import { fetchLocations, reconcileLocationsDisabled } from './src/redux/slices/locationsSlice';
 import { fetchProducts, fetchConsumedProducts } from './src/redux/slices/productsSlice';
 import { processSyncQueueIfOnline } from './src/utils/syncManager';
-import { loadAppPrefs, loadData, saveData, STORAGE_KEYS } from './src/utils/storageUtils';
+import { loadData, saveData, STORAGE_KEYS } from './src/utils/storageUtils';
 import { scheduleDailyReminderIfNeeded, scheduleDailyUpdateReminderIfNeeded } from './src/utils/notificationUtils';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
@@ -313,18 +313,15 @@ const AppContent = () => {
     }
   }, [dispatch, checkForUpdates, handleAppStateChange]);
 
-  // 오프라인/온라인 모드 전환 시 동기화 큐 처리
+  // 주기적으로 동기화 큐 처리 (모드 제거)
   useEffect(() => {
     let interval;
     (async () => {
       // 최초 진입 시 한 번 처리
       await processSyncQueueIfOnline(dispatch, store.getState);
-      // 주기적으로 모드 변경/큐 여부를 확인(가벼운 작업)
+      // 주기적으로 큐 여부를 확인(가벼운 작업)
       interval = setInterval(async () => {
-        const prefs = await loadAppPrefs();
-        if (prefs?.syncMode === 'online' || prefs?.offlineMode === false) {
-          await processSyncQueueIfOnline(dispatch, store.getState);
-        }
+        await processSyncQueueIfOnline(dispatch, store.getState);
       }, 2000);
     })();
     return () => {

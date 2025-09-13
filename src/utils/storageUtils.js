@@ -17,7 +17,6 @@ export const STORAGE_KEYS = {
   DAILY_REMINDER_SENT: 'somomi_daily_reminder_sent', // 일자별 리마인더 발송 기록
   DAILY_UPDATE_REMINDER_SENT: 'somomi_daily_update_reminder_sent', // 일자별 작성 리마인더 발송 기록
   ID_MAP: 'somomi_id_map', // remoteId -> localId 매핑
-  SYNC_QUEUE: 'somomi_sync_queue', // 오프라인 동기화 작업 큐
   PRODUCT_FORM_DRAFT: 'somomi_product_form_draft', // 제품 등록 초안
   LOCATION_FORM_DRAFT: 'somomi_location_form_draft', // 영역 생성 초안
 };
@@ -75,13 +74,13 @@ export const saveAppPrefs = async (prefs) => {
 export const loadAppPrefs = async () => {
   try {
     const prefs = await loadData(STORAGE_KEYS.APP_PREFS);
-    // 기본값: 오프라인 모드 활성화
-    const defaults = { offlineMode: true, syncMode: 'offline' };
+    // 기본값 축소: 오프라인/온라인 모드 개념 제거
+    const defaults = {};
     return { ...defaults, ...(prefs || {}) };
   } catch (error) {
     console.error('앱 설정 로드 오류:', error);
-    // 오류 시에도 기본값 반환
-    return { offlineMode: true, syncMode: 'offline' };
+    // 오류 시에도 빈 기본값 반환
+    return {};
   }
 };
 
@@ -98,7 +97,7 @@ export const clearAllData = async () => {
 }; 
 
 // =====================
-// 동기화 보조 스토리지
+// 동기화 보조 스토리지 (큐 제거)
 // =====================
 
 // ID 매핑 저장/로드 (remoteId -> localId)
@@ -122,68 +121,7 @@ export const loadIdMap = async () => {
   }
 };
 
-// SyncQueue: 오프라인 작업 큐
-// 작업 형태 예시: { id, entityType, action: 'create'|'update'|'delete', localId, payload, createdAt, tries }
-export const loadSyncQueue = async () => {
-  try {
-    const q = await loadData(STORAGE_KEYS.SYNC_QUEUE);
-    return Array.isArray(q) ? q : [];
-  } catch (error) {
-    console.error('동기화 큐 로드 오류:', error);
-    return [];
-  }
-};
-
-export const saveSyncQueue = async (queue) => {
-  try {
-    await saveData(STORAGE_KEYS.SYNC_QUEUE, Array.isArray(queue) ? queue : []);
-    return true;
-  } catch (error) {
-    console.error('동기화 큐 저장 오류:', error);
-    return false;
-  }
-};
-
-export const enqueueSync = async (op) => {
-  try {
-    const queue = await loadSyncQueue();
-    const safeOp = {
-      id: op?.id || `sync_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-      createdAt: new Date().toISOString(),
-      tries: 0,
-      ...op,
-    };
-    queue.push(safeOp);
-    await saveSyncQueue(queue);
-    return safeOp;
-  } catch (error) {
-    console.error('동기화 큐 추가 오류:', error);
-    return null;
-  }
-};
-
-export const dequeueSync = async () => {
-  try {
-    const queue = await loadSyncQueue();
-    if (queue.length === 0) return null;
-    const op = queue.shift();
-    await saveSyncQueue(queue);
-    return op;
-  } catch (error) {
-    console.error('동기화 큐 제거 오류:', error);
-    return null;
-  }
-};
-
-export const clearSyncQueue = async () => {
-  try {
-    await saveSyncQueue([]);
-    return true;
-  } catch (error) {
-    console.error('동기화 큐 초기화 오류:', error);
-    return false;
-  }
-};
+// 큐 관련 API 제거됨
 
 // 사용자 슬롯 정보 저장 함수
 export const saveUserSlots = async (slots) => {

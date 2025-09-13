@@ -1,4 +1,4 @@
-import { loadAppPrefs, loadSyncQueue, clearSyncQueue, loadLocations, saveLocations, loadProducts, saveProducts } from './storageUtils';
+import { loadLocations, saveLocations, loadProducts, saveProducts } from './storageUtils';
 import { fetchLocations, reconcileLocationsDisabled } from '../redux/slices/locationsSlice';
 import { reconcileLocationTemplates } from '../redux/slices/authSlice';
 import { fetchProducts } from '../redux/slices/productsSlice';
@@ -13,62 +13,23 @@ const markSyncedMeta = (entity) => {
 };
 
 export const processSyncQueueIfOnline = async (dispatch, getState) => {
-  const prefs = await loadAppPrefs();
-  const isOnline = (prefs?.syncMode === 'online') || (prefs && prefs.offlineMode === false);
-  if (!isOnline) return;
+  // 오프라인 모드 제거: 항상 큐를 처리 (서버 미도입 상태에서는 로컬 커밋만 수행)
 
-  const queue = await loadSyncQueue();
-  if (!queue || queue.length === 0) return;
+  // 큐 제거: 즉시 반환
+  return;
 
   // 현재 저장 데이터 로드
   let locations = await loadLocations();
   let products = await loadProducts();
 
-  for (const op of queue) {
-    const { entityType, action, payload } = op || {};
-    if (!entityType || !action || !payload) continue;
-    try {
-      if (entityType === 'location') {
-        if (action === 'create') {
-          const exists = locations.some(l => (l.id === payload.id) || (l.localId && l.localId === payload.localId));
-          if (!exists) {
-            locations.push(markSyncedMeta(payload));
-          }
-        } else if (action === 'update') {
-          locations = locations.map(l => {
-            const match = (l.id === payload.id) || (l.localId && l.localId === payload.localId);
-            return match ? markSyncedMeta({ ...l, ...payload }) : l;
-          });
-        } else if (action === 'delete') {
-          locations = locations.filter(l => (l.id !== payload.id) && (l.localId !== payload.localId));
-        }
-      } else if (entityType === 'product') {
-        if (action === 'create') {
-          const exists = products.some(p => (p.id === payload.id) || (p.localId && p.localId === payload.localId));
-          if (!exists) {
-            products.push(markSyncedMeta(payload));
-          }
-        } else if (action === 'update') {
-          products = products.map(p => {
-            const match = (p.id === payload.id) || (p.localId && p.localId === payload.localId);
-            return match ? markSyncedMeta({ ...p, ...payload }) : p;
-          });
-        } else if (action === 'delete') {
-          products = products.filter(p => (p.id !== payload.id) && (p.localId !== payload.localId));
-        }
-      }
-    } catch (e) {
-      // 개별 작업 실패는 무시하고 다음으로 진행 (서버 도입 시 재시도/백오프 적용)
-      // console.warn('Sync 작업 처리 중 오류:', e);
-    }
-  }
+  // 큐 제거로 처리 루프 없음
 
   // 저장 반영
   try { await saveLocations(locations); } catch (e) {}
   try { await saveProducts(products); } catch (e) {}
 
   // 큐 비우기
-  try { await clearSyncQueue(); } catch (e) {}
+  // 큐 제거: 초기화 불필요
 
   // Redux 상태 재동기화
   try {
