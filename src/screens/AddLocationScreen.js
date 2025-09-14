@@ -70,10 +70,10 @@ const AddLocationScreen = () => {
   const currentProductIdSet = new Set(currentLocationProducts.map(p => p.id));
   const usedProductSlotTemplatesInThisLocation = (userProductSlotTemplateInstances || []).filter(t => t.used && currentProductIdSet.has(t.usedByProductId)).length;
   const assignedProductSlotTemplatesForThisLocation = (isEditMode && locationToEdit)
-    ? (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locationToEdit.id)
+    ? (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locationToEdit.id && isTemplateActive(t, subscription))
     : [];
   const assignedCountForThisLocation = assignedProductSlotTemplatesForThisLocation.length;
-  const availableProductSlotTemplates = (userProductSlotTemplateInstances || []).filter(t => !t.used && !t.assignedLocationId);
+  const availableProductSlotTemplates = (userProductSlotTemplateInstances || []).filter(t => !t.used && !t.assignedLocationId && isTemplateActive(t, subscription));
  
   // 스테이징 계산은 아래 선언 이후에 수행됩니다.
   

@@ -22,7 +22,10 @@ export const isLocationExpired = (locationId, { userLocationTemplateInstances = 
 export const getLocationCapacityInfo = (locationId, { locations = [], products = [], userProductSlotTemplateInstances = [] } = {}) => {
   const location = (locations || []).find(l => l.id === locationId);
   const baseSlots = location?.feature?.baseSlots ?? 0;
-  const assignedExtra = (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locationId).length;
+  const assignedExtra = (userProductSlotTemplateInstances || [])
+    .filter(t => t.assignedLocationId === locationId)
+    .filter(t => isTemplateActive(t, null))
+    .length;
   const total = baseSlots === -1 ? -1 : baseSlots + assignedExtra;
   const used = (products || []).filter(p => p.locationId === locationId && !p.isConsumed).length;
   const isFull = total !== -1 && used >= total;

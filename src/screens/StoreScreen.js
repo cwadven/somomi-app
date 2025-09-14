@@ -724,11 +724,12 @@ const StoreScreen = () => {
   
   // 현재 슬롯 상태 표시
   const renderCurrentSlots = () => {
-    const now = Date.now();
-    const isExpired = subscription?.isSubscribed && subscription?.expiresAt && now >= new Date(subscription.expiresAt).getTime();
-    const effectiveBaseLocationSlots = isExpired ? 0 : slots.locationSlots.baseSlots;
+    // 유효한 영역 템플릿 수 = 현재 화면에서는 사용자 보유 영역 템플릿 인스턴스를 세지 않으므로, 기본 슬롯만 반영
+    const effectiveBaseLocationSlots = slots.locationSlots.baseSlots; // 구독 만료는 템플릿 유효성으로 표현함
+    // 유효한 추가 제품 슬롯 인스턴스만 카운트
+    const validExtraProductSlots = (userProductSlotTemplateInstances || []).filter(t => isTemplateActive(t, subscription)).length;
     const totalLocationSlots = effectiveBaseLocationSlots + slots.locationSlots.additionalSlots;
-    const totalProductSlots = slots.productSlots.baseSlots + (userProductSlotTemplateInstances?.length || 0);
+    const totalProductSlots = slots.productSlots.baseSlots + validExtraProductSlots;
     
     return (
       <View style={styles.currentSlotsContainer}>

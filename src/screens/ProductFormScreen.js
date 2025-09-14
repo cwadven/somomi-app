@@ -538,7 +538,7 @@ const ProductFormScreen = () => {
     // 영역별 슬롯 한도 확인: 기본 슬롯 + 해당 영역에 등록된 추가 제품 슬롯 수 (-1은 무제한)
     const locId = locationId || (selectedLocation ? selectedLocation.id : null);
     const baseSlots = selectedLocation?.feature?.baseSlots ?? slots?.productSlots?.baseSlots ?? 0;
-    const assignedExtra = (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locId).length;
+    const assignedExtra = (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locId && isTemplateActive(t, subscription)).length;
     const totalSlots = baseSlots === -1 ? -1 : baseSlots + assignedExtra;
     const usedCount = currentLocationProducts.length;
 
@@ -626,9 +626,9 @@ const ProductFormScreen = () => {
         const baseSlotsInSubmit = selectedLocation?.feature?.baseSlots ?? slots?.productSlots?.baseSlots ?? 0;
         const productsInLocation = (products || []).filter(p => p.locationId === locIdAfter && !p.isConsumed);
         const usedCountAfter = (productsInLocation.length) + 1; // 방금 추가 포함
-        const assignedExtraAfter = (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locIdAfter).length;
+        const assignedExtraAfter = (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locIdAfter && isTemplateActive(t, subscription)).length;
         if (baseSlotsInSubmit !== -1 && usedCountAfter > baseSlotsInSubmit && usedCountAfter <= baseSlotsInSubmit + assignedExtraAfter) {
-          const availableAssigned = (userProductSlotTemplateInstances || []).find(t => t.assignedLocationId === locIdAfter && !t.used);
+          const availableAssigned = (userProductSlotTemplateInstances || []).find(t => t.assignedLocationId === locIdAfter && !t.used && isTemplateActive(t, subscription));
           if (availableAssigned) {
             dispatch(markProductSlotTemplateAsUsed({ templateId: availableAssigned.id, productId: result.id }));
           }

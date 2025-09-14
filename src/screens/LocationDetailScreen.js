@@ -340,7 +340,10 @@ const LocationDetailScreen = () => {
     
     // 영역의 기본 슬롯 + 해당 영역에 등록된 추가 제품 슬롯 수
     const baseSlots = currentLocation?.feature?.baseSlots ?? slots.productSlots.baseSlots;
-    const assignedExtra = (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locationId).length;
+    const assignedExtra = (userProductSlotTemplateInstances || [])
+      .filter(t => t.assignedLocationId === locationId)
+      .filter(t => isTemplateActive(t, subscription))
+      .length;
     const totalSlots = baseSlots === -1 ? -1 : (baseSlots + assignedExtra); // -1은 무제한
     
     return { 

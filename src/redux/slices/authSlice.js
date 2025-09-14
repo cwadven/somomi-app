@@ -390,7 +390,13 @@ export const authSlice = createSlice({
 
     // 구독 정보 업데이트
     updateSubscription: (state, action) => {
-      state.subscription = { ...state.subscription, ...action.payload };
+      const nowIso = new Date().toISOString();
+      const next = { ...state.subscription, ...action.payload };
+      // 구독 시작 갱신 시 사이클 시작 시각 기록
+      if (action.payload?.isSubscribed === true) {
+        next.cycleStartedAt = nowIso;
+      }
+      state.subscription = next;
       
       // 슬롯 별도 스토리지는 사용하지 않음 (템플릿 기반으로 전환)
     },
@@ -586,6 +592,10 @@ export const authSlice = createSlice({
             } else {
               newTemplate.feature = { ...newTemplate.feature, validWhile: { type: 'subscriptionActive', plans: planId ? [planId] : [], mode: 'any', expiresAt: null } };
             }
+            // 발급 시각을 기록하여 이후 사이클과 비교 가능하도록 함
+            try {
+              newTemplate.feature.validWhile = { ...(newTemplate.feature.validWhile || {}), since: new Date().toISOString() };
+            } catch (e) {}
             state.userLocationTemplateInstances.push(newTemplate);
             mutatedLocTemplates = true;
           }
@@ -599,6 +609,7 @@ export const authSlice = createSlice({
         }
 
         if (Array.isArray(payload.productTemplate)) {
+          const issuedAt = new Date().toISOString();
           for (const _pt of payload.productTemplate) {
             state.userProductSlotTemplateInstances.push({
               id: generateId('productSlotTemplate'),
@@ -607,6 +618,7 @@ export const authSlice = createSlice({
               used: false,
               usedByProductId: null,
               assignedLocationId: null,
+              feature: { validWhile: { type: 'subscriptionActive', plans: [planId].filter(Boolean), mode: 'any', expiresAt: null, since: issuedAt } }
             });
           }
           const plain = JSON.parse(JSON.stringify(state.userProductSlotTemplateInstances));

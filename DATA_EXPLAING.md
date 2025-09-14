@@ -28,8 +28,8 @@
     // - plans: ['standard', ...] (subscriptionActive일 때 필요한 구독 플랜 ID 목록)
     // - mode: 'any' | 'all' (여러 플랜 중 하나만 활성이어도 되는지, 모두 필요한지)
     // - expiresAt: type === 'fixed'일 때만 사용되는 만료일(ISO)
-    "validWhile": { "type": "subscriptionActive", "plans": ["standard"], "mode": "any" },
-    "expiresAt": null
+    // - since: 구독 기반 발급 시, 발급 시각(ISO). 구독 사이클 시작(cycleStartedAt) 이전이면 비유효 처리
+    "validWhile": { "type": "subscriptionActive", "plans": ["standard"], "mode": "any", "expiresAt": null, "since": "2025-01-01T00:00:00.000Z" }
   },
   "used": false,                    // 영역 템플릿의 사용 여부
   "usedInLocationId": null,         // 사용 중인 영역의 localId(id → 점진 이행 구간)
@@ -100,6 +100,7 @@
 - **추가 슬롯**: `userProductSlotTemplateInstances`를 영역에 `assignedLocationId`로 배정하여 허용 범위를 확장
 - **사용 처리**: 제품 등록 시 기본 슬롯 초과분은 해당 영역에 배정되어 있고 아직 미사용인 추가 슬롯 인스턴스를 `usedByProductId`로 소모
 - **무제한**: `baseSlots === -1`이면 추가 슬롯 없이 무제한 등록 가능
+- **유효성 필터**: 추가 슬롯 집계·표시는 항상 유효한 인스턴스(`isTemplateActive === true`)만 포함합니다.
 
 ---
 
@@ -108,11 +109,21 @@
   - `validWhile.type === 'subscriptionActive'`:
     - 사용자의 활성 구독 플랜 ID 목록과 `validWhile.plans`를 비교합니다.
     - `mode === 'any'`이면 교집합이 1개 이상이면 유효, `mode === 'all'`이면 전부 포함되어야 유효합니다.
+    - `subscription.cycleStartedAt`(구독 시작 시각) 이후에 발급된 인스턴스(`validWhile.since >= cycleStartedAt`)만 유효로 간주합니다. 이전 사이클 발급분은 재구독 후에도 비유효/비표시.
   - `validWhile.type === 'fixed'`:
-    - `feature.expiresAt`(ISO)을 현재 시각과 비교하여 유효/만료를 판단합니다.
-  - 레거시 호환: `validWhile`가 없고 `feature.expiresAt`만 있는 경우, 해당 날짜 기반으로 판단합니다.
+    - `validWhile.expiresAt`(ISO)을 현재 시각과 비교하여 유효/만료를 판단합니다.
+  - 레거시 호환: `validWhile`가 없을 경우만 `feature.expiresAt`를 읽어 날짜 기반으로 판단(점진 제거 대상).
 - 만료되면 해당 영역의 "일부 UI 액션" 제한(삭제/소진 처리 등), 템플릿 변경/제품 이동은 허용
 - 템플릿 미연동(초기/로그아웃 후)은 `disabled === true`로 취급하여 동일한 필터 경로 통일
+
+### 구독/사이클 메타
+- `subscription.cycleStartedAt`: 구독 시작(또는 재구독) 시각(ISO). 구독 기반 템플릿의 유효성 비교 기준.
+- 구독으로 발급되는 템플릿(영역/추가 제품 슬롯)에는 `feature.validWhile.since`를 발급 시각으로 저장합니다.
+
+### 표시 규칙(요약)
+- 상점의 “현재 보유 슬롯”은 다음만 집계합니다.
+  - 제품 슬롯: 유효한 추가 제품 슬롯 인스턴스 수
+  - 영역 슬롯: 기본 슬롯 + 기타 추가 영역 슬롯(정책에 따라 유효분만)
 
 ---
 

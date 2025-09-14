@@ -23,10 +23,15 @@ export const isTemplateActive = (template, subscription) => {
       const active = new Set(getActivePlanIds(subscription));
       if (plans.length === 0) return false; // 계획이 비어있으면 유효하지 않음
       if (mode === 'all') {
-        return plans.every(p => active.has(p));
+        if (!plans.every(p => active.has(p))) return false;
       }
       // any
-      return plans.some(p => active.has(p));
+      if (!plans.some(p => active.has(p))) return false;
+      // 구독 사이클 기준 필터: 템플릿 발급 시각(since)이 현재 활성 사이클 시작 이전이면 무효
+      const since = validWhile.since ? new Date(validWhile.since).getTime() : null;
+      const cycleStart = subscription?.cycleStartedAt ? new Date(subscription.cycleStartedAt).getTime() : null;
+      if (since != null && cycleStart != null && since < cycleStart) return false;
+      return true;
     }
     // fixed 타입 또는 validWhile 안에 expiresAt 존재
     if (type === 'fixed' || validWhile.expiresAt != null) {

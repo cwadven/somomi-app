@@ -210,16 +210,7 @@ const LocationsScreen = () => {
           buttons: [
             { 
               text: '상점으로 이동', 
-              onPress: () => navigation.navigate('Store') 
-            },
-            { 
-              text: '기본 템플릿 추가', 
-              onPress: () => {
-                // 새로운 기본 템플릿 추가
-                dispatch(addBasicTemplateInstance());
-                // 영역 생성 화면으로 이동
-                navigation.navigate('AddLocation');
-              } 
+              onPress: () => { setAlertModalVisible(false); navigation.navigate('Store'); } 
             },
             { 
               text: '취소'
