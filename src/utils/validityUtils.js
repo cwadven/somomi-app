@@ -28,17 +28,16 @@ export const isTemplateActive = (template, subscription) => {
       // any
       return plans.some(p => active.has(p));
     }
-    if (type === 'fixed') {
-      const exp = template?.feature?.expiresAt;
+    // fixed 타입 또는 validWhile 안에 expiresAt 존재
+    if (type === 'fixed' || validWhile.expiresAt != null) {
+      const exp = validWhile.expiresAt != null ? validWhile.expiresAt : template?.feature?.expiresAt;
       if (!exp) return true; // fixed인데 만료일이 없으면 무기한으로 간주
       return Date.now() < new Date(exp).getTime();
     }
   }
 
-  // 레거시/백워드 호환: validWhile가 없으면 expiresAt 기준
-  const exp = template?.feature?.expiresAt;
-  if (!exp) return true;
-  return Date.now() < new Date(exp).getTime();
+  // validWhile가 없으면 기본적으로 유효로 간주 (모든 생성 코드에서 validWhile 주입을 전제로 함)
+  return true;
 };
 
 export const isTemplateExpired = (template, subscription) => !isTemplateActive(template, subscription);

@@ -14,6 +14,7 @@ import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelper
 import { deleteLocation } from './locationsSlice';
 import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { saveProducts, loadProducts, saveConsumedProducts, loadConsumedProducts } from '../../utils/storageUtils';
+import { unassignProductSlotTemplate, releaseProductSlotTemplateByProduct } from './authSlice';
 
 // 비동기 액션 생성
 export const fetchProducts = createAsyncThunk(
@@ -163,6 +164,8 @@ export const deleteProductAsync = createAsyncThunk(
       // 즉시 영구 삭제(로컬 저장소 업데이트)
       const updatedProducts = getState().products.products.filter(p => p.id !== id);
       await saveProducts(updatedProducts);
+      // 추가 제품 슬롯이 해당 제품에 사용 중이었다면 해제
+      try { dispatch(releaseProductSlotTemplateByProduct(id)); } catch (e) {}
       
       try { await refreshAfterMutation(dispatch); } catch (e) {}
       return id;
@@ -200,6 +203,8 @@ export const markProductAsConsumedAsync = createAsyncThunk(
       
       await saveProducts(updatedProducts);
       await saveConsumedProducts(updatedConsumedProducts);
+      // 추가 제품 슬롯이 해당 제품에 사용 중이었다면 해제
+      try { dispatch(releaseProductSlotTemplateByProduct(id)); } catch (e) {}
       
       try { await refreshAfterMutation(dispatch); } catch (e) {}
       return response;
@@ -406,6 +411,7 @@ export const productsSlice = createSlice({
             product => product.id !== action.payload
           );
         });
+        // 추가 제품 슬롯에 연결되어 있었다면 해제 (saga 없이 reducer 동기 업데이트는 불가하므로, UI/호출 측에서 별도 디스패치 권장)
       })
       .addCase(deleteProductAsync.rejected, (state, action) => {
         state.status = 'failed';
@@ -437,6 +443,7 @@ export const productsSlice = createSlice({
             product => product.id !== action.payload.id
           );
         });
+        // 추가 제품 슬롯에 연결되어 있었다면 해제 (동기 reducer에서는 다른 슬라이스 액션 디스패치 불가)
       })
       .addCase(markProductAsConsumedAsync.rejected, (state, action) => {
         state.status = 'failed';

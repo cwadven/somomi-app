@@ -63,10 +63,9 @@ const LocationDetailScreen = () => {
       const locKey = loc?.id;
       const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locKey) || null;
       if (!tpl) return false;
-      const exp = tpl.feature?.expiresAt;
-      return !!exp && (Date.now() >= new Date(exp).getTime());
+      return !isTemplateActive(tpl, subscription);
     } catch (e) { return false; }
-  }, [userLocationTemplateInstances]);
+  }, [userLocationTemplateInstances, subscription]);
 
   // 제품 목록 필터링
   useEffect(() => {

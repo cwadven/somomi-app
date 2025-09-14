@@ -16,7 +16,6 @@ export const STORAGE_KEYS = {
   DAILY_REMINDER_SENT: 'somomi_daily_reminder_sent', // 일자별 리마인더 발송 기록
   DAILY_UPDATE_REMINDER_SENT: 'somomi_daily_update_reminder_sent', // 일자별 작성 리마인더 발송 기록
   PRODUCT_FORM_DRAFT: 'somomi_product_form_draft', // 제품 등록 초안
-  LOCATION_FORM_DRAFT: 'somomi_location_form_draft', // 영역 생성 초안
 };
 
 // 데이터 저장 함수

@@ -282,23 +282,7 @@ const AddLocationScreen = () => {
     (async () => {
       if (isEditMode) return;
       try {
-        const draft = await loadData(STORAGE_KEYS.LOCATION_FORM_DRAFT);
-        if (mounted && draft) {
-          setLocationData({
-            title: draft.title || '',
-            description: draft.description || '',
-            icon: draft.icon || 'cube-outline',
-          });
-          // 템플릿 복원: 즉시 찾지 못하면 ref에 저장해 두고, 이후 templates 준비되면 적용
-          draftSelectedTemplateIdRef.current = draft.selectedTemplateId || null;
-          if (draft.selectedTemplateId) {
-            const found = availableTemplates.find(t => t.id === draft.selectedTemplateId);
-            if (found) {
-              setSelectedTemplateInstance(found);
-              draftSelectedTemplateIdRef.current = null;
-            }
-          }
-        }
+        // 위치 폼 드래프트 로직 제거됨
       } catch (e) {}
     })();
     return () => { mounted = false; };
@@ -323,13 +307,7 @@ const AddLocationScreen = () => {
     if (hasSubmittedRef.current) return;
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
     draftTimerRef.current = setTimeout(() => {
-      const draft = {
-        title: locationData.title,
-        description: locationData.description,
-        icon: locationData.icon,
-        selectedTemplateId: selectedTemplateInstance?.id || null,
-      };
-      saveData(STORAGE_KEYS.LOCATION_FORM_DRAFT, draft);
+      // 위치 폼 드래프트 저장 로직 제거됨
     }, 400);
     return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
   }, [isEditMode, locationData.title, locationData.description, locationData.icon, selectedTemplateInstance?.id]);
@@ -538,8 +516,7 @@ const AddLocationScreen = () => {
           iconColor: '#4CAF50'
         });
         setAlertModalVisible(true);
-        // 성공 시 초안 삭제
-        try { await removeData(STORAGE_KEYS.LOCATION_FORM_DRAFT); didCreateRef.current = true; } catch (e) {}
+        // 드래프트 삭제 로직 제거됨
       }
     } catch (error) {
       setIsLoading(false);
@@ -889,11 +866,13 @@ const AddLocationScreen = () => {
                         </View>
                         <TouchableOpacity
                           style={[styles.assignButton, { backgroundColor: '#9E9E9E' }]}
-                          onPress={() => 
-                            (t.used && t.usedByProductId)
-                              ? handleUnassignProductSlot(t.id)
-                              : setStagedUnassignTemplateIds(prev => prev.includes(t.id) ? prev : [...prev, t.id])
-                          }
+                          onPress={() => {
+                            if (t.used && t.usedByProductId) {
+                              navigation.navigate('ProductDetail', { productId: t.usedByProductId });
+                            } else {
+                              setStagedUnassignTemplateIds(prev => prev.includes(t.id) ? prev : [...prev, t.id]);
+                            }
+                          }}
                         >
                           <Text style={styles.assignButtonText}>{(t.used && t.usedByProductId) ? '제품 확인' : '해제'}</Text>
                         </TouchableOpacity>

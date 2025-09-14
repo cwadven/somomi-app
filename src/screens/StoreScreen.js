@@ -196,9 +196,9 @@ const StoreScreen = () => {
         }
         if (item.category === 'locationTemplateSpecial') {
           const specialTemplate = Array.isArray(item.templates) && item.templates[0] ? item.templates[0] : null;
-          const days = specialTemplate?.feature?.expiresAt ? null : (specialTemplate?.durationDays || 30);
+          const days = (specialTemplate?.feature?.validWhile && specialTemplate.feature.validWhile.expiresAt) ? null : (specialTemplate?.durationDays || 30);
           const baseSlots = (specialTemplate && typeof specialTemplate.feature?.baseSlots === 'number') ? specialTemplate.feature.baseSlots : -1;
-          const expiresAt = specialTemplate?.feature?.expiresAt || new Date(Date.now() + (days || 0) * 24 * 60 * 60 * 1000).toISOString();
+          const expiresAt = (specialTemplate?.feature?.validWhile && specialTemplate.feature.validWhile.expiresAt) || new Date(Date.now() + (days || 0) * 24 * 60 * 60 * 1000).toISOString();
           // slots counter 업데이트(스페셜 영역도 하나의 추가 영역으로 카운트)
           dispatch(updateSlots({ locationSlots: { additionalSlots: slots.locationSlots.additionalSlots + 1 } }));
           dispatch(addTemplateInstance({
@@ -206,7 +206,7 @@ const StoreScreen = () => {
             name: specialTemplate?.locationTemplateName || '스페셜 영역',
             description: days ? `${days}일 유효 / 제품 슬롯 무제한` : '제품 슬롯 무제한',
             icon: 'star',
-            feature: { baseSlots, expiresAt },
+            feature: { baseSlots, validWhile: { type: 'fixed', expiresAt } },
             used: false,
             usedInLocationId: null,
           }));

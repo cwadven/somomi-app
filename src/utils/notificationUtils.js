@@ -143,8 +143,8 @@ export const processProductNotifications = (notifications, products, locations, 
   const isLocationTemplateExpired = (locId) => {
     try {
       const tpl = (templates || []).find(t => t.usedInLocationId === locId);
-      const exp = tpl?.feature?.expiresAt;
-      return !!exp && (Date.now() >= new Date(exp).getTime());
+      if (!tpl) return false;
+      return !isTemplateActive(tpl, null);
     } catch (e) { return false; }
   };
 

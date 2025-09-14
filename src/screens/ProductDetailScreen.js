@@ -16,6 +16,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchProductById, deleteProductAsync, markProductAsConsumedAsync } from '../redux/slices/productsSlice';
+import { isTemplateActive } from '../utils/validityUtils';
 import AlertModal from '../components/AlertModal';
 import ProductNotificationSettings from '../components/ProductNotificationSettings';
 import CalendarView from '../components/CalendarView';
@@ -67,7 +68,7 @@ const ProductDetailScreen = () => {
   
   const { productId } = route.params;
   const { currentProduct, status, error } = useSelector(state => state.products);
-  const { userLocationTemplateInstances } = useSelector(state => state.auth);
+  const { userLocationTemplateInstances, subscription } = useSelector(state => state.auth);
   
   // 최신 상태를 참조하기 위한 ref
   const consumptionDateRef = useRef({
@@ -1067,8 +1068,7 @@ const ProductDetailScreen = () => {
       <View style={styles.bottomActionBar}>
         {(() => {
           const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === currentProduct.locationId);
-          const exp = tpl?.feature?.expiresAt;
-          const isLocationExpired = !!exp && (Date.now() >= new Date(exp).getTime());
+          const isLocationExpired = tpl ? !isTemplateActive(tpl, subscription) : false;
           const onBlocked = (msg) => {
             setAlertModalConfig({
               title: '불가',

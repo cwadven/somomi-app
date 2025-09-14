@@ -4,7 +4,7 @@ import { Provider, useDispatch, useSelector } from 'react-redux';
 import { Platform, StyleSheet, Linking, AppState, View, ActivityIndicator, Text, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
-import { verifyToken, getAnonymousToken, logout, loadUserLocationTemplateInstances, loadUserProductSlotTemplateInstances } from './src/redux/slices/authSlice';
+import { verifyToken, getAnonymousToken, logout, loadUserLocationTemplateInstances, loadUserProductSlotTemplateInstances, updateSubscription } from './src/redux/slices/authSlice';
 import { reconcileLocationTemplates } from './src/redux/slices/authSlice';
 import * as Updates from 'expo-updates';
 import Constants from 'expo-constants';
@@ -417,6 +417,32 @@ const AppContent = () => {
               </View>
             )}
             
+            {/* 구독 디버깅 섹션 */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={styles.infoLabel}>구독 디버깅</Text>
+              <View style={{ flexDirection: 'row', marginTop: 8 }}>
+                <TouchableOpacity
+                  style={[styles.button, styles.logoutBtn, { marginRight: 6 }]}
+                  onPress={() => {
+                    dispatch(updateSubscription({ isSubscribed: false, plan: null, expiresAt: null }));
+                    addLog('구독 해제 처리됨(isSubscribed=false, plan=null)', 'warning');
+                  }}
+                >
+                  <Text style={styles.buttonText}>구독 해제</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.checkButton, { marginLeft: 6 }]}
+                  onPress={() => {
+                    const nowIso = new Date().toISOString();
+                    dispatch(updateSubscription({ isSubscribed: false, expiresAt: nowIso }));
+                    addLog(`구독 만료 처리됨(isSubscribed=false, expiresAt=${nowIso})`, 'warning');
+                  }}
+                >
+                  <Text style={styles.buttonText}>구독 만료(즉시)</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             <View style={styles.loginButtonsContainer}>
               {isLoggedIn ? (
                 <TouchableOpacity 

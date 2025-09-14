@@ -581,10 +581,10 @@ export const authSlice = createSlice({
             // 유효성 정책 적용: 구독 연동(기본) 또는 fixed
             if (lt && lt.feature && lt.feature.validWhile) {
               newTemplate.feature = { ...newTemplate.feature, validWhile: lt.feature.validWhile };
-            } else if (lt && lt.feature && lt.feature.expiresAt != null) {
-              newTemplate.feature = { ...newTemplate.feature, expiresAt: lt.feature.expiresAt, validWhile: { type: 'fixed' } };
+            } else if (lt && lt.feature && lt.feature.validWhile && lt.feature.validWhile.expiresAt != null) {
+              newTemplate.feature = { ...newTemplate.feature, validWhile: { type: 'fixed', expiresAt: lt.feature.validWhile.expiresAt } };
             } else {
-              newTemplate.feature = { ...newTemplate.feature, validWhile: { type: 'subscriptionActive', plans: planId ? [planId] : [], mode: 'any' } };
+              newTemplate.feature = { ...newTemplate.feature, validWhile: { type: 'subscriptionActive', plans: planId ? [planId] : [], mode: 'any', expiresAt: null } };
             }
             state.userLocationTemplateInstances.push(newTemplate);
             mutatedLocTemplates = true;
@@ -627,7 +627,7 @@ export const authSlice = createSlice({
         // 레거시: 구 스키마는 구독 연동 정책으로 처리
         newTemplate.feature = {
           ...newTemplate.feature,
-          validWhile: { type: 'subscriptionActive', plans: planId ? [planId] : [], mode: 'any' }
+          validWhile: { type: 'subscriptionActive', plans: planId ? [planId] : [], mode: 'any', expiresAt: null }
         };
         state.userLocationTemplateInstances.push(newTemplate);
       }

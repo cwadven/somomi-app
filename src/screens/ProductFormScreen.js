@@ -559,8 +559,7 @@ const ProductFormScreen = () => {
     // 해당 영역에 연결된 템플릿이 구독 만료일 때만 작업 차단
     const locId = locationId || selectedLocation?.id;
     const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locId);
-    const exp = tpl?.feature?.expiresAt;
-    const isExpired = !!exp && (Date.now() >= new Date(exp).getTime());
+    const isExpired = tpl ? !isTemplateActive(tpl, subscription) : false;
     if (isExpired) {
       setAlertModalConfig({
         title: '템플릿 만료',

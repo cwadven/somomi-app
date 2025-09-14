@@ -8,10 +8,8 @@ import { isTemplateActive } from './validityUtils';
 export const isLocationExpired = (locationId, { userLocationTemplateInstances = [], locations = [], subscription } = {}) => {
   const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locationId);
   if (!tpl) {
-    // fallback: 위치에 박힌 feature를 볼 수 있지만 정책 일관성을 위해 없음으로 간주
-    const fallbackLocation = (locations || []).find(l => l.id === locationId);
-    const exp = fallbackLocation?.feature?.expiresAt;
-    return !!exp && (Date.now() >= new Date(exp).getTime());
+    // 템플릿이 없으면 만료 아님
+    return false;
   }
   return !isTemplateActive(tpl, subscription);
 };
