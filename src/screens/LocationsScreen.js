@@ -1,3 +1,4 @@
+import { isTemplateActive } from '../utils/validityUtils';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   View, 
@@ -53,16 +54,14 @@ const LocationsScreen = () => {
   const isLocationExpired = useCallback((loc) => {
     const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === loc.id) || null;
     if (!tpl) return false;
-    const exp = tpl.expiresAt || tpl.feature?.expiresAt;
-    return !!exp && (Date.now() >= new Date(exp).getTime());
-  }, [userLocationTemplateInstances]);
+    return !isTemplateActive(tpl, subscription);
+  }, [userLocationTemplateInstances, subscription]);
 
   // 템플릿 만료 판별 헬퍼
   const isTemplateExpired = useCallback((tpl) => {
     if (!tpl) return false;
-    const exp = tpl?.expiresAt || tpl?.feature?.expiresAt;
-    return !!exp && (Date.now() >= new Date(exp).getTime());
-  }, []);
+    return !isTemplateActive(tpl, subscription);
+  }, [subscription]);
 
   // 템플릿 선택 모달 콘텐츠를 선택 상태에 맞게 갱신
   useEffect(() => {
@@ -347,10 +346,7 @@ const LocationsScreen = () => {
     return null;
   }, [isLoading, hasError, error, dispatch]);
   
-  // 로딩 중이거나 에러가 있으면 해당 컴포넌트 반환
-  if (isLoading || hasError) {
-    return loadingOrErrorComponent;
-  }
+  // 주의: 훅 호출 순서를 보장하기 위해 중간 early return 금지
 
   // 템플릿 인스턴스 기준으로 사용 가능한 슬롯 계산 (메모이제이션)
   const nonExpiredTemplates = useMemo(() => userLocationTemplateInstances.filter(t => !isTemplateExpired(t)), [userLocationTemplateInstances, isTemplateExpired]);
@@ -371,118 +367,124 @@ const LocationsScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* 구독 만료 배너 */}
-      {/* 전역 만료 배너 제거. 영역별로 안내 */}
-      {/* 슬롯 상태 표시 바 - 템플릿 인스턴스 기준 */}
-      <SlotStatusBar 
-        used={usedTemplates.length} 
-        total={totalTemplates} 
-        type="location" 
-      />
-      {/* 자동 연동 모달 제거됨 */}
-      
-      {/* 모든 제품 버튼 */}
-      <TouchableOpacity 
-        style={styles.allProductsCard}
-        onPress={handleAllProductsPress}
-      >
-        <View style={styles.allProductsIconContainer}>
-          <Ionicons name="albums-outline" size={30} color="#4CAF50" />
-        </View>
-        <View style={styles.locationInfo}>
-          <Text style={styles.locationTitle}>모든 제품</Text>
-          <Text style={styles.locationDescription} numberOfLines={1}>
-            등록된 모든 제품을 확인합니다
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={24} color="#999" />
-      </TouchableOpacity>
-      
-      {/* 영역 목록 */}
-      <Text style={styles.sectionTitle}>내 영역 목록</Text>
-      
-      {/* 영역 슬롯 리스트 */}
-      <View style={styles.locationsContainer}>
-        {locations.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
-            <Text style={styles.emptySubText}>
-              오른쪽 하단의 + 버튼을 눌러 영역을 추가하세요.
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={locations}
-            keyExtractor={(item) => String(item.localId || item.id)}
-            renderItem={({ item }) => (
-              <TouchableOpacity 
-                style={styles.locationListItem}
-                onPress={() => handleLocationPress(item)}
-              >
-                <View style={styles.locationListItemContent}>
-                  <View style={styles.locationIconContainer}>
-                    <Ionicons name={item.icon || 'cube-outline'} size={24} color="#4CAF50" />
-                  </View>
-                  <View style={styles.locationListItemTextContainer}>
-                    <Text style={styles.locationListItemTitle}>{item.title}</Text>
-                    {item.description ? (
-                      <Text style={styles.locationListItemDescription} numberOfLines={1}>
-                        {item.description}
-                      </Text>
-                    ) : null}
-                    {isLoggedIn && !userLocationTemplateInstances.some(t => t.usedInLocationId === item.id) && (
-                      <Text style={{ color: '#F44336', marginTop: 4, fontSize: 12 }}>
-                        템플릿 미연동(비활성화)
-                      </Text>
-                    )}
-                    {isLocationExpired(item) && (
-                      <Text style={{ color: '#F44336', marginTop: 4, fontSize: 12 }}>
-                        템플릿 만료됨
-                      </Text>
-                    )}
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={24} color="#999" />
-              </TouchableOpacity>
-            )}
+      {(isLoading || hasError) ? (
+        loadingOrErrorComponent
+      ) : (
+        <>
+          {/* 구독 만료 배너 */}
+          {/* 전역 만료 배너 제거. 영역별로 안내 */}
+          {/* 슬롯 상태 표시 바 - 템플릿 인스턴스 기준 */}
+          <SlotStatusBar 
+            used={usedTemplates.length} 
+            total={totalTemplates} 
+            type="location" 
           />
-        )}
-        
-        {/* 영역 추가 버튼 (우측 하단에 고정) - 사용 가능한 템플릿이 있을 때만 배지 표시 */}
-        <TouchableOpacity 
-          style={[
-            styles.addButton,
-            availableTemplates.length === 0 ? styles.disabledAddButton : null
-          ]}
-          onPress={handleAddLocation}
-        >
-          <Ionicons name="add" size={30} color="white" />
-          {availableTemplates.length > 0 && (
-            <View style={styles.slotCountBadge}>
-              <Text style={styles.slotCountText}>{availableTemplates.length}</Text>
+          {/* 자동 연동 모달 제거됨 */}
+          
+          {/* 모든 제품 버튼 */}
+          <TouchableOpacity 
+            style={styles.allProductsCard}
+            onPress={handleAllProductsPress}
+          >
+            <View style={styles.allProductsIconContainer}>
+              <Ionicons name="albums-outline" size={30} color="#4CAF50" />
             </View>
-          )}
-        </TouchableOpacity>
-      </View>
-      
-      {/* 회원가입 유도 모달 */}
-      <SignupPromptModal 
-        visible={showSignupPrompt}
-        onClose={() => setShowSignupPrompt(false)}
-        message={getSignupPromptMessage()}
-        currentCount={userLocationTemplateInstances.filter(template => template.used).length}
-        maxCount={1}
-      />
-      <AlertModal
-        visible={alertModalVisible || templatePickerVisible}
-        title={alertModalConfig.title}
-        message={alertModalConfig.message}
-        content={alertModalConfig.content}
-        buttons={alertModalConfig.buttons}
-        onClose={() => { setAlertModalVisible(false); setTemplatePickerVisible(false); }}
-        icon={alertModalConfig.icon}
-        iconColor={alertModalConfig.iconColor}
-      />
+            <View style={styles.locationInfo}>
+              <Text style={styles.locationTitle}>모든 제품</Text>
+              <Text style={styles.locationDescription} numberOfLines={1}>
+                등록된 모든 제품을 확인합니다
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#999" />
+          </TouchableOpacity>
+          
+          {/* 영역 목록 */}
+          <Text style={styles.sectionTitle}>내 영역 목록</Text>
+          
+          {/* 영역 슬롯 리스트 */}
+          <View style={styles.locationsContainer}>
+            {locations.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
+                <Text style={styles.emptySubText}>
+                  오른쪽 하단의 + 버튼을 눌러 영역을 추가하세요.
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={locations}
+                keyExtractor={(item) => String(item.localId || item.id)}
+                renderItem={({ item }) => (
+                  <TouchableOpacity 
+                    style={styles.locationListItem}
+                    onPress={() => handleLocationPress(item)}
+                  >
+                    <View style={styles.locationListItemContent}>
+                      <View style={styles.locationIconContainer}>
+                        <Ionicons name={item.icon || 'cube-outline'} size={24} color="#4CAF50" />
+                      </View>
+                      <View style={styles.locationListItemTextContainer}>
+                        <Text style={styles.locationListItemTitle}>{item.title}</Text>
+                        {item.description ? (
+                          <Text style={styles.locationListItemDescription} numberOfLines={1}>
+                            {item.description}
+                          </Text>
+                        ) : null}
+                        {isLoggedIn && !userLocationTemplateInstances.some(t => t.usedInLocationId === item.id) && (
+                          <Text style={{ color: '#F44336', marginTop: 4, fontSize: 12 }}>
+                            템플릿 미연동(비활성화)
+                          </Text>
+                        )}
+                        {isLocationExpired(item) && (
+                          <Text style={{ color: '#F44336', marginTop: 4, fontSize: 12 }}>
+                            템플릿 만료됨
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={24} color="#999" />
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+            
+            {/* 영역 추가 버튼 (우측 하단에 고정) - 사용 가능한 템플릿이 있을 때만 배지 표시 */}
+            <TouchableOpacity 
+              style={[
+                styles.addButton,
+                availableTemplates.length === 0 ? styles.disabledAddButton : null
+              ]}
+              onPress={handleAddLocation}
+            >
+              <Ionicons name="add" size={30} color="white" />
+              {availableTemplates.length > 0 && (
+                <View style={styles.slotCountBadge}>
+                  <Text style={styles.slotCountText}>{availableTemplates.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+          
+          {/* 회원가입 유도 모달 */}
+          <SignupPromptModal 
+            visible={showSignupPrompt}
+            onClose={() => setShowSignupPrompt(false)}
+            message={getSignupPromptMessage()}
+            currentCount={userLocationTemplateInstances.filter(template => template.used).length}
+            maxCount={1}
+          />
+          <AlertModal
+            visible={alertModalVisible || templatePickerVisible}
+            title={alertModalConfig.title}
+            message={alertModalConfig.message}
+            content={alertModalConfig.content}
+            buttons={alertModalConfig.buttons}
+            onClose={() => { setAlertModalVisible(false); setTemplatePickerVisible(false); }}
+            icon={alertModalConfig.icon}
+            iconColor={alertModalConfig.iconColor}
+          />
+        </>
+      )}
     </View>
   );
 };

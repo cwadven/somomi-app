@@ -1067,7 +1067,7 @@ const ProductDetailScreen = () => {
       <View style={styles.bottomActionBar}>
         {(() => {
           const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === currentProduct.locationId);
-          const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
+          const exp = tpl?.feature?.expiresAt;
           const isLocationExpired = !!exp && (Date.now() >= new Date(exp).getTime());
           const onBlocked = (msg) => {
             setAlertModalConfig({

@@ -16,6 +16,7 @@ import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, add
 import productTemplateData from '../storeTemplateData/productTemplateData';
 import locationTemplateData from '../storeTemplateData/locationTemplateData';
 import subscriptionTemplateData from '../storeTemplateData/subscriptionTemplateData';
+import { getLocationSlotChipLabels, getDurationChipLabel, getProductSlotChipLabel } from '../utils/badgeLabelUtils';
 import pointPackageData from '../storeTemplateData/pointPackageData';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
@@ -121,8 +122,9 @@ const StoreScreen = () => {
           itemType: 'subscription'
         }));
         
-        // 구독 처리 - 테스트용 20초 유효 기간
-        const expiryDate = new Date(Date.now() + 20 * 1000);
+        // 구독 처리 - 플랜 만료일 계산 (기본: 30일)
+        const durationDays = typeof item.durationDays === 'number' ? item.durationDays : 30;
+        const expiryDate = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
         
         dispatch(updateSubscription({
           isSubscribed: true,
@@ -176,7 +178,7 @@ const StoreScreen = () => {
           // slots counter 업데이트
           dispatch(updateSlots({ locationSlots: { additionalSlots: slots.locationSlots.additionalSlots + count } }));
           for (const t of templates) {
-            const baseSlots = t?.baseSlots != null ? t.baseSlots : 3;
+            const baseSlots = (t && typeof t.feature?.baseSlots === 'number') ? t.feature.baseSlots : 3;
             const displayName = t?.locationTemplateName || '기본 영역';
             dispatch(addTemplateInstance({
               productId: t?.locationTemplateId || 'basic_location',
@@ -194,15 +196,15 @@ const StoreScreen = () => {
         }
         if (item.category === 'locationTemplateSpecial') {
           const specialTemplate = Array.isArray(item.templates) && item.templates[0] ? item.templates[0] : null;
-          const days = specialTemplate?.durationDays || 30;
-          const baseSlots = specialTemplate?.baseSlots != null ? specialTemplate.baseSlots : -1;
-          const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+          const days = specialTemplate?.feature?.expiresAt ? null : (specialTemplate?.durationDays || 30);
+          const baseSlots = (specialTemplate && typeof specialTemplate.feature?.baseSlots === 'number') ? specialTemplate.feature.baseSlots : -1;
+          const expiresAt = specialTemplate?.feature?.expiresAt || new Date(Date.now() + (days || 0) * 24 * 60 * 60 * 1000).toISOString();
           // slots counter 업데이트(스페셜 영역도 하나의 추가 영역으로 카운트)
           dispatch(updateSlots({ locationSlots: { additionalSlots: slots.locationSlots.additionalSlots + 1 } }));
           dispatch(addTemplateInstance({
             productId: specialTemplate?.locationTemplateId || 'special_location',
             name: specialTemplate?.locationTemplateName || '스페셜 영역',
-            description: `${days}일 유효 / 제품 슬롯 무제한`,
+            description: days ? `${days}일 유효 / 제품 슬롯 무제한` : '제품 슬롯 무제한',
             icon: 'star',
             feature: { baseSlots, expiresAt },
             used: false,
@@ -463,16 +465,25 @@ const StoreScreen = () => {
 
         {/* 요약 칩 */}
         {(() => {
-          const locationCount = Array.isArray(plan.locationTemplate) ? plan.locationTemplate.length : (plan.locationSlots || 0);
-          const durationDays = Array.isArray(plan.locationTemplate) && plan.locationTemplate[0]?.durationDays ? plan.locationTemplate[0].durationDays : plan.durationDays || null;
-          const perLocSlots = Array.isArray(plan.productTemplate) ? plan.productTemplate.length : (plan.productSlotsPerLocation || 0);
+          const durationDays = typeof plan.durationDays === 'number' ? plan.durationDays : null;
+          const baseSlotsValues = (Array.isArray(plan.locationTemplate) ? plan.locationTemplate : [])
+            .map(t => t?.feature?.baseSlots)
+            .filter(v => typeof v === 'number');
+          const locationLabels = getLocationSlotChipLabels(baseSlotsValues);
+          const productCount = Array.isArray(plan.productTemplate) ? plan.productTemplate.length : 0;
+          const durationLabel = getDurationChipLabel(durationDays);
+          const productLabel = getProductSlotChipLabel(productCount);
           return (
             <View style={styles.summaryChipsRow}>
-              <View style={styles.chip}><Ionicons name="grid" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`영역 ${locationCount}개`}</Text></View>
-              {durationDays != null && (
-                <View style={styles.chip}><Ionicons name="time" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`${durationDays}일`}</Text></View>
+              {durationLabel && (
+                <View style={styles.chip}><Ionicons name="time" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{durationLabel}</Text></View>
               )}
-              <View style={styles.chip}><Ionicons name="cube" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`제품 슬롯/영역 ${perLocSlots}개`}</Text></View>
+              {locationLabels.map((label, idx) => (
+                <View key={`plan-loc-${idx}`} style={styles.chip}><Ionicons name="cube" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{label}</Text></View>
+              ))}
+              {productLabel && (
+                <View style={styles.chip}><Ionicons name="add-circle" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{productLabel}</Text></View>
+              )}
             </View>
           );
         })()}
@@ -563,17 +574,21 @@ const StoreScreen = () => {
               </View>
               {(() => {
                 const templates = Array.isArray(item.templates) ? item.templates : [];
-                const templateCount = templates.length;
                 const isSpecial = item.category === 'locationTemplateSpecial';
-                const durationDays = isSpecial ? (templates[0]?.durationDays || null) : null;
-                const baseSlotsLabel = isSpecial ? (templates[0]?.baseSlots === -1 ? '무제한' : `${templates[0]?.baseSlots}개`) : templates.map(t => t.baseSlots).join('/');
+                const durationDays = isSpecial ? (templates[0]?.feature?.durationDays || null) : null;
+                const baseSlotsValues = templates
+                  .map(t => t?.feature?.baseSlots)
+                  .filter(v => typeof v === 'number');
+                const locationLabels = getLocationSlotChipLabels(baseSlotsValues);
+                const durationLabel = getDurationChipLabel(durationDays);
                 return (
                   <View style={styles.summaryChipsRow}>
-                    <View style={styles.chip}><Ionicons name="layers" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`템플릿 ${templateCount}개`}</Text></View>
-                    {durationDays != null && (
-                      <View style={styles.chip}><Ionicons name="time" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`${durationDays}일`}</Text></View>
+                    {durationLabel && (
+                      <View className="chip"><Ionicons name="time" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{durationLabel}</Text></View>
                     )}
-                    <View style={styles.chip}><Ionicons name="cube" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`기본 슬롯 ${baseSlotsLabel}`}</Text></View>
+                    {locationLabels.map((label, idx) => (
+                      <View key={`loc-${idx}`} style={styles.chip}><Ionicons name="cube" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{label}</Text></View>
+                    ))}
                   </View>
                 );
               })()}
@@ -627,9 +642,11 @@ const StoreScreen = () => {
               {(() => {
                 const tpl = Array.isArray(item.templates) && item.templates[0] ? item.templates[0] : null;
                 const count = tpl?.count || tpl?.countPerLocation || 0;
+                const label = getProductSlotChipLabel(count);
+                if (!label) return null;
                 return (
                   <View style={styles.summaryChipsRow}>
-                    <View style={styles.chip}><Ionicons name="add-circle" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{`추가 슬롯 ${count}개`}</Text></View>
+                    <View style={styles.chip}><Ionicons name="add-circle" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{label}</Text></View>
                   </View>
                 );
               })()}

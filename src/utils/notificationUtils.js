@@ -1,3 +1,4 @@
+import { isTemplateActive } from './validityUtils';
 import { Platform } from 'react-native';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
@@ -40,8 +41,8 @@ export const processLocationNotifications = (notifications, products, locations,
   const isLocationTemplateExpired = (locId) => {
     try {
       const tpl = (templates || []).find(t => t.usedInLocationId === locId);
-      const exp = tpl?.expiresAt || tpl?.feature?.expiresAt;
-      return !!exp && (Date.now() >= new Date(exp).getTime());
+      if (!tpl) return false;
+      return !isTemplateActive(tpl, null); // 백그라운드 처리에서는 최신 subscription 주입이 어려울 수 있으므로 null 허용
     } catch (e) { return false; }
   };
 
@@ -142,7 +143,7 @@ export const processProductNotifications = (notifications, products, locations, 
   const isLocationTemplateExpired = (locId) => {
     try {
       const tpl = (templates || []).find(t => t.usedInLocationId === locId);
-      const exp = tpl?.expiresAt || tpl?.feature?.expiresAt;
+      const exp = tpl?.feature?.expiresAt;
       return !!exp && (Date.now() >= new Date(exp).getTime());
     } catch (e) { return false; }
   };

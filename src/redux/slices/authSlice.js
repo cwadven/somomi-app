@@ -572,18 +572,19 @@ export const authSlice = createSlice({
 
         if (Array.isArray(payload.locationTemplate)) {
           for (const lt of payload.locationTemplate) {
-            const baseSlots = (lt && typeof lt.baseSlots === 'number') ? lt.baseSlots : 3;
+            const baseSlots = (lt && typeof lt.feature?.baseSlots === 'number') ? lt.feature.baseSlots : 3;
             const newTemplate = createBasicLocationTemplate(undefined, baseSlots);
             if (lt && lt.locationTemplateName) newTemplate.name = lt.locationTemplateName;
             if (lt && lt.locationTemplateId) newTemplate.productId = lt.locationTemplateId;
             newTemplate.origin = 'subscription';
             newTemplate.subscriptionPlanId = planId;
-            // 만료 처리: 템플릿 지정 우선 → 페이로드 공통 → 구독 상태
-            if (lt && typeof lt.durationDays === 'number') {
-              const expIso = new Date(nowMs + lt.durationDays * 24 * 60 * 60 * 1000).toISOString();
-              newTemplate.feature = { ...newTemplate.feature, expiresAt: expIso };
-            } else if (fallbackExpiresAt) {
-              newTemplate.expiresAt = fallbackExpiresAt;
+            // 유효성 정책 적용: 구독 연동(기본) 또는 fixed
+            if (lt && lt.feature && lt.feature.validWhile) {
+              newTemplate.feature = { ...newTemplate.feature, validWhile: lt.feature.validWhile };
+            } else if (lt && lt.feature && lt.feature.expiresAt != null) {
+              newTemplate.feature = { ...newTemplate.feature, expiresAt: lt.feature.expiresAt, validWhile: { type: 'fixed' } };
+            } else {
+              newTemplate.feature = { ...newTemplate.feature, validWhile: { type: 'subscriptionActive', plans: planId ? [planId] : [], mode: 'any' } };
             }
             state.userLocationTemplateInstances.push(newTemplate);
             mutatedLocTemplates = true;
@@ -623,7 +624,11 @@ export const authSlice = createSlice({
         const newTemplate = createBasicLocationTemplate(undefined, productSlotsPerLocation);
         newTemplate.origin = 'subscription';
         newTemplate.subscriptionPlanId = planId;
-        newTemplate.expiresAt = fallbackExpiresAt;
+        // 레거시: 구 스키마는 구독 연동 정책으로 처리
+        newTemplate.feature = {
+          ...newTemplate.feature,
+          validWhile: { type: 'subscriptionActive', plans: planId ? [planId] : [], mode: 'any' }
+        };
         state.userLocationTemplateInstances.push(newTemplate);
       }
       const plainTemplates = JSON.parse(JSON.stringify(state.userLocationTemplateInstances));

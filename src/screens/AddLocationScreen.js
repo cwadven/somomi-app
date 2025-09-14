@@ -20,6 +20,7 @@ import { fetchProductsByLocation } from '../redux/slices/productsSlice';
 import IconSelector from '../components/IconSelector';
 import AlertModal from '../components/AlertModal';
 import { saveData, loadData, removeData, STORAGE_KEYS } from '../utils/storageUtils';
+import { isTemplateActive } from '../utils/validityUtils';
 
 const AddLocationScreen = () => {
   const navigation = useNavigation();
@@ -30,16 +31,15 @@ const AddLocationScreen = () => {
   const isEditMode = route.params?.isEditMode || false;
   const locationToEdit = route.params?.location;
   
-  // 템플릿 인스턴스 목록 가져오기
-  const { userLocationTemplateInstances, slots, userProductSlotTemplateInstances } = useSelector(state => state.auth);
+  // 템플릿 인스턴스 및 구독 상태
+  const { userLocationTemplateInstances, slots, userProductSlotTemplateInstances, subscription } = useSelector(state => state.auth);
   const additionalProductSlots = slots?.productSlots?.additionalSlots || 0;
   const { locationProducts } = useSelector(state => state.products);
   
-  // 만료 템플릿 판단 (구독 템플릿 또는 일반 영역 템플릿의 만료 필드 모두 허용)
+  // 만료 템플릿 판단: 정책 기반(validWhile) 또는 expiresAt
   const isTemplateExpired = (t) => {
     if (!t) return false;
-    const exp = t.subscriptionExpiresAt || t.expiresAt || t.feature?.expiresAt;
-    return !!exp && (Date.now() >= new Date(exp).getTime());
+    return !isTemplateActive(t, subscription);
   };
   // 사용 가능 + 미만료 템플릿만 필터링
   const availableTemplates = userLocationTemplateInstances.filter(template => !template.used && !isTemplateExpired(template));

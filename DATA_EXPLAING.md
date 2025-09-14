@@ -21,13 +21,20 @@
   "localId": "tmpl_local_xxx",
   "remoteId": null,
   "productId": "basic_location",  // 템플릿 제품/플랜 식별용
-  "feature": { "baseSlots": 3 },  // 영역 템플릿의 기본 제품 슬롯 수 (-1: 무제한)
+  "feature": {
+    "baseSlots": 3,                // 기본 슬롯(-1: 무제한)
+    // 유효성 정책(validWhile): 날짜가 아닌 '구독 활성' 기반 권장
+    // - type: 'subscriptionActive' | 'fixed'
+    // - plans: ['standard', ...] (subscriptionActive일 때 필요한 구독 플랜 ID 목록)
+    // - mode: 'any' | 'all' (여러 플랜 중 하나만 활성이어도 되는지, 모두 필요한지)
+    // - expiresAt: type === 'fixed'일 때만 사용되는 만료일(ISO)
+    "validWhile": { "type": "subscriptionActive", "plans": ["standard"], "mode": "any" },
+    "expiresAt": null
+  },
   "used": false,                    // 영역 템플릿의 사용 여부
   "usedInLocationId": null,         // 사용 중인 영역의 localId(id → 점진 이행 구간)
   "assignedLocationId": null,       // (추가 제품 슬롯 템플릿) 배정된 영역의 localId
   "usedByProductId": null,          // (추가 제품 슬롯 템플릿) 실제 사용 중인 제품 id
-  "subscriptionExpiresAt": null,    // 구독 만료일(있다면 우선 사용)
-  "expiresAt": null,                // 일반 만료일
   "createdAt": "...",
   "updatedAt": "...",
   "deviceId": "...",
@@ -97,7 +104,13 @@
 ---
 
 ## 만료/비활성 로직
-- 만료 판단: `subscriptionExpiresAt` → `expiresAt` → `feature.expiresAt` 순서로 평가
+- 만료 판단: 템플릿의 `feature.validWhile` 정책을 최우선으로 평가합니다.
+  - `validWhile.type === 'subscriptionActive'`:
+    - 사용자의 활성 구독 플랜 ID 목록과 `validWhile.plans`를 비교합니다.
+    - `mode === 'any'`이면 교집합이 1개 이상이면 유효, `mode === 'all'`이면 전부 포함되어야 유효합니다.
+  - `validWhile.type === 'fixed'`:
+    - `feature.expiresAt`(ISO)을 현재 시각과 비교하여 유효/만료를 판단합니다.
+  - 레거시 호환: `validWhile`가 없고 `feature.expiresAt`만 있는 경우, 해당 날짜 기반으로 판단합니다.
 - 만료되면 해당 영역의 "일부 UI 액션" 제한(삭제/소진 처리 등), 템플릿 변경/제품 이동은 허용
 - 템플릿 미연동(초기/로그아웃 후)은 `disabled === true`로 취급하여 동일한 필터 경로 통일
 

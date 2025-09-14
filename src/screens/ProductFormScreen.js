@@ -1,3 +1,4 @@
+import { isTemplateActive } from '../utils/validityUtils';
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
@@ -70,11 +71,10 @@ const ProductFormScreen = () => {
   // 초안 저장용 디바운스 타이머
   const draftTimerRef = useRef(null);
   
-  // 템플릿 만료 판단 (구독/일반 만료 모두)
+  // 템플릿 만료 판단 (정책 기반)
   const isTemplateExpired = (template) => {
     if (!template) return false;
-    const exp = template.expiresAt || template.feature?.expiresAt;
-    return !!exp && (Date.now() >= new Date(exp).getTime());
+    return !isTemplateActive(template, subscription);
   };
 
   // 특정 영역이 만료 템플릿에 연결되어 있는지
@@ -559,7 +559,7 @@ const ProductFormScreen = () => {
     // 해당 영역에 연결된 템플릿이 구독 만료일 때만 작업 차단
     const locId = locationId || selectedLocation?.id;
     const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locId);
-    const exp = tpl?.expiresAt || tpl?.feature?.expiresAt;
+    const exp = tpl?.feature?.expiresAt;
     const isExpired = !!exp && (Date.now() >= new Date(exp).getTime());
     if (isExpired) {
       setAlertModalConfig({
