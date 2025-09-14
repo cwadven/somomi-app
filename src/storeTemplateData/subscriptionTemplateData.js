@@ -10,9 +10,9 @@ const subscriptionTemplateData = [
     // - locationTemplate: 영역 템플릿 인스턴스 목록(예: 3개)
     // - productTemplate: 영역당 기본 제공 제품 슬롯 정책
     locationTemplate: [
-      { locationTemplateId: 'sub_loc_tpl_basic_a', baseSlots: 5, locationTemplateName: '구독 영역A', durationDays: 30 },
-      { locationTemplateId: 'sub_loc_tpl_basic_b', baseSlots: 5, locationTemplateName: '구독 영역B', durationDays: 30 },
-      { locationTemplateId: 'sub_loc_tpl_basic_c', baseSlots: 5, locationTemplateName: '구독 영역C', durationDays: 30 },
+      { locationTemplateId: 'sub_loc_tpl_basic_a', baseSlots: 10, locationTemplateName: '구독 영역A', durationDays: 30 },
+      { locationTemplateId: 'sub_loc_tpl_basic_b', baseSlots: 10, locationTemplateName: '구독 영역B', durationDays: 30 },
+      { locationTemplateId: 'sub_loc_tpl_basic_c', baseSlots: 10, locationTemplateName: '구독 영역C', durationDays: 30 },
     ],
     productTemplate: [
       { productSlotTemplateId: 'sub_prod_tpl_basic_01', productSlotTemplateName: '구독 제품 슬롯', durationDays: 30 },

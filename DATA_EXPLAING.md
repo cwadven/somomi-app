@@ -1,10 +1,10 @@
-## 데이터/템플릿 관리 개요 (Offline-First)
+## 로컬 우선 데이터/템플릿 관리 개요
 
-- **핵심 원칙**: 오프라인 우선. 모든 엔터티는 로컬에서 정상 동작하고, 온라인 모드에서 동기화됨.
-- **ID 전략**: `localId`(오프라인 내부 참조) + `remoteId`(서버 통신용) 공존. 내부 관계는 항상 `localId` 기반.
-- **공통 메타(SyncMeta)**: `syncStatus`, `createdAt`, `updatedAt`, `lastSyncedAt`, `version?`, `deviceId`, `ownerUserId?`, `deletedAt?`
-- **동기화 큐**: 오프라인에서 발생한 C/U/D를 `SyncQueue`에 적재. 온라인 전환 시 순서대로 처리.
-- **삭제 정책**: Tombstone(소프트 삭제). `syncStatus='deleted'`, `deletedAt` 설정 후 서버 반영 → GC.
+- **핵심 원칙**: 조회는 로컬 데이터 기준. 생성/수정/삭제 시에만 선택적으로 최신화 트리거(향후 서버 연동 시 확장).
+- **ID 전략**: `localId`(내부 참조) + `remoteId`(선택적 서버 통신용) 공존. 내부 관계는 항상 `localId` 우선.
+- **공통 메타(Meta)**: `localId`, `remoteId?`, `createdAt`, `updatedAt`, `deviceId`, `ownerUserId?`
+- **동기화 큐/오프라인 모드**: 사용하지 않음(제거됨).
+- **삭제 정책**: 로컬에서 즉시 삭제(톰브스톤 미사용).
 
 ---
 
@@ -28,7 +28,6 @@
   "usedByProductId": null,          // (추가 제품 슬롯 템플릿) 실제 사용 중인 제품 id
   "subscriptionExpiresAt": null,    // 구독 만료일(있다면 우선 사용)
   "expiresAt": null,                // 일반 만료일
-  "syncStatus": "synced",
   "createdAt": "...",
   "updatedAt": "...",
   "deviceId": "...",
@@ -49,7 +48,6 @@
   "feature": { "baseSlots": 3 },  // 연결된 템플릿에서 파생
   "templateInstanceId": "tmpl_inst_xxx",
   "disabled": false,               // 템플릿 미연동/만료 등 비활성 상태 표현
-  "syncStatus": "dirty",
   "createdAt": "...",
   "updatedAt": "..."
 }
@@ -70,7 +68,6 @@
   "expiryDate": "...",
   "estimatedEndDate": null,
   "isConsumed": false,
-  "syncStatus": "synced",
   "createdAt": "...",
   "updatedAt": "..."
 }
@@ -85,8 +82,7 @@
   "name": "요거트",
   "locationId": "loc_local_01",   // 소진 당시 영역(localId 기준이 이상적)
   "consumptionDate": "...",       // 사용자 지정 소진일
-  "processedAt": "...",           // 실제 소진 처리 시각(정렬 기준)
-  "syncStatus": "synced"
+  "processedAt": "..."            // 실제 소진 처리 시각(정렬 기준)
 }
 ```
 
@@ -133,18 +129,14 @@
 - `somomi_consumed_products`: 소진된 제품 목록
 - `somomi_user_location_templates`: 사용자 보유 영역 템플릿 인스턴스
 - `somomi_user_product_slot_templates`: 사용자 보유 추가 제품 슬롯 인스턴스
-- `somomi_app_prefs`: 앱/알림/오프라인 설정(예: `offlineMode`, `syncMode` 등)
-- `somomi_id_map`: 원격/로컬 ID 매핑(선택)
-- `somomi_sync_queue`: 오프라인 작업 큐(C/U/D)
+- `somomi_app_prefs`: 앱/알림 설정
 - (그 외) 알림/카테고리/처리 로그 등
 
 ---
 
-## 동기화(요약)
-- 오프라인: 모든 변경은 로컬 즉시 반영 + `SyncQueue`에 기록
-- 온라인: 큐를 엔터티 의존 순서대로 업로드(템플릿 → 영역 → 제품 → 추가 슬롯 → 알림 규칙)
-- 서버 응답의 `remoteId`, `updatedAt`, `version/ETag` 등을 반영하여 `syncStatus='synced'`
-- 충돌: 기본 LWW(Last-Write-Wins, `updatedAt`)로 해소. 집계/제약은 서버 유효성 우선.
+## 동기화(현재 정책)
+- 서버 연동은 추후 도입 예정입니다. 현재는 로컬 퍼시스턴스만 사용합니다.
+- 변경 작업 이후에만 선택적으로 최신화 유틸(`refreshAfterMutation(dispatch)`)을 호출할 수 있고, 일반 조회는 로컬 데이터를 그대로 사용합니다.
 
 ---
 
@@ -154,10 +146,13 @@
 
 ---
 
-## Import / Export (업데이트 디버깅)
-- Export: "영역/제품/소진된 제품" 각각 JSON 배열로 저장(`somomi_export_<type>_<ts>.json`)
-- Import: JSON 파일 선택 → 배열 구조 유효성 검사 후 해당 스토리지 키에 저장 → 관련 목록 즉시 리프레시
-- 웹 환경은 파일 저장 미지원: 콘솔/디버그 로그로 대체
+## Export (업데이트 디버깅)
+- "영역/제품/소진된 제품" 각각을 JSON 배열로 내보냅니다(`somomi_export_<type>_<ts>.json`).
+- 플랫폼별 저장 방식
+  - Web: 브라우저 다운로드(Blob + a[download])
+  - Android: SAF(저장소 접근 프레임워크)로 사용자 위치 선택, 실패 시 공유 시트로 대체
+  - iOS: 문서 디렉토리에 저장 후 공유 시트로 내보내기
+- Import 기능은 제거되었습니다(디버그 UI에서도 "데이터 가져오기" 섹션 삭제).
 
 ---
 

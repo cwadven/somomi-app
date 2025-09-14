@@ -582,9 +582,8 @@ export const authSlice = createSlice({
             if (lt && typeof lt.durationDays === 'number') {
               const expIso = new Date(nowMs + lt.durationDays * 24 * 60 * 60 * 1000).toISOString();
               newTemplate.feature = { ...newTemplate.feature, expiresAt: expIso };
-              newTemplate.subscriptionExpiresAt = expIso;
             } else if (fallbackExpiresAt) {
-              newTemplate.subscriptionExpiresAt = fallbackExpiresAt;
+              newTemplate.expiresAt = fallbackExpiresAt;
             }
             state.userLocationTemplateInstances.push(newTemplate);
             mutatedLocTemplates = true;
@@ -624,7 +623,7 @@ export const authSlice = createSlice({
         const newTemplate = createBasicLocationTemplate(undefined, productSlotsPerLocation);
         newTemplate.origin = 'subscription';
         newTemplate.subscriptionPlanId = planId;
-        newTemplate.subscriptionExpiresAt = fallbackExpiresAt;
+        newTemplate.expiresAt = fallbackExpiresAt;
         state.userLocationTemplateInstances.push(newTemplate);
       }
       const plainTemplates = JSON.parse(JSON.stringify(state.userLocationTemplateInstances));

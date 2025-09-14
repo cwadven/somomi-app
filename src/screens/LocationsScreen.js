@@ -53,14 +53,14 @@ const LocationsScreen = () => {
   const isLocationExpired = useCallback((loc) => {
     const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === loc.id) || null;
     if (!tpl) return false;
-    const exp = tpl.subscriptionExpiresAt || tpl.expiresAt || tpl.feature?.expiresAt;
+    const exp = tpl.expiresAt || tpl.feature?.expiresAt;
     return !!exp && (Date.now() >= new Date(exp).getTime());
   }, [userLocationTemplateInstances]);
 
   // 템플릿 만료 판별 헬퍼
   const isTemplateExpired = useCallback((tpl) => {
     if (!tpl) return false;
-    const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
+    const exp = tpl?.expiresAt || tpl?.feature?.expiresAt;
     return !!exp && (Date.now() >= new Date(exp).getTime());
   }, []);
 

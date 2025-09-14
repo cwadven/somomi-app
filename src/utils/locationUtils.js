@@ -7,7 +7,7 @@
 export const isLocationExpired = (locationId, { userLocationTemplateInstances = [], locations = [] } = {}) => {
   const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locationId);
   const fallbackLocation = (locations || []).find(l => l.id === locationId);
-  const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt || fallbackLocation?.feature?.expiresAt;
+  const exp = tpl?.expiresAt || tpl?.feature?.expiresAt || fallbackLocation?.feature?.expiresAt;
   return !!exp && (Date.now() >= new Date(exp).getTime());
 };
 

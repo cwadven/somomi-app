@@ -62,7 +62,7 @@ const LocationDetailScreen = () => {
       const locKey = loc?.id;
       const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locKey) || null;
       if (!tpl) return false;
-      const exp = tpl.subscriptionExpiresAt || tpl.expiresAt || tpl.feature?.expiresAt;
+      const exp = tpl.expiresAt || tpl.feature?.expiresAt;
       return !!exp && (Date.now() >= new Date(exp).getTime());
     } catch (e) { return false; }
   }, [userLocationTemplateInstances]);
@@ -354,7 +354,7 @@ const LocationDetailScreen = () => {
   // 슬롯 상태에 따른 제품 추가 가능 여부
   // 템플릿 만료 시에는 제품 추가/삭제/변경은 막고, 상세 조회/수정 화면 진입만 허용
   const linkedTemplate = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locationId) || null;
-  const linkedTemplateExpiry = linkedTemplate?.subscriptionExpiresAt || linkedTemplate?.expiresAt || linkedTemplate?.feature?.expiresAt;
+  const linkedTemplateExpiry = linkedTemplate?.expiresAt || linkedTemplate?.feature?.expiresAt;
   const isTemplateExpired = !!linkedTemplateExpiry && (Date.now() >= new Date(linkedTemplateExpiry).getTime());
   const canAddProduct = !isTemplateExpired && (totalSlots === -1 || usedSlots < totalSlots);
   

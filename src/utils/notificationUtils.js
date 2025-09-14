@@ -40,7 +40,7 @@ export const processLocationNotifications = (notifications, products, locations,
   const isLocationTemplateExpired = (locId) => {
     try {
       const tpl = (templates || []).find(t => t.usedInLocationId === locId);
-      const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
+      const exp = tpl?.expiresAt || tpl?.feature?.expiresAt;
       return !!exp && (Date.now() >= new Date(exp).getTime());
     } catch (e) { return false; }
   };
@@ -142,7 +142,7 @@ export const processProductNotifications = (notifications, products, locations, 
   const isLocationTemplateExpired = (locId) => {
     try {
       const tpl = (templates || []).find(t => t.usedInLocationId === locId);
-      const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
+      const exp = tpl?.expiresAt || tpl?.feature?.expiresAt;
       return !!exp && (Date.now() >= new Date(exp).getTime());
     } catch (e) { return false; }
   };

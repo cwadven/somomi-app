@@ -73,7 +73,7 @@ const ProductFormScreen = () => {
   // 템플릿 만료 판단 (구독/일반 만료 모두)
   const isTemplateExpired = (template) => {
     if (!template) return false;
-    const exp = template.subscriptionExpiresAt || template.expiresAt || template.feature?.expiresAt;
+    const exp = template.expiresAt || template.feature?.expiresAt;
     return !!exp && (Date.now() >= new Date(exp).getTime());
   };
 
@@ -559,7 +559,7 @@ const ProductFormScreen = () => {
     // 해당 영역에 연결된 템플릿이 구독 만료일 때만 작업 차단
     const locId = locationId || selectedLocation?.id;
     const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locId);
-    const exp = tpl?.subscriptionExpiresAt || tpl?.expiresAt || tpl?.feature?.expiresAt;
+    const exp = tpl?.expiresAt || tpl?.feature?.expiresAt;
     const isExpired = !!exp && (Date.now() >= new Date(exp).getTime());
     if (isExpired) {
       setAlertModalConfig({
