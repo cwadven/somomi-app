@@ -98,6 +98,8 @@ const ProductFormScreen = () => {
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [createdProduct, setCreatedProduct] = useState(null);
   const didSubmitRef = useRef(false);
+  const pendingNavActionRef = useRef(null);
+  const isNavigatingAwayRef = useRef(false);
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [alertModalConfig, setAlertModalConfig] = useState({
     title: '',
@@ -184,15 +186,145 @@ const ProductFormScreen = () => {
     return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
   }, [isEditMode, productName, brand, purchasePlace, price, selectedCategory, selectedLocation, purchaseDate, expiryDate, estimatedEndDate, memo]);
 
-  // 뒤로가기로 화면을 떠날 때(추가 모드, 미제출) 초안 삭제
+  // 폼 변경 여부 판단
+  const hasUnsavedChanges = () => {
+    if (didSubmitRef.current) return false;
+    // 추가 모드: 사용자가 뭔가 입력했는지 단순 휴리스틱으로 판단
+    if (!isEditMode) {
+      return (
+        (productName && productName.trim() !== '') ||
+        (brand && brand.trim() !== '') ||
+        (purchasePlace && purchasePlace.trim() !== '') ||
+        (price && String(price).trim() !== '') ||
+        false ||
+        !!expiryDate ||
+        !!estimatedEndDate ||
+        (memo && memo.trim() !== '')
+      );
+    }
+    // 수정 모드: 기존 값과 비교
+    if (!currentProduct) return false;
+    const original = {
+      name: currentProduct.name || '',
+      brand: currentProduct.brand || '',
+      purchasePlace: currentProduct.purchasePlace || '',
+      price: typeof currentProduct.price === 'number' ? String(currentProduct.price) : '',
+      category: (() => {
+        // 원본 카테고리 정규화: id 우선, 없으면 name 문자열
+        const c = currentProduct.category || null;
+        if (currentProduct.categoryId) {
+          return { id: currentProduct.categoryId };
+        }
+        if (c && typeof c === 'object') {
+          if (c.id) return { id: c.id };
+          if (c.name) return { name: c.name };
+        }
+        if (typeof c === 'string') return { name: c };
+        return null;
+      })(),
+      locationId: currentProduct.locationId || null,
+      purchaseDate: currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate).toISOString().slice(0,10) : null,
+      expiryDate: currentProduct.expiryDate ? new Date(currentProduct.expiryDate).toISOString().slice(0,10) : null,
+      estimatedEndDate: currentProduct.estimatedEndDate ? new Date(currentProduct.estimatedEndDate).toISOString().slice(0,10) : null,
+      memo: currentProduct.memo || ''
+    };
+    const current = {
+      name: productName || '',
+      brand: brand || '',
+      purchasePlace: purchasePlace || '',
+      price: price ? String(price) : '',
+      category: (() => {
+        const c = selectedCategory || null;
+        if (!c) return null;
+        if (typeof c === 'object') {
+          if (c.id) return { id: c.id };
+          if (c.name) return { name: c.name };
+        }
+        if (typeof c === 'string') return { name: c };
+        return null;
+      })(),
+      locationId: selectedLocation?.id || currentProduct.locationId || null,
+      purchaseDate: purchaseDate ? new Date(purchaseDate).toISOString().slice(0,10) : null,
+      expiryDate: expiryDate ? new Date(expiryDate).toISOString().slice(0,10) : null,
+      estimatedEndDate: estimatedEndDate ? new Date(estimatedEndDate).toISOString().slice(0,10) : null,
+      memo: memo || ''
+    };
+    // 카테고리 비교: id 우선 → name 비교 폴백
+    const categoryChanged = (() => {
+      const o = original.category;
+      const c = current.category;
+      const ov = o ? (o.id || o.name || null) : null;
+      const cv = c ? (c.id || c.name || null) : null;
+      return ov !== cv;
+    })();
+    const basicChanged = (
+      original.name !== current.name ||
+      original.brand !== current.brand ||
+      original.purchasePlace !== current.purchasePlace ||
+      original.price !== current.price ||
+      original.locationId !== current.locationId ||
+      original.purchaseDate !== current.purchaseDate ||
+      original.expiryDate !== current.expiryDate ||
+      original.estimatedEndDate !== current.estimatedEndDate ||
+      original.memo !== current.memo
+    );
+    return categoryChanged || basicChanged;
+  };
+
+  // 나가기 확인 모달
+  const confirmLeaveWithoutSaving = (onConfirm) => {
+    setAlertModalConfig({
+      title: '저장하지 않고 나가시겠어요?',
+      message: '작성된 내용이 있습니다. 저장하지 않고 나가면 입력한 내용이 사라집니다.',
+      icon: 'help-circle',
+      iconColor: '#FF9800',
+      buttons: [
+        { text: '취소', style: 'cancel' },
+        { text: '나가기', onPress: onConfirm }
+      ]
+    });
+    setAlertModalVisible(true);
+  };
+
+  // 뒤로가기/제스처 차단 및 확인 흐름
   useEffect(() => {
-    if (isEditMode) return;
     const unsubscribe = navigation.addListener('beforeRemove', async (e) => {
-      if (didSubmitRef.current) return; // 제출된 경우 보존 처리 이미 끝남
-      try { await removeData(STORAGE_KEYS.PRODUCT_FORM_DRAFT); } catch (err) {}
+      if (didSubmitRef.current) return; // 제출 완료 시 차단하지 않음
+      if (isNavigatingAwayRef.current) return; // 확인 후 실제 내비게이션은 허용
+      if (!hasUnsavedChanges()) {
+        // 추가 모드일 땐 초안 정리만 수행
+        if (!isEditMode) { try { await removeData(STORAGE_KEYS.PRODUCT_FORM_DRAFT); } catch (err) {} }
+        return;
+      }
+      e.preventDefault();
+      pendingNavActionRef.current = e.data.action;
+      confirmLeaveWithoutSaving(async () => {
+        setAlertModalVisible(false);
+        isNavigatingAwayRef.current = true;
+        if (!isEditMode) { try { await removeData(STORAGE_KEYS.PRODUCT_FORM_DRAFT); } catch (err) {} }
+        if (pendingNavActionRef.current) {
+          navigation.dispatch(pendingNavActionRef.current);
+          pendingNavActionRef.current = null;
+        }
+      });
     });
     return unsubscribe;
-  }, [navigation, isEditMode]);
+  }, [navigation, isEditMode, productName, brand, purchasePlace, price, selectedCategory, selectedLocation, purchaseDate, expiryDate, estimatedEndDate, memo, currentProduct]);
+
+  // 헤더 뒤로가기 버튼 핸들러
+  const handleBackPress = async () => {
+    if (didSubmitRef.current || !hasUnsavedChanges()) {
+      if (!isEditMode) { try { await removeData(STORAGE_KEYS.PRODUCT_FORM_DRAFT); } catch (err) {} }
+      navigation.goBack();
+      return;
+    }
+    confirmLeaveWithoutSaving(async () => {
+      setAlertModalVisible(false);
+      isNavigatingAwayRef.current = true;
+      if (!isEditMode) { try { await removeData(STORAGE_KEYS.PRODUCT_FORM_DRAFT); } catch (err) {} }
+      navigation.goBack();
+    });
+  };
 
   // 수정 모드인 경우 제품 데이터 로드
   useEffect(() => {
@@ -858,7 +990,7 @@ const ProductFormScreen = () => {
     >
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={navigation.goBack} style={styles.backButton}>
+          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>

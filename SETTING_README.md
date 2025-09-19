@@ -564,3 +564,9 @@ Error: EMFILE: too many open files, watch
 ```
 watchman
 ```
+
+Local 실행
+
+```
+npx expo start --no-cache
+```
