@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { Platform, StyleSheet, Linking, AppState, View, ActivityIndicator, Text, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import store from './src/redux/store';
@@ -80,6 +80,7 @@ const AppContent = () => {
   const [updateError, setUpdateError] = useState(null);
   const [pushToken, setPushToken] = useState('');
   const [appState, setAppState] = useState(AppState.currentState);
+  const prevAppStateRef = useRef(AppState.currentState);
   const [dataInitialized, setDataInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
@@ -171,16 +172,17 @@ const AppContent = () => {
   
   // 앱 상태 변경 핸들러
   const handleAppStateChange = useCallback((nextAppState) => {
+    const previousState = prevAppStateRef.current;
     setAppState(nextAppState);
     
-    // 앱이 백그라운드에서 포그라운드로 돌아올 때 알림 권한 확인
-    if (appState.match(/inactive|background/) && nextAppState === 'active' && Platform.OS !== 'web') {
+    // 앱이 백그라운드/비활성 → 활성으로 전환될 때만 처리
+    if (previousState?.match(/inactive|background/) && nextAppState === 'active' && Platform.OS !== 'web') {
       pushNotificationService.requestNotificationPermission();
-      // 포그라운드 전환 시 스케줄 재검사/예약
       try { scheduleDailyReminderIfNeeded(); } catch (e) { }
       try { scheduleDailyUpdateReminderIfNeeded(); } catch (e) { }
     }
-  }, [appState]);
+    prevAppStateRef.current = nextAppState;
+  }, []);
 
   // 구독 만료 감시 (20초 테스트 포함)
   useEffect(() => {
@@ -279,39 +281,26 @@ const AppContent = () => {
     }
   };
   
+  // 초기화: 마운트 시 1회만 수행
   useEffect(() => {
     initializeApp();
-    
-    // 앱 상태 변경 리스너 등록
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-    
-    // 웹이 아닌 환경에서만 알림 관련 코드 실행
-    if (Platform.OS !== 'web') {
-      // Firebase 관련 이벤트 리스너 등록
-      let unsubscribe;
-      let messagingUnsubscribe;
+  }, [dispatch]);
 
-      return () => {
-        // 앱 상태 변경 리스너 정리
-        subscription.remove();
-        pushNotificationService.cleanupNotificationHandler();
-        
-        // 이벤트 리스너 정리
-        if (unsubscribe) unsubscribe();
-        if (messagingUnsubscribe) messagingUnsubscribe();
-      };
-    } else {
-      // 웹 환경에서는 앱 상태 변경 리스너만 정리
+  // 앱 상태 변경 리스너 등록
+  useEffect(() => {
+    const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
     return () => {
-        subscription.remove();
+      appStateSubscription.remove();
+      pushNotificationService.cleanupNotificationHandler();
     };
-    }
-    
-    // 업데이트 확인
+  }, [handleAppStateChange]);
+
+  // 업데이트 확인 (프로덕션에서만)
+  useEffect(() => {
     if (!__DEV__) {
       checkForUpdates();
     }
-  }, [dispatch, checkForUpdates, handleAppStateChange]);
+  }, [checkForUpdates]);
 
   // 주기적으로 동기화 큐 처리 (모드 제거)
   useEffect(() => {
