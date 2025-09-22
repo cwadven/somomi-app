@@ -116,9 +116,17 @@ const AddLocationScreen = () => {
     }
   }, [dispatch, isEditMode, locationToEdit?.id]);
 
-  // 뒤로 가기 핸들러
+  // 뒤로 가기 핸들러(헤더 버튼)
   const handleGoBack = () => {
-    navigation.goBack();
+    if (!hasUnsavedChanges()) {
+      navigation.goBack();
+      return;
+    }
+    confirmLeaveWithoutSaving(() => {
+      setAlertModalVisible(false);
+      isNavigatingAwayRef.current = true;
+      navigation.goBack();
+    });
   };
 
   // 템플릿 인스턴스를 productId별로 그룹화
@@ -158,6 +166,8 @@ const AddLocationScreen = () => {
   const didCreateRef = useRef(false);
   const hasSubmittedRef = useRef(false);
   const draftSelectedTemplateIdRef = useRef(null);
+  const pendingNavActionRef = useRef(null);
+  const isNavigatingAwayRef = useRef(false);
   
   // 스테이징 미리보기 계산 (선언 이후)
   const stagedAssignCount = stagedAssignTemplateIds.length;
@@ -311,6 +321,72 @@ const AddLocationScreen = () => {
     }, 400);
     return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
   }, [isEditMode, locationData.title, locationData.description, locationData.icon, selectedTemplateInstance?.id]);
+
+  // 변경 여부 판단
+  const hasUnsavedChanges = () => {
+    if (hasSubmittedRef.current) return false;
+    if (isEditMode) {
+      const original = {
+        title: locationToEdit?.title || '',
+        description: locationToEdit?.description || '',
+        icon: locationToEdit?.icon || 'cube-outline',
+        templateInstanceId: locationToEdit?.templateInstanceId || null,
+      };
+      const current = {
+        title: locationData.title || '',
+        description: locationData.description || '',
+        icon: locationData.icon || 'cube-outline',
+        templateInstanceId: selectedEditTemplateInstance?.id || original.templateInstanceId,
+      };
+      const basicChanged = (
+        original.title !== current.title ||
+        original.description !== current.description ||
+        original.icon !== current.icon
+      );
+      const templateChanged = original.templateInstanceId !== current.templateInstanceId;
+      const stagedChanged = (stagedAssignTemplateIds.length > 0 || stagedUnassignTemplateIds.length > 0);
+      return basicChanged || templateChanged || stagedChanged;
+    }
+    // 생성 모드: 텍스트 입력이 있는지만 체크(템플릿/아이콘 자동 반영은 제외)
+    return (
+      (locationData.title && locationData.title.trim() !== '') ||
+      (locationData.description && locationData.description.trim() !== '')
+    );
+  };
+
+  // 나가기 확인 모달
+  const confirmLeaveWithoutSaving = (onConfirm) => {
+    setAlertModalConfig({
+      title: '저장하지 않고 나가시겠어요?',
+      message: '작성된 내용이 있습니다. 저장하지 않고 나가면 입력한 내용이 사라집니다.',
+      icon: 'help-circle',
+      iconColor: '#FF9800',
+      buttons: [
+        { text: '취소', style: 'cancel' },
+        { text: '나가기', onPress: onConfirm }
+      ]
+    });
+    setAlertModalVisible(true);
+  };
+
+  // 네비게이션 뒤로가기/제스처 차단
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (isNavigatingAwayRef.current) return; // 확인 후 실제 내비게이션 허용
+      if (!hasUnsavedChanges()) return;
+      e.preventDefault();
+      pendingNavActionRef.current = e.data.action;
+      confirmLeaveWithoutSaving(() => {
+        setAlertModalVisible(false);
+        isNavigatingAwayRef.current = true;
+        if (pendingNavActionRef.current) {
+          navigation.dispatch(pendingNavActionRef.current);
+          pendingNavActionRef.current = null;
+        }
+      });
+    });
+    return unsubscribe;
+  }, [navigation, isEditMode, locationData.title, locationData.description, locationData.icon, selectedEditTemplateInstance, stagedAssignTemplateIds, stagedUnassignTemplateIds]);
   
   // 입력값 변경 핸들러
   const handleInputChange = (key, value) => {
