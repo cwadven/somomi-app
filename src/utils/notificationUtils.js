@@ -526,17 +526,11 @@ export const scheduleDailyReminderIfNeeded = async () => {
     const data = { type: 'reminder', deepLink: 'somomi://notifications' };
 
     let notifId = null;
-    if (delaySec === 0) {
-      // 9시가 이미 지난 경우에는 즉시 1회 발송
-      notifId = await sendImmediateNotification(title, body, data);
-      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 즉시 발송 결과 id=${notifId}`); } catch (e) {}
-    }
-    // 다음 9시에 매일 반복 예약 (OS가 백그라운드에서도 처리)
+    // 다음 9시에 매일 반복 예약 (중복 방지: 동일 ID 재예약)
     try {
       const dailyId = await pushNotificationService.scheduleDailyLocalNotification(title, body, data, 9, 0);
-      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 매일 반복 예약 완료 id=${dailyId}`); } catch (e) {}
-      // 예약 성공 시 notifId를 dailyId로 간주하여 기록 저장 판단에 활용
-      if (!notifId) notifId = dailyId;
+      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 매일 반복 예약(중복방지) 완료 id=${dailyId}`); } catch (e) {}
+      notifId = dailyId;
     } catch (e) {}
  
     // 발송 기록 저장
@@ -582,16 +576,11 @@ export const scheduleDailyUpdateReminderIfNeeded = async () => {
     const data = { type: 'update_reminder', deepLink: 'somomi://notifications' };
 
     let notifId = null;
-    if (delaySec === 0) {
-      // 20시가 이미 지난 경우에는 즉시 1회 발송
-      notifId = await sendImmediateNotification(title, body, data);
-      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[20시] 즉시 발송 결과 id=${notifId}`); } catch (e) {}
-    }
-    // 다음 20시에 매일 반복 예약 (OS가 백그라운드에서도 처리)
+    // 다음 20시에 매일 반복 예약 (중복 방지: 동일 ID 재예약)
     try {
       const dailyId = await pushNotificationService.scheduleDailyLocalNotification(title, body, data, 20, 0);
-      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[20시] 매일 반복 예약 완료 id=${dailyId}`); } catch (e) {}
-      if (!notifId) notifId = dailyId;
+      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[20시] 매일 반복 예약(중복방지) 완료 id=${dailyId}`); } catch (e) {}
+      notifId = dailyId;
     } catch (e) {}
  
     if (notifId) {

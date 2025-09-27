@@ -250,7 +250,8 @@ class PushNotificationService {
     try {
       await this.createNotificationChannels();
       const channelId = 'default';
-      const notificationId = `daily_${hour}_${minute}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      // 고정 ID 사용: 동일 스케줄 재설정 시 항상 1개만 유지
+      const notificationId = `daily_${String(hour).padStart(2, '0')}_${String(minute).padStart(2, '0')}`;
 
       const normalizeData = (raw) => {
         const result = {};
@@ -295,7 +296,10 @@ class PushNotificationService {
         timestamp: next.getTime(),
         repeatFrequency: RepeatFrequency.DAILY,
       };
-
+      // 기존 동일 ID 트리거 제거 후 재등록 → 항상 1개 유지
+      try {
+        await notifee.cancelTriggerNotification(notificationId);
+      } catch (e) {}
       await notifee.createTriggerNotification(notificationConfig, trigger);
       addDebugLog(`매일 알림 예약 완료: ${hour}:${minute.toString().padStart(2, '0')} id=${notificationId}`, 'success');
       return notificationId;
@@ -600,6 +604,36 @@ class PushNotificationService {
     }
     
     addDebugLog('알림 핸들러 정리 완료', 'success');
+  }
+
+  // 단일 알림 취소
+  async cancelNotification(id) {
+    if (Platform.OS === 'web') return;
+    try {
+      // 표시된 알림/트리거 알림 모두 취소 시도
+      await Promise.all([
+        notifee.cancelNotification(id).catch(() => {}),
+        notifee.cancelTriggerNotification(id).catch(() => {}),
+      ]);
+      addDebugLog(`알림 취소 완료: id=${id}`, 'success');
+    } catch (e) {
+      addDebugLog(`알림 취소 오류(id=${id}): ${e?.message || String(e)}`, 'error');
+    }
+  }
+
+  // 모든 알림/예약 취소 (표시/트리거 모두)
+  async cancelAllNotifications() {
+    if (Platform.OS === 'web') return;
+    try {
+      await Promise.all([
+        notifee.cancelAllNotifications().catch(() => {}),
+        notifee.cancelDisplayedNotifications().catch(() => {}),
+        notifee.cancelTriggerNotifications().catch(() => {}),
+      ]);
+      addDebugLog('모든 알림/예약 취소 완료', 'success');
+    } catch (e) {
+      addDebugLog(`모든 알림 취소 오류: ${e?.message || String(e)}`, 'error');
+    }
   }
 
   // 알림 데이터에서 딥링크 생성 함수
