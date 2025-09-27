@@ -10,21 +10,64 @@ const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
 
   const handleSignup = async () => {
     try {
       setLoading(true);
       setError('');
+      // 기본 검증
+      if (!email || !email.includes('@')) {
+        setError('유효한 이메일을 입력하세요.');
+        return;
+      }
+      if (!password || password.length < 6) {
+        setError('비밀번호는 6자 이상이어야 합니다.');
+        return;
+      }
+      if (password !== passwordConfirm) {
+        setError('비밀번호가 일치하지 않습니다.');
+        return;
+      }
+      if (!otpVerified) {
+        setError('이메일 인증을 완료해 주세요.');
+        return;
+      }
       const u = username || (email && email.includes('@') ? email.split('@')[0] : '사용자');
-      await dispatch(registerUser({ username: u, email, password })).unwrap();
+      await dispatch(registerUser({ username: u, email, password, otpCode })).unwrap();
       navigation.goBack();
     } catch (e) {
       setError(e?.message || '회원가입 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRequestOtp = () => {
+    setError('');
+    if (!email || !email.includes('@')) {
+      setError('유효한 이메일을 입력한 후 인증을 요청하세요.');
+      return;
+    }
+    // 실제 구현에서는 서버에 인증 메일 발송 요청
+    setOtpRequested(true);
+    setOtpVerified(false);
+    setOtpCode('');
+  };
+
+  const handleVerifyOtp = () => {
+    setError('');
+    if (!/^\d{6}$/.test(otpCode)) {
+      setError('6자리 숫자 인증 코드를 입력하세요.');
+      return;
+    }
+    // 실제 구현에서는 서버에 코드 검증 요청
+    setOtpVerified(true);
   };
 
   return (
@@ -49,17 +92,22 @@ const LoginScreen = ({ navigation }) => {
             style={styles.input}
             value={username}
             onChangeText={setUsername}
-            placeholder="사용자 이름"
+            placeholder="닉네임"
             autoCapitalize="none"
           />
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="이메일"
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
+          <View style={styles.row}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={email}
+              onChangeText={(t) => { setEmail(t); setOtpRequested(false); setOtpVerified(false); }}
+              placeholder="이메일"
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+            <TouchableOpacity style={styles.smallBtn} onPress={handleRequestOtp} disabled={loading}>
+              <Text style={styles.smallBtnText}>{otpRequested ? '재요청' : '인증 받기'}</Text>
+            </TouchableOpacity>
+          </View>
           <TextInput
             style={styles.input}
             value={password}
@@ -67,6 +115,30 @@ const LoginScreen = ({ navigation }) => {
             placeholder="비밀번호"
             secureTextEntry={true}
           />
+          <TextInput
+            style={styles.input}
+            value={passwordConfirm}
+            onChangeText={setPasswordConfirm}
+            placeholder="비밀번호 확인"
+            secureTextEntry={true}
+          />
+          {otpRequested && !otpVerified && (
+            <View style={styles.row}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={otpCode}
+                onChangeText={(t) => setOtpCode(t.replace(/[^0-9]/g, '').slice(0, 6))}
+                placeholder="인증 코드(6자리)"
+                keyboardType="number-pad"
+              />
+              <TouchableOpacity style={styles.smallBtn} onPress={handleVerifyOtp} disabled={loading}>
+                <Text style={styles.smallBtnText}>확인하기</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {otpVerified && (
+            <Text style={styles.successText}>이메일 인증이 완료되었습니다.</Text>
+          )}
           {!!error && <Text style={styles.errorText}>{error}</Text>}
           <TouchableOpacity style={styles.primaryBtn} onPress={handleSignup} disabled={loading}>
             {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>회원가입</Text>}
@@ -135,6 +207,25 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 12,
   },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  smallBtn: {
+    backgroundColor: '#E8F5E9',
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    marginLeft: 8,
+  },
+  smallBtnText: {
+    color: '#2E7D32',
+    fontWeight: '700',
+    fontSize: 12,
+  },
   primaryBtn: {
     backgroundColor: '#4CAF50',
     borderRadius: 8,
@@ -150,6 +241,12 @@ const styles = StyleSheet.create({
     color: '#F44336',
     marginBottom: 8,
     textAlign: 'center',
+  },
+  successText: {
+    color: '#2E7D32',
+    marginBottom: 8,
+    textAlign: 'center',
+    fontWeight: '700',
   },
   closeBtn: {
     alignItems: 'center',

@@ -88,7 +88,11 @@ const ProfileScreen = () => {
   const handleLogout = () => {
     setModalTitle('로그아웃');
     setModalMessage('정말 로그아웃 하시겠습니까?');
-    setModalAction(() => dispatch(logout()));
+    setModalAction(null);
+    setModalButtons([
+      { text: '취소', style: 'cancel', onPress: () => setModalVisible(false) },
+      { text: '확인', onPress: () => { setModalVisible(false); dispatch(logout()); } },
+    ]);
     setModalVisible(true);
   };
 
@@ -115,13 +119,13 @@ const ProfileScreen = () => {
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState('');
   const [modalAction, setModalAction] = useState(null);
+  const [modalButtons, setModalButtons] = useState(null);
 
   // 모달 닫기 핸들러
   const handleModalClose = () => {
     setModalVisible(false);
-    if (modalAction) {
-      modalAction();
-    }
+    // onClose에서는 액션을 수행하지 않음 (버튼으로만 수행)
+    setModalButtons(null);
   };
 
   // 앱 정보 표시
@@ -189,10 +193,10 @@ const ProfileScreen = () => {
             <Text style={styles.loginSubtitle}>다양한 기능을 이용하려면 로그인 해주세요.</Text>
             <View style={styles.authButtonsContainer}>
               <TouchableOpacity 
-                style={[styles.logoutButton, { backgroundColor: '#4CAF50', borderRadius: 8 }]}
+                style={styles.authCtaButton}
                 onPress={() => navigation.navigate('RootLogin')}
               >
-                <Text style={[styles.logoutText, { color: '#fff' }]}>로그인/회원가입</Text>
+                <Text style={styles.authCtaText}>로그인/회원가입</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -315,6 +319,10 @@ const ProfileScreen = () => {
         visible={modalVisible}
         title={modalTitle}
         message={modalMessage}
+        buttons={modalButtons || [
+          { text: '취소', style: 'cancel' },
+          { text: '확인', onPress: () => { setModalVisible(false); if (modalAction) modalAction(); } }
+        ]}
         onClose={handleModalClose}
       />
     </>
@@ -385,6 +393,20 @@ const styles = StyleSheet.create({
   authButtonsContainer: {
     width: '100%',
     paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  authCtaButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 24,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    minWidth: 180,
+    alignItems: 'center',
+  },
+  authCtaText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
   },
   previewContainer: {
     width: '100%',
