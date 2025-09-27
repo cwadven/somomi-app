@@ -138,13 +138,15 @@ const LocationsScreen = () => {
       console.log('LocationsScreen: 영역 목록 로드 시작');
       // 로그인 상태에서 진입 시 템플릿 최신화
       try { if (isLoggedIn) { dispatch(loadUserLocationTemplateInstances()); } } catch (e) {}
-      dispatch(fetchLocations())
+      if (isLoggedIn) {
+        dispatch(fetchLocations())
         .then(result => {
           console.log('LocationsScreen: 영역 목록 로드 성공', result);
         })
         .catch(err => {
           console.error('LocationsScreen: 영역 목록 로드 실패', err);
         });
+      }
     }
   }, [dispatch, isFocused]);
 

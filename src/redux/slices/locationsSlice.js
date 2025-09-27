@@ -4,7 +4,7 @@ import { fetchGuestSections } from '../../api/sectionApi';
 import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { ENTITY_TYPES } from '../../api/syncApi';
 import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
-import { createGuestSection } from '../../api/sectionApi';
+import { createGuestSection, updateGuestSection } from '../../api/sectionApi';
 
 // 영역 목록 가져오기
 export const fetchLocations = createAsyncThunk(
@@ -16,30 +16,31 @@ export const fetchLocations = createAsyncThunk(
       const state = getState();
       const isLoggedIn = !!state?.auth?.isLoggedIn;
 
-      // 로그인 여부와 무관하게, 서버 게스트 섹션 API로 동기화(요청사항)
-      try {
-        const res = await fetchGuestSections();
-        const items = Array.isArray(res?.guest_sections) ? res.guest_sections : [];
-        if (items.length >= 0) {
-          // 서버 → 로컬 스키마 매핑
-          const mapped = items.map((it) => ({
-            id: String(it.id),
-            title: it.title,
-            description: it.description || '',
-            icon: it.icon || 'cube-outline',
-            templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
-            feature: {
-              baseSlots: typeof it?.feature?.base_slots === 'number' ? it.feature.base_slots : 0,
-            },
-            disabled: !!it.disabled,
-            createdAt: it.created_at || new Date().toISOString(),
-            updatedAt: it.updated_at || new Date().toISOString(),
-          }));
-          await saveLocations(mapped);
-          return mapped;
+      // 로그인 상태에서만 서버 동기화 수행
+      if (isLoggedIn) {
+        try {
+          const res = await fetchGuestSections();
+          const items = Array.isArray(res?.guest_sections) ? res.guest_sections : [];
+          if (items.length >= 0) {
+            const mapped = items.map((it) => ({
+              id: String(it.id),
+              title: it.title,
+              description: it.description || '',
+              icon: it.icon || 'cube-outline',
+              templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
+              feature: {
+                baseSlots: typeof it?.feature?.base_slots === 'number' ? it.feature.base_slots : 0,
+              },
+              disabled: !!it.disabled,
+              createdAt: it.created_at || new Date().toISOString(),
+              updatedAt: it.updated_at || new Date().toISOString(),
+            }));
+            await saveLocations(mapped);
+            return mapped;
+          }
+        } catch (apiErr) {
+          console.warn('게스트 섹션 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
         }
-      } catch (apiErr) {
-        console.warn('게스트 섹션 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
       }
 
       // 로컬 폴백
@@ -128,24 +129,40 @@ export const updateLocation = createAsyncThunk(
   'locations/updateLocation',
   async (locationData, { rejectWithValue, getState, dispatch }) => {
     try {
-      // 실제 구현에서는 API 호출
-      // 여기서는 수정된 데이터 그대로 반환
-      const enriched = await commitUpdate(ENTITY_TYPES.LOCATION, {
-        ...locationData,
-        templateInstanceLocalId: locationData.templateInstanceLocalId || locationData.templateInstanceId,
-      }, {
-        deviceId: getState().auth?.deviceId || locationData.deviceId || 'unknown',
-        ownerUserId: getState().auth?.user?.id || locationData.ownerUserId,
-      });
-      
-      // 영역 수정 후 전체 영역 목록을 AsyncStorage에 저장
-      const updatedLocations = getState().locations.locations.map(location => 
-        location.id === enriched.id ? enriched : location
-      );
-      await saveLocations(updatedLocations);
-      
-      try { await refreshAfterMutation(dispatch); } catch (e) {}
-      return enriched;
+      // 서버 API: Update guest section
+      const sectionId = locationData.id || locationData.localId;
+      const payload = {
+        title: locationData.title,
+        description: locationData.description || null,
+        icon: locationData.icon || null,
+        guest_section_template_id: Number(locationData.templateInstanceId || locationData.templateInstanceLocalId),
+      };
+      await updateGuestSection(sectionId, payload);
+
+      // 수정 후 목록 재동기화
+      try {
+        const listRes = await fetchGuestSections();
+        const items = Array.isArray(listRes?.guest_sections) ? listRes.guest_sections : [];
+        const mapped = items.map((it) => ({
+          id: String(it.id),
+          title: it.title,
+          description: it.description || '',
+          icon: it.icon || 'cube-outline',
+          templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
+          feature: {
+            baseSlots: typeof it?.feature?.base_slots === 'number' ? it.feature.base_slots : 0,
+          },
+          disabled: !!it.disabled,
+          createdAt: it.created_at || new Date().toISOString(),
+          updatedAt: it.updated_at || new Date().toISOString(),
+        }));
+        await saveLocations(mapped);
+        return mapped.find(x => x.id === String(sectionId)) || null;
+      } catch (e) {
+        console.warn('수정 후 목록 동기화 실패:', e?.message || String(e));
+        const stored = await loadLocations();
+        return (stored || []).find(x => x.id === String(sectionId)) || null;
+      }
     } catch (error) {
       return rejectWithValue(error.message);
     }

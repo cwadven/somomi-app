@@ -1,14 +1,14 @@
 import { API_BASE_URL } from '../config/apiConfig';
 import { loadJwtToken } from '../utils/storageUtils';
 
-export const request = async (path, { method = 'GET', headers = {}, body } = {}) => {
+export const request = async (path, { method = 'GET', headers = {}, body, skipAuth = false } = {}) => {
   const token = await loadJwtToken();
   const reqHeaders = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
     ...headers,
   };
-  if (token && typeof token === 'string' && !reqHeaders.Authorization) {
+  if (!skipAuth && token && typeof token === 'string' && !reqHeaders.Authorization) {
     reqHeaders.Authorization = `jwt ${token}`;
   }
   const res = await fetch(`${API_BASE_URL}${path}`, {

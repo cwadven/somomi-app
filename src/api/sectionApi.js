@@ -18,10 +18,19 @@ export const createGuestSection = async ({ title, description = null, icon = nul
   });
 };
 
+export const updateGuestSection = async (guest_section_id, { title, description = null, icon = null, guest_section_template_id }) => {
+  // PUT /v1/section/guest-sections/{guest_section_id}
+  return request(`/v1/section/guest-sections/${guest_section_id}`, {
+    method: 'PUT',
+    body: { title, description, icon, guest_section_template_id },
+  });
+};
+
 export default {
   fetchGuestSectionTemplates,
   fetchGuestSections,
   createGuestSection,
+  updateGuestSection,
 };
 
 
