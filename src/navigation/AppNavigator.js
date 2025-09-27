@@ -24,9 +24,11 @@ import NotificationDateScreen from '../screens/NotificationDateScreen';
 import StoreScreen from '../screens/StoreScreen';
 import PointScreen from '../screens/PointScreen';
 import MyProductsScreen from '../screens/MyProductsScreen';
+import LoginScreen from '../screens/LoginScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
+const RootStack = createStackNavigator();
 
 // 홈 스택 네비게이터
 const HomeStack = () => {
@@ -168,8 +170,8 @@ const ProfileStack = () => {
   );
 };
 
-// 메인 탭 네비게이터
-const AppNavigator = ({ linking }) => {
+// 메인 탭 네비게이터만 구성하는 컴포넌트
+const MainTabs = ({ linking }) => {
   const [isReady, setIsReady] = useState(false);
   const [initialState, setInitialState] = useState();
 
@@ -197,12 +199,64 @@ const AppNavigator = ({ linking }) => {
   }
 
   return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+          if (route.name === 'Home') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Locations') {
+            iconName = focused ? 'grid' : 'grid-outline';
+          } else if (route.name === 'Profile') {
+            iconName = focused ? 'person' : 'person-outline';
+          }
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: '#4CAF50',
+        tabBarInactiveTintColor: 'gray',
+        headerShown: false
+      })}
+      screenListeners={({ navigation, route }) => ({
+        tabPress: (e) => {
+          if (route.name === 'Locations' && navigation.isFocused()) {
+            e.preventDefault();
+            navigation.navigate('Locations', { screen: 'LocationsScreen' });
+          }
+        },
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeStack} options={{ title: '홈' }} />
+      <Tab.Screen name="Locations" component={LocationsStack} options={{ title: '내 영역' }} />
+      <Tab.Screen name="Profile" component={ProfileStack} options={{ title: '프로필' }} />
+    </Tab.Navigator>
+  );
+};
+
+// 루트 네비게이터: Login을 탭 위에 완전히 덮는 모달로 표시
+const AppNavigator = ({ linking }) => {
+  const [isReady, setIsReady] = useState(false);
+  const [initialState, setInitialState] = useState();
+
+  useEffect(() => {
+    const restoreState = async () => {
+      try {
+        const savedStateString = await AsyncStorage.getItem('navigation-state');
+        if (savedStateString) {
+          const state = JSON.parse(savedStateString);
+          setInitialState(state);
+        }
+      } finally {
+        setIsReady(true);
+      }
+    };
+    if (!isReady) restoreState();
+  }, [isReady]);
+
+  if (!isReady) return null;
+
+  return (
     <SafeAreaProvider>
-      <StatusBar 
-        barStyle="dark-content" 
-        backgroundColor="transparent" 
-        translucent={true} 
-      />
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       <SafeAreaView style={{ flex: 1 }}>
         <NavigationContainer
           linking={linking}
@@ -211,51 +265,10 @@ const AppNavigator = ({ linking }) => {
             AsyncStorage.setItem('navigation-state', JSON.stringify(state));
           }}
         >
-          <Tab.Navigator
-            screenOptions={({ route }) => ({
-              tabBarIcon: ({ focused, color, size }) => {
-                let iconName;
-
-                if (route.name === 'Home') {
-                  iconName = focused ? 'home' : 'home-outline';
-                } else if (route.name === 'Locations') {
-                  iconName = focused ? 'grid' : 'grid-outline';
-                } else if (route.name === 'Profile') {
-                  iconName = focused ? 'person' : 'person-outline';
-                }
-
-                return <Ionicons name={iconName} size={size} color={color} />;
-              },
-              tabBarActiveTintColor: '#4CAF50',
-              tabBarInactiveTintColor: 'gray',
-              headerShown: false
-            })}
-            screenListeners={({ navigation, route }) => ({
-              tabPress: (e) => {
-                // '내 영역' 탭을 이미 보고 있을 때 다시 누르면 루트로 이동
-                if (route.name === 'Locations' && navigation.isFocused()) {
-                  e.preventDefault();
-                  navigation.navigate('Locations', { screen: 'LocationsScreen' });
-                }
-              },
-            })}
-          >
-            <Tab.Screen 
-              name="Home" 
-              component={HomeStack} 
-              options={{ title: '홈' }}
-            />
-            <Tab.Screen 
-              name="Locations" 
-              component={LocationsStack} 
-              options={{ title: '내 영역' }}
-            />
-            <Tab.Screen 
-              name="Profile" 
-              component={ProfileStack} 
-              options={{ title: '프로필' }}
-            />
-          </Tab.Navigator>
+          <RootStack.Navigator screenOptions={{ headerShown: false }}>
+            <RootStack.Screen name="MainTabs" children={() => <MainTabs linking={linking} />} />
+            <RootStack.Screen name="RootLogin" component={LoginScreen} options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+          </RootStack.Navigator>
         </NavigationContainer>
       </SafeAreaView>
     </SafeAreaProvider>

@@ -150,33 +150,33 @@ const HomeScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>소모미</Text>
-        <TouchableOpacity style={styles.notificationButton}>
-          <Ionicons name="notifications-outline" size={24} color="#333" />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
       
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* 배너 섹션 */}
-        <View style={styles.bannerSection}>
-          <FlatList
-            ref={flatListRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={banners}
-            renderItem={renderBanner}
-            keyExtractor={item => String(item.id)}
-            pagingEnabled
-            snapToAlignment="center"
-            onScroll={handleBannerScroll}
-            decelerationRate="fast"
-            snapToInterval={width}
-          />
-          <View style={styles.bannerIndicator}>
-            <Text style={styles.bannerIndicatorText}>
-              {currentBannerIndex + 1}/{banners.length}
-            </Text>
+        {/* 배너 섹션 (데이터가 있을 때만 표시) */}
+        {banners.length > 0 && (
+          <View style={styles.bannerSection}>
+            <FlatList
+              ref={flatListRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={banners}
+              renderItem={renderBanner}
+              keyExtractor={item => String(item.id)}
+              pagingEnabled
+              snapToAlignment="center"
+              onScroll={handleBannerScroll}
+              decelerationRate="fast"
+              snapToInterval={width}
+            />
+            <View style={styles.bannerIndicator}>
+              <Text style={styles.bannerIndicatorText}>
+                {currentBannerIndex + 1}/{banners.length}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
         
         {/* 추천 상품 섹션 */}
         <View style={styles.section}>
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
   },
   notificationButton: {
-    padding: 8,
+    // removed
   },
   bannerSection: {
     position: 'relative',

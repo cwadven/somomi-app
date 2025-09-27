@@ -23,6 +23,7 @@ import { checkAnonymousLimits } from '../utils/authUtils';
 import SlotPlaceholder from '../components/SlotPlaceholder';
 import SlotStatusBar from '../components/SlotStatusBar';
 import AlertModal from '../components/AlertModal';
+// 로그인 폼/소셜 버튼은 내 영역에서 노출하지 않음
 
 const LocationsScreen = () => {
   const dispatch = useDispatch();
@@ -336,6 +337,45 @@ const LocationsScreen = () => {
     
     return null;
   }, [isLoading, hasError, error, dispatch]);
+
+  // 로그인 게이트 컴포넌트
+  const loginGateComponent = useMemo(() => {
+    if (isLoggedIn) return null;
+    return (
+      <View style={[styles.centered, { paddingHorizontal: 24 }]}>
+        <Ionicons name="lock-closed" size={48} color="#4CAF50" style={{ marginBottom: 12 }} />
+        <Text style={styles.loginTitle}>로그인이 필요합니다</Text>
+        <Text style={styles.loginSubtitle}>내 영역 기능을 이용하려면 로그인해주세요.</Text>
+        <View style={{ width: '100%', marginTop: 16 }}>
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <Text style={styles.primaryBtnText}>로그인 하러 가기</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 예시 프리뷰 (반투명 카드 + 하단 페이드) */}
+        <View style={styles.previewContainer}>
+          {[1,2,3].map((i) => (
+            <View key={`preview-${i}`} style={styles.previewCard}>
+              <View style={styles.previewLeft}>
+                <View style={styles.previewIconCircle}>
+                  <Ionicons name="cube-outline" size={18} color="#4CAF50" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.previewTitleBar} />
+                  <View style={styles.previewSubtitleBar} />
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#BDBDBD" />
+            </View>
+          ))}
+          <View pointerEvents="none" style={styles.previewFade} />
+        </View>
+      </View>
+    );
+  }, [isLoggedIn]);
   
   // 주의: 훅 호출 순서를 보장하기 위해 중간 early return 금지
 
@@ -358,7 +398,9 @@ const LocationsScreen = () => {
 
   return (
     <View style={styles.container}>
-      {(isLoading || hasError) ? (
+      {!isLoggedIn ? (
+        loginGateComponent
+      ) : (isLoading || hasError) ? (
         loadingOrErrorComponent
       ) : (
         <>
@@ -668,6 +710,83 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+  },
+  loginTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 8,
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  loginSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  previewContainer: {
+    width: '100%',
+    marginTop: 24,
+    paddingHorizontal: 4,
+    position: 'relative',
+  },
+  previewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#eeeeee',
+  },
+  previewLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  previewIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  previewTitleBar: {
+    width: '60%',
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#e0e0e0',
+    marginBottom: 6,
+  },
+  previewSubtitleBar: {
+    width: '40%',
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#eee',
+  },
+  previewFade: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 40,
+    backgroundColor: 'rgba(248,248,248,0.9)',
+  },
+  primaryBtn: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  primaryBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
   locationListItem: {
     flexDirection: 'row',

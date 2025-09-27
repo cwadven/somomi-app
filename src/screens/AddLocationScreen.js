@@ -434,7 +434,7 @@ const AddLocationScreen = () => {
     
     // 수정 모드가 아니고 템플릿이 선택되지 않은 경우에만 검증
     if (!selectedTemplateInstance && !isEditMode) {
-      setAlertModalConfig({
+    setAlertModalConfig({
         title: '선택 오류',
         message: '템플릿을 선택해주세요.',
         buttons: [
@@ -442,8 +442,8 @@ const AddLocationScreen = () => {
         ],
         icon: 'alert-circle',
         iconColor: '#F44336'
-      });
-      setAlertModalVisible(true);
+    });
+    setAlertModalVisible(true);
       return;
     }
     
@@ -556,7 +556,7 @@ const AddLocationScreen = () => {
         
         // 영역 생성 API 호출
         const result = await dispatch(createLocation({
-          ...locationData,
+        ...locationData,
           templateInstanceId: selectedTemplateInstance.id,
           productId: selectedTemplateInstance.productId,
           feature: selectedTemplateInstance.feature
@@ -664,7 +664,7 @@ const AddLocationScreen = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{isEditMode ? '영역 수정' : '영역 생성'}</Text>
         <View style={styles.headerRight} />
-      </View>
+          </View>
       
       <ScrollView style={styles.container}>
         {/* 템플릿 선택 섹션 (생성 모드에서만 표시) */}
@@ -673,7 +673,7 @@ const AddLocationScreen = () => {
             <Text style={styles.sectionTitle}>템플릿 선택</Text>
             <Text style={styles.sectionDescription}>
               영역을 생성할 템플릿을 선택하세요. 템플릿에 따라 제공되는 기능이 다릅니다.
-            </Text>
+          </Text>
             
             {/* 단일 스크롤 리스트로 통합 */}
             {availableTemplates.length > 0 ? (
@@ -681,7 +681,7 @@ const AddLocationScreen = () => {
                 <ScrollView style={styles.templateOptionsScroll}>
                   <View style={styles.templateOptions}>
                     {availableTemplates.map(template => (
-                      <TouchableOpacity 
+          <TouchableOpacity 
                         key={template.id}
                         style={[
                           styles.templateOption,
@@ -705,11 +705,11 @@ const AddLocationScreen = () => {
                         {selectedTemplateInstance?.id === template.id && (
                           <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
                         )}
-                      </TouchableOpacity>
+          </TouchableOpacity>
                     ))}
-                  </View>
+        </View>
                 </ScrollView>
-              </View>
+      </View>
             ) : (
               <View style={styles.emptyTemplates}>
                 <Text style={styles.emptyTemplatesText}>사용 가능한 템플릿이 없습니다. 상점에서 구매 후 다시 시도하세요.</Text>

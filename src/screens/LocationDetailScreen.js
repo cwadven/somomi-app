@@ -257,7 +257,7 @@ const LocationDetailScreen = () => {
         dispatch(releaseTemplateInstance(locationId));
       }
       
-      navigation.goBack();
+          navigation.goBack();
     } catch (error) {
       Alert.alert('오류', '영역 삭제 중 문제가 발생했습니다.');
     }
@@ -291,14 +291,14 @@ const LocationDetailScreen = () => {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity 
+            <TouchableOpacity 
             style={styles.backButton}
             onPress={handleGoBack}
-          >
+            >
             <Ionicons name="arrow-back" size={24} color="#4CAF50" />
-          </TouchableOpacity>
+            </TouchableOpacity>
           <Text style={styles.loadingText}>로딩 중...</Text>
-        </View>
+          </View>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#4CAF50" />
         </View>
@@ -311,22 +311,22 @@ const LocationDetailScreen = () => {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity 
+            <TouchableOpacity 
             style={styles.backButton}
             onPress={handleGoBack}
-          >
+            >
             <Ionicons name="arrow-back" size={24} color="#4CAF50" />
-          </TouchableOpacity>
+            </TouchableOpacity>
           <Text style={styles.headerTitle}>오류</Text>
-        </View>
+          </View>
         <View style={styles.centered}>
           <Text style={styles.errorText}>오류: {error}</Text>
-          <TouchableOpacity 
+            <TouchableOpacity 
             style={styles.retryButton}
             onPress={() => dispatch(fetchLocationById(locationId))}
           >
             <Text style={styles.retryButtonText}>다시 시도</Text>
-          </TouchableOpacity>
+            </TouchableOpacity>
         </View>
       </View>
     );
@@ -405,14 +405,14 @@ const LocationDetailScreen = () => {
           </ScrollView>
         </View>
         {locationProducts.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
             {!isAllProductsView && (
               <Text style={styles.emptySubText}>
                 오른쪽 하단의 + 버튼을 눌러 제품을 추가하세요.
               </Text>
             )}
-          </View>
+            </View>
         ) : (
           <FlatList
             data={sortProducts(locationProducts)}
@@ -429,17 +429,17 @@ const LocationDetailScreen = () => {
         
         {/* 제품 추가 버튼 (모든 제품 보기가 아닐 때만 표시) */}
         {!isAllProductsView && (
-          <TouchableOpacity 
+        <TouchableOpacity 
             style={[
               styles.addButton,
               !canAddProduct && styles.disabledButton
             ]}
-            onPress={handleAddProduct}
+          onPress={handleAddProduct}
             disabled={!canAddProduct}
-          >
-            <Ionicons name="add" size={30} color="white" />
+        >
+          <Ionicons name="add" size={30} color="white" />
           </TouchableOpacity>
-        )}
+          )}
       </View>
     );
   };
@@ -452,7 +452,7 @@ const LocationDetailScreen = () => {
       </ScrollView>
     );
   };
-  
+
   return (
     <View style={styles.container}>
       {/* 헤더 */}
@@ -477,7 +477,7 @@ const LocationDetailScreen = () => {
             </>
           ) : currentLocation && (
             <>
-              <View style={styles.locationIconContainer}>
+            <View style={styles.locationIconContainer}>
                 <Ionicons name={currentLocation.icon || 'cube-outline'} size={24} color="#4CAF50" />
               </View>
               <View style={styles.headerTextContainer}>
@@ -485,61 +485,61 @@ const LocationDetailScreen = () => {
                 {currentLocation.description ? (
                   <Text style={styles.locationDescription}>{currentLocation.description}</Text>
                 ) : null}
-              </View>
+            </View>
             </>
+            )}
+          </View>
+          
+        {/* 영역 수정/삭제 버튼 (모든 제품 보기가 아닐 때만 표시) */}
+        {!isAllProductsView && (
+            <View style={styles.headerActions}>
+              <TouchableOpacity 
+                style={styles.headerActionButton}
+              onPress={handleEditPress}
+              >
+                <Ionicons name="create-outline" size={24} color="#4CAF50" />
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.headerActionButton}
+              onPress={handleDeletePress}
+              >
+                <Ionicons name="trash-outline" size={24} color="#F44336" />
+              </TouchableOpacity>
+            </View>
           )}
         </View>
         
-        {/* 영역 수정/삭제 버튼 (모든 제품 보기가 아닐 때만 표시) */}
-        {!isAllProductsView && (
-          <View style={styles.headerActions}>
-            <TouchableOpacity 
-              style={styles.headerActionButton}
-              onPress={handleEditPress}
-            >
-              <Ionicons name="create-outline" size={24} color="#4CAF50" />
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.headerActionButton}
-              onPress={handleDeletePress}
-            >
-              <Ionicons name="trash-outline" size={24} color="#F44336" />
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-      
       {/* 슬롯 상태 표시 (모든 제품 보기가 아닐 때만 표시) */}
       {!isAllProductsView && (
-        <SlotStatusBar 
+          <SlotStatusBar 
           used={usedSlots} 
           total={totalSlots} 
-          type="product" 
-        />
-      )}
-      
+            type="product" 
+          />
+        )}
+        
       {/* 탭 메뉴 (모든 제품 보기가 아닐 때만 표시) */}
       {!isAllProductsView && (
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
             style={[styles.tab, activeTab === 'products' && styles.activeTab]}
             onPress={() => handleTabChange('products')}
-          >
+            >
             <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
-              제품 목록
-            </Text>
-          </TouchableOpacity>
+                제품 목록
+              </Text>
+            </TouchableOpacity>
           
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'notifications' && styles.activeTab]}
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'notifications' && styles.activeTab]}
             onPress={() => handleTabChange('notifications')}
-          >
-            <Text style={[styles.tabText, activeTab === 'notifications' && styles.activeTabText]}>
-              알림 설정
-            </Text>
-          </TouchableOpacity>
-        </View>
+            >
+              <Text style={[styles.tabText, activeTab === 'notifications' && styles.activeTabText]}>
+                알림 설정
+              </Text>
+            </TouchableOpacity>
+              </View>
       )}
       
       {/* 탭 내용 */}

@@ -14,7 +14,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { logout } from '../redux/slices/authSlice';
-import KakaoLoginButton from '../components/KakaoLoginButton';
+import BasicLoginForm from '../components/BasicLoginForm';
 import NotificationSettings from '../components/NotificationSettings';
 import { clearAllData, loadSyncQueue } from '../utils/storageUtils';
 import { initializeData } from '../api/productsApi';
@@ -184,33 +184,16 @@ const ProfileScreen = () => {
               <Text style={styles.logoutText}>로그아웃</Text>
             </TouchableOpacity>
           </>
-        ) : isAnonymous ? (
-          <View style={styles.loginContainer}>
-            <Text style={styles.loginTitle}>비회원으로 이용 중</Text>
-            <Text style={styles.loginSubtitle}>
-              회원가입하면 더 많은 기능을 이용할 수 있습니다.
-              {'\n'}(영역 무제한 생성, 상품 무제한 등록)
-            </Text>
-            <View style={styles.authButtonsContainer}>
-              <KakaoLoginButton
-                onLoginStart={handleLoginStart}
-                onLoginComplete={handleLoginComplete}
-                onLoginError={handleLoginError}
-              />
-            </View>
-          </View>
         ) : (
           <View style={styles.loginContainer}>
-            <Text style={styles.loginTitle}>로그인이 필요합니다</Text>
-            <Text style={styles.loginSubtitle}>
-              제품 정보를 클라우드에 저장하고 여러 기기에서 동기화하려면 로그인하세요.
-            </Text>
+            <Text style={styles.loginSubtitle}>다양한 기능을 이용하려면 로그인 해주세요.</Text>
             <View style={styles.authButtonsContainer}>
-              <KakaoLoginButton
-                onLoginStart={handleLoginStart}
-                onLoginComplete={handleLoginComplete}
-                onLoginError={handleLoginError}
-              />
+              <TouchableOpacity 
+                style={[styles.logoutButton, { backgroundColor: '#4CAF50', borderRadius: 8 }]}
+                onPress={() => navigation.navigate('RootLogin')}
+              >
+                <Text style={[styles.logoutText, { color: '#fff' }]}>로그인/회원가입</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -218,8 +201,8 @@ const ProfileScreen = () => {
 
       {/* 앱푸시 테스트 섹션 제거 */}
 
-      {/* 앱 설정: 비회원(anonymous)도 표시 */}
-      {(isLoggedIn && user) || isAnonymous ? (
+      {/* 앱 설정: 로그인 완료 후에만 표시 */}
+      {(isLoggedIn && user) ? (
         <>
           {/* 설정 섹션 */}
           <View style={styles.settingsSection}>
@@ -242,43 +225,44 @@ const ProfileScreen = () => {
         </>
       ) : null}
 
-      {/* 정보 섹션은 항상 표시 */}
+      {/* 정보 섹션: 일부 항목은 로그인 후에만 표시 */}
       <View style={styles.settingsSection}>
         <Text style={styles.sectionTitle}>정보</Text>
-
-        <SettingItem
-          icon="checkmark-done-circle-outline"
-          title="소진 처리한 상품 목록"
-          onPress={() => navigation.navigate('ConsumedProducts')}
-        />
         
-        <SettingItem
-          icon="notifications-outline"
-          title="알림 목록"
-          onPress={() => navigation.navigate('Notifications')}
-        />
-
-        {/* 동기화 상태 UI 제거 */}
+        {(isLoggedIn && user) && (
+          <>
+            <SettingItem
+              icon="checkmark-done-circle-outline"
+              title="소진 처리한 상품 목록"
+              onPress={() => navigation.navigate('ConsumedProducts')}
+            />
+            
+            <SettingItem
+              icon="notifications-outline"
+              title="알림 목록"
+              onPress={() => navigation.navigate('Notifications')}
+            />
+            
+            <SettingItem
+              icon="cart-outline"
+              title="상점"
+              onPress={() => navigation.navigate('Store')}
+            />
+          </>
+        )}
         
-
-        <SettingItem
-          icon="cart-outline"
-          title="상점"
-          onPress={() => navigation.navigate('Store')}
-        />
-
         <SettingItem
           icon="information-circle-outline"
           title="앱 정보"
           onPress={showAppInfo}
         />
-
+        
         <SettingItem
           icon="help-circle-outline"
           title="도움말"
           onPress={showHelp}
         />
-
+        
         {/* 문의하기는 로그인한 사용자에게만 표시 */}
         {isLoggedIn && (
           <SettingItem
@@ -401,6 +385,50 @@ const styles = StyleSheet.create({
   authButtonsContainer: {
     width: '100%',
     paddingHorizontal: 20,
+  },
+  previewContainer: {
+    width: '100%',
+    paddingHorizontal: 20,
+    marginTop: 16,
+  },
+  previewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#eeeeee',
+  },
+  previewLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  previewIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  previewTitleBar: {
+    width: '60%',
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#e0e0e0',
+    marginBottom: 6,
+  },
+  previewSubtitleBar: {
+    width: '40%',
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#eee',
   },
   settingsSection: {
     backgroundColor: '#fff',

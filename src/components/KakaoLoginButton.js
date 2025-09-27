@@ -13,6 +13,7 @@ import { kakaoLogin } from '../redux/slices/authSlice';
 const KakaoLoginButton = ({ onLoginStart, onLoginComplete, onLoginError }) => {
   const dispatch = useDispatch();
   const [loading, setLoading] = React.useState(false);
+  
 
   const handleKakaoLogin = async () => {
     try {
