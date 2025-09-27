@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -16,8 +16,45 @@ import { fetchConsumedProducts } from '../redux/slices/productsSlice';
 const ConsumedProductsScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
+  // 정렬 상태: LocationDetailScreen과 동일한 인터랙션(내림차순 → 오름차순 → 해제)
+  const [sortKey, setSortKey] = useState('consumed'); // 'consumed' | null
+  const [sortDesc, setSortDesc] = useState(true);
   
   const { consumedProducts, consumedStatus, error } = useSelector(state => state.products);
+  // 정렬된 목록 (소진 처리 시점 기준)
+  const sortedConsumedProducts = useMemo(() => {
+    const list = Array.isArray(consumedProducts) ? [...consumedProducts] : [];
+    if (!sortKey) return list;
+    const getDate = (item) => {
+      const d = item?.consumedAt || item?.processedAt || null;
+      return d ? new Date(d).getTime() : -Infinity;
+    };
+    const dir = sortDesc ? -1 : 1;
+    const present = list.filter(i => !!(i?.consumedAt || i?.processedAt));
+    const missing = list.filter(i => !(i?.consumedAt || i?.processedAt));
+    present.sort((a, b) => {
+      const da = getDate(a);
+      const db = getDate(b);
+      if (da === db) return 0;
+      return da > db ? dir : -dir;
+    });
+    return [...present, ...missing];
+  }, [consumedProducts, sortKey, sortDesc]);
+
+  // 정렬 칩 클릭 핸들러 (내림 → 오름 → 해제)
+  const handleSortPress = () => {
+    if (sortKey !== 'consumed') {
+      setSortKey('consumed');
+      setSortDesc(true);
+      return;
+    }
+    if (sortDesc) {
+      setSortDesc(false);
+      return;
+    }
+    setSortKey(null);
+  };
+
   
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
@@ -135,8 +172,19 @@ const ConsumedProductsScreen = () => {
       </View>
       
       <View style={styles.container}>
+        {/* 정렬 바 - LocationDetailScreen 스타일 준용, 기준은 소진 처리순만 */}
+        <View style={styles.sortBar}>
+          <View style={styles.sortBarContent}>
+            <TouchableOpacity style={[styles.sortChip, sortKey === 'consumed' && styles.sortChipActive]} onPress={handleSortPress}>
+              <Text style={[styles.sortChipText, sortKey === 'consumed' && styles.sortChipTextActive]}>소진순</Text>
+              {sortKey === 'consumed' && (
+                <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
         <FlatList
-          data={consumedProducts}
+          data={sortedConsumedProducts}
           renderItem={renderItem}
           keyExtractor={item => `consumed-${String(item.localId || item.id)}-${item.processedAt || item.consumedAt || ''}`}
           ListEmptyComponent={renderEmptyList}
@@ -172,6 +220,51 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 32,
+  },
+  headerRightBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sortBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  sortBarContent: {
+    alignItems: 'center',
+    paddingRight: 8,
+    flexDirection: 'row',
+  },
+  sortChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: '#f1f8e9',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#c5e1a5',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sortChipActive: {
+    backgroundColor: '#c8e6c9',
+    borderColor: '#81c784',
+  },
+  sortChipText: {
+    fontSize: 12,
+    color: '#4CAF50',
+  },
+  sortChipTextActive: {
+    fontWeight: '600',
+  },
+  sortChipArrow: {
+    marginLeft: 4,
   },
   container: {
     flex: 1,
