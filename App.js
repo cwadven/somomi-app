@@ -335,6 +335,63 @@ const AppContent = () => {
             </TouchableOpacity>
           </View>
           <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent} nestedScrollEnabled>
+            {/* 디버그 로그인 영역 (최상단으로 이동) */}
+            <View style={styles.loginButtonsContainer}>
+              {isLoggedIn ? (
+                <TouchableOpacity 
+                  style={[styles.loginButton, styles.logoutBtn]}
+                  onPress={() => {
+                    dispatch(logout());
+                    // 영역/로컬 상태 초기화
+                    try {
+                      const { resetLocationsState } = require('./src/redux/slices/locationsSlice');
+                      dispatch(resetLocationsState());
+                    } catch (e) {}
+                    addLog('로그아웃 처리됨', 'warning');
+                  }}
+                >
+                  <Text style={styles.loginButtonText}>로그아웃</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity 
+                  style={[styles.loginButton, styles.loginBtn]}
+                  onPress={async () => {
+                    try {
+                      console.log('디버그 로그인 시작');
+                      const mockCredentials = {
+                        username: '디버그 사용자',
+                        email: 'debug@example.com'
+                      };
+                      const result = await dispatch(loginUser(mockCredentials)).unwrap();
+                      console.log('디버그 로그인 성공:', result);
+                      addLog('디버그 사용자로 로그인됨', 'success');
+                    } catch (error) {
+                      console.error('디버그 로그인 실패:', error);
+                      addLog(`로그인 실패: ${error.message}`, 'error');
+                    }
+                  }}
+                >
+                  <Text style={styles.loginButtonText}>디버그 로그인</Text>
+                </TouchableOpacity>
+              )}
+              
+              {!isAnonymous && !isLoggedIn && (
+                <TouchableOpacity 
+                  style={[styles.loginButton, styles.anonymousBtn]}
+                  onPress={async () => {
+                    try {
+                      await dispatch(getAnonymousToken()).unwrap();
+                      addLog('익명 사용자로 전환됨', 'info');
+                    } catch (error) {
+                      addLog(`익명 로그인 실패: ${error.message}`, 'error');
+                    }
+                  }}
+                >
+                  <Text style={styles.loginButtonText}>익명 사용자 전환</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
             {/* 로그인 상태 표시 및 전환 버튼 */}
             <View style={styles.loginStatusContainer}>
               <Text style={styles.statusLabel}>로그인 상태:</Text>
@@ -432,61 +489,7 @@ const AppContent = () => {
               </View>
             </View>
 
-            <View style={styles.loginButtonsContainer}>
-              {isLoggedIn ? (
-                <TouchableOpacity 
-                  style={[styles.loginButton, styles.logoutBtn]}
-                  onPress={() => {
-                    dispatch(logout());
-                    // 영역/로컬 상태 초기화
-                    try {
-                      const { resetLocationsState } = require('./src/redux/slices/locationsSlice');
-                      dispatch(resetLocationsState());
-                    } catch (e) {}
-                    addLog('로그아웃 처리됨', 'warning');
-                  }}
-                >
-                  <Text style={styles.loginButtonText}>로그아웃</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity 
-                  style={[styles.loginButton, styles.loginBtn]}
-                  onPress={async () => {
-                    try {
-                      console.log('디버그 로그인 시작');
-                      const mockCredentials = {
-                        username: '디버그 사용자',
-                        email: 'debug@example.com'
-                      };
-                      const result = await dispatch(loginUser(mockCredentials)).unwrap();
-                      console.log('디버그 로그인 성공:', result);
-                      addLog('디버그 사용자로 로그인됨', 'success');
-                    } catch (error) {
-                      console.error('디버그 로그인 실패:', error);
-                      addLog(`로그인 실패: ${error.message}`, 'error');
-                    }
-                  }}
-                >
-                  <Text style={styles.loginButtonText}>디버그 로그인</Text>
-                </TouchableOpacity>
-              )}
-              
-              {!isAnonymous && !isLoggedIn && (
-                <TouchableOpacity 
-                  style={[styles.loginButton, styles.anonymousBtn]}
-                  onPress={async () => {
-                    try {
-                      await dispatch(getAnonymousToken()).unwrap();
-                      addLog('익명 사용자로 전환됨', 'info');
-                    } catch (error) {
-                      addLog(`익명 로그인 실패: ${error.message}`, 'error');
-                    }
-                  }}
-                >
-                  <Text style={styles.loginButtonText}>익명 사용자 전환</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            
             
             <View style={styles.statusContainer}>
               <Text style={styles.statusLabel}>업데이트 상태:</Text>
