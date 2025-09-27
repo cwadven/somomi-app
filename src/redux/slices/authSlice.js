@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId, saveLocations, saveProducts, saveConsumedProducts } from '../../utils/storageUtils';
+import { saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId, saveLocations, saveProducts, saveConsumedProducts, saveRefreshToken } from '../../utils/storageUtils';
+import { loginMember } from '../../api/memberApi';
 import { generateId } from '../../utils/idUtils';
 import { resetLocationsState } from './locationsSlice';
 
@@ -112,20 +113,20 @@ export const kakaoLogin = createAsyncThunk(
 
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
-  async (credentials, { rejectWithValue }) => {
+  async ({ username, password }, { rejectWithValue }) => {
     try {
-      const response = {
-        token: `user_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`,
-        user: {
-          id: '1',
-          username: credentials.username,
-          email: credentials.email || 'user@example.com',
-        }
-      };
-      await saveJwtToken(response.token);
-      return response;
-    } catch (error) {
-      return rejectWithValue(error.message);
+      const res = await loginMember({ username, password });
+      const accessToken = res?.access_token;
+      const refreshToken = res?.refresh_token;
+      if (!accessToken) throw new Error('로그인 정보가 올바르지 않습니다.');
+      await saveJwtToken(accessToken);
+      if (refreshToken) await saveRefreshToken(refreshToken);
+      // 서버에서 사용자 정보 별도 제공 전까지 최소 프로필 구성
+      const user = { id: 'me', username };
+      return { token: accessToken, user };
+    } catch (err) {
+      const apiMsg = err?.response?.data?.message;
+      return rejectWithValue(apiMsg || err.message || '로그인에 실패했습니다.');
     }
   }
 );

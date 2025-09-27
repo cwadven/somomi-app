@@ -20,12 +20,12 @@ const BasicLoginForm = ({ onLoginStart, onLoginComplete, onLoginError }) => {
         setError('유효한 이메일을 입력하세요.');
         return;
       }
-      const derivedUsername = (email && email.includes('@')) ? email.split('@')[0] : '사용자';
-      const creds = { username: derivedUsername, email: email || 'user@example.com', password };
-      await dispatch(loginUser(creds)).unwrap();
+      // 서버 스펙: username + password
+      const username = email; // 이메일을 username으로 사용
+      await dispatch(loginUser({ username, password })).unwrap();
       if (onLoginComplete) onLoginComplete();
     } catch (error) {
-      setError(error?.message || '로그인 중 오류가 발생했습니다.');
+      setError(error || '로그인 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -90,6 +90,8 @@ const styles = StyleSheet.create({
     color: '#F44336',
     marginTop: 2,
     marginBottom: 8,
+    alignSelf: 'flex-start',
+    textAlign: 'left',
   },
 });
 

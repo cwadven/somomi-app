@@ -11,6 +11,7 @@ export const STORAGE_KEYS = {
   USER_LOCATION_TEMPLATES: 'somomi_user_location_templates', // 사용자 영역 템플릿 인스턴스
   USER_PRODUCT_SLOT_TEMPLATES: 'somomi_user_product_slot_templates', // 사용자 제품 슬롯 템플릿 인스턴스
   JWT_TOKEN: 'somomi_jwt_token',
+  REFRESH_TOKEN: 'somomi_refresh_token',
   DEVICE_ID: 'somomi_device_id',
   APP_PREFS: 'somomi_app_prefs', // 앱 설정(알림 등)
   DAILY_REMINDER_SENT: 'somomi_daily_reminder_sent', // 일자별 리마인더 발송 기록
@@ -225,6 +226,17 @@ export const loadJwtToken = async () => {
 };
 export const removeJwtToken = async () => {
   return removeData(STORAGE_KEYS.JWT_TOKEN);
+};
+
+// 리프레시 토큰 저장/로드/삭제
+export const saveRefreshToken = async (token) => {
+  return saveData(STORAGE_KEYS.REFRESH_TOKEN, token);
+};
+export const loadRefreshToken = async () => {
+  return loadData(STORAGE_KEYS.REFRESH_TOKEN);
+};
+export const removeRefreshToken = async () => {
+  return removeData(STORAGE_KEYS.REFRESH_TOKEN);
 };
 
 // 디바이스 ID 영구 저장/로드
