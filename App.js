@@ -271,8 +271,13 @@ const AppContent = () => {
       console.error('앱 초기화 오류:', error);
       
       // 오류 발생 시 익명 토큰 발급 시도
+      // 단, 기존에 저장된 Access Token(비-익명)이 있으면 절대 덮어쓰지 않음
       try {
-        await dispatch(getAnonymousToken()).unwrap();
+        const existingToken = await loadData(STORAGE_KEYS.JWT_TOKEN);
+        const isAnonymousToken = existingToken && typeof existingToken === 'string' && existingToken.startsWith('anonymous_');
+        if (!existingToken || isAnonymousToken) {
+          await dispatch(getAnonymousToken()).unwrap();
+        }
       } catch (anonymousError) {
         console.error('익명 토큰 발급 실패:', anonymousError);
       }

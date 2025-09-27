@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId, saveLocations, saveProducts, saveConsumedProducts, saveRefreshToken } from '../../utils/storageUtils';
+import { saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId, saveLocations, saveProducts, saveConsumedProducts, saveRefreshToken, removeRefreshToken } from '../../utils/storageUtils';
 import { loginMember } from '../../api/memberApi';
 import { generateId } from '../../utils/idUtils';
 import { resetLocationsState } from './locationsSlice';
@@ -472,6 +472,7 @@ export const authSlice = createSlice({
       // AsyncStorage에서 토큰 제거
       // (웹 폴리필에서는 localStorage도 함께 제거될 수 있음)
       try { removeJwtToken(); } catch (e) {}
+      try { removeRefreshToken(); } catch (e) {}
       
       // 주: 동기 리듀서에서는 다른 슬라이스 액션을 직접 디스패치할 수 없음
       // 실제 화면에서 logout 디스패치 후 locations 초기화를 위해 컴포넌트에서 resetLocationsState를 함께 디스패치하거나,
