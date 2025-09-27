@@ -9,7 +9,7 @@ export const request = async (path, { method = 'GET', headers = {}, body } = {})
     ...headers,
   };
   if (token && typeof token === 'string' && !reqHeaders.Authorization) {
-    reqHeaders.Authorization = `Bearer ${token}`;
+    reqHeaders.Authorization = `jwt ${token}`;
   }
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method,

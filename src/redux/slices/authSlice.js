@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId, saveLocations, saveProducts, saveConsumedProducts, saveRefreshToken, removeRefreshToken } from '../../utils/storageUtils';
+import { saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId, saveLocations, saveProducts, saveConsumedProducts, saveRefreshToken, removeRefreshToken, removeData, STORAGE_KEYS } from '../../utils/storageUtils';
 import { loginMember } from '../../api/memberApi';
+import { fetchGuestSectionTemplates } from '../../api/sectionApi';
 import { generateId } from '../../utils/idUtils';
 import { resetLocationsState } from './locationsSlice';
 
@@ -31,7 +32,7 @@ export const reconcileLocationTemplates = createAsyncThunk(
   'auth/reconcileLocationTemplates',
   async (_, { getState }) => {
     const state = getState();
-    const templates = (state.auth.userLocationTemplateInstances || []).map(t => ({ ...t, localId: t.localId || t.id }));
+    const templates = (state.auth.userLocationTemplateInstances || []).map(t => ({ ...t }));
     const locations = state.locations.locations || [];
     const linkedTemplateIds = new Set();
     // 영역에 연결된 템플릿 적용
@@ -113,7 +114,7 @@ export const kakaoLogin = createAsyncThunk(
 
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
-  async ({ username, password }, { rejectWithValue }) => {
+  async ({ username, password }, { rejectWithValue, dispatch }) => {
     try {
       const res = await loginMember({ username, password });
       const accessToken = res?.access_token;
@@ -123,6 +124,8 @@ export const loginUser = createAsyncThunk(
       if (refreshToken) await saveRefreshToken(refreshToken);
       // 서버에서 사용자 정보 별도 제공 전까지 최소 프로필 구성
       const user = { id: 'me', username };
+      // 로그인 직후 내 템플릿 최신화
+      try { await dispatch(loadUserLocationTemplateInstances()).unwrap(); } catch (e) {}
       return { token: accessToken, user };
     } catch (err) {
       const apiMsg = err?.response?.data?.message;
@@ -232,25 +235,44 @@ export const loadUserLocationTemplateInstances = createAsyncThunk(
   'auth/loadUserLocationTemplateInstances',
   async (_, { rejectWithValue, getState }) => {
     try {
+      // 비로그인 상태에서는 생성/저장 금지
+      const state = getState();
+      const isLoggedIn = !!state?.auth?.isLoggedIn;
+      if (!isLoggedIn) {
+        try { await removeData(STORAGE_KEYS.USER_LOCATION_TEMPLATES); } catch (e) {}
+        return [];
+      }
+
+      // 로그인 상태: 게스트 엔드포인트를 사용해 최신화(요청사항)
+      try {
+        const res = await fetchGuestSectionTemplates();
+        const items = Array.isArray(res?.guest_section_templates) ? res.guest_section_templates : [];
+        if (items.length > 0) {
+          const mapped = items.map((it) => ({
+            id: String(it.id),
+            productId: 'server_section_template',
+            name: it.name,
+            description: it.description || '',
+            icon: it.icon || 'cube-outline',
+            feature: {
+              baseSlots: typeof it?.feature?.base_slots === 'number' ? it.feature.base_slots : 0,
+            },
+            used: !!it.used,
+            usedInLocationId: it.used_in_section_id ? String(it.used_in_section_id) : null,
+            createdAt: it.created_at || new Date().toISOString(),
+            updatedAt: it.updated_at || new Date().toISOString(),
+          }));
+          await saveUserLocationTemplates(mapped);
+          return mapped;
+        }
+      } catch (apiErr) {
+        console.warn('게스트 섹션 템플릿 API 실패 또는 빈 목록:', apiErr?.message || String(apiErr));
+      }
+
+      // 로컬 저장소 폴백 (오프라인 등)
       const templates = await loadUserLocationTemplates();
-      console.log('로드된 사용자 영역 템플릿 인스턴스:', templates);
-      
-      // 저장된 템플릿이 있으면 그대로 반환
-      if (templates && templates.length > 0) {
-        console.log('저장된 템플릿 인스턴스를 사용합니다.');
-        return templates;
-      }
-      
-      // 저장된 템플릿이 없으면 기본 템플릿 생성(디바이스ID 기반)
-      console.log('저장된 템플릿이 없어 기본 템플릿을 생성합니다.');
-      let deviceId = await loadDeviceId();
-      if (!deviceId) {
-        deviceId = `device_${Math.random().toString(36).substring(2, 15)}`;
-        await saveDeviceId(deviceId);
-      }
-      const defaults = createAnonymousDefaultTemplates(deviceId, []);
-      await saveUserLocationTemplates(defaults);
-      return defaults;
+      if (templates && templates.length > 0) return templates;
+      return [];
     } catch (error) {
       console.error('사용자 영역 템플릿 인스턴스 로드 오류:', error);
       return rejectWithValue(error.message);
@@ -285,20 +307,14 @@ const createBasicLocationTemplate = (idOverride, baseSlotsOverride, extraMeta = 
     },
     used: false,
     usedInLocationId: null,
-    // SyncMeta 기본값
-    localId: undefined, // 아래에서 id로 세팅
-    remoteId: undefined,
-    syncStatus: 'synced',
     createdAt: nowIso,
     updatedAt: nowIso,
-    lastSyncedAt: undefined,
     version: undefined,
     deviceId: null,
     ownerUserId: undefined,
     deletedAt: undefined,
     ...extraMeta,
   };
-  obj.localId = obj.id;
   return obj;
 };
 
@@ -333,7 +349,7 @@ const initialState = {
   purchaseHistory: [], // 구매 내역
   pointHistory: [], // G 내역 (충전 및 사용)
   // 사용자가 소유한 영역 템플릿 인스턴스 목록 - 비회원은 기본 템플릿 1개 제공
-  userLocationTemplateInstances: [createBasicLocationTemplate(undefined, 3)],
+  userLocationTemplateInstances: [],
   // 사용자가 소유한 제품 슬롯 템플릿 인스턴스 목록 (각 인스턴스는 제품 1개를 추가 허용)
   userProductSlotTemplateInstances: []
 };
@@ -765,25 +781,9 @@ export const authSlice = createSlice({
         state.isAnonymous = true;
         state.deviceId = action.payload.deviceId || state.deviceId;
         state.error = null;
-        
-        // 이미 사용 중인 템플릿이 있는지 확인
-        const usedTemplates = state.userLocationTemplateInstances.filter(t => t.used);
-        
-        if (usedTemplates.length > 0) {
-          // 이미 사용 중인 템플릿이 있으면 템플릿 상태 유지
-          console.log('익명 토큰 발급: 이미 사용 중인 템플릿이 있습니다. 템플릿 상태 유지:', state.userLocationTemplateInstances);
-        } else {
-          // 비회원은 기본 템플릿 2개 제공 (각 3 슬롯, 디바이스ID 기반 결정적 ID)
-          console.log('익명 토큰 발급: 템플릿 인스턴스 초기화');
-          const defaults = createAnonymousDefaultTemplates(action.payload.deviceId || state.deviceId || 'unknown', state.userLocationTemplateInstances);
-          state.userLocationTemplateInstances = defaults;
-          console.log('익명 토큰 발급 후 템플릿 인스턴스:', defaults);
-          
-          // AsyncStorage에 저장
-          saveUserLocationTemplates(defaults)
-            .then(() => console.log('익명 토큰 발급 후 템플릿 인스턴스 저장 성공'))
-            .catch(err => console.error('익명 토큰 발급 후 템플릿 인스턴스 저장 실패:', err));
-        }
+        // 게스트는 템플릿을 생성/저장하지 않음
+        state.userLocationTemplateInstances = [];
+        try { removeData(STORAGE_KEYS.USER_LOCATION_TEMPLATES); } catch (e) {}
       })
       .addCase(getAnonymousToken.rejected, (state, action) => {
         state.loading = false;
@@ -833,21 +833,7 @@ export const authSlice = createSlice({
         state.token = action.payload.token;
         state.user = action.payload.user;
         state.error = null;
-        
-        // 회원은 기본 템플릿 3개 제공
-        console.log('일반 로그인 성공: 템플릿 인스턴스 초기화');
-        const templates = [
-          createBasicLocationTemplate(undefined, 5),
-          createBasicLocationTemplate(undefined, 5),
-          createBasicLocationTemplate(undefined, 5)
-        ];
-        state.userLocationTemplateInstances = templates;
-        console.log('일반 로그인 후 템플릿 인스턴스:', templates);
-        
-        // AsyncStorage에 저장
-        saveUserLocationTemplates(templates)
-          .then(() => console.log('일반 로그인 후 템플릿 인스턴스 저장 성공'))
-          .catch(err => console.error('일반 로그인 후 템플릿 인스턴스 저장 실패:', err));
+        // 로그인 직후 템플릿은 별도 thunk에서 최신화
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
@@ -900,16 +886,9 @@ export const authSlice = createSlice({
           state.isLoggedIn = false;
           state.isAnonymous = false;
           state.error = null;
-          // 기본 템플릿 1개 제공
-          console.log('토큰 없음: 기본 템플릿 1개 제공');
-          const defaults = createAnonymousDefaultTemplates(action.payload?.deviceId || state.deviceId || 'unknown', state.userLocationTemplateInstances);
-          state.userLocationTemplateInstances = defaults;
-          console.log('토큰 없음 후 템플릿 인스턴스:', defaults);
-          
-          // AsyncStorage에 저장
-          saveUserLocationTemplates(defaults)
-            .then(() => console.log('토큰 없음 후 템플릿 인스턴스 저장 성공'))
-            .catch(err => console.error('토큰 없음 후 템플릿 인스턴스 저장 실패:', err));
+          // 게스트 템플릿 생성/저장 금지
+          state.userLocationTemplateInstances = [];
+          try { removeData(STORAGE_KEYS.USER_LOCATION_TEMPLATES); } catch (e) {}
           return;
         }
         
@@ -949,19 +928,9 @@ export const authSlice = createSlice({
             .then(() => console.log('토큰 검증 후 템플릿 인스턴스 (로그인) 저장 성공'))
             .catch(err => console.error('토큰 검증 후 템플릿 인스턴스 (로그인) 저장 실패:', err));
         } else {
-          // 익명 사용자 처리
-          console.log('토큰 검증 (익명 사용자): 템플릿 인스턴스 확인');
-          const usedTemplates = state.userLocationTemplateInstances.filter(t => t.used);
-          if (usedTemplates.length > 0) {
-            console.log('익명 사용자가 이미 템플릿을 사용 중입니다. 템플릿 상태 유지:', state.userLocationTemplateInstances);
-          } else if (!action.payload.templates) {
-            const defaults = createAnonymousDefaultTemplates(action.payload.deviceId || state.deviceId || 'unknown', state.userLocationTemplateInstances);
-            state.userLocationTemplateInstances = defaults;
-            console.log('토큰 검증 후 템플릿 인스턴스 (익명):', defaults);
-            saveUserLocationTemplates(defaults)
-              .then(() => console.log('토큰 검증 후 템플릿 인스턴스 (익명) 저장 성공'))
-              .catch(err => console.error('토큰 검증 후 템플릿 인스턴스 (익명) 저장 실패:', err));
-          }
+          // 익명 사용자: 템플릿을 생성/저장하지 않음
+          state.userLocationTemplateInstances = Array.isArray(action.payload.templates) ? action.payload.templates : [];
+          try { if (!state.userLocationTemplateInstances.length) removeData(STORAGE_KEYS.USER_LOCATION_TEMPLATES); } catch (e) {}
         }
         
         state.error = null;
