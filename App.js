@@ -704,8 +704,7 @@ const AppContent = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text style={styles.loadingText}>데이터를 불러오는 중...</Text>
+        {/* 스피너 제거: 스플래시 느낌만 유지 */}
         <TouchableOpacity 
           style={styles.debugButton}
           onPress={() => setShowDebugModal(true)}
