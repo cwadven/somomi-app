@@ -4,6 +4,7 @@ import { fetchGuestSections } from '../../api/sectionApi';
 import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { ENTITY_TYPES } from '../../api/syncApi';
 import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
+import { createGuestSection } from '../../api/sectionApi';
 
 // 영역 목록 가져오기
 export const fetchLocations = createAsyncThunk(
@@ -77,35 +78,44 @@ export const createLocation = createAsyncThunk(
   'locations/createLocation',
   async (locationData, { rejectWithValue, getState, dispatch }) => {
     try {
-      // 디버깅 로그
       console.log('createLocation 시작:', locationData);
-      
-      // 실제 구현에서는 API 호출
-      // 여기서는 임시 ID 생성 후 반환
-      const base = {
-        ...locationData,
-        id: `loc_${Date.now()}`,
-        // 관계 필드(localId) 호환
-        templateInstanceLocalId: locationData.templateInstanceLocalId || locationData.templateInstanceId,
-        // templateInstanceId, productId, feature는 locationData에서 전달받음
-        disabled: false,
-        // SyncMeta 기본값 추가는 syncApi에서 수행
+
+      // 서버 API: Create guest section
+      const payload = {
+        title: locationData.title,
+        description: locationData.description || null,
+        icon: locationData.icon || null,
+        guest_section_template_id: Number(locationData.templateInstanceId || locationData.templateInstanceLocalId),
       };
-      // sync 게이트웨이 적용
-      const newLocation = await commitCreate(ENTITY_TYPES.LOCATION, { ...base, localId: base.id }, {
-        deviceId: getState().auth?.deviceId,
-        ownerUserId: getState().auth?.user?.id,
-      });
-      
-      console.log('생성된 영역:', newLocation);
-      
-      // 새 영역이 생성된 후 전체 영역 목록을 AsyncStorage에 저장
-      const updatedLocations = [...getState().locations.locations, newLocation];
-      await saveLocations(updatedLocations);
-      
-      // 변경 직후 한 번 최신화(서버 도입 시 활성)
-      try { await refreshAfterMutation(dispatch); } catch (e) {}
-      return newLocation;
+      const res = await createGuestSection(payload);
+      const createdId = res?.guest_section_id;
+      if (!createdId) throw new Error('영역 생성에 실패했습니다.');
+
+      // 생성 후 목록 재동기화(GET)
+      try {
+        const listRes = await fetchGuestSections();
+        const items = Array.isArray(listRes?.guest_sections) ? listRes.guest_sections : [];
+        const mapped = items.map((it) => ({
+          id: String(it.id),
+          title: it.title,
+          description: it.description || '',
+          icon: it.icon || 'cube-outline',
+          templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
+          feature: {
+            baseSlots: typeof it?.feature?.base_slots === 'number' ? it.feature.base_slots : 0,
+          },
+          disabled: !!it.disabled,
+          createdAt: it.created_at || new Date().toISOString(),
+          updatedAt: it.updated_at || new Date().toISOString(),
+        }));
+        await saveLocations(mapped);
+        return mapped.find(x => x.id === String(createdId)) || mapped[0] || null;
+      } catch (e) {
+        console.warn('생성 후 목록 동기화 실패:', e?.message || String(e));
+        // 폴백: 로컬 목록 반환
+        const stored = await loadLocations();
+        return (stored || []).find(x => x.id === String(createdId)) || null;
+      }
     } catch (error) {
       console.error('영역 생성 오류:', error);
       return rejectWithValue(error.message || '영역 생성 중 오류가 발생했습니다.');

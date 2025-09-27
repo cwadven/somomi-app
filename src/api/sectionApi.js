@@ -10,9 +10,18 @@ export const fetchGuestSections = async () => {
   return request('/v1/section/guest-sections', { method: 'GET' });
 };
 
+export const createGuestSection = async ({ title, description = null, icon = null, guest_section_template_id }) => {
+  // POST /v1/section/guest-sections → { guest_section_id }
+  return request('/v1/section/guest-sections', {
+    method: 'POST',
+    body: { title, description, icon, guest_section_template_id },
+  });
+};
+
 export default {
   fetchGuestSectionTemplates,
   fetchGuestSections,
+  createGuestSection,
 };
 
 
