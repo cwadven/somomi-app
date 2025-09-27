@@ -26,11 +26,19 @@ export const updateGuestSection = async (guest_section_id, { title, description 
   });
 };
 
+export const deleteGuestSection = async (guest_section_id) => {
+  // DELETE /v1/section/guest-sections/{guest_section_id}
+  return request(`/v1/section/guest-sections/${guest_section_id}`, {
+    method: 'DELETE',
+  });
+};
+
 export default {
   fetchGuestSectionTemplates,
   fetchGuestSections,
   createGuestSection,
   updateGuestSection,
+  deleteGuestSection,
 };
 
 

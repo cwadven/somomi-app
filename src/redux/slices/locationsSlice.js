@@ -1,10 +1,9 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { saveLocations, loadLocations } from '../../utils/storageUtils';
-import { fetchGuestSections } from '../../api/sectionApi';
 import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { ENTITY_TYPES } from '../../api/syncApi';
 import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
-import { createGuestSection, updateGuestSection } from '../../api/sectionApi';
+import { createGuestSection, updateGuestSection, deleteGuestSection, fetchGuestSections } from '../../api/sectionApi';
 
 // 영역 목록 가져오기
 export const fetchLocations = createAsyncThunk(
@@ -174,24 +173,35 @@ export const deleteLocation = createAsyncThunk(
   'locations/deleteLocation',
   async (locationId, { rejectWithValue, getState, dispatch }) => {
     try {
-      // sync 게이트웨이 적용 (tombstone는 상위에서 관리 가능)
-      await commitDelete(ENTITY_TYPES.LOCATION, { id: locationId, localId: locationId }, {
-        deviceId: getState().auth?.deviceId,
-        ownerUserId: getState().auth?.user?.id,
-      });
-      
-      // tombstone: 저장소에는 남기되 상태는 제거
-      const nowIso = new Date().toISOString();
-      const updatedLocations = getState().locations.locations.map(loc => {
-        if (loc.id === locationId) {
-          return { ...loc, syncStatus: 'deleted', deletedAt: nowIso };
-        }
-        return loc;
-      });
-      await saveLocations(updatedLocations);
-      
-      try { await refreshAfterMutation(dispatch); } catch (e) {}
-      return locationId;
+      // 서버 API: Delete guest section
+      await deleteGuestSection(locationId);
+
+      // 삭제 후 목록 재동기화
+      try {
+        const listRes = await fetchGuestSections();
+        const items = Array.isArray(listRes?.guest_sections) ? listRes.guest_sections : [];
+        const mapped = items.map((it) => ({
+          id: String(it.id),
+          title: it.title,
+          description: it.description || '',
+          icon: it.icon || 'cube-outline',
+          templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
+          feature: {
+            baseSlots: typeof it?.feature?.base_slots === 'number' ? it.feature.base_slots : 0,
+          },
+          disabled: !!it.disabled,
+          createdAt: it.created_at || new Date().toISOString(),
+          updatedAt: it.updated_at || new Date().toISOString(),
+        }));
+        await saveLocations(mapped);
+        return locationId;
+      } catch (e) {
+        console.warn('삭제 후 목록 동기화 실패:', e?.message || String(e));
+        // 폴백: 로컬 목록에서 제거
+        const updated = (await loadLocations() || []).filter(x => x.id !== locationId);
+        await saveLocations(updated);
+        return locationId;
+      }
     } catch (error) {
       return rejectWithValue(error.message);
     }
