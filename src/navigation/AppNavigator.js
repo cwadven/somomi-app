@@ -25,6 +25,7 @@ import StoreScreen from '../screens/StoreScreen';
 import PointScreen from '../screens/PointScreen';
 import MyProductsScreen from '../screens/MyProductsScreen';
 import LoginScreen from '../screens/LoginScreen';
+import HelpScreen from '../screens/HelpScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -268,6 +269,7 @@ const AppNavigator = ({ linking }) => {
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
             <RootStack.Screen name="MainTabs" children={() => <MainTabs linking={linking} />} />
             <RootStack.Screen name="RootLogin" component={LoginScreen} options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <RootStack.Screen name="RootHelp" component={HelpScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
           </RootStack.Navigator>
         </NavigationContainer>
       </SafeAreaView>

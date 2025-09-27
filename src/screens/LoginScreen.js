@@ -240,7 +240,8 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#F44336',
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: 'left',
+    alignSelf: 'flex-start',
   },
   successText: {
     color: '#2E7D32',

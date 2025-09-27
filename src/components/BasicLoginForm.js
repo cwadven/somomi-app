@@ -8,17 +8,24 @@ const BasicLoginForm = ({ onLoginStart, onLoginComplete, onLoginError }) => {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
 
   const handleBasicLogin = async () => {
     try {
       setLoading(true);
+      setError('');
       if (onLoginStart) onLoginStart();
+      // 간단한 이메일 형식 검증
+      if (!email || !email.includes('@')) {
+        setError('유효한 이메일을 입력하세요.');
+        return;
+      }
       const derivedUsername = (email && email.includes('@')) ? email.split('@')[0] : '사용자';
       const creds = { username: derivedUsername, email: email || 'user@example.com', password };
       await dispatch(loginUser(creds)).unwrap();
       if (onLoginComplete) onLoginComplete();
     } catch (error) {
-      if (onLoginError) onLoginError(error?.message || '로그인 중 오류가 발생했습니다.');
+      setError(error?.message || '로그인 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -41,6 +48,7 @@ const BasicLoginForm = ({ onLoginStart, onLoginComplete, onLoginError }) => {
         placeholder="비밀번호"
         secureTextEntry={true}
       />
+      {!!error && <Text style={styles.errorText}>{error}</Text>}
       <TouchableOpacity style={styles.primaryBtn} onPress={handleBasicLogin} disabled={loading}>
         {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>로그인</Text>}
       </TouchableOpacity>
@@ -77,6 +85,11 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     color: '#fff',
     fontWeight: '700',
+  },
+  errorText: {
+    color: '#F44336',
+    marginTop: 2,
+    marginBottom: 8,
   },
 });
 

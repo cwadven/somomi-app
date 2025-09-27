@@ -133,15 +133,15 @@ const ProfileScreen = () => {
     setModalTitle('앱 정보');
     setModalMessage('소모미 (SoMoMi) v1.0.0\n생활용품 리마인드 알림 앱');
     setModalAction(null);
+    setModalButtons([
+      { text: '확인', onPress: () => setModalVisible(false) }
+    ]);
     setModalVisible(true);
   };
 
   // 도움말 표시
   const showHelp = () => {
-    setModalTitle('알림');
-    setModalMessage('도움말 기능은 아직 구현되지 않았습니다.');
-    setModalAction(null);
-    setModalVisible(true);
+    navigation.navigate('RootHelp');
   };
 
   // 문의하기 표시
@@ -277,9 +277,7 @@ const ProfileScreen = () => {
         )}
       </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>소모미 (SoMoMi) v1.0.0</Text>
-      </View>
+      {/* 앱 버전 표시는 앱 정보 화면에서 제공 */}
     </ScrollView>
   );
 
