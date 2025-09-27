@@ -213,10 +213,11 @@ const LocationsScreen = () => {
           buttons: [
             { 
               text: '상점으로 이동', 
-              onPress: () => { setAlertModalVisible(false); navigation.navigate('Store'); } 
+              onPress: () => { setAlertModalVisible(false); navigation.navigate('Store'); }
             },
             { 
-              text: '취소'
+              text: '취소',
+              style: 'cancel'
             }
           ]
         });

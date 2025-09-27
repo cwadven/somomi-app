@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { saveLocations, loadLocations } from '../../utils/storageUtils';
+import { fetchGuestSections } from '../../api/sectionApi';
 import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { ENTITY_TYPES } from '../../api/syncApi';
 import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
@@ -10,20 +11,39 @@ export const fetchLocations = createAsyncThunk(
   async (_, { rejectWithValue, getState }) => {
     try {
       console.log('fetchLocations 시작');
-      
-      // 현재 상태에서 영역 목록 가져오기
-      let currentLocations = getState().locations.locations;
-      console.log('현재 저장된 영역 목록:', currentLocations);
-      
-      // 영역 목록이 비어있으면 AsyncStorage에서 로드
-      if (currentLocations.length === 0) {
-        const storedLocations = await loadLocations();
-        console.log('AsyncStorage에서 로드한 영역 목록:', storedLocations);
-        return storedLocations || [];
+
+      const state = getState();
+      const isLoggedIn = !!state?.auth?.isLoggedIn;
+
+      // 로그인 여부와 무관하게, 서버 게스트 섹션 API로 동기화(요청사항)
+      try {
+        const res = await fetchGuestSections();
+        const items = Array.isArray(res?.guest_sections) ? res.guest_sections : [];
+        if (items.length >= 0) {
+          // 서버 → 로컬 스키마 매핑
+          const mapped = items.map((it) => ({
+            id: String(it.id),
+            title: it.title,
+            description: it.description || '',
+            icon: it.icon || 'cube-outline',
+            templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
+            feature: {
+              baseSlots: typeof it?.feature?.base_slots === 'number' ? it.feature.base_slots : 0,
+            },
+            disabled: !!it.disabled,
+            createdAt: it.created_at || new Date().toISOString(),
+            updatedAt: it.updated_at || new Date().toISOString(),
+          }));
+          await saveLocations(mapped);
+          return mapped;
+        }
+      } catch (apiErr) {
+        console.warn('게스트 섹션 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
       }
-      
-      // 이미 영역 목록이 있으면 그대로 반환
-      return currentLocations;
+
+      // 로컬 폴백
+      const storedLocations = await loadLocations();
+      return storedLocations || [];
     } catch (error) {
       console.error('영역 목록 가져오기 오류:', error);
       return rejectWithValue(error.message || '영역 목록을 불러오는 중 오류가 발생했습니다.');
