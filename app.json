@@ -70,7 +70,8 @@
     "extra": {
       "eas": {
         "projectId": "25a0cbfb-df85-4335-8012-d06cc57c6fc6"
-      }
+      },
+      "apiBaseUrl": "https://somomi.co.kr"
     },
     "owner": "next_story",
     "scheme": "somomi"
