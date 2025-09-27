@@ -27,7 +27,7 @@ const SlotStatusBar = ({ used, total, type = 'product', onDetailPress }) => {
   
   // 사용 중인 슬롯과 전체 슬롯 수를 안전하게 표시
   const safeUsed = isNaN(used) ? 0 : used;
-  const safeTotal = isUnlimited ? -1 : (isNaN(total) || total <= 0 ? 1 : total);
+  const safeTotal = isUnlimited ? -1 : (isNaN(total) || total < 0 ? 0 : total);
   
   return (
     <View style={styles.container}>

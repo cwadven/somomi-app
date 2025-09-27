@@ -386,6 +386,9 @@ const LocationsScreen = () => {
   const availableTemplates = useMemo(() => nonExpiredTemplates.filter(template => !template.used), [nonExpiredTemplates]);
   const usedTemplates = useMemo(() => nonExpiredTemplates.filter(template => template.used), [nonExpiredTemplates]);
   const totalTemplates = nonExpiredTemplates.length;
+  // 원본(만료 포함) 기준 카운트
+  const rawTotalTemplates = userLocationTemplateInstances.length;
+  const rawUsedTemplates = useMemo(() => userLocationTemplateInstances.filter(t => t.used).length, [userLocationTemplateInstances]);
   
   // 템플릿 상태 변경시에만 로그 출력
   useEffect(() => {
@@ -410,8 +413,8 @@ const LocationsScreen = () => {
           {/* 전역 만료 배너 제거. 영역별로 안내 */}
           {/* 슬롯 상태 표시 바 - 템플릿 인스턴스 기준 */}
           <SlotStatusBar 
-            used={usedTemplates.length} 
-            total={totalTemplates} 
+            used={rawUsedTemplates} 
+            total={rawTotalTemplates} 
             type="location" 
           />
           {/* 자동 연동 모달 제거됨 */}
