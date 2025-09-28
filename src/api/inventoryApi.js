@@ -18,10 +18,19 @@ export const createInventoryItemInSection = async (guest_section_id, body) => {
   });
 };
 
+export const consumeInventoryItem = async (guest_inventory_item_id, consumed_at) => {
+  // POST /v1/inventory/item/{guest_inventory_item_id}/consume
+  return request(`/v1/inventory/item/${guest_inventory_item_id}/consume`, {
+    method: 'POST',
+    body: { consumed_at },
+  });
+};
+
 export default {
   fetchGuestInventoryItemTemplates,
   fetchInventoryItemsBySection,
   createInventoryItemInSection,
+  consumeInventoryItem,
 };
 
 

@@ -15,7 +15,8 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchProductById, deleteProductAsync, markProductAsConsumedAsync } from '../redux/slices/productsSlice';
+import { fetchProductById, deleteProductAsync, fetchProductsByLocation } from '../redux/slices/productsSlice';
+import { consumeInventoryItem } from '../api/inventoryApi';
 import { isTemplateActive } from '../utils/validityUtils';
 import AlertModal from '../components/AlertModal';
 import ProductNotificationSettings from '../components/ProductNotificationSettings';
@@ -334,22 +335,19 @@ const ProductDetailScreen = () => {
             // 알림 모달 닫기
             setAlertModalVisible(false);
             
-            // 소진 처리 API 호출
-            dispatch(markProductAsConsumedAsync({ 
-              id: currentProduct.id, 
-              consumptionDate: date.toISOString() 
-            }))
-              .unwrap()
+            // 소진 처리 API 호출 (서버)
+            consumeInventoryItem(currentProduct.id, date.toISOString())
               .then(() => {
                 // 약간의 지연 후 성공 모달 표시 (애니메이션 충돌 방지)
                 setTimeout(() => {
                   // 성공 모달 설정 및 표시
-                  setSuccessModalConfig({
+                   setSuccessModalConfig({
                     title: '소진 처리 완료',
                     message: `${productName} 제품이 ${formattedDate}에 소진 처리되었습니다.`,
                     onConfirm: () => {
                       // 모달 닫기 후 이전 화면으로 이동
                       setSuccessModalVisible(false);
+                       try { if (currentProduct?.locationId) { dispatch(fetchProductsByLocation(currentProduct.locationId)); } } catch (e) {}
                       navigation.goBack();
                     }
                   });
