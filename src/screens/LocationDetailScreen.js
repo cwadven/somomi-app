@@ -284,7 +284,8 @@ const LocationDetailScreen = () => {
   
   // 제품 상세 화면으로 이동
   const handleProductPress = (product) => {
-    navigation.navigate('ProductDetail', { productId: product.id });
+    // 제품 상세로 이동 시, 리스트에서 가져온 제품 객체를 함께 전달
+    navigation.navigate('ProductDetail', { productId: product.id, product });
   };
   
   // 탭 변경 핸들러

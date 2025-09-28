@@ -66,7 +66,7 @@ const ProductDetailScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
   
-  const { productId } = route.params;
+  const { productId, product: passedProduct } = route.params || {};
   const { currentProduct: selectedProduct, status, error, locationProducts } = useSelector(state => state.products);
   // 섹션 인벤토리 API로 채워진 캐시에서 우선 탐색
   const cachedFromSections = (() => {
@@ -81,7 +81,7 @@ const ProductDetailScreen = () => {
       return null;
     }
   })();
-  const currentProduct = selectedProduct || cachedFromSections;
+  const currentProduct = passedProduct || selectedProduct || cachedFromSections;
   const { userLocationTemplateInstances, subscription } = useSelector(state => state.auth);
   
   // 최신 상태를 참조하기 위한 ref
@@ -172,8 +172,11 @@ const ProductDetailScreen = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
   useEffect(() => {
-    dispatch(fetchProductById(productId));
-  }, [dispatch, productId]);
+    // 리스트/캐시/파라미터에 데이터가 없을 때만 개별 상세 로드
+    if (!currentProduct && productId) {
+      dispatch(fetchProductById(productId));
+    }
+  }, [dispatch, productId, currentProduct]);
   
   // 소진 처리 날짜 상태 변화 감지 및 로깅
   useEffect(() => {
@@ -526,7 +529,7 @@ const ProductDetailScreen = () => {
   };
   
   // 제품 데이터가 로딩 중일 경우 로딩 화면 표시
-  if (status === 'loading') {
+  if (!currentProduct && status === 'loading') {
     return (
       <View style={styles.mainContainer}>
         <View style={styles.headerBar}>
@@ -544,7 +547,7 @@ const ProductDetailScreen = () => {
   }
   
   // 에러가 발생한 경우 에러 메시지 표시
-  if (status === 'failed') {
+  if (!currentProduct && status === 'failed') {
     return (
       <View style={styles.mainContainer}>
         <View style={styles.headerBar}>
