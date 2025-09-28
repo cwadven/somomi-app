@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, saveDeviceId, loadDeviceId, saveLocations, saveProducts, saveConsumedProducts, saveRefreshToken, removeRefreshToken, removeData, STORAGE_KEYS } from '../../utils/storageUtils';
 import { loginMember } from '../../api/memberApi';
 import { fetchGuestSectionTemplates } from '../../api/sectionApi';
+import { fetchGuestInventoryItemTemplates } from '../../api/inventoryApi';
 import { generateId } from '../../utils/idUtils';
 import { resetLocationsState } from './locationsSlice';
 
@@ -126,6 +127,7 @@ export const loginUser = createAsyncThunk(
       const user = { id: 'me', username };
       // 로그인 직후 내 템플릿 최신화
       try { await dispatch(loadUserLocationTemplateInstances()).unwrap(); } catch (e) {}
+      try { await dispatch(loadUserProductSlotTemplateInstances()).unwrap(); } catch (e) {}
       return { token: accessToken, user };
     } catch (err) {
       const apiMsg = err?.response?.data?.message;
@@ -283,8 +285,36 @@ export const loadUserLocationTemplateInstances = createAsyncThunk(
 // 사용자 제품 슬롯 템플릿 인스턴스 로드
 export const loadUserProductSlotTemplateInstances = createAsyncThunk(
   'auth/loadUserProductSlotTemplateInstances',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
+      const state = getState();
+      const isLoggedIn = !!state?.auth?.isLoggedIn;
+      if (isLoggedIn) {
+        try {
+          const res = await fetchGuestInventoryItemTemplates();
+          const items = Array.isArray(res?.guest_inventory_item_templates) ? res.guest_inventory_item_templates : [];
+          if (items.length > 0) {
+            const mapped = items.map((it) => ({
+              id: String(it.id),
+              name: it.name,
+              description: it.description || '',
+              used: !!it.used,
+              assignedLocationId: it.assigned_in_section_id ? String(it.assigned_in_section_id) : null,
+              usedByProductId: it.used_in_inventory_item_id ? String(it.used_in_inventory_item_id) : null,
+              createdAt: it.created_at || new Date().toISOString(),
+              updatedAt: it.updated_at || new Date().toISOString(),
+            }));
+            await saveUserProductSlotTemplates(mapped);
+            return mapped;
+          }
+        } catch (apiErr) {
+          console.warn('게스트 인벤토리 템플릿 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
+        }
+      } else {
+        // 비로그인: 저장 금지 및 초기화
+        try { await saveUserProductSlotTemplates([]); } catch (e) {}
+        return [];
+      }
       const templates = await loadUserProductSlotTemplates();
       return templates || [];
     } catch (error) {

@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useIsFocused, useRoute } from '@react-navigation/native';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { updateLocation } from '../redux/slices/locationsSlice';
-import { addBasicTemplateInstance, loadUserLocationTemplateInstances } from '../redux/slices/authSlice';
+import { addBasicTemplateInstance, loadUserLocationTemplateInstances, loadUserProductSlotTemplateInstances } from '../redux/slices/authSlice';
 import SignupPromptModal from '../components/SignupPromptModal';
 import { checkAnonymousLimits } from '../utils/authUtils';
 import SlotPlaceholder from '../components/SlotPlaceholder';
@@ -138,6 +138,7 @@ const LocationsScreen = () => {
       console.log('LocationsScreen: 영역 목록 로드 시작');
       // 로그인 상태에서 진입 시 템플릿 최신화
       try { if (isLoggedIn) { dispatch(loadUserLocationTemplateInstances()); } } catch (e) {}
+      try { if (isLoggedIn) { dispatch(loadUserProductSlotTemplateInstances()); } } catch (e) {}
       if (isLoggedIn) {
         dispatch(fetchLocations())
         .then(result => {
