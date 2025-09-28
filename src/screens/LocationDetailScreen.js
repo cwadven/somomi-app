@@ -33,7 +33,7 @@ const LocationDetailScreen = () => {
   const isAllProductsView = isAllProducts || locationId === 'all';
   
   const { currentLocation, status, error, locations } = useSelector(state => state.locations);
-  const { products } = useSelector(state => state.products);
+  const { products, locationProducts: locationProductsCache } = useSelector(state => state.products);
   const { slots, userProductSlotTemplateInstances, subscription, userLocationTemplateInstances } = useSelector(state => state.auth);
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -82,12 +82,18 @@ const LocationDetailScreen = () => {
       });
       setLocationProducts(filtered);
     } else {
-      const filteredProducts = (products || []).filter(product => 
-        product.locationId === locationId && product.syncStatus !== 'deleted' && !product.isConsumed
-      );
-      setLocationProducts(filteredProducts);
+      // 우선 캐시된 서버 응답을 사용
+      const cached = locationProductsCache?.[locationId];
+      if (Array.isArray(cached)) {
+        setLocationProducts(cached);
+      } else {
+        const filteredProducts = (products || []).filter(product => 
+          product.locationId === locationId && product.syncStatus !== 'deleted' && !product.isConsumed
+        );
+        setLocationProducts(filteredProducts);
+      }
     }
-  }, [products, locationId, isAllProductsView, locations, isLocExpired]);
+  }, [products, locationProductsCache, locationId, isAllProductsView, locations, isLocExpired]);
 
   // 비율 계산 헬퍼
   const computeRate = useCallback((startIso, endIso) => {

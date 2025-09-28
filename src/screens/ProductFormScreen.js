@@ -20,7 +20,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { addProductAsync, updateProductAsync, fetchProducts, fetchProductById } from '../redux/slices/productsSlice';
+import { addProductAsync, updateProductAsync, fetchProducts, fetchProductById, fetchProductsByLocation } from '../redux/slices/productsSlice';
 import { markProductSlotTemplateAsUsed } from '../redux/slices/authSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { fetchCategories } from '../redux/slices/categoriesSlice';
@@ -31,6 +31,7 @@ import CategorySelector from '../components/CategorySelector';
 import LocationSelector from '../components/LocationSelector';
 import SignupPromptModal from '../components/SignupPromptModal';
 import AlertModal from '../components/AlertModal';
+import { createInventoryItemInSection } from '../api/inventoryApi';
 
 // 조건부 DateTimePicker 임포트
 let DateTimePicker;
@@ -751,10 +752,37 @@ const ProductFormScreen = () => {
         // 수정 모드
         result = await dispatch(updateProductAsync({ ...productData, id: productId })).unwrap();
       } else {
-        // 추가 모드
-        result = await dispatch(addProductAsync(productData)).unwrap();
-        // 기본 슬롯 초과분은 해당 영역에 등록된 추가 슬롯에서 소모 (할당된 것 중 미사용)
+        // 추가 모드 → 서버 API로 생성
         const locIdAfter = locationId || selectedLocation?.id;
+        const body = {
+          name: productName,
+          memo: memo || null,
+          guest_inventory_item_template_id: null,
+          brand: brand || null,
+          point_of_purchase: purchasePlace || null,
+          purchase_price: price && String(price).trim() !== '' ? parseFloat(String(price)) : null,
+          purchase_at: purchaseDate.toISOString(),
+          icon_url: null,
+          expected_expire_at: estimatedEndDate ? estimatedEndDate.toISOString() : null,
+          expire_at: expiryDate ? expiryDate.toISOString() : null,
+        };
+        const createRes = await createInventoryItemInSection(locIdAfter, body);
+        const newId = createRes?.guest_inventory_item_id ? String(createRes.guest_inventory_item_id) : undefined;
+        // 생성 후 목록 최신화
+        try { await dispatch(fetchProductsByLocation(locIdAfter)).unwrap(); } catch (e) {}
+        result = {
+          id: newId,
+          locationId: String(locIdAfter),
+          name: body.name,
+          memo: body.memo,
+          brand: body.brand,
+          purchasePlace: body.point_of_purchase,
+          price: body.purchase_price,
+          purchaseDate: body.purchase_at,
+          expiryDate: body.expire_at,
+          estimatedEndDate: body.expected_expire_at,
+        };
+        // 기본 슬롯 초과분은 해당 영역에 등록된 추가 슬롯에서 소모 (할당된 것 중 미사용)
         const baseSlotsInSubmit = selectedLocation?.feature?.baseSlots ?? slots?.productSlots?.baseSlots ?? 0;
         const productsInLocation = (products || []).filter(p => p.locationId === locIdAfter && !p.isConsumed);
         const usedCountAfter = (productsInLocation.length) + 1; // 방금 추가 포함

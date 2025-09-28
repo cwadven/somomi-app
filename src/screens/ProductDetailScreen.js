@@ -67,7 +67,21 @@ const ProductDetailScreen = () => {
   const dispatch = useDispatch();
   
   const { productId } = route.params;
-  const { currentProduct, status, error } = useSelector(state => state.products);
+  const { currentProduct: selectedProduct, status, error, locationProducts } = useSelector(state => state.products);
+  // 섹션 인벤토리 API로 채워진 캐시에서 우선 탐색
+  const cachedFromSections = (() => {
+    try {
+      const lists = Object.values(locationProducts || {});
+      for (const list of lists) {
+        const found = Array.isArray(list) ? list.find(p => String(p.id) === String(productId)) : null;
+        if (found) return found;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  })();
+  const currentProduct = selectedProduct || cachedFromSections;
   const { userLocationTemplateInstances, subscription } = useSelector(state => state.auth);
   
   // 최신 상태를 참조하기 위한 ref

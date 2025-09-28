@@ -12,6 +12,7 @@ import {
 import { ENTITY_TYPES } from '../../api/syncApi';
 import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
 import { deleteLocation } from './locationsSlice';
+import { fetchInventoryItemsBySection } from '../../api/inventoryApi';
 import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { saveProducts, loadProducts, saveConsumedProducts, loadConsumedProducts } from '../../utils/storageUtils';
 import { unassignProductSlotTemplate, releaseProductSlotTemplateByProduct } from './authSlice';
@@ -60,10 +61,35 @@ export const fetchProductsByLocation = createAsyncThunk(
   'products/fetchProductsByLocation',
   async (locationId, { rejectWithValue, getState }) => {
     try {
-      // 모든 제품 가져오기
+      // 서버 호출로 영역별 인벤토리 동기화 (특정 영역일 때)
+      if (locationId !== 'all') {
+        try {
+          const res = await fetchInventoryItemsBySection(locationId);
+          const items = Array.isArray(res?.guest_inventory_items) ? res.guest_inventory_items : [];
+          const mapped = items.map((it) => ({
+            id: String(it.id),
+            locationId: it.guest_section_id ? String(it.guest_section_id) : null,
+            name: it.name,
+            memo: it.memo || '',
+            brand: it.brand || '',
+            pointOfPurchase: it.point_of_purchase || '',
+            purchasePrice: typeof it.purchase_price === 'number' ? it.purchase_price : null,
+            purchaseDate: it.purchase_at || null,
+            iconUrl: it.icon_url || null,
+            estimatedEndDate: it.expected_expire_at || null,
+            expiryDate: it.expire_at || null,
+            createdAt: it.created_at,
+            updatedAt: it.updated_at,
+            isConsumed: false,
+          }));
+          return mapped;
+        } catch (apiErr) {
+          console.warn('영역별 인벤토리 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
+        }
+      }
+
+      // 폴백: 로컬 저장/상태 기반
       const { products } = getState().products;
-      
-      // 이미 제품 데이터가 있으면 필터링만 수행
       if (products.length > 0) {
         if (locationId === 'all') {
           return products;
@@ -73,10 +99,8 @@ export const fetchProductsByLocation = createAsyncThunk(
           );
         }
       }
-      
-      // 제품 데이터가 없으면 AsyncStorage에서 로드
+
       const storedProducts = await loadProducts();
-      
       if (locationId === 'all') {
         return storedProducts;
       } else {
