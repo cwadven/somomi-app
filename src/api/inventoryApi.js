@@ -26,11 +26,26 @@ export const consumeInventoryItem = async (guest_inventory_item_id, consumed_at)
   });
 };
 
+export const revokeConsumeInventoryItem = async (guest_inventory_item_id, body = {}) => {
+  // POST /v1/inventory/item/{guest_inventory_item_id}/revoke-consume
+  return request(`/v1/inventory/item/${guest_inventory_item_id}/revoke-consume`, {
+    method: 'POST',
+    body,
+  });
+};
+
+export const fetchConsumedInventoryItems = async () => {
+  // GET /v1/inventory/items/consumed → { guest_inventory_items: [...] }
+  return request('/v1/inventory/items/consumed', { method: 'GET' });
+};
+
 export default {
   fetchGuestInventoryItemTemplates,
   fetchInventoryItemsBySection,
   createInventoryItemInSection,
   consumeInventoryItem,
+  revokeConsumeInventoryItem,
+  fetchConsumedInventoryItems,
 };
 
 

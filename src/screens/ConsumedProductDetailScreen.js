@@ -12,7 +12,8 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchConsumedProducts, restoreConsumedProductAsync } from '../redux/slices/productsSlice';
+import { fetchConsumedProducts } from '../redux/slices/productsSlice';
+import { revokeConsumeInventoryItem } from '../api/inventoryApi';
 import LocationSelectionModal from '../components/LocationSelectionModal';
 import AlertModal from '../components/AlertModal';
 
@@ -89,26 +90,41 @@ const ConsumedProductDetailScreen = () => {
     ? (locations.find(loc => loc.id === currentProduct.locationId) || null)
     : null;
   
-  // 소진 철회 처리 함수: 항상 대상 영역을 선택하도록 모달 표시
+  // 소진 철회 처리 함수: 기본 철회 시도 후 특정 에러코드면 영역 선택 유도
   const handleRestoreProduct = () => {
-    setLocationSelectionVisible(true);
-  };
-  
-  // 영역 선택 후 소진 철회 처리
-  const handleLocationSelect = (location) => {
-    // 소진 철회 전에 현재 제품 정보 저장
-    const productName = currentProduct.name;
-    
     setIsRestoring(true);
-    dispatch(restoreConsumedProductAsync({ id: currentProduct.id, locationId: location.id }))
-      .unwrap()
+    revokeConsumeInventoryItem(currentProduct.id)
       .then(() => {
-        // 성공 시 바로 이전 화면으로 이동
         navigation.goBack();
       })
       .catch((error) => {
         setIsRestoring(false);
-        showErrorModal(`소진 철회 중 오류가 발생했습니다: ${error.message}`);
+        const code = error?.response?.data?.error_code;
+        if (
+          code === 'guest-section-not-exists' ||
+          code === 'guest-section-exceed-base-slot' ||
+          code === 'guest-inventory-item-template-invalid' ||
+          code === 'guest-inventory-item-template-already-item-registered'
+        ) {
+          setLocationSelectionVisible(true);
+          return;
+        }
+        const msg = error?.response?.data?.message || error?.message || '소진 철회 중 오류가 발생했습니다.';
+        showErrorModal(msg);
+      });
+  };
+  
+  // 영역 선택 후 소진 철회 처리 (지정 영역으로 재시도)
+  const handleLocationSelect = (location) => {
+    setIsRestoring(true);
+    revokeConsumeInventoryItem(currentProduct.id, { guest_section_id: location?.id })
+      .then(() => {
+        navigation.goBack();
+      })
+      .catch((error) => {
+        setIsRestoring(false);
+        const msg = error?.response?.data?.message || error?.message || '소진 철회 중 오류가 발생했습니다.';
+        showErrorModal(msg);
       });
   };
   

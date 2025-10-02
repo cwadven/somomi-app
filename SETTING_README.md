@@ -568,5 +568,5 @@ watchman
 Local 실행
 
 ```
-npx expo start --no-cache
+npx expo start --reset-cache
 ```

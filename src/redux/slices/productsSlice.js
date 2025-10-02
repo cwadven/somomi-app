@@ -15,6 +15,7 @@ import { deleteLocation } from './locationsSlice';
 import { fetchInventoryItemsBySection } from '../../api/inventoryApi';
 import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { saveProducts, loadProducts, saveConsumedProducts, loadConsumedProducts } from '../../utils/storageUtils';
+import { fetchConsumedInventoryItems } from '../../api/inventoryApi';
 import { unassignProductSlotTemplate, releaseProductSlotTemplateByProduct } from './authSlice';
 
 // 비동기 액션 생성
@@ -243,25 +244,52 @@ export const fetchConsumedProducts = createAsyncThunk(
   'products/fetchConsumedProducts',
   async (_, { rejectWithValue, getState }) => {
     try {
-      console.log('fetchConsumedProducts 시작');
-      
-      // 현재 상태에서 소진된 제품 목록 가져오기
-      const currentConsumedProducts = getState().products.consumedProducts;
-      console.log('현재 저장된 소진된 제품 목록:', currentConsumedProducts);
-      
-      // 소진된 제품 목록이 비어있으면 AsyncStorage에서 로드
-      if (currentConsumedProducts.length === 0) {
-        const storedConsumedProducts = await loadConsumedProducts();
-        console.log('AsyncStorage에서 로드한 소진된 제품 목록:', storedConsumedProducts);
-        return (storedConsumedProducts || []).slice().sort((a, b) => {
-          const ta = a.consumedAt ? new Date(a.consumedAt).getTime() : 0;
-          const tb = b.consumedAt ? new Date(b.consumedAt).getTime() : 0;
-          return tb - ta;
-        });
+      const state = getState();
+      const isLoggedIn = !!state?.auth?.isLoggedIn;
+      if (isLoggedIn) {
+        try {
+          const res = await fetchConsumedInventoryItems();
+          const items = Array.isArray(res?.guest_inventory_items) ? res.guest_inventory_items : [];
+          const mapped = items.map((it) => ({
+            id: String(it.id),
+            locationId: it.guest_section_id ? String(it.guest_section_id) : null,
+            name: it.name,
+            memo: it.memo || '',
+            brand: it.brand || '',
+            purchasePlace: it.point_of_purchase || '',
+            price: typeof it.purchase_price === 'number' ? it.purchase_price : null,
+            purchaseDate: it.purchase_at || null,
+            iconUrl: it.icon_url || null,
+            estimatedEndDate: it.expected_expire_at || null,
+            expiryDate: it.expire_at || null,
+            consumedAt: it.consumed_at || null,
+            processedAt: it.processed_at || null,
+            createdAt: it.created_at,
+            updatedAt: it.updated_at,
+            isConsumed: true,
+          }));
+          // 정렬: 최근 처리 순
+          mapped.sort((a, b) => {
+            const ta = a.processedAt ? new Date(a.processedAt).getTime() : (a.consumedAt ? new Date(a.consumedAt).getTime() : 0);
+            const tb = b.processedAt ? new Date(b.processedAt).getTime() : (b.consumedAt ? new Date(b.consumedAt).getTime() : 0);
+            return tb - ta;
+          });
+          try { await saveConsumedProducts(mapped); } catch (e) {}
+          return mapped;
+        } catch (apiErr) {
+          console.warn('소진 목록 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
+        }
       }
-      
-      // 이미 소진된 제품 목록이 있으면 그대로 반환
-      return currentConsumedProducts;
+
+      // 폴백: 현재 상태 또는 AsyncStorage
+      const currentConsumedProducts = state.products.consumedProducts;
+      if (currentConsumedProducts.length > 0) return currentConsumedProducts;
+      const storedConsumedProducts = await loadConsumedProducts();
+      return (storedConsumedProducts || []).slice().sort((a, b) => {
+        const ta = a.consumedAt ? new Date(a.consumedAt).getTime() : 0;
+        const tb = b.consumedAt ? new Date(b.consumedAt).getTime() : 0;
+        return tb - ta;
+      });
     } catch (error) {
       console.error('소진된 제품 목록 가져오기 오류:', error);
       return rejectWithValue(error.message);
