@@ -268,8 +268,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 16,
+    backgroundColor: '#fff',
   },
   loadingContainer: {
     flex: 1,
@@ -301,6 +300,9 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
   },
   emptyContainer: {
     flex: 1,
