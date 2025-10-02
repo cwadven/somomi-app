@@ -249,7 +249,7 @@ export const fetchConsumedProducts = createAsyncThunk(
       if (isLoggedIn) {
         try {
           const res = await fetchConsumedInventoryItems();
-          const items = Array.isArray(res?.guest_inventory_items) ? res.guest_inventory_items : [];
+          const items = Array.isArray(res?.guest_inventory_consumed_items) ? res.guest_inventory_consumed_items : [];
           const mapped = items.map((it) => ({
             id: String(it.id),
             locationId: it.guest_section_id ? String(it.guest_section_id) : null,
@@ -263,7 +263,7 @@ export const fetchConsumedProducts = createAsyncThunk(
             estimatedEndDate: it.expected_expire_at || null,
             expiryDate: it.expire_at || null,
             consumedAt: it.consumed_at || null,
-            processedAt: it.processed_at || null,
+            processedAt: it.moved_to_consumed_section_at || null,
             createdAt: it.created_at,
             updatedAt: it.updated_at,
             isConsumed: true,

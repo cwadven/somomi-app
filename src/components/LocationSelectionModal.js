@@ -13,7 +13,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { isLocationExpired as isLocationExpiredUtil, getLocationCapacityInfo } from '../utils/locationUtils';
 
-const LocationSelectionModal = ({ visible, onClose, onSelectLocation }) => {
+const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMessage }) => {
   const dispatch = useDispatch();
   const { locations, status } = useSelector(state => state.locations);
   const { products } = useSelector(state => state.products);
@@ -102,6 +102,12 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation }) => {
           </View>
 
           <View style={styles.modalBody}>
+            {reasonMessage ? (
+              <View style={styles.reasonBox}>
+                <Ionicons name="alert-circle-outline" size={18} color="#d35400" style={{ marginRight: 6 }} />
+                <Text style={styles.reasonText}>{reasonMessage}</Text>
+              </View>
+            ) : null}
             <Text style={styles.modalDescription}>
               복원할 제품을 넣을 영역을 선택하세요.
             </Text>
@@ -187,6 +193,23 @@ const styles = StyleSheet.create({
   modalBody: {
     padding: 16,
     maxHeight: 400,
+  },
+  reasonBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fff6e6',
+    borderColor: '#ffd9a6',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  reasonText: {
+    flex: 1,
+    color: '#8a4b08',
+    fontSize: 13,
+    lineHeight: 18,
   },
   footerButtons: {
     flexDirection: 'row',

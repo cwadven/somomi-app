@@ -91,6 +91,8 @@ const ConsumedProductDetailScreen = () => {
     : null;
   
   // 소진 철회 처리 함수: 기본 철회 시도 후 특정 에러코드면 영역 선택 유도
+  const [reasonForSelection, setReasonForSelection] = useState('');
+
   const handleRestoreProduct = () => {
     setIsRestoring(true);
     revokeConsumeInventoryItem(currentProduct.id)
@@ -100,17 +102,29 @@ const ConsumedProductDetailScreen = () => {
       .catch((error) => {
         setIsRestoring(false);
         const code = error?.response?.data?.error_code;
+        const msg = error?.response?.data?.message || error?.message || undefined;
         if (
           code === 'guest-section-not-exists' ||
           code === 'guest-section-exceed-base-slot' ||
           code === 'guest-inventory-item-template-invalid' ||
           code === 'guest-inventory-item-template-already-item-registered'
         ) {
+          let reason = msg;
+          if (!reason) {
+            const map = {
+              'guest-section-not-exists': '선택된 영역을 찾을 수 없습니다. 다른 영역을 선택해주세요.',
+              'guest-section-exceed-base-slot': '해당 영역의 유효 슬롯을 초과했습니다. 다른 영역을 선택해주세요.',
+              'guest-inventory-item-template-invalid': '연결 가능한 제품 템플릿이 유효하지 않습니다. 다른 영역을 선택하거나 템플릿을 확인해주세요.',
+              'guest-inventory-item-template-already-item-registered': '이미 연결된 제품이 있는 템플릿입니다. 다른 영역을 선택해주세요.',
+            };
+            reason = map[code] || '해당 영역으로 복원할 수 없습니다. 다른 영역을 선택해주세요.';
+          }
+          setReasonForSelection(reason);
           setLocationSelectionVisible(true);
           return;
         }
-        const msg = error?.response?.data?.message || error?.message || '소진 철회 중 오류가 발생했습니다.';
-        showErrorModal(msg);
+        const finalMsg = msg || '소진 철회 중 오류가 발생했습니다.';
+        showErrorModal(finalMsg);
       });
   };
   
@@ -327,6 +341,7 @@ const ConsumedProductDetailScreen = () => {
         visible={locationSelectionVisible}
         onClose={() => setLocationSelectionVisible(false)}
         onSelectLocation={handleLocationSelect}
+        reasonMessage={reasonForSelection}
       />
       
       {/* 알림 모달 */}
