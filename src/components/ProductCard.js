@@ -185,6 +185,14 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
           <View style={styles.dateInfo}>
             <Ionicons name="calendar-outline" size={14} color={isZeroHP ? "#888" : "#666"} />
             <View style={styles.dateTextContainer}>
+              {product.purchaseDate && (
+                <Text style={[
+                  styles.dateText,
+                  isZeroHP && styles.zeroHPSubText
+                ]}>
+                  구매일: {new Date(product.purchaseDate).toLocaleDateString()}
+                </Text>
+              )}
               {product.expiryDate && (
                 <Text style={[
                   styles.dateText,
@@ -198,16 +206,24 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
                   styles.dateText,
                   isZeroHP && styles.zeroHPSubText
                 ]}>
-                  소진예상: {new Date(product.estimatedEndDate).toLocaleDateString()}
+                  소비기한: {new Date(product.estimatedEndDate).toLocaleDateString()}
                 </Text>
               )}
-              {!product.expiryDate && !product.estimatedEndDate && (
-            <Text style={[
-              styles.dateText,
-              isZeroHP && styles.zeroHPSubText
-            ]}>
+              {product.createdAt && (
+                <Text style={[
+                  styles.dateText,
+                  isZeroHP && styles.zeroHPSubText
+                ]}>
+                  등록일: {new Date(product.createdAt).toLocaleDateString()}
+                </Text>
+              )}
+              {!product.purchaseDate && !product.expiryDate && !product.estimatedEndDate && !product.createdAt && (
+                <Text style={[
+                  styles.dateText,
+                  isZeroHP && styles.zeroHPSubText
+                ]}>
                   날짜 정보 없음
-            </Text>
+                </Text>
               )}
             </View>
           </View>

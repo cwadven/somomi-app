@@ -31,7 +31,7 @@ import CategorySelector from '../components/CategorySelector';
 import LocationSelector from '../components/LocationSelector';
 import SignupPromptModal from '../components/SignupPromptModal';
 import AlertModal from '../components/AlertModal';
-import { createInventoryItemInSection } from '../api/inventoryApi';
+import { createInventoryItemInSection, updateInventoryItem } from '../api/inventoryApi';
 
 // 조건부 DateTimePicker 임포트
 let DateTimePicker;
@@ -49,7 +49,7 @@ const ProductFormScreen = () => {
   const route = useRoute();
   
   // 라우트 파라미터에서 모드와 관련 정보 가져오기
-  const { mode = 'add', productId, locationId } = route.params || {};
+  const { mode = 'add', productId, locationId, product: passedProduct } = route.params || {};
   const isEditMode = mode === 'edit';
   
   // Redux 상태
@@ -329,45 +329,48 @@ const ProductFormScreen = () => {
 
   // 수정 모드인 경우 제품 데이터 로드
   useEffect(() => {
-    if (isEditMode && productId) {
+    if (isEditMode && (passedProduct || productId)) {
+      if (passedProduct) return; // 이미 전달됨
       dispatch(fetchProductById(productId));
     }
-  }, [dispatch, isEditMode, productId]);
+  }, [dispatch, isEditMode, productId, passedProduct]);
 
   // 제품 데이터가 로드되면 폼에 채우기 (수정 모드)
+  const editingProduct = passedProduct || currentProduct;
+
   useEffect(() => {
-    if (isEditMode && currentProduct) {
-      setProductName(currentProduct.name || '');
-      setBrand(currentProduct.brand || '');
-      setPurchasePlace(currentProduct.purchasePlace || '');
+    if (isEditMode && editingProduct) {
+      setProductName(editingProduct.name || '');
+      setBrand(editingProduct.brand || '');
+      setPurchasePlace(editingProduct.purchasePlace || '');
       setPrice(
-        typeof currentProduct.price === 'number' && !isNaN(currentProduct.price)
-          ? String(currentProduct.price)
+        typeof editingProduct.price === 'number' && !isNaN(editingProduct.price)
+          ? String(editingProduct.price)
           : ''
       );
-      setMemo(currentProduct.memo || '');
+      setMemo(editingProduct.memo || '');
       
       // 날짜 설정
-      if (currentProduct.purchaseDate) {
-        setPurchaseDate(new Date(currentProduct.purchaseDate));
+      if (editingProduct.purchaseDate) {
+        setPurchaseDate(new Date(editingProduct.purchaseDate));
       }
       
-      if (currentProduct.expiryDate) {
-        setExpiryDate(new Date(currentProduct.expiryDate));
+      if (editingProduct.expiryDate) {
+        setExpiryDate(new Date(editingProduct.expiryDate));
       }
       
-      if (currentProduct.estimatedEndDate) {
-        setEstimatedEndDate(new Date(currentProduct.estimatedEndDate));
+      if (editingProduct.estimatedEndDate) {
+        setEstimatedEndDate(new Date(editingProduct.estimatedEndDate));
       }
       
       // 카테고리 설정 (객체/문자열/ID 모두 대응)
       if (categories.length > 0) {
         const resolveCategory = () => {
           // 1) 제품에 categoryId가 있는 경우
-          if (currentProduct.categoryId) {
-            return categories.find(cat => cat.id === currentProduct.categoryId);
+          if (editingProduct.categoryId) {
+            return categories.find(cat => cat.id === editingProduct.categoryId);
           }
-          const c = currentProduct.category;
+          const c = editingProduct.category;
           if (!c) return null;
           // 2) 제품에 category가 객체로 저장된 경우
           if (typeof c === 'object') {
@@ -391,14 +394,14 @@ const ProductFormScreen = () => {
       }
       
       // 영역 설정
-      if (currentProduct.locationId && locations.length > 0) {
-        const location = locations.find(loc => loc.id === currentProduct.locationId);
+      if (editingProduct.locationId && locations.length > 0) {
+        const location = locations.find(loc => loc.id === editingProduct.locationId);
         if (location) {
           setSelectedLocation(location);
         }
       }
     }
-  }, [isEditMode, currentProduct, categories, locations]);
+  }, [isEditMode, editingProduct, categories, locations]);
 
   // 초기 선택된 영역 설정 및 해당 영역의 제품 개수 확인 (추가 모드)
   useEffect(() => {
@@ -749,8 +752,41 @@ const ProductFormScreen = () => {
 
       let result;
       if (isEditMode) {
-        // 수정 모드
-        result = await dispatch(updateProductAsync({ ...productData, id: productId })).unwrap();
+        // 수정 모드 → 서버 API로 업데이트
+        const locIdAfter = selectedLocation?.id || currentProduct.locationId || null;
+        const body = {
+          guest_section_id: locIdAfter ? Number(locIdAfter) : null,
+          name: productName,
+          memo: memo || null,
+          brand: brand || null,
+          point_of_purchase: purchasePlace || null,
+          purchase_price: price && String(price).trim() !== '' ? parseFloat(String(price)) : null,
+          purchase_at: purchaseDate.toISOString(),
+          icon_url: null,
+          expected_expire_at: estimatedEndDate ? estimatedEndDate.toISOString() : null,
+          expire_at: expiryDate ? expiryDate.toISOString() : null,
+        };
+        try {
+          await updateInventoryItem(productId, body);
+        } catch (e) {
+          throw e;
+        }
+        // 수정 후: 해당 영역 목록 최신화 + 제품 상세 화면을 위해 최신 데이터 확보
+        if (locIdAfter) {
+          try { await dispatch(fetchProductsByLocation(String(locIdAfter))).unwrap(); } catch (e) {}
+        }
+        result = {
+          id: String(productId),
+          locationId: locIdAfter ? String(locIdAfter) : null,
+          name: body.name,
+          memo: body.memo,
+          brand: body.brand,
+          purchasePlace: body.point_of_purchase,
+          price: body.purchase_price,
+          purchaseDate: body.purchase_at,
+          expiryDate: body.expire_at,
+          estimatedEndDate: body.expected_expire_at,
+        };
       } else {
         // 추가 모드 → 서버 API로 생성
         const locIdAfter = locationId || selectedLocation?.id;

@@ -82,7 +82,7 @@ const ProductDetailScreen = () => {
       return null;
     }
   })();
-  const currentProduct = passedProduct || selectedProduct || cachedFromSections;
+  const currentProduct = cachedFromSections || selectedProduct || passedProduct;
   const { userLocationTemplateInstances, subscription } = useSelector(state => state.auth);
   
   // 최신 상태를 참조하기 위한 ref
@@ -178,6 +178,14 @@ const ProductDetailScreen = () => {
       dispatch(fetchProductById(productId));
     }
   }, [dispatch, productId, currentProduct]);
+
+  // 제품 상세가 포커스되거나 라우트 파라미터가 갱신될 때, 해당 영역 캐시 최신화 시도 (수정 직후 반영 목적)
+  useEffect(() => {
+    const locId = currentProduct?.locationId || passedProduct?.locationId;
+    if (locId) {
+      try { dispatch(fetchProductsByLocation(String(locId))); } catch (e) {}
+    }
+  }, [dispatch, passedProduct, currentProduct?.locationId]);
   
   // 소진 처리 날짜 상태 변화 감지 및 로깅
   useEffect(() => {
@@ -727,7 +735,7 @@ const ProductDetailScreen = () => {
   
   // 제품 수정 화면으로 이동
   const handleEdit = () => {
-            navigation.navigate('ProductForm', { mode: 'edit', productId: currentProduct.id });
+            navigation.navigate('ProductForm', { mode: 'edit', productId: currentProduct.id, product: currentProduct });
   };
   
   // 알림 설정 탭으로 전환
@@ -981,6 +989,12 @@ const ProductDetailScreen = () => {
         <View style={styles.detailsSection}>
           <Text style={styles.sectionTitle}>제품 정보</Text>
           
+          <InfoItem 
+            label="등록일" 
+            value={currentProduct.createdAt ? new Date(currentProduct.createdAt).toLocaleDateString() : null} 
+            icon="time-outline" 
+          />
+
           <InfoItem 
             label="구매일" 
             value={currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate).toLocaleDateString() : null} 

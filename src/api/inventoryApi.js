@@ -39,6 +39,14 @@ export const fetchConsumedInventoryItems = async () => {
   return request('/v1/inventory/items/consumed', { method: 'GET' });
 };
 
+export const updateInventoryItem = async (guest_inventory_item_id, body) => {
+  // PUT /v1/inventory/item/{guest_inventory_item_id}
+  return request(`/v1/inventory/item/${guest_inventory_item_id}`, {
+    method: 'PUT',
+    body,
+  });
+};
+
 export default {
   fetchGuestInventoryItemTemplates,
   fetchInventoryItemsBySection,
@@ -46,6 +54,7 @@ export default {
   consumeInventoryItem,
   revokeConsumeInventoryItem,
   fetchConsumedInventoryItems,
+  updateInventoryItem,
 };
 
 
