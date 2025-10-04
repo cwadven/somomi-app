@@ -831,21 +831,9 @@ export const authSlice = createSlice({
         state.token = action.payload.token;
         state.user = action.payload.user;
         state.error = null;
-        
-        // 회원은 기본 템플릿 3개 제공
-        console.log('카카오 로그인 성공: 템플릿 인스턴스 초기화');
-        const templates = [
-          createBasicLocationTemplate(undefined, 5),
-          createBasicLocationTemplate(undefined, 5),
-          createBasicLocationTemplate(undefined, 5)
-        ];
-        state.userLocationTemplateInstances = templates;
-        console.log('카카오 로그인 후 템플릿 인스턴스:', templates);
-        
-        // AsyncStorage에 저장
-        saveUserLocationTemplates(templates)
-          .then(() => console.log('카카오 로그인 후 템플릿 인스턴스 저장 성공'))
-          .catch(err => console.error('카카오 로그인 후 템플릿 인스턴스 저장 실패:', err));
+        // 템플릿은 서버 API 기반으로만 로드
+        state.userLocationTemplateInstances = [];
+        try { removeData(STORAGE_KEYS.USER_LOCATION_TEMPLATES); } catch (e) {}
       })
       .addCase(kakaoLogin.rejected, (state, action) => {
         state.loading = false;
@@ -881,21 +869,9 @@ export const authSlice = createSlice({
         state.token = action.payload.token;
         state.user = action.payload.user;
         state.error = null;
-        
-        // 회원은 기본 템플릿 3개 제공
-        console.log('회원가입 성공: 템플릿 인스턴스 초기화');
-        const templates = [
-          createBasicLocationTemplate(undefined, 5),
-          createBasicLocationTemplate(undefined, 5),
-          createBasicLocationTemplate(undefined, 5)
-        ];
-        state.userLocationTemplateInstances = templates;
-        console.log('회원가입 후 템플릿 인스턴스:', templates);
-        
-        // AsyncStorage에 저장
-        saveUserLocationTemplates(templates)
-          .then(() => console.log('회원가입 후 템플릿 인스턴스 저장 성공'))
-          .catch(err => console.error('회원가입 후 템플릿 인스턴스 저장 실패:', err));
+        // 템플릿은 서버 API 기반으로만 로드
+        state.userLocationTemplateInstances = [];
+        try { removeData(STORAGE_KEYS.USER_LOCATION_TEMPLATES); } catch (e) {}
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
@@ -927,7 +903,7 @@ export const authSlice = createSlice({
         state.isAnonymous = action.payload.isAnonymous;
         state.deviceId = action.payload.deviceId || state.deviceId;
         
-        // 로그인 사용자라면 로그인 상태/사용자 정보 복원 (템플릿 존재 여부와 무관하게 선행)
+      // 로그인 사용자라면 로그인 상태/사용자 정보 복원 (템플릿 존재 여부와 무관하게 선행)
         if (!action.payload.isAnonymous) {
           state.isLoggedIn = true;
           if (action.payload.user) {
@@ -938,30 +914,9 @@ export const authSlice = createSlice({
           state.user = null;
         }
         
-        // 템플릿 복원 우선
-        if (action.payload.templates) {
-          console.log('저장된 템플릿 인스턴스 사용:', action.payload.templates);
-          state.userLocationTemplateInstances = action.payload.templates;
-        } else if (!action.payload.isAnonymous) {
-          // 로그인 사용자이며 저장된 템플릿이 없을 때 기본 3개 제공
-          console.log('토큰 검증 (로그인 사용자): 템플릿 인스턴스 초기화');
-          const templates = [
-            createBasicLocationTemplate(undefined, 5),
-            createBasicLocationTemplate(undefined, 5),
-            createBasicLocationTemplate(undefined, 5)
-          ];
-          state.userLocationTemplateInstances = templates;
-          console.log('토큰 검증 후 템플릿 인스턴스 (로그인):', templates);
-          
-          // AsyncStorage에 저장
-          saveUserLocationTemplates(templates)
-            .then(() => console.log('토큰 검증 후 템플릿 인스턴스 (로그인) 저장 성공'))
-            .catch(err => console.error('토큰 검증 후 템플릿 인스턴스 (로그인) 저장 실패:', err));
-        } else {
-          // 익명 사용자: 템플릿을 생성/저장하지 않음
-          state.userLocationTemplateInstances = Array.isArray(action.payload.templates) ? action.payload.templates : [];
-          try { if (!state.userLocationTemplateInstances.length) removeData(STORAGE_KEYS.USER_LOCATION_TEMPLATES); } catch (e) {}
-        }
+        // 템플릿은 서버 API로만 로드하도록 유지 (기본 템플릿 생성 금지)
+        state.userLocationTemplateInstances = Array.isArray(action.payload.templates) ? action.payload.templates : [];
+        try { if (!state.userLocationTemplateInstances.length) removeData(STORAGE_KEYS.USER_LOCATION_TEMPLATES); } catch (e) {}
         
         state.error = null;
       })
