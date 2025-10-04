@@ -42,12 +42,16 @@ const LoginScreen = ({ navigation }) => {
       }
       // 이메일/토큰 기반 회원가입 API 호출
       const res = await emailSignUp({ email, one_time_token: otpCode, password, password2: passwordConfirm });
-      const accessToken = res?.access_token;
-      const refreshToken = res?.refresh_token;
+      const accessToken = res?.access_token ?? res?.data?.access_token;
+      const refreshToken = res?.refresh_token ?? res?.data?.refresh_token;
       if (accessToken) {
         await saveJwtToken(accessToken);
         if (refreshToken) await saveRefreshToken(refreshToken);
         try { await dispatch(verifyToken()).unwrap(); } catch (e) {}
+      } else {
+        setError('토큰 발급에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+        setLoading(false);
+        return;
       }
       navigation.goBack();
     } catch (e) {
