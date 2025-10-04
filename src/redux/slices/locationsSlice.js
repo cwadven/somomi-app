@@ -34,8 +34,18 @@ export const fetchLocations = createAsyncThunk(
               createdAt: it.created_at || new Date().toISOString(),
               updatedAt: it.updated_at || new Date().toISOString(),
             }));
-            await saveLocations(mapped);
-            return mapped;
+            // 서버 목록과 로컬 저장 목록을 병합하여 만료 상태 등으로 서버에서 누락된 항목도 표시되도록 유지
+            let merged = mapped;
+            try {
+              const stored = await loadLocations();
+              if (Array.isArray(stored) && stored.length > 0) {
+                const seen = new Set(mapped.map(x => String(x.id)));
+                const onlyLocal = stored.filter(x => !seen.has(String(x.id)));
+                merged = [...mapped, ...onlyLocal];
+              }
+            } catch (_) {}
+            await saveLocations(merged);
+            return merged;
           }
         } catch (apiErr) {
           console.warn('게스트 섹션 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
