@@ -32,11 +32,20 @@ export const verifyVerificationToken = async (email, one_time_token) => {
   });
 };
 
+export const emailSignUp = async ({ email, one_time_token, password, password2 }) => {
+  return request('/v1/member/email-sign-up', {
+    method: 'POST',
+    body: { email, one_time_token, password, password2 },
+    skipAuth: true,
+  });
+};
+
 export default {
   loginMember,
   refreshAccessToken,
   sendVerificationToken,
   verifyVerificationToken,
+  emailSignUp,
 };
 
 

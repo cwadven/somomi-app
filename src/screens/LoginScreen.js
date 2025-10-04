@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { useDispatch } from 'react-redux';
-import { registerUser } from '../redux/slices/authSlice';
-import { sendVerificationToken, verifyVerificationToken } from '../api/memberApi';
+import { registerUser, verifyToken } from '../redux/slices/authSlice';
+import { sendVerificationToken, verifyVerificationToken, emailSignUp } from '../api/memberApi';
+import { saveJwtToken, saveRefreshToken } from '../utils/storageUtils';
 import BasicLoginForm from '../components/BasicLoginForm';
 
 const LoginScreen = ({ navigation }) => {
@@ -39,8 +40,15 @@ const LoginScreen = ({ navigation }) => {
         setError('이메일 인증을 완료해 주세요.');
         return;
       }
-      const u = (email && email.includes('@')) ? email.split('@')[0] : 'user';
-      await dispatch(registerUser({ username: u, email, password, otpCode })).unwrap();
+      // 이메일/토큰 기반 회원가입 API 호출
+      const res = await emailSignUp({ email, one_time_token: otpCode, password, password2: passwordConfirm });
+      const accessToken = res?.access_token;
+      const refreshToken = res?.refresh_token;
+      if (accessToken) {
+        await saveJwtToken(accessToken);
+        if (refreshToken) await saveRefreshToken(refreshToken);
+        try { await dispatch(verifyToken()).unwrap(); } catch (e) {}
+      }
       navigation.goBack();
     } catch (e) {
       setError(e?.message || '회원가입 중 오류가 발생했습니다.');
@@ -56,14 +64,17 @@ const LoginScreen = ({ navigation }) => {
       setError('유효한 이메일을 입력한 후 인증을 요청하세요.');
       return;
     }
-    setOtpRequested(true);
     setOtpVerified(false);
     setOtpCode('');
-    // 서버에 인증 메일 발송 요청
-    sendVerificationToken(email).catch((e) => {
-      setError(e?.response?.data?.message || e?.message || '인증 메일 전송 중 오류가 발생했습니다.');
-      setOtpRequested(false);
-    });
+    // 서버에 인증 메일 발송 요청 (성공 시에만 입력 UI 노출)
+    sendVerificationToken(email)
+      .then(() => {
+        setOtpRequested(true);
+      })
+      .catch((e) => {
+        setError(e?.response?.data?.message || e?.message || '인증 메일 전송 중 오류가 발생했습니다.');
+        setOtpRequested(false);
+      });
   };
 
   const handleVerifyOtp = () => {
