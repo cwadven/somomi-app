@@ -1086,7 +1086,8 @@ const ProductFormScreen = () => {
               value={productName}
               onChangeText={(text) => handleFieldChange('productName', text)}
               onBlur={() => handleFieldBlur('productName', productName)}
-              placeholder="제품명을 입력하세요"
+            placeholder="제품명을 입력하세요"
+            placeholderTextColor="#999"
             />
             {touched.productName && errors.productName ? (
               <Text style={styles.errorText}>{errors.productName}</Text>
@@ -1100,7 +1101,8 @@ const ProductFormScreen = () => {
               style={styles.input}
               value={brand}
               onChangeText={setBrand}
-              placeholder="브랜드명을 입력하세요"
+            placeholder="브랜드명을 입력하세요"
+            placeholderTextColor="#999"
             />
           </View>
 
@@ -1111,7 +1113,8 @@ const ProductFormScreen = () => {
               style={styles.input}
               value={purchasePlace}
               onChangeText={setPurchasePlace}
-              placeholder="구매처를 입력하세요"
+            placeholder="구매처를 입력하세요"
+            placeholderTextColor="#999"
             />
           </View>
 
@@ -1123,7 +1126,8 @@ const ProductFormScreen = () => {
               value={price}
               onChangeText={(text) => setPrice(text.replace(/[^0-9]/g, ''))}
               keyboardType="number-pad"
-              placeholder="숫자만 입력"
+            placeholder="숫자만 입력"
+            placeholderTextColor="#999"
             />
           </View>
           
@@ -1277,7 +1281,8 @@ const ProductFormScreen = () => {
               style={[styles.input, styles.textArea]}
               value={memo}
               onChangeText={setMemo}
-              placeholder="메모를 입력하세요"
+            placeholder="메모를 입력하세요"
+            placeholderTextColor="#999"
               multiline={true}
               numberOfLines={4}
             />
