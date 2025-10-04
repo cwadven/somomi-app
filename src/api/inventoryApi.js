@@ -47,6 +47,13 @@ export const updateInventoryItem = async (guest_inventory_item_id, body) => {
   });
 };
 
+export const deleteInventoryItem = async (guest_inventory_item_id) => {
+  // DELETE /v1/inventory/item/{guest_inventory_item_id}
+  return request(`/v1/inventory/item/${guest_inventory_item_id}`, {
+    method: 'DELETE',
+  });
+};
+
 export default {
   fetchGuestInventoryItemTemplates,
   fetchInventoryItemsBySection,
@@ -55,6 +62,7 @@ export default {
   revokeConsumeInventoryItem,
   fetchConsumedInventoryItems,
   updateInventoryItem,
+  deleteInventoryItem,
 };
 
 

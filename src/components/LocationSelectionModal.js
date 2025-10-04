@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,12 +12,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { isLocationExpired as isLocationExpiredUtil, getLocationCapacityInfo } from '../utils/locationUtils';
+import { fetchProductsByLocation } from '../redux/slices/productsSlice';
 
 const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMessage }) => {
   const dispatch = useDispatch();
   const { locations, status } = useSelector(state => state.locations);
-  const { products } = useSelector(state => state.products);
-  const { userProductSlotTemplateInstances, userLocationTemplateInstances } = useSelector(state => state.auth);
+  const { products, locationProducts } = useSelector(state => state.products);
+  const { userProductSlotTemplateInstances, userLocationTemplateInstances, subscription } = useSelector(state => state.auth);
   const [loading, setLoading] = useState(true);
   const [selectedLocationId, setSelectedLocationId] = useState(null);
 
@@ -27,7 +28,21 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMess
       setLoading(true);
       dispatch(fetchLocations())
         .unwrap()
-        .then(() => setLoading(false))
+        .then(async (fetchedLocations) => {
+          try {
+            const list = Array.isArray(fetchedLocations) ? fetchedLocations : (locations || []);
+            // 각 영역별 제품 목록 최신화 (용량 계산 정확도 향상)
+            await Promise.all(
+              list.map((loc) => {
+                if (!loc?.id) return Promise.resolve();
+                return dispatch(fetchProductsByLocation(String(loc.id)))
+                  .unwrap()
+                  .catch(() => {});
+              })
+            );
+          } catch (_) {}
+          setLoading(false);
+        })
         .catch(() => setLoading(false));
       setSelectedLocationId(null);
     }
@@ -37,10 +52,29 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMess
     setSelectedLocationId(location.id);
   };
 
+  // 복원 가능(만료 아님 && 가득 참 아님)한 영역만 필터링
+  const eligibleLocations = useMemo(() => {
+    try {
+      return (locations || []).filter((loc) => {
+        const { isFull } = getLocationCapacityInfo(
+          loc.id,
+          { locations, products, locationProducts, userProductSlotTemplateInstances, subscription }
+        );
+        const expired = isLocationExpiredUtil(loc.id, { userLocationTemplateInstances, subscription });
+        return !isFull && !expired;
+      });
+    } catch (e) {
+      return [];
+    }
+  }, [locations, products, locationProducts, userProductSlotTemplateInstances, userLocationTemplateInstances, subscription]);
+
   const renderLocationItem = ({ item }) => (
     (() => {
-      const { used, total, isFull } = getLocationCapacityInfo(item.id, { locations, products, userProductSlotTemplateInstances });
-      const expired = isLocationExpiredUtil(item.id, { userLocationTemplateInstances });
+      const { used, total, isFull } = getLocationCapacityInfo(
+        item.id,
+        { locations, products, locationProducts, userProductSlotTemplateInstances, subscription }
+      );
+      const expired = isLocationExpiredUtil(item.id, { userLocationTemplateInstances, subscription });
       const disabled = expired || isFull;
       const selected = selectedLocationId === item.id;
       return (
@@ -116,9 +150,9 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMess
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#4CAF50" />
               </View>
-            ) : locations.length > 0 ? (
+            ) : eligibleLocations.length > 0 ? (
               <FlatList
-                data={locations}
+                data={eligibleLocations}
                 renderItem={renderLocationItem}
                 keyExtractor={(item) => String(item.localId || item.id)}
                 contentContainerStyle={styles.listContainer}
@@ -126,10 +160,8 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMess
             ) : (
               <View style={styles.emptyContainer}>
                 <Ionicons name="alert-circle-outline" size={48} color="#ccc" />
-                <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
-                <Text style={styles.emptySubText}>
-                  먼저 영역을 추가해주세요.
-                </Text>
+                <Text style={styles.emptyText}>복원 가능한 영역이 없습니다.</Text>
+                <Text style={styles.emptySubText}>만료되었거나 슬롯이 가득 찬 영역은 표시되지 않습니다.</Text>
               </View>
             )}
           </View>
@@ -143,10 +175,13 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMess
               style={[styles.footerButton, styles.footerConfirm, !selectedLocationId && styles.footerConfirmDisabled]}
               onPress={() => {
                 if (!selectedLocationId) return;
-                const selected = locations.find(l => l.id === selectedLocationId);
+                const selected = eligibleLocations.find(l => l.id === selectedLocationId);
                 if (!selected) return;
-                const { isFull } = getLocationCapacityInfo(selectedLocationId, { locations, products, userProductSlotTemplateInstances });
-                const expired = isLocationExpiredUtil(selectedLocationId, { userLocationTemplateInstances });
+                const { isFull } = getLocationCapacityInfo(
+                  selectedLocationId,
+                  { locations, products, locationProducts, userProductSlotTemplateInstances, subscription }
+                );
+                const expired = isLocationExpiredUtil(selectedLocationId, { userLocationTemplateInstances, subscription });
                 if (isFull || expired) return;
                 onSelectLocation(selected);
                 onClose();

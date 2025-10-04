@@ -12,7 +12,7 @@ import {
 import { ENTITY_TYPES } from '../../api/syncApi';
 import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
 import { deleteLocation } from './locationsSlice';
-import { fetchInventoryItemsBySection } from '../../api/inventoryApi';
+import { fetchInventoryItemsBySection, deleteInventoryItem } from '../../api/inventoryApi';
 import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { saveProducts, loadProducts, saveConsumedProducts, loadConsumedProducts } from '../../utils/storageUtils';
 import { fetchConsumedInventoryItems } from '../../api/inventoryApi';
@@ -182,16 +182,26 @@ export const deleteProductAsync = createAsyncThunk(
   'products/deleteProduct',
   async (id, { rejectWithValue, getState, dispatch }) => {
     try {
-      await commitDelete(ENTITY_TYPES.PRODUCT, { id, localId: id }, {
-        deviceId: getState().auth?.deviceId,
-        ownerUserId: getState().auth?.user?.id,
-      });
-      // 즉시 영구 삭제(로컬 저장소 업데이트)
-      const updatedProducts = getState().products.products.filter(p => p.id !== id);
+      const state = getState();
+      const isLoggedIn = !!state?.auth?.isLoggedIn;
+
+      if (isLoggedIn) {
+        // 서버에 삭제 요청
+        await deleteInventoryItem(id);
+      } else {
+        // 오프라인/비로그인: 로컬 동기화 큐 기록
+        await commitDelete(ENTITY_TYPES.PRODUCT, { id, localId: id }, {
+          deviceId: state.auth?.deviceId,
+          ownerUserId: state.auth?.user?.id,
+        });
+      }
+
+      // 로컬 상태/스토리지 정리
+      const updatedProducts = state.products.products.filter(p => p.id !== id);
       await saveProducts(updatedProducts);
       // 추가 제품 슬롯이 해당 제품에 사용 중이었다면 해제
       try { dispatch(releaseProductSlotTemplateByProduct(id)); } catch (e) {}
-      
+
       try { await refreshAfterMutation(dispatch); } catch (e) {}
       return id;
     } catch (error) {
