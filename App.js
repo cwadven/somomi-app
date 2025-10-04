@@ -697,12 +697,14 @@ const AppContent = () => {
     return (
       <>
         <CodePushUpdateLoading error={updateError} />
-        <TouchableOpacity 
-          style={styles.debugButton}
-          onPress={() => setShowDebugModal(true)}
-        >
-          <Ionicons name="bug-outline" size={24} color="#fff" />
-        </TouchableOpacity>
+        {Platform.OS === 'web' && (
+          <TouchableOpacity 
+            style={styles.debugButton}
+            onPress={() => setShowDebugModal(true)}
+          >
+            <Ionicons name="bug-outline" size={24} color="#fff" />
+          </TouchableOpacity>
+        )}
         <UpdateDebugModal />
       </>
     );
@@ -713,12 +715,14 @@ const AppContent = () => {
     return (
       <View style={styles.loadingContainer}>
         {/* 스피너 제거: 스플래시 느낌만 유지 */}
-        <TouchableOpacity 
-          style={styles.debugButton}
-          onPress={() => setShowDebugModal(true)}
-        >
-          <Ionicons name="bug-outline" size={24} color="#fff" />
-        </TouchableOpacity>
+        {Platform.OS === 'web' && (
+          <TouchableOpacity 
+            style={styles.debugButton}
+            onPress={() => setShowDebugModal(true)}
+          >
+            <Ionicons name="bug-outline" size={24} color="#fff" />
+          </TouchableOpacity>
+        )}
         <UpdateDebugModal />
       </View>
     );
@@ -727,16 +731,18 @@ const AppContent = () => {
   return (
     <>
       <AppNavigator linking={linking} />
-      <View style={styles.debugButtonsContainer}>
-        <TouchableOpacity 
-          style={[styles.debugButton, styles.updateDebugButton]}
-          onPress={() => setShowDebugModal(true)}
-        >
-          <Ionicons name="bug-outline" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      {Platform.OS === 'web' && (
+        <View style={styles.debugButtonsContainer}>
+          <TouchableOpacity 
+            style={[styles.debugButton, styles.updateDebugButton]}
+            onPress={() => setShowDebugModal(true)}
+          >
+            <Ionicons name="bug-outline" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
       <UpdateDebugModal />
-      <PushNotificationDebugger />
+      {Platform.OS === 'web' && <PushNotificationDebugger />}
     </>
   );
 };
