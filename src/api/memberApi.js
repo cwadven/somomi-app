@@ -24,10 +24,19 @@ export const sendVerificationToken = async (email) => {
   });
 };
 
+export const verifyVerificationToken = async (email, one_time_token) => {
+  return request('/v1/member/verify-verification-token', {
+    method: 'POST',
+    body: { email, one_time_token },
+    skipAuth: true,
+  });
+};
+
 export default {
   loginMember,
   refreshAccessToken,
   sendVerificationToken,
+  verifyVerificationToken,
 };
 
 

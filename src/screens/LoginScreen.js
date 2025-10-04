@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { registerUser } from '../redux/slices/authSlice';
-import { sendVerificationToken } from '../api/memberApi';
+import { sendVerificationToken, verifyVerificationToken } from '../api/memberApi';
 import BasicLoginForm from '../components/BasicLoginForm';
 
 const LoginScreen = ({ navigation }) => {
@@ -12,6 +12,7 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [otpRequested, setOtpRequested] = useState(false);
@@ -50,6 +51,7 @@ const LoginScreen = ({ navigation }) => {
 
   const handleRequestOtp = () => {
     setError('');
+    setOtpError('');
     if (!email || !email.includes('@')) {
       setError('유효한 이메일을 입력한 후 인증을 요청하세요.');
       return;
@@ -67,11 +69,15 @@ const LoginScreen = ({ navigation }) => {
   const handleVerifyOtp = () => {
     setError('');
     if (!/^\d{6}$/.test(otpCode)) {
-      setError('6자리 숫자 인증 코드를 입력하세요.');
+      setOtpError('6자리 숫자 인증 코드를 입력하세요.');
       return;
     }
-    // 실제 구현에서는 서버에 코드 검증 요청
-    setOtpVerified(true);
+    verifyVerificationToken(email, otpCode)
+      .then(() => { setOtpVerified(true); setOtpError(''); })
+      .catch((e) => {
+        setOtpVerified(false);
+        setOtpError(e?.response?.data?.message || e?.message || '인증 코드 검증에 실패했습니다.');
+      });
   };
 
   return (
@@ -112,7 +118,7 @@ const LoginScreen = ({ navigation }) => {
               <TextInput
                 style={[styles.input, { flex: 1 }]}
                 value={otpCode}
-                onChangeText={(t) => setOtpCode(t.replace(/[^0-9]/g, '').slice(0, 6))}
+                onChangeText={(t) => { setOtpCode(t.replace(/[^0-9]/g, '').slice(0, 6)); setOtpError(''); }}
                 placeholder="인증 코드(6자리)"
                 keyboardType="number-pad"
               />
@@ -120,6 +126,9 @@ const LoginScreen = ({ navigation }) => {
                 <Text style={styles.smallBtnText}>확인하기</Text>
               </TouchableOpacity>
             </View>
+          )}
+          {!!otpError && (
+            <Text style={styles.otpErrorText}>{otpError}</Text>
           )}
           {otpVerified && (
             <Text style={styles.successText}>이메일 인증이 완료되었습니다.</Text>
@@ -247,6 +256,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
     fontWeight: '700',
+  },
+  otpErrorText: {
+    color: '#F44336',
+    marginTop: 4,
+    marginBottom: 8,
+    textAlign: 'left',
+    alignSelf: 'flex-start',
   },
   closeBtn: {
     alignItems: 'center',
