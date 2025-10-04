@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { registerUser } from '../redux/slices/authSlice';
+import { sendVerificationToken } from '../api/memberApi';
 import BasicLoginForm from '../components/BasicLoginForm';
 
 const LoginScreen = ({ navigation }) => {
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
   const dispatch = useDispatch();
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -38,7 +38,7 @@ const LoginScreen = ({ navigation }) => {
         setError('이메일 인증을 완료해 주세요.');
         return;
       }
-      const u = username || (email && email.includes('@') ? email.split('@')[0] : '사용자');
+      const u = (email && email.includes('@')) ? email.split('@')[0] : 'user';
       await dispatch(registerUser({ username: u, email, password, otpCode })).unwrap();
       navigation.goBack();
     } catch (e) {
@@ -54,10 +54,14 @@ const LoginScreen = ({ navigation }) => {
       setError('유효한 이메일을 입력한 후 인증을 요청하세요.');
       return;
     }
-    // 실제 구현에서는 서버에 인증 메일 발송 요청
     setOtpRequested(true);
     setOtpVerified(false);
     setOtpCode('');
+    // 서버에 인증 메일 발송 요청
+    sendVerificationToken(email).catch((e) => {
+      setError(e?.response?.data?.message || e?.message || '인증 메일 전송 중 오류가 발생했습니다.');
+      setOtpRequested(false);
+    });
   };
 
   const handleVerifyOtp = () => {
@@ -88,13 +92,7 @@ const LoginScreen = ({ navigation }) => {
         <BasicLoginForm onLoginComplete={() => navigation.goBack()} />
       ) : (
         <View style={styles.formBox}>
-          <TextInput
-            style={styles.input}
-            value={username}
-            onChangeText={setUsername}
-            placeholder="닉네임"
-            autoCapitalize="none"
-          />
+          {/* 닉네임 입력 제거 */}
           <View style={styles.row}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
@@ -108,22 +106,9 @@ const LoginScreen = ({ navigation }) => {
               <Text style={styles.smallBtnText}>{otpRequested ? '재요청' : '인증 받기'}</Text>
             </TouchableOpacity>
           </View>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="비밀번호"
-            secureTextEntry={true}
-          />
-          <TextInput
-            style={styles.input}
-            value={passwordConfirm}
-            onChangeText={setPasswordConfirm}
-            placeholder="비밀번호 확인"
-            secureTextEntry={true}
-          />
+          {/* 인증코드 입력: 이메일 아래로 이동 */}
           {otpRequested && !otpVerified && (
-            <View style={styles.row}>
+            <View style={[styles.row, { marginTop: 8 }]}> 
               <TextInput
                 style={[styles.input, { flex: 1 }]}
                 value={otpCode}
@@ -139,6 +124,20 @@ const LoginScreen = ({ navigation }) => {
           {otpVerified && (
             <Text style={styles.successText}>이메일 인증이 완료되었습니다.</Text>
           )}
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            placeholder="비밀번호"
+            secureTextEntry={true}
+          />
+          <TextInput
+            style={styles.input}
+            value={passwordConfirm}
+            onChangeText={setPasswordConfirm}
+            placeholder="비밀번호 확인"
+            secureTextEntry={true}
+          />
           {!!error && <Text style={styles.errorText}>{error}</Text>}
           <TouchableOpacity style={styles.primaryBtn} onPress={handleSignup} disabled={loading}>
             {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>회원가입</Text>}
