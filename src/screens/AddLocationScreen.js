@@ -794,21 +794,23 @@ const AddLocationScreen = () => {
               value={locationData.title}
               onChangeText={(text) => handleInputChange('title', text)}
               placeholder="영역 이름 입력..."
+              placeholderTextColor="#999"
               editable={!(isEditMode && isEditLockedByExpiry)}
             />
         </View>
         
           <View style={styles.formGroup}>
             <Text style={styles.label}>설명 (선택사항)</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
+            <TextInput
+              style={[styles.input, styles.textArea, styles.placeholderLight]}
               value={locationData.description}
               onChangeText={(text) => handleInputChange('description', text)}
-              placeholder={selectedTemplateInstance ? selectedTemplateInstance.description : "영역에 대한 설명을 입력하세요"}
-            multiline
+              placeholder={"영역 설명 입력..."}
+              placeholderTextColor="#999"
+              multiline
               editable={!(isEditMode && isEditLockedByExpiry)}
-          />
-        </View>
+            />
+          </View>
         
           <View style={styles.formGroup}>
             <Text style={styles.label}>아이콘</Text>
@@ -1114,6 +1116,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+  },
+  placeholderLight: {
+    color: '#333',
   },
   textArea: {
     height: 100,
