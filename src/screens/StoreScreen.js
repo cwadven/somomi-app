@@ -10,13 +10,13 @@ import {
   FlatList
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance, addTemplateInstance, addProductSlotTemplateInstances, applySubscriptionToTemplates } from '../redux/slices/authSlice';
 import { isTemplateActive } from '../utils/validityUtils';
 import productTemplateData from '../storeTemplateData/productTemplateData';
 import locationTemplateData from '../storeTemplateData/locationTemplateData';
-import { fetchSectionTemplateProducts } from '../api/productApi';
+import { fetchSectionTemplateProducts, fetchPointProducts } from '../api/productApi';
 import subscriptionTemplateData from '../storeTemplateData/subscriptionTemplateData';
 import { getLocationSlotChipLabels, getDurationChipLabel, getProductSlotChipLabel } from '../utils/badgeLabelUtils';
 import pointPackageData from '../storeTemplateData/pointPackageData';
@@ -70,12 +70,10 @@ const StoreScreen = () => {
       try {
         if (!isLoggedIn) return;
         const res = await fetchAvailablePoint();
-        const value = typeof res?.available_point === 'number' ? res.available_point : null;
-        if (mounted && value != null) {
-          // 화면 표시만 갱신: auth.points.balance를 직접 바꾸지 않고 UI 레벨에서만 반영하려면 로컬 상태를 써도 되나,
-          // 현재 구조에서는 points.balance를 그대로 사용 중이므로, 여기서는 임시로 override 상태를 둔다.
-          setRemotePoint(value);
-        }
+        const raw = res?.available_point;
+        const num = raw != null ? Number(raw) : null;
+        const value = (num != null && isFinite(num)) ? num : null;
+        if (mounted) setRemotePoint(value);
       } catch (e) {
         if (mounted) setRemotePoint(null);
       }
@@ -83,8 +81,26 @@ const StoreScreen = () => {
     return () => { mounted = false; };
   }, [isLoggedIn]);
 
+  // 포커스 시 포인트 재동기화
+  useFocusEffect(
+    React.useCallback(() => {
+      let alive = true;
+      (async () => {
+        try {
+          if (!isLoggedIn) return;
+          const res = await fetchAvailablePoint();
+          const raw = res?.available_point;
+          const num = raw != null ? Number(raw) : null;
+          const value = (num != null && isFinite(num)) ? num : null;
+          if (alive) setRemotePoint(value);
+        } catch (_) {}
+      })();
+      return () => { alive = false; };
+    }, [isLoggedIn])
+  );
+
   const [remotePoint, setRemotePoint] = useState(null);
-  
+
   // 모달 상태
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [alertModalConfig, setAlertModalConfig] = useState({
@@ -110,7 +126,31 @@ const StoreScreen = () => {
   const storeCatalog = [...productTemplateData, ...locationTemplateData];
   
   // 포인트 패키지 정보
-  const pointPackages = pointPackageData;
+  const [remotePointProducts, setRemotePointProducts] = useState(null);
+  const pointPackages = Array.isArray(remotePointProducts)
+    ? remotePointProducts.map((p) => ({
+        id: String(p.product_id),
+        name: p.title,
+        price: typeof p.price === 'number' ? p.price.toLocaleString() + '원' : String(p.price),
+        points: typeof p.point === 'number' ? p.point : 0,
+        bonus: 0,
+      }))
+    : pointPackageData;
+
+  // 포인트 상품 목록 로드
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetchPointProducts();
+        const list = Array.isArray(res?.point_products) ? res.point_products : [];
+        if (mounted) setRemotePointProducts(list);
+      } catch (e) {
+        if (mounted) setRemotePointProducts(null);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
   
   // 구독 구매 처리
   const handleSubscribe = (plan) => {
@@ -664,7 +704,8 @@ const StoreScreen = () => {
                 if (!item.saleEndAt) return null;
                 const endTs = new Date(item.saleEndAt).getTime();
                 if (!isFinite(endTs)) return null;
-                const remain = Math.max(0, endTs - nowTs);
+                const remain = endTs - nowTs;
+                if (remain <= 0) return null;
                 const sec = Math.floor(remain / 1000);
                 const d = Math.floor(sec / 86400);
                 const h = Math.floor((sec % 86400) / 3600).toString().padStart(2, '0');
@@ -770,9 +811,6 @@ const StoreScreen = () => {
           >
             <Text style={styles.pointPackageName}>{pkg.name}</Text>
             <Text style={styles.pointPackagePrice}>{pkg.price}</Text>
-            {pkg.bonus && (
-              <Text style={styles.pointPackageBonus}>+{pkg.bonus}G 보너스</Text>
-            )}
           </TouchableOpacity>
         ))}
       </View>
