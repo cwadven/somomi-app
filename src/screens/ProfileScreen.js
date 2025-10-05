@@ -123,8 +123,8 @@ const ProfileScreen = () => {
     setModalMessage('정말 로그아웃 하시겠습니까?');
     setModalAction(null);
     setModalButtons([
-      { text: '취소', style: 'cancel', onPress: () => setModalVisible(false) },
       { text: '확인', onPress: () => { setModalVisible(false); dispatch(logout()); } },
+      { text: '취소', style: 'cancel', onPress: () => setModalVisible(false) },
     ]);
     setModalVisible(true);
   };
