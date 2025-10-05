@@ -16,6 +16,7 @@ import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, add
 import { isTemplateActive } from '../utils/validityUtils';
 import productTemplateData from '../storeTemplateData/productTemplateData';
 import locationTemplateData from '../storeTemplateData/locationTemplateData';
+import { fetchSectionTemplateProducts } from '../api/productApi';
 import subscriptionTemplateData from '../storeTemplateData/subscriptionTemplateData';
 import { getLocationSlotChipLabels, getDurationChipLabel, getProductSlotChipLabel } from '../utils/badgeLabelUtils';
 import pointPackageData from '../storeTemplateData/pointPackageData';
@@ -30,6 +31,7 @@ const StoreScreen = () => {
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
   
   const [showPointHistory, setShowPointHistory] = useState(false);
+  const [nowTs, setNowTs] = useState(Date.now());
   
   // 영역 데이터 로드
   useEffect(() => {
@@ -37,6 +39,28 @@ const StoreScreen = () => {
       dispatch(fetchLocations());
     }
   }, [dispatch, isLoggedIn]);
+
+  // 1초 간격으로 현재 시각 갱신(카운트다운 표시용)
+  useEffect(() => {
+    const id = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // 영역 슬롯 상품 API 로드
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetchSectionTemplateProducts();
+        const list = Array.isArray(res?.guest_section_template_products) ? res.guest_section_template_products : [];
+        if (mounted) setRemoteLocationTemplateProducts(list);
+      } catch (e) {
+        // 실패 시 로컬 카탈로그로 대체
+        if (mounted) setRemoteLocationTemplateProducts(null);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [isLoggedIn]);
   
   // 모달 상태
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -58,7 +82,8 @@ const StoreScreen = () => {
   // 구독 플랜 정보 (외부 데이터)
   const subscriptionPlans = subscriptionTemplateData;
   
-  // 데이터 주도 방식 카탈로그 (외부 데이터)
+  // 데이터 주도 방식 카탈로그 (외부 데이터 + 서버)
+  const [remoteLocationTemplateProducts, setRemoteLocationTemplateProducts] = useState(null);
   const storeCatalog = [...productTemplateData, ...locationTemplateData];
   
   // 포인트 패키지 정보
@@ -549,7 +574,25 @@ const StoreScreen = () => {
   
   // 영역 슬롯만 렌더링
   const renderLocationSlotItems = () => {
-    const items = storeCatalog.filter((i) => i.category === 'locationTemplateBundle' || i.category === 'locationTemplateSpecial');
+    const apiItems = Array.isArray(remoteLocationTemplateProducts) ? remoteLocationTemplateProducts : null;
+    const items = apiItems ? apiItems.map((p) => {
+      const templates = Array.isArray(p.templates) ? p.templates.map(t => ({
+        feature: {
+          baseSlots: typeof t.base_slots === 'number' ? t.base_slots : 0,
+          validWhile: t.available_days ? { type: 'fixed', expiresAt: null } : { type: 'fixed', expiresAt: null },
+        }
+      })) : [];
+      return {
+        id: String(p.product_id),
+        category: 'locationTemplateBundle',
+        name: p.title,
+        description: p.description || '',
+        saleEndAt: p.end_at || null,
+        originalPointPrice: null,
+        realPointPrice: typeof p.price === 'number' ? p.price : 0,
+        templates,
+      };
+    }) : storeCatalog.filter((i) => i.category === 'locationTemplateBundle' || i.category === 'locationTemplateSpecial');
     return (
       <View style={styles.slotsGrid}>
         {items.map((item) => (
@@ -576,7 +619,7 @@ const StoreScreen = () => {
               {(() => {
                 const templates = Array.isArray(item.templates) ? item.templates : [];
                 const isSpecial = item.category === 'locationTemplateSpecial';
-                const durationDays = isSpecial ? (templates[0]?.feature?.durationDays || null) : null;
+                const durationDays = null;
                 const baseSlotsValues = templates
                   .map(t => t?.feature?.baseSlots)
                   .filter(v => typeof v === 'number');
@@ -590,6 +633,25 @@ const StoreScreen = () => {
                     {locationLabels.map((label, idx) => (
                       <View key={`loc-${idx}`} style={styles.chip}><Ionicons name="cube" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{label}</Text></View>
                     ))}
+                  </View>
+                );
+              })()}
+              {/* 판매 종료 카운트다운 */}
+              {(() => {
+                if (!item.saleEndAt) return null;
+                const endTs = new Date(item.saleEndAt).getTime();
+                if (!isFinite(endTs)) return null;
+                const remain = Math.max(0, endTs - nowTs);
+                const sec = Math.floor(remain / 1000);
+                const d = Math.floor(sec / 86400);
+                const h = Math.floor((sec % 86400) / 3600).toString().padStart(2, '0');
+                const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0');
+                const s = Math.floor(sec % 60).toString().padStart(2, '0');
+                const label = d > 0 ? `${d}일 ${h}:${m}:${s}` : `${h}:${m}:${s}`;
+                return (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                    <Ionicons name="time-outline" size={12} color="#E53935" style={{ marginRight: 4 }} />
+                    <Text style={styles.saleEndCountdown}>종료까지: {label}</Text>
                   </View>
                 );
               })()}
@@ -821,7 +883,7 @@ const StoreScreen = () => {
         
         {/* 포인트 정보 */}
         {isLoggedIn && (
-          <View style={styles.pointInfoContainer}>
+          <View style={[styles.pointInfoContainer, { marginTop: 12 }]}>
             <View style={styles.pointInfoHeader}>
               <Text style={styles.pointInfoTitle}>보유 G</Text>
             </View>
@@ -829,8 +891,7 @@ const StoreScreen = () => {
           </View>
         )}
         
-        {/* 현재 슬롯 상태 */}
-        {isLoggedIn && renderCurrentSlots()}
+        {/* 현재 슬롯 상태 숨김 */}
 
         {/* 상점 탭 (사용자 기본 정보 아래) */}
         <View style={styles.shopTabsContainer}>
@@ -1171,6 +1232,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 2,
+  },
+  saleEndCountdown: {
+    fontSize: 12,
+    color: '#E53935',
+    fontWeight: '600',
   },
   slotIconContainer: {
     width: 60,
