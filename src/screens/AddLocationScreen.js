@@ -697,9 +697,7 @@ const AddLocationScreen = () => {
                             <Text style={styles.templateOptionTitle}>
                               {template.name} · 기본 슬롯: {renderSlotCount(template.feature?.baseSlots)}
           </Text>
-                            {!!template.description && (
-                              <Text style={styles.templateOptionSubtitle} numberOfLines={1}>{template.description}</Text>
-                            )}
+                            {/* 생성 화면에서는 템플릿 description 비표시 */}
                           </View>
                         </View>
                         {selectedTemplateInstance?.id === template.id && (
