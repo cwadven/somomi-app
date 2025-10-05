@@ -128,33 +128,17 @@ const AppContent = () => {
       if (update.isAvailable) {
         addLog('새 업데이트가 있습니다. 다운로드 시작...', 'success');
         setUpdateStatus('downloading');
-        setIsUpdating(true);
-        
         try {
-          // 업데이트 다운로드
+          // 업데이트 다운로드 (현재 세션에선 적용하지 않음)
           const fetchResult = await Updates.fetchUpdateAsync();
-          addLog(`업데이트 다운로드 완료: ${JSON.stringify(fetchResult)}`, 'success');
+          addLog(`업데이트 다운로드 완료: ${JSON.stringify(fetchResult)}\n다음 앱 재시작 시 적용됩니다.`, 'success');
           setUpdateStatus('ready');
-          
-          // 업데이트 자동 적용
-          addLog('업데이트 자동 적용 시작...', 'info');
-          try {
-            await Updates.reloadAsync();
-          } catch (reloadError) {
-            console.error('업데이트 적용 오류:', reloadError);
-            const errorMsg = `업데이트 적용 오류: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`;
-            addLog(errorMsg, 'error');
-            setUpdateError(errorMsg);
-            setUpdateStatus('error');
-            setIsUpdating(false);
-          }
         } catch (fetchError) {
           console.error('Update fetch error:', fetchError);
           const errorMsg = `업데이트 다운로드 오류: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`;
           addLog(errorMsg, 'error');
           setUpdateError(errorMsg);
           setUpdateStatus('error');
-          setIsUpdating(false);
         }
       } else {
         addLog('사용 가능한 업데이트가 없습니다.', 'info');
