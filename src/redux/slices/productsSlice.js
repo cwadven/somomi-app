@@ -12,7 +12,7 @@ import {
 import { ENTITY_TYPES } from '../../api/syncApi';
 import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
 import { deleteLocation } from './locationsSlice';
-import { fetchInventoryItemsBySection, deleteInventoryItem } from '../../api/inventoryApi';
+import { fetchInventoryItemsBySection, fetchAllInventoryItems, deleteInventoryItem } from '../../api/inventoryApi';
 import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { saveProducts, loadProducts, saveConsumedProducts, loadConsumedProducts } from '../../utils/storageUtils';
 import { fetchConsumedInventoryItems } from '../../api/inventoryApi';
@@ -62,8 +62,32 @@ export const fetchProductsByLocation = createAsyncThunk(
   'products/fetchProductsByLocation',
   async (locationId, { rejectWithValue, getState }) => {
     try {
-      // 서버 호출로 영역별 인벤토리 동기화 (특정 영역일 때)
-      if (locationId !== 'all') {
+      // 서버 호출: 전체/특정 영역 분기
+      if (locationId === 'all') {
+        try {
+          const res = await fetchAllInventoryItems();
+          const items = Array.isArray(res?.guest_inventory_items) ? res.guest_inventory_items : [];
+          const mapped = items.map((it) => ({
+            id: String(it.id),
+            locationId: it.guest_section_id ? String(it.guest_section_id) : null,
+            name: it.name,
+            memo: it.memo || '',
+            brand: it.brand || '',
+            purchasePlace: it.point_of_purchase || '',
+            price: typeof it.purchase_price === 'number' ? it.purchase_price : null,
+            purchaseDate: it.purchase_at || null,
+            iconUrl: it.icon_url || null,
+            estimatedEndDate: it.expected_expire_at || null,
+            expiryDate: it.expire_at || null,
+            createdAt: it.created_at,
+            updatedAt: it.updated_at,
+            isConsumed: false,
+          }));
+          return mapped;
+        } catch (apiErr) {
+          console.warn('전체 인벤토리 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
+        }
+      } else {
         try {
           const res = await fetchInventoryItemsBySection(locationId);
           const items = Array.isArray(res?.guest_inventory_items) ? res.guest_inventory_items : [];

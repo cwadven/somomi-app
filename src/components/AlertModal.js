@@ -13,6 +13,7 @@ const AlertModal = ({ visible, title, message, content, onClose, buttons, icon, 
             styles.button,
             button.style === 'cancel' && styles.cancelButton,
             button.style === 'destructive' && styles.destructiveButton,
+            button.style === 'success' && styles.successButton,
             index > 0 && styles.buttonMargin
           ]}
           onPress={() => {
@@ -136,10 +137,13 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   cancelButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#F44336',
   },
   destructiveButton: {
     backgroundColor: '#F44336',
+  },
+  successButton: {
+    backgroundColor: '#4CAF50',
   },
   buttonText: {
     color: 'white',
@@ -147,7 +151,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   cancelButtonText: {
-    color: '#333',
+    color: 'white',
   },
   destructiveButtonText: {
     color: 'white',
