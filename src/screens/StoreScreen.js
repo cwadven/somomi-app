@@ -157,6 +157,7 @@ const StoreScreen = () => {
         name: p.title,
         price: typeof p.price === 'number' ? p.price.toLocaleString() + '원' : String(p.price),
         points: typeof p.point === 'number' ? p.point : 0,
+        saleEndAt: p.end_at || null,
         bonus: 0,
       }))
     : pointPackageData;
