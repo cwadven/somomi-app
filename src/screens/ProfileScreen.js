@@ -14,6 +14,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { logout } from '../redux/slices/authSlice';
+import { fetchMemberProfile } from '../api/memberApi';
 import BasicLoginForm from '../components/BasicLoginForm';
 import NotificationSettings from '../components/NotificationSettings';
 import { clearAllData, loadSyncQueue } from '../utils/storageUtils';
@@ -44,6 +45,38 @@ const ProfileScreen = () => {
       } catch (e) {}
     })();
   }, []);
+
+  // 로그인 상태에서 화면 진입 시 프로필 최신화
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (isLoggedIn) {
+          const res = await fetchMemberProfile();
+          // 응답 매핑: nickname, profile_image_url
+          const next = {
+            ...user,
+            username: res?.nickname || user?.username || '사용자',
+            name: res?.nickname || user?.name || '사용자',
+            email: undefined, // 이메일 영역 제거
+            profileImage: res?.profile_image_url || null,
+          };
+          // 로컬에서만 최신화: authSlice에 user 업데이트 로직이 없다면 화면 레벨 상태로 반영
+          // 간단히 setState 없이 selector 기반 표시 값을 가공해 사용하려 했으나, 여기서는 임시로 객체 교체
+          // eslint-disable-next-line no-param-reassign
+          if (mounted) {
+            // NOTE: Redux 상태 직접 변경 불가 → 화면에서 next를 우선 사용하도록 로컬 상태 보관
+            setProfileOverride(next);
+          }
+        }
+      } catch (e) {
+        // 무시: 비로그인/토큰 오류 시 그대로
+      }
+    })();
+    return () => { mounted = false; };
+  }, [isLoggedIn]);
+
+  const [profileOverride, setProfileOverride] = useState(null);
 
   useEffect(() => {
     let interval;
@@ -171,18 +204,17 @@ const ProfileScreen = () => {
     <ScrollView style={styles.container}>
       {/* 프로필 헤더 */}
       <View style={styles.profileHeader}>
-        {isLoggedIn && user ? (
+        {isLoggedIn && (profileOverride || user) ? (
           <>
-            {user.profileImage ? (
-              <Image source={{ uri: user.profileImage }} style={styles.profileImage} />
+            {(profileOverride?.profileImage || user?.profileImage) ? (
+              <Image source={{ uri: (profileOverride?.profileImage || user?.profileImage) }} style={styles.profileImage} />
             ) : (
               <View style={[styles.profileImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#e0e0e0' }]}>
                 <Ionicons name="person-circle" size={64} color="#9E9E9E" />
               </View>
             )}
             <View style={styles.profileInfo}>
-              <Text style={styles.userName}>{user.username || user.name}</Text>
-              <Text style={styles.userEmail}>{user.email}</Text>
+              <Text style={styles.userName}>{(profileOverride?.username || profileOverride?.name || user?.username || user?.name || '사용자')}</Text>
             </View>
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
               <Text style={styles.logoutText}>로그아웃</Text>

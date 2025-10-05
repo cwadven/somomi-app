@@ -40,6 +40,12 @@ export const emailSignUp = async ({ email, one_time_token, password, password2 }
   });
 };
 
+export const fetchMemberProfile = async () => {
+  return request('/v1/member/profile', {
+    method: 'GET',
+  });
+};
+
 export default {
   loginMember,
   refreshAccessToken,
