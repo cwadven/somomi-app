@@ -32,7 +32,7 @@ const StoreScreen = () => {
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
   
   const [showPointHistory, setShowPointHistory] = useState(false);
-  const [nowTs, setNowTs] = useState(Date.now());
+  // 영역 슬롯 내부에서만 카운트다운 렌더를 트리거하기 위해 전역 타이머는 두지 않습니다.
   
   // 영역 데이터 로드
   useEffect(() => {
@@ -41,11 +41,35 @@ const StoreScreen = () => {
     }
   }, [dispatch, isLoggedIn]);
 
-  // 1초 간격으로 현재 시각 갱신(카운트다운 표시용)
-  useEffect(() => {
-    const id = setInterval(() => setNowTs(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  // 영역 슬롯 항목용 카운트다운 전용 컴포넌트(해당 영역만 재렌더)
+  const SaleEndCountdown = ({ endAt }) => {
+    const [label, setLabel] = useState(null);
+    useEffect(() => {
+      if (!endAt) { setLabel(null); return; }
+      const endTs = new Date(endAt).getTime();
+      if (!isFinite(endTs)) { setLabel(null); return; }
+      const update = () => {
+        const remain = endTs - Date.now();
+        if (remain <= 0) { setLabel(null); return; }
+        const sec = Math.floor(remain / 1000);
+        const d = Math.floor(sec / 86400);
+        const h = Math.floor((sec % 86400) / 3600).toString().padStart(2, '0');
+        const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0');
+        const s = Math.floor(sec % 60).toString().padStart(2, '0');
+        setLabel(d > 0 ? `${d}일 ${h}:${m}:${s}` : `${h}:${m}:${s}`);
+      };
+      update();
+      const id = setInterval(update, 1000);
+      return () => clearInterval(id);
+    }, [endAt]);
+    if (!label) return null;
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+        <Ionicons name="time-outline" size={12} color="#E53935" style={{ marginRight: 4 }} />
+        <Text style={styles.saleEndCountdown}>종료까지: {label}</Text>
+      </View>
+    );
+  };
 
   // 영역 슬롯 상품 API 로드
   useEffect(() => {
@@ -465,11 +489,11 @@ const StoreScreen = () => {
   
   // 포인트 구매 확인 모달
   const PointPurchaseConfirmModal = () => {
-    if (!selectedPointPackage) return null;
+    if (!pointPurchaseConfirmVisible || !selectedPointPackage) return null;
     
     return (
       <Modal
-        visible={pointPurchaseConfirmVisible}
+        visible={true}
         transparent={true}
         animationType="fade"
       >
@@ -488,10 +512,6 @@ const StoreScreen = () => {
             <View style={styles.modalContent}>
               <Text style={styles.modalProductName}>{selectedPointPackage.name}</Text>
               <Text style={styles.modalProductPrice}>{selectedPointPackage.price}</Text>
-              
-              {selectedPointPackage.bonus && (
-                <Text style={styles.modalBonus}>+{selectedPointPackage.bonus.toLocaleString()} 보너스 젬</Text>
-              )}
               
               <Text style={styles.modalDescription}>
                 결제 후 즉시 젬이 충전됩니다.
@@ -699,26 +719,8 @@ const StoreScreen = () => {
                   </View>
                 );
               })()}
-              {/* 판매 종료 카운트다운 */}
-              {(() => {
-                if (!item.saleEndAt) return null;
-                const endTs = new Date(item.saleEndAt).getTime();
-                if (!isFinite(endTs)) return null;
-                const remain = endTs - nowTs;
-                if (remain <= 0) return null;
-                const sec = Math.floor(remain / 1000);
-                const d = Math.floor(sec / 86400);
-                const h = Math.floor((sec % 86400) / 3600).toString().padStart(2, '0');
-                const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0');
-                const s = Math.floor(sec % 60).toString().padStart(2, '0');
-                const label = d > 0 ? `${d}일 ${h}:${m}:${s}` : `${h}:${m}:${s}`;
-                return (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                    <Ionicons name="time-outline" size={12} color="#E53935" style={{ marginRight: 4 }} />
-                    <Text style={styles.saleEndCountdown}>종료까지: {label}</Text>
-                  </View>
-                );
-              })()}
+              {/* 판매 종료 카운트다운: 국소 렌더 */}
+              <SaleEndCountdown endAt={item.saleEndAt} />
               <Text style={styles.slotTileSubtitle} numberOfLines={2}>{item.description}</Text>
             </View>
             {/* 우측: 가격/버튼 */}
