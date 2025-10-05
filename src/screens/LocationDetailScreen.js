@@ -490,7 +490,9 @@ const LocationDetailScreen = () => {
               <View style={styles.headerTextContainer}>
                 <Text style={styles.locationTitle}>{currentLocation.title}</Text>
                 {currentLocation.description ? (
-                  <Text style={styles.locationDescription}>{currentLocation.description}</Text>
+                  <Text style={styles.locationDescription} numberOfLines={1}>
+                    {currentLocation.description}
+                  </Text>
                 ) : null}
             </View>
             </>
