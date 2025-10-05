@@ -23,6 +23,7 @@ import pointPackageData from '../storeTemplateData/pointPackageData';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
+import { fetchAvailablePoint } from '../api/pointApi';
 
 const StoreScreen = () => {
   const dispatch = useDispatch();
@@ -61,6 +62,28 @@ const StoreScreen = () => {
     })();
     return () => { mounted = false; };
   }, [isLoggedIn]);
+
+  // 가용 포인트 동기화
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (!isLoggedIn) return;
+        const res = await fetchAvailablePoint();
+        const value = typeof res?.available_point === 'number' ? res.available_point : null;
+        if (mounted && value != null) {
+          // 화면 표시만 갱신: auth.points.balance를 직접 바꾸지 않고 UI 레벨에서만 반영하려면 로컬 상태를 써도 되나,
+          // 현재 구조에서는 points.balance를 그대로 사용 중이므로, 여기서는 임시로 override 상태를 둔다.
+          setRemotePoint(value);
+        }
+      } catch (e) {
+        if (mounted) setRemotePoint(null);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [isLoggedIn]);
+
+  const [remotePoint, setRemotePoint] = useState(null);
   
   // 모달 상태
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -887,7 +910,7 @@ const StoreScreen = () => {
             <View style={styles.pointInfoHeader}>
               <Text style={styles.pointInfoTitle}>보유 G</Text>
             </View>
-            <Text style={styles.pointInfoValue}>{points.balance.toLocaleString()}G</Text>
+            <Text style={styles.pointInfoValue}>{(remotePoint != null ? remotePoint : points.balance).toLocaleString()}G</Text>
           </View>
         )}
         
