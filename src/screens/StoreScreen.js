@@ -16,7 +16,7 @@ import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, add
 import { isTemplateActive } from '../utils/validityUtils';
 import productTemplateData from '../storeTemplateData/productTemplateData';
 import locationTemplateData from '../storeTemplateData/locationTemplateData';
-import { fetchSectionTemplateProducts, fetchPointProducts } from '../api/productApi';
+import { fetchSectionTemplateProducts, fetchPointProducts, fetchInventoryItemTemplateProducts } from '../api/productApi';
 import subscriptionTemplateData from '../storeTemplateData/subscriptionTemplateData';
 import { getLocationSlotChipLabels, getDurationChipLabel, getProductSlotChipLabel } from '../utils/badgeLabelUtils';
 import pointPackageData from '../storeTemplateData/pointPackageData';
@@ -162,6 +162,9 @@ const StoreScreen = () => {
       }))
     : pointPackageData;
 
+  // 제품 슬롯(Inventory Item Template) 상품 목록
+  const [remoteInventoryItemTemplateProducts, setRemoteInventoryItemTemplateProducts] = useState(null);
+
   // 포인트 상품 목록 로드
   useEffect(() => {
     let mounted = true;
@@ -172,6 +175,21 @@ const StoreScreen = () => {
         if (mounted) setRemotePointProducts(list);
       } catch (e) {
         if (mounted) setRemotePointProducts(null);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // 제품 슬롯 상품 목록 로드
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetchInventoryItemTemplateProducts();
+        const list = Array.isArray(res?.guest_inventory_item_template_products) ? res.guest_inventory_item_template_products : [];
+        if (mounted) setRemoteInventoryItemTemplateProducts(list);
+      } catch (e) {
+        if (mounted) setRemoteInventoryItemTemplateProducts(null);
       }
     })();
     return () => { mounted = false; };
@@ -203,6 +221,11 @@ const StoreScreen = () => {
       } else {
         goToProfileTab();
       }
+      return;
+    }
+    // 원격 제품 슬롯(템플릿 수 미확정)은 구매 비활성화
+    if (item.category === 'productSlot' && (!Array.isArray(item.templates) || item.templates.length === 0)) {
+      showErrorModal('해당 상품은 준비 중입니다.');
       return;
     }
     
@@ -409,6 +432,7 @@ const StoreScreen = () => {
         visible={purchaseConfirmVisible}
         transparent={true}
         animationType="fade"
+        onRequestClose={() => setPurchaseConfirmVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
@@ -497,6 +521,7 @@ const StoreScreen = () => {
         visible={true}
         transparent={true}
         animationType="fade"
+        onRequestClose={() => setPointPurchaseConfirmVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
@@ -747,7 +772,19 @@ const StoreScreen = () => {
   
   // 제품 슬롯만 렌더링
   const renderProductSlotItems = () => {
-    const items = storeCatalog.filter((i) => i.category === 'productSlot');
+    const apiItems = Array.isArray(remoteInventoryItemTemplateProducts) ? remoteInventoryItemTemplateProducts : null;
+    const items = apiItems
+      ? apiItems.map((p) => ({
+          id: String(p.product_id),
+          category: 'productSlot',
+          name: p.title,
+          description: p.description || '',
+          saleEndAt: p.end_at || null,
+          originalPointPrice: null,
+          realPointPrice: typeof p.price === 'number' ? p.price : 0,
+          // templates는 서버 스키마에 없음 → 구매는 비활성 처리
+        }))
+      : storeCatalog.filter((i) => i.category === 'productSlot');
     return (
       <View style={styles.slotsGrid}>
         {items.map((item) => (
@@ -780,6 +817,8 @@ const StoreScreen = () => {
                   </View>
                 );
               })()}
+              {/* 판매 종료 카운트다운 */}
+              <SaleEndCountdown endAt={item.saleEndAt} />
               <Text style={styles.slotTileSubtitle} numberOfLines={2}>{item.description}</Text>
             </View>
             <View style={styles.slotTileRight}>
