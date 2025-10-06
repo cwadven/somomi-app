@@ -17,7 +17,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance, addTemplateInstance, addProductSlotTemplateInstances, applySubscriptionToTemplates } from '../redux/slices/authSlice';
 import { isTemplateActive } from '../utils/validityUtils';
 import { fetchSectionTemplateProducts, fetchPointProducts, fetchInventoryItemTemplateProducts } from '../api/productApi';
-import subscriptionTemplateData from '../storeTemplateData/subscriptionTemplateData';
 import { getLocationSlotChipLabels, getDurationChipLabel, getProductSlotChipLabel } from '../utils/badgeLabelUtils';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
@@ -138,12 +137,12 @@ const StoreScreen = () => {
   const [purchaseConfirmVisible, setPurchaseConfirmVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null); // kept for compatibility
   const [selectedItem, setSelectedItem] = useState(null); // new generic selected item
-  const [activeShopTab, setActiveShopTab] = useState('productSlot'); // 'productSlot' | 'locationSlot' | 'subscription' | 'points'
+  const [activeShopTab, setActiveShopTab] = useState('productSlot'); // 'productSlot' | 'locationSlot' | 'points'
   const [pointPurchaseConfirmVisible, setPointPurchaseConfirmVisible] = useState(false);
   const [selectedPointPackage, setSelectedPointPackage] = useState(null);
   
   // 구독 플랜 정보 (외부 데이터)
-  const subscriptionPlans = subscriptionTemplateData;
+  // 구독 플랜 제거 (추후 추가 예정)
   
   // 데이터 주도 방식 카탈로그 (외부 데이터 + 서버)
   const [remoteLocationTemplateProducts, setRemoteLocationTemplateProducts] = useState(null);
@@ -169,22 +168,7 @@ const StoreScreen = () => {
   // 제품 슬롯 상품은 productSlot 탭에서만 로드 (위 탭 이펙트에서 처리)
   
   // 구독 구매 처리
-  const handleSubscribe = (plan) => {
-    if (!isLoggedIn) {
-      if (isAnonymous) {
-        setShowSignupPrompt(true);
-      } else {
-        goToProfileTab();
-      }
-      return;
-    }
-    
-    setSelectedProduct({
-      type: 'subscription',
-      ...plan
-    });
-    setPurchaseConfirmVisible(true);
-  };
+  // 구독 플랜 제거
   
   // 카탈로그 아이템 구매 처리(슬롯/스페셜/번들 등 확장형)
   const handlePurchaseItem = (item) => {
@@ -210,11 +194,13 @@ const StoreScreen = () => {
     
     try {
       // 포인트 차감
-      const pointCost = item.realPointPrice ?? item.pointPrice;
+      const pointCost = (typeof item.realPointPrice === 'number' ? item.realPointPrice : (typeof item.pointPrice === 'number' ? item.pointPrice : 0));
+      const effectiveBalanceRaw = (remotePoint != null ? Number(remotePoint) : Number(points.balance));
+      const effectiveBalance = isFinite(effectiveBalanceRaw) ? effectiveBalanceRaw : 0;
       
       // 포인트가 부족한 경우
-      if (points.balance < pointCost) {
-        showErrorModal(`젬이 부족합니다.\n현재 젬: ${points.balance.toLocaleString()}G\n필요 젬: ${pointCost.toLocaleString()}G`);
+      if (effectiveBalance < pointCost) {
+        showErrorModal(`G가 부족합니다.\n현재 G: ${effectiveBalance.toLocaleString()}G\n필요 G: ${pointCost.toLocaleString()}G`);
         return;
       }
       
@@ -440,10 +426,18 @@ const StoreScreen = () => {
               )}
               
               <View style={styles.pointInfoInModal}>
-                <Text style={styles.pointInfoText}>현재 젬: {points.balance.toLocaleString()}G</Text>
-                <Text style={styles.pointInfoText}>
-                  구매 후 젬: {Math.max(0, points.balance - (item.realPointPrice ?? item.pointPrice)).toLocaleString()}G
-                </Text>
+                {(() => {
+                  const pointCost = (typeof item.realPointPrice === 'number' ? item.realPointPrice : (typeof item.pointPrice === 'number' ? item.pointPrice : 0));
+                  const effectiveBalanceRaw = (remotePoint != null ? Number(remotePoint) : Number(points.balance));
+                  const effectiveBalance = isFinite(effectiveBalanceRaw) ? effectiveBalanceRaw : 0;
+                  const after = Math.max(0, effectiveBalance - pointCost);
+                  return (
+                    <>
+                      <Text style={styles.pointInfoText}>현재 G: {effectiveBalance.toLocaleString()}G</Text>
+                      <Text style={styles.pointInfoText}>구매 후 G: {after.toLocaleString()}G</Text>
+                    </>
+                  );
+                })()}
               </View>
               
               <View style={styles.modalActions}>
@@ -454,21 +448,19 @@ const StoreScreen = () => {
                   <Text style={styles.modalCancelButtonText}>취소</Text>
                 </TouchableOpacity>
                 
-                {points.balance >= (item.realPointPrice ?? item.pointPrice) ? (
+                {(() => {
+                  const pointCost = (typeof item.realPointPrice === 'number' ? item.realPointPrice : (typeof item.pointPrice === 'number' ? item.pointPrice : 0));
+                  const effectiveBalanceRaw = (remotePoint != null ? Number(remotePoint) : Number(points.balance));
+                  const effectiveBalance = isFinite(effectiveBalanceRaw) ? effectiveBalanceRaw : 0;
+                  return effectiveBalance >= pointCost;
+                })() ? (
                   <TouchableOpacity 
                     style={[styles.modalButton, styles.modalConfirmButton]}
                     onPress={confirmPurchase}
                   >
                     <Text style={styles.modalConfirmButtonText}>구매하기</Text>
                   </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity 
-                    style={[styles.modalButton, styles.modalChargeButton]}
-                    onPress={goToPointScreen}
-                  >
-                    <Text style={styles.chargePointButtonText}>젬 충전하기</Text>
-                  </TouchableOpacity>
-                )}
+                ) : null}
               </View>
             </View>
           </View>
@@ -531,85 +523,7 @@ const StoreScreen = () => {
   };
   
   // 구독 플랜 렌더링
-  const renderSubscriptionPlans = () => {
-    return subscriptionPlans.map((plan) => (
-      <TouchableOpacity 
-        key={plan.id} 
-        style={styles.planCard}
-        onPress={() => handleSubscribe(plan)}
-      >
-        {/* 헤더: 이름 + 세일 배지 */}
-        <View style={styles.planHeaderRow}>
-          <Text style={styles.planName}>{plan.name}</Text>
-          {(plan.originalPointPrice != null && plan.realPointPrice != null && plan.originalPointPrice !== plan.realPointPrice) && (
-            <View style={styles.saleBadge}>
-              <Ionicons name="pricetag" size={12} color="#fff" />
-              <Text style={styles.saleBadgeText}>
-                {`-${Math.max(0, Math.round((1 - (plan.realPointPrice / plan.originalPointPrice)) * 100))}%`}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* 가격 표시 */}
-        {(plan.originalPointPrice != null && plan.realPointPrice != null && plan.originalPointPrice !== plan.realPointPrice) ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={[styles.planPriceOriginal, styles.strike]}>{plan.originalPointPrice.toLocaleString()}G</Text>
-            <Text style={styles.planPriceReal}>{plan.realPointPrice.toLocaleString()}G</Text>
-          </View>
-        ) : (
-          <Text style={styles.planPrice}>
-            {(plan.originalPointPrice ?? plan.realPointPrice ?? 0) === 0 ? '무료' : `${(plan.originalPointPrice ?? plan.realPointPrice ?? 0).toLocaleString()}G`}
-          </Text>
-        )}
-
-        {/* 요약 칩 */}
-        {(() => {
-          const durationDays = typeof plan.durationDays === 'number' ? plan.durationDays : null;
-          const baseSlotsValues = (Array.isArray(plan.locationTemplate) ? plan.locationTemplate : [])
-            .map(t => t?.feature?.baseSlots)
-            .filter(v => typeof v === 'number');
-          const locationLabels = getLocationSlotChipLabels(baseSlotsValues);
-          const productCount = Array.isArray(plan.productTemplate) ? plan.productTemplate.length : 0;
-          const durationLabel = getDurationChipLabel(durationDays);
-          const productLabel = getProductSlotChipLabel(productCount);
-          return (
-            <View style={styles.summaryChipsRow}>
-              {durationLabel && (
-                <View style={styles.chip}><Ionicons name="time" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{durationLabel}</Text></View>
-              )}
-              {locationLabels.map((label, idx) => (
-                <View key={`plan-loc-${idx}`} style={styles.chip}><Ionicons name="cube" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{label}</Text></View>
-              ))}
-              {productLabel && (
-                <View style={styles.chip}><Ionicons name="add-circle" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{productLabel}</Text></View>
-              )}
-            </View>
-          );
-        })()}
- 
-        <Text style={styles.planDescription}>{plan.description}</Text>
-        <View style={styles.planFeatures}>
-          {plan.features.map((feature, index) => (
-            <View key={index} style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-              <Text style={styles.featureText}>{feature}</Text>
-            </View>
-          ))}
-        </View>
-        <View style={styles.planButtonContainer}>
-          <TouchableOpacity 
-            style={styles.planButton}
-            onPress={() => handleSubscribe(plan)}
-          >
-            <Text style={styles.planButtonText}>
-              {plan.realPointPrice === 0 ? '시작하기' : '구독하기'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    ));
-  };
+  // 구독 플랜 렌더 제거
   
   // (제거) 슬롯 기본 카탈로그 렌더링은 더 이상 사용하지 않음
   
@@ -922,7 +836,13 @@ const StoreScreen = () => {
             <View style={styles.pointInfoHeader}>
               <Text style={styles.pointInfoTitle}>보유 G</Text>
             </View>
-            <Text style={styles.pointInfoValue}>{(remotePoint != null ? remotePoint : points.balance).toLocaleString()}G</Text>
+            {(() => {
+              const val = (remotePoint != null ? Number(remotePoint) : Number(points.balance));
+              const isLoadingPoint = !isFinite(val) || remotePoint === null; // API 호출 전(null)
+              return (
+                <Text style={styles.pointInfoValue}>{isLoadingPoint ? '-' : val.toLocaleString() + 'G'}</Text>
+              );
+            })()}
           </View>
         )}
         
@@ -943,12 +863,7 @@ const StoreScreen = () => {
             >
               <Text style={[styles.shopTabText, activeShopTab === 'locationSlot' && styles.shopTabTextActive]}>영역 슬롯</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.shopTabItem, activeShopTab === 'subscription' && styles.shopTabItemActive]}
-              onPress={() => handleTabChange('subscription')}
-            >
-              <Text style={[styles.shopTabText, activeShopTab === 'subscription' && styles.shopTabTextActive]}>구독 플랜</Text>
-            </TouchableOpacity>
+            {/* 구독 플랜 탭 제거 */}
             <TouchableOpacity
               style={[styles.shopTabItem, activeShopTab === 'points' && styles.shopTabItemActive]}
               onPress={() => handleTabChange('points')}
@@ -973,14 +888,13 @@ const StoreScreen = () => {
           </View>
         )}
 
-        {activeShopTab === 'subscription' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>구독 플랜</Text>
-            <View style={styles.plansContainer}>
-              {renderSubscriptionPlans()}
-            </View>
+        {/* 구독 플랜 섹션 (데이터 없음) */}
+        <View className="subscription-section" style={styles.section}>
+          <Text style={styles.sectionTitle}>구독 플랜</Text>
+          <View style={styles.plansContainer}>
+            <Text style={{ color: '#666' }}>현재 판매 중인 구독 플랜이 없습니다.</Text>
           </View>
-        )}
+        </View>
 
         {activeShopTab === 'points' && (
           <View style={[styles.section, styles.pointChargeSection]}>
