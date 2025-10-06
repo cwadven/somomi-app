@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Platform, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
@@ -20,6 +20,34 @@ const PaymentWebViewScreen = () => {
     }
     if (url.startsWith('somomi://payment/fail')) {
       navigation.replace('PaymentFail');
+      return true;
+    }
+    // 외부 앱 스킴 처리 (카카오톡/인텐트/전화/마켓 등)
+    const lower = url.toLowerCase();
+    const externalSchemes = ['kakaotalk://', 'kakaopay://', 'tel:', 'mailto:', 'sms:', 'market://'];
+    if (externalSchemes.some(s => lower.startsWith(s))) {
+      Linking.canOpenURL(url).then((supported) => {
+        if (supported) Linking.openURL(url).catch(() => {});
+      }).catch(() => {});
+      return true; // WebView 로드 막기
+    }
+    // Android intent:// 처리
+    if (Platform.OS === 'android' && lower.startsWith('intent://')) {
+      try {
+        const fallbackMatch = url.match(/S\.browser_fallback_url=([^;]+)/);
+        const pkgMatch = url.match(/;package=([^;]+)/);
+        const fallbackUrl = fallbackMatch ? decodeURIComponent(fallbackMatch[1]) : null;
+        const pkg = pkgMatch ? pkgMatch[1] : null;
+        if (fallbackUrl) {
+          Linking.openURL(fallbackUrl).catch(() => {});
+          return true;
+        }
+        if (pkg) {
+          const marketUrl = `market://details?id=${pkg}`;
+          Linking.openURL(marketUrl).catch(() => {});
+          return true;
+        }
+      } catch (_) {}
       return true;
     }
     return false;

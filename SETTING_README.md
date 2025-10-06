@@ -24,6 +24,9 @@ EXPO_UPDATES_URL=https://u.expo.dev/ProjectID
 ```bash
 rm -rf node_modules/.cache && npx expo prebuild -p android --clean
 ```
+```bash
+./build_script.sh
+```
 
 5. my-release-key.keystore 생성
 
