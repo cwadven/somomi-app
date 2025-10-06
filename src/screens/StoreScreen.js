@@ -14,7 +14,6 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance, addTemplateInstance, addProductSlotTemplateInstances, applySubscriptionToTemplates } from '../redux/slices/authSlice';
 import { isTemplateActive } from '../utils/validityUtils';
-import productTemplateData from '../storeTemplateData/productTemplateData';
 import locationTemplateData from '../storeTemplateData/locationTemplateData';
 import { fetchSectionTemplateProducts, fetchPointProducts, fetchInventoryItemTemplateProducts } from '../api/productApi';
 import subscriptionTemplateData from '../storeTemplateData/subscriptionTemplateData';
@@ -147,7 +146,7 @@ const StoreScreen = () => {
   
   // 데이터 주도 방식 카탈로그 (외부 데이터 + 서버)
   const [remoteLocationTemplateProducts, setRemoteLocationTemplateProducts] = useState(null);
-  const storeCatalog = [...productTemplateData, ...locationTemplateData];
+  const storeCatalog = [...locationTemplateData];
   
   // 포인트 패키지 정보
   const [remotePointProducts, setRemotePointProducts] = useState(null);
@@ -772,22 +771,21 @@ const StoreScreen = () => {
   
   // 제품 슬롯만 렌더링
   const renderProductSlotItems = () => {
-    const apiItems = Array.isArray(remoteInventoryItemTemplateProducts) ? remoteInventoryItemTemplateProducts : null;
-    const items = apiItems
-      ? apiItems.map((p) => ({
-          id: String(p.product_id),
-          category: 'productSlot',
-          name: p.title,
-          description: p.description || '',
-          saleEndAt: p.end_at || null,
-          originalPointPrice: null,
-          realPointPrice: typeof p.price === 'number' ? p.price : 0,
-          // templates는 서버 스키마에 없음 → 구매는 비활성 처리
-        }))
-      : storeCatalog.filter((i) => i.category === 'productSlot');
+    const apiItems = Array.isArray(remoteInventoryItemTemplateProducts) ? remoteInventoryItemTemplateProducts : [];
+    const items = apiItems.map((p) => ({
+      id: String(p.product_id),
+      category: 'productSlot',
+      name: p.title,
+      description: p.description || '',
+      saleEndAt: p.end_at || null,
+      originalPointPrice: null,
+      realPointPrice: typeof p.price === 'number' ? p.price : 0,
+    }));
     return (
       <View style={styles.slotsGrid}>
-        {items.map((item) => (
+        {items.length === 0 ? (
+          <Text style={styles.emptyText}>판매 중인 제품 슬롯 상품이 없습니다.</Text>
+        ) : items.map((item) => (
           <View key={item.id} style={styles.slotTile}>
             <View style={styles.slotTileLeft}>
               <View style={styles.slotTileIconWrap}>
@@ -806,17 +804,7 @@ const StoreScreen = () => {
                   </View>
                 )}
               </View>
-              {(() => {
-                const tpl = Array.isArray(item.templates) && item.templates[0] ? item.templates[0] : null;
-                const count = tpl?.count || tpl?.countPerLocation || 0;
-                const label = getProductSlotChipLabel(count);
-                if (!label) return null;
-                return (
-                  <View style={styles.summaryChipsRow}>
-                    <View style={styles.chip}><Ionicons name="add-circle" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{label}</Text></View>
-                  </View>
-                );
-              })()}
+              {/* 서버 스키마에는 개수 정보가 없어 칩은 숨김 */}
               {/* 판매 종료 카운트다운 */}
               <SaleEndCountdown endAt={item.saleEndAt} />
               <Text style={styles.slotTileSubtitle} numberOfLines={2}>{item.description}</Text>
