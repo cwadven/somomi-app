@@ -153,6 +153,29 @@ const AppContent = () => {
       setIsUpdating(false);
     }
   }, [addLog]);
+
+  // 앱 재시작 1회만으로 적용되도록: 실행 초기에 미리 다운로드, 백그라운드 전환 시에도 미리 다운로드
+  const isPrefetchingRef = useRef(false);
+  const prefetchUpdateIfAvailable = useCallback(async () => {
+    if (__DEV__ || Platform.OS === 'web') return;
+    if (isPrefetchingRef.current) return;
+    try {
+      isPrefetchingRef.current = true;
+      const update = await Updates.checkForUpdateAsync();
+      if (update?.isAvailable) {
+        try {
+          await Updates.fetchUpdateAsync();
+          addLog('업데이트 사전 다운로드 완료. 다음 재시작 시 적용됩니다.', 'info');
+        } catch (e) {
+          addLog(`업데이트 사전 다운로드 실패: ${e instanceof Error ? e.message : String(e)}`, 'warning');
+        }
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      isPrefetchingRef.current = false;
+    }
+  }, [addLog]);
   
   // 앱 상태 변경 핸들러
   const handleAppStateChange = useCallback((nextAppState) => {
@@ -164,6 +187,10 @@ const AppContent = () => {
       pushNotificationService.requestNotificationPermission();
       try { scheduleDailyReminderIfNeeded(); } catch (e) { }
       try { scheduleDailyUpdateReminderIfNeeded(); } catch (e) { }
+    }
+    // 활성 → 비활성/백그라운드로 갈 때, 업데이트 사전 다운로드 시도
+    if (previousState === 'active' && nextAppState?.match(/inactive|background/)) {
+      prefetchUpdateIfAvailable();
     }
     prevAppStateRef.current = nextAppState;
   }, []);
@@ -205,6 +232,8 @@ const AppContent = () => {
   const initializeApp = async () => {
     try {
       setIsLoading(true);
+      // 프로덕션: 앱 시작 시 업데이트 사전 다운로드 시도 (다음 1회 재시작에 적용)
+      try { await prefetchUpdateIfAvailable(); } catch (e) {}
       // 7단계: 1회 마이그레이션 수행 (id/localId/메타 보강)
       await migrateLocalIdsAndMeta();
       

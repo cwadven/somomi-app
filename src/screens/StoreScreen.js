@@ -805,15 +805,24 @@ const StoreScreen = () => {
   // 포인트 패키지 렌더링
   const renderPointPackages = () => {
     return (
-      <View style={styles.pointPackagesRow}>
-        {pointPackages.slice(0, 3).map((pkg) => (
+      <View style={styles.pointPackagesColumn}>
+        {pointPackages.map((pkg) => (
           <TouchableOpacity 
             key={pkg.id} 
             style={styles.pointPackageCard}
             onPress={() => handlePurchasePoints(pkg)}
           >
-            <Text style={styles.pointPackageName}>{pkg.name}</Text>
-            <Text style={styles.pointPackagePrice}>{pkg.price}</Text>
+            {/* 포인트 표시는 번개 아이콘 + G 표기로 통일 */}
+            <View style={styles.pointPackageMiddle}>
+              <Ionicons name="flash" size={20} color="#4CAF50" />
+              <Text style={styles.pointPackagePoints}>{(pkg.points || 0).toLocaleString()} G</Text>
+            </View>
+            <View style={styles.pointPackageFooter}>
+              <View style={styles.priceChip}>
+                <Text style={styles.priceChipText}>{pkg.price}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#4CAF50" />
+            </View>
           </TouchableOpacity>
         ))}
       </View>
@@ -1521,7 +1530,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   modalChargeButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#4CAF50',
   },
   chargePointButtonText: {
     color: '#fff',
@@ -1567,16 +1576,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   pointInfoInModal: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 4,
-    padding: 12,
+    backgroundColor: '#F1F8E9',
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#C5E1A5',
     marginBottom: 16,
     width: '100%',
+    alignSelf: 'stretch',
   },
   pointInfoText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: 15,
+    color: '#2E7D32',
+    fontWeight: '600',
+    marginBottom: 6,
   },
   chargePointButton: {
     backgroundColor: '#2196F3',
@@ -1739,25 +1753,59 @@ const styles = StyleSheet.create({
     borderColor: '#e0e8ff',
   },
   
-  pointPackagesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  pointPackagesColumn: {
+    flexDirection: 'column',
     marginTop: 8,
+    gap: 8,
   },
   
   pointPackageCard: {
-    flex: 1,
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 12,
-    marginHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 14,
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+  },
+  pointPackageTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 6,
+  },
+  pointPackageMiddle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 6,
+  },
+  pointPackagePoints: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#2e7d32',
+  },
+  pointPackageFooter: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  priceChip: {
+    backgroundColor: '#E8F5E9',
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  priceChipText: {
+    color: '#2e7d32',
+    fontWeight: '700',
+    fontSize: 13,
   },
   
   pointPackageName: {
