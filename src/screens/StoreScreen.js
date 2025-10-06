@@ -10,15 +10,13 @@ import {
   FlatList
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance, addTemplateInstance, addProductSlotTemplateInstances, applySubscriptionToTemplates } from '../redux/slices/authSlice';
 import { isTemplateActive } from '../utils/validityUtils';
-import locationTemplateData from '../storeTemplateData/locationTemplateData';
 import { fetchSectionTemplateProducts, fetchPointProducts, fetchInventoryItemTemplateProducts } from '../api/productApi';
 import subscriptionTemplateData from '../storeTemplateData/subscriptionTemplateData';
 import { getLocationSlotChipLabels, getDurationChipLabel, getProductSlotChipLabel } from '../utils/badgeLabelUtils';
-import pointPackageData from '../storeTemplateData/pointPackageData';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
@@ -70,57 +68,46 @@ const StoreScreen = () => {
     );
   };
 
-  // 영역 슬롯 상품 API 로드
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
+  // 탭 데이터 로더
+  const fetchDataForTab = async (tab) => {
+    try {
+      if (tab === 'locationSlot') {
         const res = await fetchSectionTemplateProducts();
         const list = Array.isArray(res?.guest_section_template_products) ? res.guest_section_template_products : [];
-        if (mounted) setRemoteLocationTemplateProducts(list);
-      } catch (e) {
-        // 실패 시 로컬 카탈로그로 대체
-        if (mounted) setRemoteLocationTemplateProducts(null);
+        setRemoteLocationTemplateProducts(list);
+      } else if (tab === 'productSlot') {
+        const res = await fetchInventoryItemTemplateProducts();
+        const list = Array.isArray(res?.guest_inventory_item_template_products) ? res.guest_inventory_item_template_products : [];
+        setRemoteInventoryItemTemplateProducts(list);
+      } else if (tab === 'points') {
+        const res = await fetchPointProducts();
+        const list = Array.isArray(res?.point_products) ? res.point_products : [];
+        setRemotePointProducts(list);
+        if (isLoggedIn) {
+          try {
+            const res2 = await fetchAvailablePoint();
+            const raw = res2?.available_point;
+            const num = raw != null ? Number(raw) : null;
+            const value = (num != null && isFinite(num)) ? num : null;
+            setRemotePoint(value);
+          } catch (_) {}
+        }
       }
-    })();
-    return () => { mounted = false; };
-  }, [isLoggedIn]);
+    } catch (_) {}
+  };
 
-  // 가용 포인트 동기화
+  // 초기 진입 시 현재 탭 데이터 로드
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        if (!isLoggedIn) return;
-        const res = await fetchAvailablePoint();
-        const raw = res?.available_point;
-        const num = raw != null ? Number(raw) : null;
-        const value = (num != null && isFinite(num)) ? num : null;
-        if (mounted) setRemotePoint(value);
-      } catch (e) {
-        if (mounted) setRemotePoint(null);
-      }
-    })();
-    return () => { mounted = false; };
-  }, [isLoggedIn]);
+    fetchDataForTab(activeShopTab);
+  }, []);
 
-  // 포커스 시 포인트 재동기화
-  useFocusEffect(
-    React.useCallback(() => {
-      let alive = true;
-      (async () => {
-        try {
-          if (!isLoggedIn) return;
-          const res = await fetchAvailablePoint();
-          const raw = res?.available_point;
-          const num = raw != null ? Number(raw) : null;
-          const value = (num != null && isFinite(num)) ? num : null;
-          if (alive) setRemotePoint(value);
-        } catch (_) {}
-      })();
-      return () => { alive = false; };
-    }, [isLoggedIn])
-  );
+  // 탭 변경 핸들러
+  const handleTabChange = (tab) => {
+    setActiveShopTab(tab);
+    fetchDataForTab(tab);
+  };
+
+  // 가용 포인트 값은 points 탭에서만 동기화함 (위 탭 이펙트에서 처리)
 
   const [remotePoint, setRemotePoint] = useState(null);
 
@@ -146,7 +133,6 @@ const StoreScreen = () => {
   
   // 데이터 주도 방식 카탈로그 (외부 데이터 + 서버)
   const [remoteLocationTemplateProducts, setRemoteLocationTemplateProducts] = useState(null);
-  const storeCatalog = [...locationTemplateData];
   
   // 포인트 패키지 정보
   const [remotePointProducts, setRemotePointProducts] = useState(null);
@@ -159,40 +145,14 @@ const StoreScreen = () => {
         saleEndAt: p.end_at || null,
         bonus: 0,
       }))
-    : pointPackageData;
+    : [];
 
   // 제품 슬롯(Inventory Item Template) 상품 목록
   const [remoteInventoryItemTemplateProducts, setRemoteInventoryItemTemplateProducts] = useState(null);
 
-  // 포인트 상품 목록 로드
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await fetchPointProducts();
-        const list = Array.isArray(res?.point_products) ? res.point_products : [];
-        if (mounted) setRemotePointProducts(list);
-      } catch (e) {
-        if (mounted) setRemotePointProducts(null);
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
+  // 포인트 상품은 points 탭에서만 로드 (위 탭 이펙트에서 처리)
 
-  // 제품 슬롯 상품 목록 로드
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await fetchInventoryItemTemplateProducts();
-        const list = Array.isArray(res?.guest_inventory_item_template_products) ? res.guest_inventory_item_template_products : [];
-        if (mounted) setRemoteInventoryItemTemplateProducts(list);
-      } catch (e) {
-        if (mounted) setRemoteInventoryItemTemplateProducts(null);
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
+  // 제품 슬롯 상품은 productSlot 탭에서만 로드 (위 탭 이펙트에서 처리)
   
   // 구독 구매 처리
   const handleSubscribe = (plan) => {
@@ -641,40 +601,7 @@ const StoreScreen = () => {
     ));
   };
   
-  // 슬롯 아이템 렌더링
-  const renderSlotItems = () => {
-    return (
-      <View style={styles.slotsGrid}>
-        {storeCatalog.map((item) => (
-          <TouchableOpacity 
-            key={item.id} 
-            style={styles.slotCard}
-            onPress={() => handlePurchaseItem(item)}
-          >
-            <View style={styles.slotIconContainer}>
-              <Ionicons 
-                name={item.category === 'locationTemplateSpecial' ? 'star' : item.category === 'locationTemplateBundle' ? 'grid' : 'cube'} 
-                size={30} 
-                color="#4CAF50" 
-              />
-            </View>
-            <Text style={styles.slotName}>{item.name}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-              {(item.originalPointPrice != null && item.realPointPrice != null && item.originalPointPrice !== item.realPointPrice) ? (
-                <>
-                  <Text style={[styles.slotPriceOriginal, styles.strike]}>{item.originalPointPrice.toLocaleString()}G</Text>
-                  <Text style={styles.slotPriceReal}>{item.realPointPrice.toLocaleString()}G</Text>
-                </>
-              ) : (
-                <Text style={styles.slotPrice}>{(item.originalPointPrice ?? item.realPointPrice ?? item.pointPrice).toLocaleString()}G</Text>
-              )}
-            </View>
-            <Text style={styles.slotDescription}>{item.description}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
+  // (제거) 슬롯 기본 카탈로그 렌더링은 더 이상 사용하지 않음
   
   // 영역 슬롯만 렌더링
   const renderLocationSlotItems = () => {
@@ -696,10 +623,12 @@ const StoreScreen = () => {
         realPointPrice: typeof p.price === 'number' ? p.price : 0,
         templates,
       };
-    }) : storeCatalog.filter((i) => i.category === 'locationTemplateBundle' || i.category === 'locationTemplateSpecial');
+    }) : [];
     return (
       <View style={styles.slotsGrid}>
-        {items.map((item) => (
+        {items.length === 0 ? (
+          <Text style={styles.emptyText}>판매 중인 영역 슬롯 상품이 없습니다.</Text>
+        ) : items.map((item) => (
           <View key={item.id} style={styles.slotTile}>
             {/* 좌측 아이콘 */}
             <View style={styles.slotTileLeft}>
@@ -994,25 +923,25 @@ const StoreScreen = () => {
           <View style={styles.shopTabs}>
             <TouchableOpacity
               style={[styles.shopTabItem, activeShopTab === 'productSlot' && styles.shopTabItemActive]}
-              onPress={() => setActiveShopTab('productSlot')}
+              onPress={() => handleTabChange('productSlot')}
             >
               <Text style={[styles.shopTabText, activeShopTab === 'productSlot' && styles.shopTabTextActive]}>제품 슬롯</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.shopTabItem, activeShopTab === 'locationSlot' && styles.shopTabItemActive]}
-              onPress={() => setActiveShopTab('locationSlot')}
+              onPress={() => handleTabChange('locationSlot')}
             >
               <Text style={[styles.shopTabText, activeShopTab === 'locationSlot' && styles.shopTabTextActive]}>영역 슬롯</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.shopTabItem, activeShopTab === 'subscription' && styles.shopTabItemActive]}
-              onPress={() => setActiveShopTab('subscription')}
+              onPress={() => handleTabChange('subscription')}
             >
               <Text style={[styles.shopTabText, activeShopTab === 'subscription' && styles.shopTabTextActive]}>구독 플랜</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.shopTabItem, activeShopTab === 'points' && styles.shopTabItemActive]}
-              onPress={() => setActiveShopTab('points')}
+              onPress={() => handleTabChange('points')}
             >
               <Text style={[styles.shopTabText, activeShopTab === 'points' && styles.shopTabTextActive]}>G 충전</Text>
             </TouchableOpacity>
