@@ -13,13 +13,13 @@ const CodePushUpdateLoading = ({ error }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fefbf2',
     justifyContent: 'center',
     alignItems: 'center',
   },
   splash: {
-    width: 240,
-    height: 240,
+    width: '80%',
+    height: '80%',
   },
   spinner: {
     marginTop: 16,

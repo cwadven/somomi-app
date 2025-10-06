@@ -741,18 +741,7 @@ const AppContent = () => {
   // 데이터 초기화 중이면 로딩 화면 표시
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        {/* 스피너 제거: 스플래시 느낌만 유지 */}
-        {Platform.OS === 'web' && (
-          <TouchableOpacity 
-            style={styles.debugButton}
-            onPress={() => setShowDebugModal(true)}
-          >
-            <Ionicons name="bug-outline" size={24} color="#fff" />
-          </TouchableOpacity>
-        )}
-        <UpdateDebugModal />
-      </View>
+      <CodePushUpdateLoading />
     );
   }
   
