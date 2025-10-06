@@ -360,32 +360,12 @@ const StoreScreen = () => {
     if (!selectedPointPackage) return;
     try {
       const res = await buyPointWithKakao(Number(selectedPointPackage.id));
-      const appScheme = Platform.OS === 'android' ? res?.android_app_scheme : Platform.OS === 'ios' ? res?.ios_app_scheme : null;
       const mobileUrl = res?.next_redirect_mobile_url || res?.next_redirect_app_url || res?.next_redirect_pc_url;
       const webUrl = res?.next_redirect_pc_url || res?.next_redirect_mobile_url || res?.next_redirect_app_url;
-
-      if (Platform.OS === 'ios' || Platform.OS === 'android') {
-        if (appScheme) {
-          try {
-            const supported = await Linking.canOpenURL(appScheme);
-            if (supported) {
-              await Linking.openURL(appScheme);
-              return;
-            }
-          } catch (_) {}
-        }
-        if (mobileUrl) {
-          await Linking.openURL(mobileUrl);
-          return;
-        }
-        showErrorModal('결제 페이지로 이동할 수 없습니다.');
-      } else {
-        if (typeof window !== 'undefined' && window.location && (webUrl || mobileUrl)) {
-          window.location.href = webUrl || mobileUrl;
-        } else {
-          showErrorModal('결제 페이지로 이동할 수 없습니다.');
-        }
-      }
+      const url = Platform.OS === 'web' ? (webUrl || mobileUrl) : (mobileUrl || webUrl);
+      if (!url) { showErrorModal('결제 페이지로 이동할 수 없습니다.'); return; }
+      // 앱 내 웹뷰로 이동
+      navigation.navigate('PaymentWebView', { url });
     } catch (error) {
       const msg = error?.response?.data?.message || '결제 요청 중 오류가 발생했습니다.';
       showErrorModal(msg);
