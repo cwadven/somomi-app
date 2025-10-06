@@ -22,45 +22,82 @@ const PaymentWebViewScreen = () => {
       navigation.replace('PaymentFail');
       return true;
     }
-    // 외부 앱 스킴 처리 (카카오톡/인텐트/전화/마켓 등)
     const lower = url.toLowerCase();
+    // http/https/about:blank 등은 WebView가 로드
+    if (lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('about:')) {
+      return false;
+    }
+    // 외부 스킴(카카오/전화/메일/마켓 등)은 WebView가 로드하지 않도록 막고 OS로 전달
     const externalSchemes = ['kakaotalk://', 'kakaopay://', 'tel:', 'mailto:', 'sms:', 'market://'];
     if (externalSchemes.some(s => lower.startsWith(s))) {
-      Linking.canOpenURL(url).then((supported) => {
-        if (supported) Linking.openURL(url).catch(() => {});
-      }).catch(() => {});
-      return true; // WebView 로드 막기
+      Linking.openURL(url).catch(() => {
+        if (lower.startsWith('kakaotalk://')) {
+          Linking.openURL('market://details?id=com.kakao.talk').catch(() => {});
+        }
+      });
+      return true; // WebView 로드 방지
     }
-    // Android intent:// 처리
+    // Android intent:// 처리: app scheme 변환 → fallback → 마켓
     if (Platform.OS === 'android' && lower.startsWith('intent://')) {
       try {
+        const schemeMatch = url.match(/;scheme=([^;]+)/i);
+        const endOfScheme = url.indexOf('#Intent');
+        const pathPart = url.substring('intent://'.length, endOfScheme >= 0 ? endOfScheme : undefined);
+        const appScheme = schemeMatch ? schemeMatch[1] : null;
+        const appUrl = appScheme ? `${appScheme}://${pathPart}` : null;
         const fallbackMatch = url.match(/S\.browser_fallback_url=([^;]+)/);
-        const pkgMatch = url.match(/;package=([^;]+)/);
         const fallbackUrl = fallbackMatch ? decodeURIComponent(fallbackMatch[1]) : null;
+        const pkgMatch = url.match(/;package=([^;]+)/i);
         const pkg = pkgMatch ? pkgMatch[1] : null;
-        if (fallbackUrl) {
+        if (appUrl) {
+          Linking.openURL(appUrl).catch(() => {
+            if (fallbackUrl) {
+              Linking.openURL(fallbackUrl).catch(() => {});
+            } else if (pkg) {
+              Linking.openURL(`market://details?id=${pkg}`).catch(() => {});
+            }
+          });
+        } else if (fallbackUrl) {
           Linking.openURL(fallbackUrl).catch(() => {});
-          return true;
-        }
-        if (pkg) {
-          const marketUrl = `market://details?id=${pkg}`;
-          Linking.openURL(marketUrl).catch(() => {});
-          return true;
+        } else if (pkg) {
+          Linking.openURL(`market://details?id=${pkg}`).catch(() => {});
         }
       } catch (_) {}
-      return true;
+      return true; // WebView 로드 방지
     }
-    return false;
+    // 알 수 없는 스킴은 로드 방지
+    return true;
   }, [navigation]);
 
   const onShouldStart = useCallback((request) => {
-    const intercepted = handleDeepLink(request?.url);
+    const url = request?.url || '';
+    // 서버에서 window.location.href = 'about:blank#close' 같은 방식으로 닫기 요청 시도 가능
+    if (url.toLowerCase().startsWith('about:blank#close') || url.toLowerCase().endsWith('#close')) {
+      navigation.goBack();
+      return false;
+    }
+    const intercepted = handleDeepLink(url);
     return !intercepted;
   }, [handleDeepLink]);
 
   const onNavChange = useCallback((navState) => {
     handleDeepLink(navState?.url);
   }, [handleDeepLink]);
+
+  const onMessage = useCallback((event) => {
+    try {
+      const data = event?.nativeEvent?.data;
+      if (!data) return;
+      if (data === 'close' || data === 'CLOSE') {
+        navigation.goBack();
+        return;
+      }
+      const parsed = JSON.parse(data);
+      if (parsed && (parsed.type === 'close' || parsed.type === 'CLOSE')) {
+        navigation.goBack();
+      }
+    } catch (_) {}
+  }, [navigation]);
 
   if (Platform.OS === 'web') {
     useEffect(() => {
@@ -107,12 +144,15 @@ const PaymentWebViewScreen = () => {
         source={{ uri: startUrl }}
         onShouldStartLoadWithRequest={onShouldStart}
         onNavigationStateChange={onNavChange}
+        onMessage={onMessage}
         startInLoadingState
         incognito
         originWhitelist={["*"]}
         javaScriptEnabled
         domStorageEnabled
-        setSupportMultipleWindows={false}
+        thirdPartyCookiesEnabled
+        mixedContentMode="always"
+        setSupportMultipleWindows
       />
     </View>
   );

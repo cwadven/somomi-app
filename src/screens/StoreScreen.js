@@ -347,9 +347,13 @@ const StoreScreen = () => {
     if (!selectedPointPackage) return;
     try {
       const res = await buyPointWithKakao(Number(selectedPointPackage.id));
-      const mobileUrl = res?.next_redirect_mobile_url || res?.next_redirect_app_url || res?.next_redirect_pc_url;
-      const webUrl = res?.next_redirect_pc_url || res?.next_redirect_mobile_url || res?.next_redirect_app_url;
-      const url = Platform.OS === 'web' ? (webUrl || mobileUrl) : (mobileUrl || webUrl);
+      const appUrl = res?.next_redirect_app_url || null;
+      const mobileUrl = res?.next_redirect_mobile_url || null;
+      const pcUrl = res?.next_redirect_pc_url || null;
+      // 웹뷰 기반 플로우 권장: Android는 mobile 우선(내장 WebView에서 진행), 웹은 pc, iOS는 mobile 우선
+      const url = Platform.OS === 'web'
+        ? (pcUrl || mobileUrl || appUrl)
+        : (Platform.OS === 'android' ? (mobileUrl || appUrl || pcUrl) : (mobileUrl || appUrl || pcUrl));
       if (!url) { showErrorModal('결제 페이지로 이동할 수 없습니다.'); return; }
       // 앱 내 웹뷰로 이동
       navigation.navigate('PaymentWebView', { url });
