@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   Image,
   Modal,
-  FlatList
+  FlatList,
+  Linking,
+  Platform,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
@@ -21,6 +23,7 @@ import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
 import { fetchAvailablePoint } from '../api/pointApi';
+import { buyPointWithKakao } from '../api/paymentApi';
 
 const StoreScreen = () => {
   const dispatch = useDispatch();
@@ -328,28 +331,40 @@ const StoreScreen = () => {
   };
   
   // 포인트 구매 확정 처리
-  const confirmPointPurchase = () => {
+  const confirmPointPurchase = async () => {
     setPointPurchaseConfirmVisible(false);
-    
     if (!selectedPointPackage) return;
-    
     try {
-      // 실제 결제 처리 로직 (여기서는 가상으로 처리)
-      const totalPoints = selectedPointPackage.points + (selectedPointPackage.bonus || 0);
-      
-      // 포인트 추가
-      dispatch(addPoints({
-        amount: totalPoints,
-        description: `${selectedPointPackage.name} 구매${selectedPointPackage.bonus ? ` (+보너스 ${selectedPointPackage.bonus}G)` : ''}`,
-        paymentMethod: '신용카드'
-      }));
-      
-      showSuccessModal(
-        'G 충전 완료', 
-        `${totalPoints.toLocaleString()}G가 충전되었습니다.\n현재 보유 G: ${(points.balance + totalPoints).toLocaleString()}G`
-      );
+      const res = await buyPointWithKakao(Number(selectedPointPackage.id));
+      const appScheme = Platform.OS === 'android' ? res?.android_app_scheme : Platform.OS === 'ios' ? res?.ios_app_scheme : null;
+      const mobileUrl = res?.next_redirect_mobile_url || res?.next_redirect_app_url || res?.next_redirect_pc_url;
+      const webUrl = res?.next_redirect_pc_url || res?.next_redirect_mobile_url || res?.next_redirect_app_url;
+
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        if (appScheme) {
+          try {
+            const supported = await Linking.canOpenURL(appScheme);
+            if (supported) {
+              await Linking.openURL(appScheme);
+              return;
+            }
+          } catch (_) {}
+        }
+        if (mobileUrl) {
+          await Linking.openURL(mobileUrl);
+          return;
+        }
+        showErrorModal('결제 페이지로 이동할 수 없습니다.');
+      } else {
+        if (typeof window !== 'undefined' && window.location && (webUrl || mobileUrl)) {
+          window.location.href = webUrl || mobileUrl;
+        } else {
+          showErrorModal('결제 페이지로 이동할 수 없습니다.');
+        }
+      }
     } catch (error) {
-      showErrorModal('결제 처리 중 오류가 발생했습니다.');
+      const msg = error?.response?.data?.message || '결제 요청 중 오류가 발생했습니다.';
+      showErrorModal(msg);
     }
   };
   
