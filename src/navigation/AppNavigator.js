@@ -26,6 +26,9 @@ import PointScreen from '../screens/PointScreen';
 import MyProductsScreen from '../screens/MyProductsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import HelpScreen from '../screens/HelpScreen';
+import PaymentSuccessScreen from '../screens/PaymentSuccessScreen';
+import PaymentFailScreen from '../screens/PaymentFailScreen';
+import PaymentCancelScreen from '../screens/PaymentCancelScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -260,7 +263,19 @@ const AppNavigator = ({ linking }) => {
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       <SafeAreaView style={{ flex: 1 }}>
         <NavigationContainer
-          linking={linking}
+          linking={{
+            ...linking,
+            prefixes: [...(linking?.prefixes || []), 'somomi://'],
+            config: {
+              ...linking?.config,
+              screens: {
+                ...(linking?.config?.screens || {}),
+                PaymentSuccess: 'payment/success',
+                PaymentFail: 'payment/fail',
+                PaymentCancel: 'payment/cancel',
+              },
+            },
+          }}
           initialState={initialState}
           onStateChange={(state) => {
             AsyncStorage.setItem('navigation-state', JSON.stringify(state));
@@ -270,6 +285,9 @@ const AppNavigator = ({ linking }) => {
             <RootStack.Screen name="MainTabs" children={() => <MainTabs linking={linking} />} />
             <RootStack.Screen name="RootLogin" component={LoginScreen} options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <RootStack.Screen name="RootHelp" component={HelpScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
+            <RootStack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
+            <RootStack.Screen name="PaymentFail" component={PaymentFailScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
+            <RootStack.Screen name="PaymentCancel" component={PaymentCancelScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
           </RootStack.Navigator>
         </NavigationContainer>
       </SafeAreaView>

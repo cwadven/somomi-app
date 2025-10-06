@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance, addTemplateInstance, addProductSlotTemplateInstances, applySubscriptionToTemplates } from '../redux/slices/authSlice';
 import { isTemplateActive } from '../utils/validityUtils';
@@ -103,6 +103,30 @@ const StoreScreen = () => {
   useEffect(() => {
     fetchDataForTab(activeShopTab);
   }, []);
+
+  // 상점 접근 시 포인트 API 즉시 호출 (포커스마다 실행)
+  useFocusEffect(
+    React.useCallback(() => {
+      let alive = true;
+      (async () => {
+        try {
+          const res = await fetchPointProducts();
+          const list = Array.isArray(res?.point_products) ? res.point_products : [];
+          if (alive) setRemotePointProducts(list);
+        } catch (_) {}
+        if (isLoggedIn) {
+          try {
+            const res2 = await fetchAvailablePoint();
+            const raw = res2?.available_point;
+            const num = raw != null ? Number(raw) : null;
+            const value = (num != null && isFinite(num)) ? num : null;
+            if (alive) setRemotePoint(value);
+          } catch (_) {}
+        }
+      })();
+      return () => { alive = false; };
+    }, [isLoggedIn])
+  );
 
   // 탭 변경 핸들러
   const handleTabChange = (tab) => {
