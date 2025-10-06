@@ -82,19 +82,6 @@ const StoreScreen = () => {
         const res = await fetchInventoryItemTemplateProducts();
         const list = Array.isArray(res?.guest_inventory_item_template_products) ? res.guest_inventory_item_template_products : [];
         setRemoteInventoryItemTemplateProducts(list);
-      } else if (tab === 'points') {
-        const res = await fetchPointProducts();
-        const list = Array.isArray(res?.point_products) ? res.point_products : [];
-        setRemotePointProducts(list);
-        if (isLoggedIn) {
-          try {
-            const res2 = await fetchAvailablePoint();
-            const raw = res2?.available_point;
-            const num = raw != null ? Number(raw) : null;
-            const value = (num != null && isFinite(num)) ? num : null;
-            setRemotePoint(value);
-          } catch (_) {}
-        }
       }
     } catch (_) {}
   };
