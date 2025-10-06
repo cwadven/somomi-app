@@ -133,6 +133,8 @@ const AppContent = () => {
           const fetchResult = await Updates.fetchUpdateAsync();
           addLog(`업데이트 다운로드 완료: ${JSON.stringify(fetchResult)}\n다음 앱 재시작 시 적용됩니다.`, 'success');
           setUpdateStatus('ready');
+          // 다음 포그라운드 진입 시 자동 적용
+          updateReadyRef.current = true;
         } catch (fetchError) {
           console.error('Update fetch error:', fetchError);
           const errorMsg = `업데이트 다운로드 오류: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`;
@@ -156,6 +158,7 @@ const AppContent = () => {
 
   // 앱 재시작 1회만으로 적용되도록: 실행 초기에 미리 다운로드, 백그라운드 전환 시에도 미리 다운로드
   const isPrefetchingRef = useRef(false);
+  const updateReadyRef = useRef(false);
   const prefetchUpdateIfAvailable = useCallback(async () => {
     if (__DEV__ || Platform.OS === 'web') return;
     if (isPrefetchingRef.current) return;
@@ -166,6 +169,8 @@ const AppContent = () => {
         try {
           await Updates.fetchUpdateAsync();
           addLog('업데이트 사전 다운로드 완료. 다음 재시작 시 적용됩니다.', 'info');
+          // 다음 포그라운드 진입 시 자동 적용
+          updateReadyRef.current = true;
         } catch (e) {
           addLog(`업데이트 사전 다운로드 실패: ${e instanceof Error ? e.message : String(e)}`, 'warning');
         }
@@ -178,7 +183,7 @@ const AppContent = () => {
   }, [addLog]);
   
   // 앱 상태 변경 핸들러
-  const handleAppStateChange = useCallback((nextAppState) => {
+  const handleAppStateChange = useCallback(async (nextAppState) => {
     const previousState = prevAppStateRef.current;
     setAppState(nextAppState);
     
@@ -187,6 +192,16 @@ const AppContent = () => {
       pushNotificationService.requestNotificationPermission();
       try { scheduleDailyReminderIfNeeded(); } catch (e) { }
       try { scheduleDailyUpdateReminderIfNeeded(); } catch (e) { }
+      // 포그라운드 복귀 시 업데이트가 준비되어 있으면 즉시 적용
+      if (updateReadyRef.current) {
+        updateReadyRef.current = false;
+        try {
+          addLog('포그라운드 복귀: 다운로드된 업데이트 적용', 'info');
+          await Updates.reloadAsync();
+        } catch (e) {
+          addLog(`업데이트 적용 실패: ${e instanceof Error ? e.message : String(e)}`, 'error');
+        }
+      }
     }
     // 활성 → 비활성/백그라운드로 갈 때, 업데이트 사전 다운로드 시도
     if (previousState === 'active' && nextAppState?.match(/inactive|background/)) {

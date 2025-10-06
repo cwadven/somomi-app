@@ -863,7 +863,12 @@ const StoreScreen = () => {
             >
               <Text style={[styles.shopTabText, activeShopTab === 'locationSlot' && styles.shopTabTextActive]}>영역 슬롯</Text>
             </TouchableOpacity>
-            {/* 구독 플랜 탭 제거 */}
+            <TouchableOpacity
+              style={[styles.shopTabItem, activeShopTab === 'subscription' && styles.shopTabItemActive]}
+              onPress={() => handleTabChange('subscription')}
+            >
+              <Text style={[styles.shopTabText, activeShopTab === 'subscription' && styles.shopTabTextActive]}>구독 플랜</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.shopTabItem, activeShopTab === 'points' && styles.shopTabItemActive]}
               onPress={() => handleTabChange('points')}
@@ -888,13 +893,14 @@ const StoreScreen = () => {
           </View>
         )}
 
-        {/* 구독 플랜 섹션 (데이터 없음) */}
-        <View className="subscription-section" style={styles.section}>
-          <Text style={styles.sectionTitle}>구독 플랜</Text>
-          <View style={styles.plansContainer}>
-            <Text style={{ color: '#666' }}>현재 판매 중인 구독 플랜이 없습니다.</Text>
+        {activeShopTab === 'subscription' && (
+          <View className="subscription-section" style={styles.section}>
+            <Text style={styles.sectionTitle}>구독 플랜</Text>
+            <View style={styles.plansContainer}>
+              <Text style={{ color: '#666' }}>현재 판매 중인 구독 플랜이 없습니다.</Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {activeShopTab === 'points' && (
           <View style={[styles.section, styles.pointChargeSection]}>
