@@ -222,11 +222,6 @@ const StoreScreen = () => {
       }
       return;
     }
-    // 원격 제품 슬롯(템플릿 수 미확정)은 구매 비활성화
-    if (item.category === 'productSlot' && (!Array.isArray(item.templates) || item.templates.length === 0)) {
-      showErrorModal('해당 상품은 준비 중입니다.');
-      return;
-    }
     
     setSelectedItem(item);
     setPurchaseConfirmVisible(true);
@@ -302,7 +297,8 @@ const StoreScreen = () => {
         // 슬롯/템플릿 구매 처리 (데이터주도)
         if (item.category === 'productSlot') {
           const slotTemplate = Array.isArray(item.templates) && item.templates[0] ? item.templates[0] : null;
-          const count = slotTemplate?.count || 0;
+          // 서버 상품에는 템플릿/개수 정보가 없으므로 기본 1개로 처리
+          const count = slotTemplate?.count || 1;
           dispatch(addProductSlotTemplateInstances({ count }));
           const nextTemplatesCount = (userProductSlotTemplateInstances?.length || 0) + count;
           showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.\n보유 추가 제품 슬롯: ${nextTemplatesCount}개`);
@@ -1480,7 +1476,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 20,
-    width: '80%',
+    width: '90%',
+    maxWidth: 640,
     alignItems: 'center',
   },
   modalHeader: {
@@ -1498,23 +1495,32 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  modalContent: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
   modalProductName: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
     color: '#333',
+    alignSelf: 'stretch',
+    textAlign: 'left',
   },
   modalProductPrice: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#4CAF50',
     marginBottom: 16,
+    alignSelf: 'stretch',
+    textAlign: 'left',
   },
   modalDescription: {
     fontSize: 14,
     color: '#666',
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 20,
+    alignSelf: 'stretch',
   },
   modalFeatures: {
     marginBottom: 20,
@@ -1537,7 +1543,8 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     borderRadius: 4,
     alignItems: 'center',
     marginHorizontal: 8,
