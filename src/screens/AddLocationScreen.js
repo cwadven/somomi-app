@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { createLocation, updateLocation } from '../redux/slices/locationsSlice';
 import { markTemplateInstanceAsUsed, releaseTemplateInstance, addTemplateInstance, unassignProductSlotTemplate, assignProductSlotTemplateToLocation } from '../redux/slices/authSlice';
 import { useSelector as useReduxSelector } from 'react-redux';
@@ -21,6 +21,7 @@ import IconSelector from '../components/IconSelector';
 import AlertModal from '../components/AlertModal';
 import { saveData, loadData, removeData, STORAGE_KEYS } from '../utils/storageUtils';
 import { isTemplateActive } from '../utils/validityUtils';
+import { fetchGuestInventoryItemTemplates } from '../api/inventoryApi';
 
 const AddLocationScreen = () => {
   const navigation = useNavigation();
@@ -32,7 +33,7 @@ const AddLocationScreen = () => {
   const locationToEdit = route.params?.location;
   
   // 템플릿 인스턴스 및 구독 상태
-  const { userLocationTemplateInstances, slots, userProductSlotTemplateInstances, subscription } = useSelector(state => state.auth);
+  const { userLocationTemplateInstances, slots, userProductSlotTemplateInstances, subscription, isLoggedIn } = useSelector(state => state.auth);
   const additionalProductSlots = slots?.productSlots?.additionalSlots || 0;
   const { locationProducts } = useSelector(state => state.products);
   
@@ -68,12 +69,41 @@ const AddLocationScreen = () => {
   const currentLocationProducts = isEditMode && locationToEdit ? (locationProducts?.[locationToEdit.id] || []) : [];
   const currentProductCount = currentLocationProducts.length;
   const currentProductIdSet = new Set(currentLocationProducts.map(p => p.id));
-  const usedProductSlotTemplatesInThisLocation = (userProductSlotTemplateInstances || []).filter(t => t.used && currentProductIdSet.has(t.usedByProductId)).length;
+  const [remoteProductSlotTemplates, setRemoteProductSlotTemplates] = useState(null);
+
+  // 포커스 시 추가 제품 슬롯 템플릿을 API로 최신화
+  useFocusEffect(
+    React.useCallback(() => {
+      let alive = true;
+      (async () => {
+        try {
+          if (!isLoggedIn) { setRemoteProductSlotTemplates(null); return; }
+          const res = await fetchGuestInventoryItemTemplates();
+          const list = Array.isArray(res) ? res : (Array.isArray(res?.guest_inventory_item_templates) ? res.guest_inventory_item_templates : res?.guest_inventory_item_template_products || []);
+          // 맵핑: assigned_in_section_id, used_in_inventory_item_id → 프론트 스키마 유사
+          const mapped = list.map(t => ({
+            id: String(t.id || t.template_id || t.product_slot_template_id || t.product_id || Math.random()),
+            assignedLocationId: t.assigned_in_section_id ?? t.assigned_section_id ?? null,
+            usedByProductId: t.used_in_inventory_item_id ?? t.used_by_inventory_item_id ?? null,
+            feature: t.feature || t.template_feature || {},
+            used: !!(t.used_in_inventory_item_id),
+          }));
+          if (alive) setRemoteProductSlotTemplates(mapped);
+        } catch (_) {
+          if (alive) setRemoteProductSlotTemplates(null);
+        }
+      })();
+      return () => { alive = false; };
+    }, [isLoggedIn])
+  );
+
+  const sourceProductSlotTemplates = Array.isArray(remoteProductSlotTemplates) ? remoteProductSlotTemplates : (userProductSlotTemplateInstances || []);
+  const usedProductSlotTemplatesInThisLocation = sourceProductSlotTemplates.filter(t => t.used && currentProductIdSet.has(t.usedByProductId)).length;
   const assignedProductSlotTemplatesForThisLocation = (isEditMode && locationToEdit)
-    ? (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locationToEdit.id && isTemplateActive(t, subscription))
+    ? sourceProductSlotTemplates.filter(t => t.assignedLocationId === locationToEdit.id && isTemplateActive(t, subscription))
     : [];
   const assignedCountForThisLocation = assignedProductSlotTemplatesForThisLocation.length;
-  const availableProductSlotTemplates = (userProductSlotTemplateInstances || []).filter(t => !t.used && !t.assignedLocationId && isTemplateActive(t, subscription));
+  const availableProductSlotTemplates = sourceProductSlotTemplates.filter(t => !t.used && !t.assignedLocationId && isTemplateActive(t, subscription));
  
   // 스테이징 계산은 아래 선언 이후에 수행됩니다.
   
@@ -181,7 +211,7 @@ const AddLocationScreen = () => {
     const baseSlots = (isEditMode
       ? (selectedEditTemplateInstance?.feature?.baseSlots ?? currentTemplate?.feature?.baseSlots)
       : selectedTemplateInstance?.feature?.baseSlots);
-    const freeTemplates = (userProductSlotTemplateInstances || []).filter(t => !t.used).length;
+    const freeTemplates = sourceProductSlotTemplates.filter(t => !t.used).length;
     const used = isEditMode ? currentProductCount : 0;
     const usedHere = isEditMode ? usedProductSlotTemplatesInThisLocation : 0;
     const allowed = typeof baseSlots === 'number' && baseSlots === -1

@@ -265,9 +265,17 @@ const StoreScreen = () => {
           // 서버 상품에는 템플릿/개수 정보가 없으므로 기본 1개로 처리
           const count = slotTemplate?.count || 1;
           dispatch(addProductSlotTemplateInstances({ count }));
-          const nextTemplatesCount = (userProductSlotTemplateInstances?.length || 0) + count;
-          showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.\n보유 추가 제품 슬롯: ${nextTemplatesCount}개`);
+          showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.`);
           dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: count }));
+          // 구매 후 가용 포인트 최신화
+          fetchAvailablePoint()
+            .then(res => {
+              const raw = res?.available_point;
+              const num = raw != null ? Number(raw) : null;
+              const value = (num != null && isFinite(num)) ? num : null;
+              setRemotePoint(value);
+            })
+            .catch(() => {});
         }
         if (item.category === 'locationTemplateBundle') {
           const templates = Array.isArray(item.templates) ? item.templates : [];
@@ -289,6 +297,15 @@ const StoreScreen = () => {
           }
           showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.`);
           dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: count }));
+          // 구매 후 가용 포인트 최신화
+          fetchAvailablePoint()
+            .then(res => {
+              const raw = res?.available_point;
+              const num = raw != null ? Number(raw) : null;
+              const value = (num != null && isFinite(num)) ? num : null;
+              setRemotePoint(value);
+            })
+            .catch(() => {});
         }
         if (item.category === 'locationTemplateSpecial') {
           const specialTemplate = Array.isArray(item.templates) && item.templates[0] ? item.templates[0] : null;
@@ -308,6 +325,15 @@ const StoreScreen = () => {
           }));
           showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.\n유효기간: ${days}일, 제품 슬롯: 무제한`);
           dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: 1 }));
+          // 구매 후 가용 포인트 최신화
+          fetchAvailablePoint()
+            .then(res => {
+              const raw = res?.available_point;
+              const num = raw != null ? Number(raw) : null;
+              const value = (num != null && isFinite(num)) ? num : null;
+              setRemotePoint(value);
+            })
+            .catch(() => {});
         }
       }
     } catch (error) {
