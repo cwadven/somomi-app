@@ -22,7 +22,7 @@ import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
 import { fetchAvailablePoint } from '../api/pointApi';
-import { buyPointWithKakao } from '../api/paymentApi';
+import { buyPointWithKakao, buyGuestTemplateProductWithPoint } from '../api/paymentApi';
 
 const StoreScreen = () => {
   const dispatch = useDispatch();
@@ -123,7 +123,7 @@ const StoreScreen = () => {
   // 가용 포인트 값은 points 탭에서만 동기화함 (위 탭 이펙트에서 처리)
 
   const [remotePoint, setRemotePoint] = useState(null);
-
+  
   // 모달 상태
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [alertModalConfig, setAlertModalConfig] = useState({
@@ -255,6 +255,11 @@ const StoreScreen = () => {
         }));
         
         // 슬롯/템플릿 구매 처리 (데이터주도)
+        // 서버 포인트 결제 API 호출 (게스트 템플릿 상품)
+        buyGuestTemplateProductWithPoint(Number(item.id)).catch((e) => {
+          const msg = e?.response?.data?.message || '포인트 결제 중 오류가 발생했습니다.';
+          showErrorModal(msg);
+        });
         if (item.category === 'productSlot') {
           const slotTemplate = Array.isArray(item.templates) && item.templates[0] ? item.templates[0] : null;
           // 서버 상품에는 템플릿/개수 정보가 없으므로 기본 1개로 처리
@@ -282,8 +287,7 @@ const StoreScreen = () => {
               usedInLocationId: null,
             }));
           }
-          const totalLocationSlots = slots.locationSlots.baseSlots + slots.locationSlots.additionalSlots + count;
-          showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.\n현재 보유 영역 슬롯: ${totalLocationSlots}개`);
+          showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.`);
           dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: count }));
         }
         if (item.category === 'locationTemplateSpecial') {
@@ -569,8 +573,8 @@ const StoreScreen = () => {
                     <Ionicons name="pricetag" size={12} color="#fff" />
                     <Text style={styles.saleBadgeText}>
                       {`-${Math.max(0, Math.round((1 - (item.realPointPrice / item.originalPointPrice)) * 100))}%`}
-                    </Text>
-                  </View>
+        </Text>
+            </View>
                 )}
               </View>
               {(() => {
@@ -589,14 +593,14 @@ const StoreScreen = () => {
                     )}
                     {locationLabels.map((label, idx) => (
                       <View key={`loc-${idx}`} style={styles.chip}><Ionicons name="cube" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{label}</Text></View>
-                    ))}
-                  </View>
+          ))}
+        </View>
                 );
               })()}
               {/* 판매 종료 카운트다운: 국소 렌더 */}
               <SaleEndCountdown endAt={item.saleEndAt} />
               <Text style={styles.slotTileSubtitle} numberOfLines={2}>{item.description}</Text>
-            </View>
+        </View>
             {/* 우측: 가격/버튼 */}
             <View style={styles.slotTileRight}>
               {(item.originalPointPrice != null && item.realPointPrice != null && item.originalPointPrice !== item.realPointPrice) ? (
@@ -610,7 +614,7 @@ const StoreScreen = () => {
               <TouchableOpacity style={[styles.slotBuyButton, { marginTop: 6 }]} onPress={() => handlePurchaseItem(item)}>
                 <Ionicons name="cart" size={16} color="#fff" />
                 <Text style={styles.slotBuyButtonText}>구매</Text>
-              </TouchableOpacity>
+      </TouchableOpacity>
             </View>
           </View>
         ))}
@@ -639,7 +643,7 @@ const StoreScreen = () => {
             <View style={styles.slotTileLeft}>
               <View style={styles.slotTileIconWrap}>
                 <Ionicons name="cube" size={22} color="#4CAF50" />
-              </View>
+            </View>
             </View>
             <View style={styles.slotTileCenter}>
               <View style={styles.slotTileTitleRow}>
@@ -670,7 +674,7 @@ const StoreScreen = () => {
               <TouchableOpacity style={[styles.slotBuyButton, { marginTop: 6 }]} onPress={() => handlePurchaseItem(item)}>
                 <Ionicons name="cart" size={16} color="#fff" />
                 <Text style={styles.slotBuyButtonText}>구매</Text>
-              </TouchableOpacity>
+          </TouchableOpacity>
             </View>
           </View>
         ))}
@@ -877,13 +881,13 @@ const StoreScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
-
+        
         {/* 탭 내용 */}
         {activeShopTab === 'productSlot' && (
-          <View style={styles.section}>
+        <View style={styles.section}>
             <Text style={styles.sectionTitle}>제품 슬롯</Text>
             {renderProductSlotItems()}
-          </View>
+        </View>
         )}
 
         {activeShopTab === 'locationSlot' && (
@@ -903,39 +907,39 @@ const StoreScreen = () => {
         )}
 
         {activeShopTab === 'points' && (
-          <View style={[styles.section, styles.pointChargeSection]}>
-            <Text style={styles.sectionTitle}>G 충전</Text>
-            {renderPointPackages()}
-
-            {isLoggedIn && pointHistory.length > 0 && (
-              <TouchableOpacity 
-                style={styles.historyToggleButton}
-                onPress={() => setShowPointHistory(!showPointHistory)}
-              >
-                <Text style={styles.historyToggleText}>
-                  {showPointHistory ? '내역 접기' : 'G 내역 자세히 보기'}
-                </Text>
-                <Ionicons 
-                  name={showPointHistory ? 'chevron-up' : 'chevron-down'} 
-                  size={16} 
-                  color="#4CAF50" 
-                />
-              </TouchableOpacity>
-            )}
-
-            {isLoggedIn && pointHistory.length > 0 && showPointHistory && (
-              <View style={styles.historyContainer}>
-                <Text style={styles.historyTitle}>G 내역</Text>
-                <FlatList
-                  data={pointHistory}
-                  renderItem={renderPointHistoryItem}
-                  keyExtractor={item => item.id}
-                  scrollEnabled={false}
-                  style={styles.historyList}
-                />
-              </View>
-            )}
-          </View>
+        <View style={[styles.section, styles.pointChargeSection]}>
+          <Text style={styles.sectionTitle}>G 충전</Text>
+          {renderPointPackages()}
+          
+          {isLoggedIn && pointHistory.length > 0 && (
+            <TouchableOpacity 
+              style={styles.historyToggleButton}
+              onPress={() => setShowPointHistory(!showPointHistory)}
+            >
+              <Text style={styles.historyToggleText}>
+                {showPointHistory ? '내역 접기' : 'G 내역 자세히 보기'}
+              </Text>
+              <Ionicons 
+                name={showPointHistory ? 'chevron-up' : 'chevron-down'} 
+                size={16} 
+                color="#4CAF50" 
+              />
+            </TouchableOpacity>
+          )}
+          
+          {isLoggedIn && pointHistory.length > 0 && showPointHistory && (
+            <View style={styles.historyContainer}>
+              <Text style={styles.historyTitle}>G 내역</Text>
+              <FlatList
+                data={pointHistory}
+                renderItem={renderPointHistoryItem}
+                keyExtractor={item => item.id}
+                scrollEnabled={false}
+                style={styles.historyList}
+              />
+            </View>
+          )}
+        </View>
         )}
         
         {/* 포인트 내역 섹션 - 제거 */}
