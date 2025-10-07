@@ -156,11 +156,7 @@ const ProfileStack = () => {
           headerShown: false
         })}
       />
-      <Stack.Screen 
-        name="Store" 
-        component={StoreScreen} 
-        options={{ title: '상점', headerShown: false }}
-      />
+      {/* 상점은 프로필 스택이 아닌 루트 모달로 표시되므로 여기서 제거 */}
       <Stack.Screen 
         name="ProductDetail" 
         component={ProductDetailScreen} 
@@ -225,6 +221,11 @@ const MainTabs = ({ linking }) => {
             e.preventDefault();
             navigation.navigate('Locations', { screen: 'LocationsScreen' });
           }
+            // 프로필 탭 선택 시 항상 루트(ProfileScreen)로 이동
+            if (route.name === 'Profile') {
+              e.preventDefault();
+              navigation.navigate('Profile', { screen: 'ProfileScreen' });
+            }
         },
       })}
     >
@@ -273,6 +274,7 @@ const AppNavigator = ({ linking }) => {
             <RootStack.Screen name="RootLogin" component={LoginScreen} options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <RootStack.Screen name="RootHelp" component={HelpScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
             <RootStack.Screen name="PaymentWebView" component={PaymentWebViewScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
+            <RootStack.Screen name="Store" component={StoreScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
           </RootStack.Navigator>
         </NavigationContainer>
       </SafeAreaView>

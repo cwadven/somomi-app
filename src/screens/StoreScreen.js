@@ -834,7 +834,16 @@ const StoreScreen = () => {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            try {
+              const parentNav = navigation.getParent && navigation.getParent();
+              if (parentNav && typeof parentNav.navigate === 'function') {
+                parentNav.navigate('Profile', { screen: 'ProfileScreen' });
+                return;
+              }
+            } catch (_) {}
+            navigation.navigate('Profile', { screen: 'ProfileScreen' });
+          }}
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
