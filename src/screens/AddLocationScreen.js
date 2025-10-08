@@ -99,8 +99,9 @@ const AddLocationScreen = () => {
 
   const sourceProductSlotTemplates = Array.isArray(remoteProductSlotTemplates) ? remoteProductSlotTemplates : (userProductSlotTemplateInstances || []);
   const usedProductSlotTemplatesInThisLocation = sourceProductSlotTemplates.filter(t => t.used && currentProductIdSet.has(t.usedByProductId)).length;
+  // 이 영역에 등록된 슬롯은 유효성 여부와 무관하게 표시 (만료/비활성도 보여주기 위함)
   const assignedProductSlotTemplatesForThisLocation = (isEditMode && locationToEdit)
-    ? sourceProductSlotTemplates.filter(t => t.assignedLocationId === locationToEdit.id && isTemplateActive(t, subscription))
+    ? sourceProductSlotTemplates.filter(t => String(t.assignedLocationId) === String(locationToEdit.id))
     : [];
   const assignedCountForThisLocation = assignedProductSlotTemplatesForThisLocation.length;
   const availableProductSlotTemplates = sourceProductSlotTemplates.filter(t => !t.used && !t.assignedLocationId && isTemplateActive(t, subscription));
@@ -523,18 +524,31 @@ const AddLocationScreen = () => {
           newFeature = selectedEditTemplateInstance.feature;
         }
         
-        // 영역 수정 API 호출
-        const updatedLocation = await dispatch(updateLocation({
-          id: locationToEdit.id,
-          title: locationData.title,
-          description: locationData.description,
-          icon: locationData.icon,
-          templateInstanceId: newTemplateInstanceId,
-          productId: newProductId,
-          feature: newFeature
-        })).unwrap();
-        
-        console.log('영역 수정 성공:', updatedLocation);
+        // 영역 수정 API 호출 (실패 시 모달 표시 후 중단)
+        let updatedLocation = null;
+        try {
+          updatedLocation = await dispatch(updateLocation({
+            id: locationToEdit.id,
+            title: locationData.title,
+            description: locationData.description,
+            icon: locationData.icon,
+            templateInstanceId: newTemplateInstanceId,
+            productId: newProductId,
+            feature: newFeature
+          })).unwrap();
+          console.log('영역 수정 성공:', updatedLocation);
+        } catch (e) {
+          setIsLoading(false);
+          setAlertModalConfig({
+            title: '수정 실패',
+            message: (e?.response?.data?.message || '영역 수정 중 오류가 발생했습니다.'),
+            buttons: [{ text: '확인' }],
+            icon: 'alert-circle',
+            iconColor: '#F44336',
+          });
+          setAlertModalVisible(true);
+          return;
+        }
         // 새 템플릿을 해당 영역에 사용 처리 (UI 동기화)
         try {
           if (changingTemplate) {
@@ -542,16 +556,25 @@ const AddLocationScreen = () => {
           }
         } catch (e) {}
 
-        // 스테이징된 제품 슬롯 등록/해제 적용
+        // 스테이징된 제품 슬롯 등록/해제 적용 - API 호출로 변경 (실패 시 모달 표시 후 중단)
         try {
-          for (const templateId of stagedAssignTemplateIds) {
-            await dispatch(assignProductSlotTemplateToLocation({ templateId, locationId: locationToEdit.id }));
-          }
-          for (const templateId of stagedUnassignTemplateIds) {
-            await dispatch(unassignProductSlotTemplate({ templateId }));
+          if (stagedAssignTemplateIds.length > 0 || stagedUnassignTemplateIds.length > 0) {
+            const assignIds = stagedAssignTemplateIds.map(id => Number(id)).filter(n => Number.isFinite(n));
+            const revokeIds = stagedUnassignTemplateIds.map(id => Number(id)).filter(n => Number.isFinite(n));
+            const { assignGuestInventoryItemTemplatesToSection } = require('../api/inventoryApi');
+            await assignGuestInventoryItemTemplatesToSection(Number(locationToEdit.id), { assign: assignIds, revoke: revokeIds });
           }
         } catch (e) {
-          console.log('제품 슬롯 스테이징 적용 중 오류:', e);
+          setIsLoading(false);
+          setAlertModalConfig({
+            title: '템플릿 적용 실패',
+            message: (e?.response?.data?.message || '제품 템플릿 연결/해제 중 오류가 발생했습니다.'),
+            buttons: [{ text: '확인' }],
+            icon: 'alert-circle',
+            iconColor: '#F44336',
+          });
+          setAlertModalVisible(true);
+          return;
         }
 
         // 스테이징 초기화
@@ -561,7 +584,7 @@ const AddLocationScreen = () => {
         setIsLoading(false);
         
         // 성공 메시지 표시 후 내 영역 탭으로 이동
-    setAlertModalConfig({
+        setAlertModalConfig({
           title: '성공',
           message: '영역이 성공적으로 수정되었습니다.',
           buttons: [
@@ -574,9 +597,9 @@ const AddLocationScreen = () => {
             }
           ],
           icon: 'checkmark-circle',
-      iconColor: '#4CAF50'
-    });
-    setAlertModalVisible(true);
+          iconColor: '#4CAF50'
+        });
+        setAlertModalVisible(true);
       } else {
         // 영역 생성 로직
         console.log('영역 생성 시작:', {

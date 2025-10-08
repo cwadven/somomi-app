@@ -59,6 +59,14 @@ export const deleteInventoryItem = async (guest_inventory_item_id) => {
   });
 };
 
+// POST /v1/inventory/section/{guest_section_id}/templates/assign
+export const assignGuestInventoryItemTemplatesToSection = async (guest_section_id, { assign = [], revoke = [] }) => {
+  return request(`/v1/inventory/section/${guest_section_id}/templates/assign`, {
+    method: 'POST',
+    body: { assign, revoke },
+  });
+};
+
 export default {
   fetchGuestInventoryItemTemplates,
   fetchInventoryItemsBySection,
@@ -69,6 +77,7 @@ export default {
   fetchAllInventoryItems,
   updateInventoryItem,
   deleteInventoryItem,
+  assignGuestInventoryItemTemplatesToSection,
 };
 
 
