@@ -55,7 +55,7 @@ const ProductFormScreen = () => {
   // Redux 상태
   const { categories, status: categoriesStatus } = useSelector(state => state.categories);
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
-  const { products, currentProduct, status: productsStatus } = useSelector(state => state.products);
+  const { products, currentProduct, status: productsStatus, locationProducts } = useSelector(state => state.products);
   const { isLoggedIn, isAnonymous, slots, userProductSlotTemplateInstances, subscription, userLocationTemplateInstances } = useSelector(state => state.auth);
 
   // 폼 상태
@@ -790,10 +790,25 @@ const ProductFormScreen = () => {
       } else {
         // 추가 모드 → 서버 API로 생성
         const locIdAfter = locationId || selectedLocation?.id;
+        const baseSlotsInSubmit = selectedLocation?.feature?.baseSlots ?? slots?.productSlots?.baseSlots ?? 0;
+        // 영역별 제품 목록: locationProducts 캐시 우선, 없으면 products 폴백
+        const cachedList = (locationProducts && (locationProducts[String(locIdAfter)] || locationProducts[locIdAfter])) || [];
+        const productsInLocation = (cachedList && cachedList.length > 0)
+          ? cachedList.filter(p => !p.isConsumed)
+          : (products || []).filter(p => String(p.locationId) === String(locIdAfter) && !p.isConsumed);
+        const usedCount = productsInLocation.length;
+        // 유효한 추가 제품 슬롯 템플릿: 이 영역에 배정되어 있고 아직 어떤 제품에도 사용되지 않음
+        const availableAssignedTemplates = (userProductSlotTemplateInstances || []).filter(t => 
+          String(t.assignedLocationId) === String(locIdAfter) && (t.usedByProductId == null)
+        );
+        const needTemplate = baseSlotsInSubmit !== -1 && usedCount >= baseSlotsInSubmit && availableAssignedTemplates.length > 0;
+        const availableAssigned = needTemplate ? availableAssignedTemplates[0] : null;
+
+        const templateIdForBody = (availableAssigned && !isNaN(Number(availableAssigned.id))) ? Number(availableAssigned.id) : null;
         const body = {
           name: productName,
           memo: memo || null,
-          guest_inventory_item_template_id: null,
+          guest_inventory_item_template_id: templateIdForBody,
           brand: brand || null,
           point_of_purchase: purchasePlace || null,
           purchase_price: price && String(price).trim() !== '' ? parseFloat(String(price)) : null,
@@ -818,16 +833,9 @@ const ProductFormScreen = () => {
           expiryDate: body.expire_at,
           estimatedEndDate: body.expected_expire_at,
         };
-        // 기본 슬롯 초과분은 해당 영역에 등록된 추가 슬롯에서 소모 (할당된 것 중 미사용)
-        const baseSlotsInSubmit = selectedLocation?.feature?.baseSlots ?? slots?.productSlots?.baseSlots ?? 0;
-        const productsInLocation = (products || []).filter(p => p.locationId === locIdAfter && !p.isConsumed);
-        const usedCountAfter = (productsInLocation.length) + 1; // 방금 추가 포함
-        const assignedExtraAfter = (userProductSlotTemplateInstances || []).filter(t => t.assignedLocationId === locIdAfter && isTemplateActive(t, subscription)).length;
-        if (baseSlotsInSubmit !== -1 && usedCountAfter > baseSlotsInSubmit && usedCountAfter <= baseSlotsInSubmit + assignedExtraAfter) {
-          const availableAssigned = (userProductSlotTemplateInstances || []).find(t => t.assignedLocationId === locIdAfter && !t.used && isTemplateActive(t, subscription));
-          if (availableAssigned) {
-            dispatch(markProductSlotTemplateAsUsed({ templateId: availableAssigned.id, productId: result.id }));
-          }
+        // 템플릿으로 생성한 경우 프론트 상태 동기화를 위해 사용 처리
+        if (availableAssigned && result.id) {
+          dispatch(markProductSlotTemplateAsUsed({ templateId: availableAssigned.id, productId: result.id }));
         }
       }
 
