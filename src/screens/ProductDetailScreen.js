@@ -16,6 +16,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchProductById, deleteProductAsync, fetchProductsByLocation } from '../redux/slices/productsSlice';
+import { loadUserProductSlotTemplateInstances } from '../redux/slices/authSlice';
 import { consumeInventoryItem } from '../api/inventoryApi';
 import { isTemplateActive } from '../utils/validityUtils';
 import AlertModal from '../components/AlertModal';
@@ -355,7 +356,13 @@ const ProductDetailScreen = () => {
                     onConfirm: () => {
                       // 모달 닫기 후 이전 화면으로 이동
                       setSuccessModalVisible(false);
-                       try { if (currentProduct?.locationId) { dispatch(fetchProductsByLocation(currentProduct.locationId)); } } catch (e) {}
+                      try {
+                        if (currentProduct?.locationId) {
+                          dispatch(fetchProductsByLocation(currentProduct.locationId));
+                        }
+                      } catch (e) {}
+                      // 템플릿 최신화
+                      try { dispatch(loadUserProductSlotTemplateInstances()); } catch (e) {}
                       navigation.goBack();
                     }
                   });

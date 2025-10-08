@@ -16,7 +16,7 @@ import { fetchInventoryItemsBySection, fetchAllInventoryItems, deleteInventoryIt
 import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { saveProducts, loadProducts, saveConsumedProducts, loadConsumedProducts } from '../../utils/storageUtils';
 import { fetchConsumedInventoryItems } from '../../api/inventoryApi';
-import { unassignProductSlotTemplate, releaseProductSlotTemplateByProduct } from './authSlice';
+import { unassignProductSlotTemplate, releaseProductSlotTemplateByProduct, loadUserProductSlotTemplateInstances } from './authSlice';
 
 // 비동기 액션 생성
 export const fetchProducts = createAsyncThunk(
@@ -226,6 +226,8 @@ export const deleteProductAsync = createAsyncThunk(
       // 추가 제품 슬롯이 해당 제품에 사용 중이었다면 해제
       try { dispatch(releaseProductSlotTemplateByProduct(id)); } catch (e) {}
 
+      // 서버 템플릿 최신화
+      try { await dispatch(loadUserProductSlotTemplateInstances()).unwrap(); } catch (e) {}
       try { await refreshAfterMutation(dispatch); } catch (e) {}
       return id;
     } catch (error) {
@@ -264,7 +266,8 @@ export const markProductAsConsumedAsync = createAsyncThunk(
       await saveConsumedProducts(updatedConsumedProducts);
       // 추가 제품 슬롯이 해당 제품에 사용 중이었다면 해제
       try { dispatch(releaseProductSlotTemplateByProduct(id)); } catch (e) {}
-      
+      // 서버 템플릿 최신화
+      try { await dispatch(loadUserProductSlotTemplateInstances()).unwrap(); } catch (e) {}
       try { await refreshAfterMutation(dispatch); } catch (e) {}
       return response;
     } catch (error) {
