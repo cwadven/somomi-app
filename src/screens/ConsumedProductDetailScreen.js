@@ -23,7 +23,7 @@ const ConsumedProductDetailScreen = () => {
   const dispatch = useDispatch();
   
   const { productId } = route.params;
-  const { consumedProducts, consumedStatus, status, error } = useSelector(state => state.products);
+  const { consumedProducts, consumedStatus, status, error, locationProducts } = useSelector(state => state.products);
   const { locations } = useSelector(state => state.locations);
   const [locationSelectionVisible, setLocationSelectionVisible] = useState(false);
   
@@ -115,7 +115,21 @@ const ConsumedProductDetailScreen = () => {
   // 영역 선택 후 소진 철회 처리 (지정 영역으로 재시도)
   const handleLocationSelect = (location) => {
     setIsRestoring(true);
-    revokeConsumeInventoryItem(currentProduct.id, { guest_section_id: location?.id })
+    try {
+      const selected = locations.find(l => String(l.id) === String(location?.id));
+      const baseSlots = selected?.feature?.baseSlots;
+      const currentList = (locationProducts && locationProducts[String(location?.id)]) || [];
+      const usedCount = Array.isArray(currentList) ? currentList.length : 0;
+      const needTemplate = typeof baseSlots === 'number' && baseSlots !== -1 && usedCount >= baseSlots;
+      let body = { guest_section_id: location?.id };
+      if (needTemplate) {
+        const connected = Array.isArray(selected?.feature?.connectedProductSlotTemplates) ? selected.feature.connectedProductSlotTemplates : [];
+        const freeTpl = connected.find(t => !t.usedByProductId);
+        if (freeTpl && freeTpl.id) {
+          body.guest_inventory_item_template_id = Number(freeTpl.id);
+        }
+      }
+      revokeConsumeInventoryItem(currentProduct.id, body)
       .then(() => {
         navigation.goBack();
       })
@@ -124,6 +138,10 @@ const ConsumedProductDetailScreen = () => {
         const msg = error?.response?.data?.message || error?.message || '소진 철회 중 오류가 발생했습니다.';
         showErrorModal(msg);
       });
+    } catch (e) {
+      setIsRestoring(false);
+      showErrorModal('영역 정보를 확인하는 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
   };
   
   // 오류 모달 표시
