@@ -583,23 +583,15 @@ const AddLocationScreen = () => {
         
         setIsLoading(false);
         
-        // 성공 메시지 표시 후 내 영역 탭으로 이동
-        setAlertModalConfig({
-          title: '성공',
-          message: '영역이 성공적으로 수정되었습니다.',
-          buttons: [
-            {
-              text: '확인',
-              onPress: () => {
-                // 스택의 최상위 화면(영역 목록)으로 이동
-                navigation.popToTop();
-              }
-            }
+        // 성공 후 스택을 재구성: [영역 목록, 영역 상세]로 리셋하여 뒤로가기 한 번에 목록으로 복귀
+        try { dispatch(fetchProductsByLocation(String(locationToEdit.id))); } catch (e) {}
+        navigation.reset({
+          index: 1,
+          routes: [
+            { name: 'LocationsScreen' },
+            { name: 'LocationDetail', params: { locationId: String(locationToEdit.id) } }
           ],
-          icon: 'checkmark-circle',
-          iconColor: '#4CAF50'
         });
-        setAlertModalVisible(true);
       } else {
         // 영역 생성 로직
         console.log('영역 생성 시작:', {
