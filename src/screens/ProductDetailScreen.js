@@ -718,7 +718,7 @@ const ProductDetailScreen = () => {
       title: '제품 삭제',
       message: '정말 이 제품을 삭제하시겠습니까?',
       buttons: [
-        { text: '취소', style: 'cancel' },
+        { text: '취소', style: 'plain' },
         { 
           text: '삭제', 
           style: 'destructive',

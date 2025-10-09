@@ -14,6 +14,7 @@ const AlertModal = ({ visible, title, message, content, onClose, buttons, icon, 
             button.style === 'cancel' && styles.cancelButton,
             button.style === 'destructive' && styles.destructiveButton,
             button.style === 'success' && styles.successButton,
+            button.style === 'plain' && styles.plainButton,
             index > 0 && styles.buttonMargin
           ]}
           onPress={() => {
@@ -27,7 +28,8 @@ const AlertModal = ({ visible, title, message, content, onClose, buttons, icon, 
           <Text style={[
             styles.buttonText,
             button.style === 'cancel' && styles.cancelButtonText,
-            button.style === 'destructive' && styles.destructiveButtonText
+            button.style === 'destructive' && styles.destructiveButtonText,
+            button.style === 'plain' && styles.plainButtonText
           ]}>
             {button.text || '확인'}
           </Text>
@@ -145,6 +147,11 @@ const styles = StyleSheet.create({
   successButton: {
     backgroundColor: '#4CAF50',
   },
+  plainButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
@@ -155,6 +162,9 @@ const styles = StyleSheet.create({
   },
   destructiveButtonText: {
     color: 'white',
+  },
+  plainButtonText: {
+    color: '#333',
   },
 });
 
