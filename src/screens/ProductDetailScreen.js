@@ -697,20 +697,8 @@ const ProductDetailScreen = () => {
     return remainingDays;
   };
 
-  // 카테고리에 맞는 아이콘 선택
-  const getCategoryIcon = () => {
-    const categoryIcons = {
-      '식품': 'fast-food',
-      '화장품': 'color-palette',
-      '세제': 'water',
-      '욕실용품': 'water-outline',
-      '주방용품': 'restaurant',
-    };
-    
-    // category가 객체인 경우 name 속성 사용
-    const categoryName = currentProduct.category?.name || currentProduct.category;
-    return categoryIcons[categoryName] || 'cube-outline';
-  };
+  // 카테고리 제거: 고정 아이콘 사용
+  const getCategoryIcon = () => 'cube-outline';
   
   // 제품 삭제 처리
   const handleDelete = () => {
@@ -970,12 +958,6 @@ const ProductDetailScreen = () => {
           
           <View style={styles.productInfo}>
             <Text style={styles.productName}>{currentProduct.name}</Text>
-            {currentProduct.category && (
-            <Text style={styles.productCategory}>
-              {/* category가 객체인 경우 name 속성 사용 */}
-              {currentProduct.category?.name || currentProduct.category}
-            </Text>
-            )}
             
             {currentProduct.location && (
               <View style={styles.locationBadge}>

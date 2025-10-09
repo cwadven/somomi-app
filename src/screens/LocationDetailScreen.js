@@ -13,11 +13,11 @@ import {
   TextInput
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchLocationById, deleteLocation } from '../redux/slices/locationsSlice';
 import { fetchProductsByLocation } from '../redux/slices/productsSlice';
-import { releaseTemplateInstance } from '../redux/slices/authSlice';
+import { releaseTemplateInstance, loadUserProductSlotTemplateInstances } from '../redux/slices/authSlice';
 import { useSelector as useReduxSelector } from 'react-redux';
 import ProductCard from '../components/ProductCard';
 import SlotStatusBar from '../components/SlotStatusBar';
@@ -56,6 +56,15 @@ const LocationDetailScreen = () => {
   useEffect(() => {
     dispatch(fetchProductsByLocation(isAllProductsView ? 'all' : locationId));
   }, [dispatch, locationId, isAllProductsView]);
+
+  // 포커스 시점마다 제품/템플릿 최신화 (슬롯 계산 즉시 반영)
+  useFocusEffect(
+    React.useCallback(() => {
+      dispatch(fetchProductsByLocation(isAllProductsView ? 'all' : locationId));
+      try { dispatch(loadUserProductSlotTemplateInstances()); } catch (e) {}
+      return () => {};
+    }, [dispatch, locationId, isAllProductsView])
+  );
   
   // 활성화/만료 상태 헬퍼 (영역)
   const isLocExpired = useCallback((loc) => {
@@ -559,6 +568,7 @@ const LocationDetailScreen = () => {
         visible={showDeleteConfirm}
         transparent={true}
         animationType="fade"
+        onRequestClose={() => setShowDeleteConfirm(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -572,6 +582,7 @@ const LocationDetailScreen = () => {
               value={deleteConfirmText}
               onChangeText={setDeleteConfirmText}
               placeholder="삭제하기"
+              placeholderTextColor="#bbb"
               autoCapitalize="none"
               autoCorrect={false}
             />

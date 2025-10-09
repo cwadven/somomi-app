@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { calculateExpiryPercentage, calculateConsumptionPercentage, getCategoryIconName } from '../utils/productUtils';
+import { calculateExpiryPercentage, calculateConsumptionPercentage } from '../utils/productUtils';
 
 // HP 바 컴포넌트
 const HPBar = ({ percentage, type }) => {
@@ -83,11 +83,7 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
           styles.characterImageContainer,
           isZeroHP && styles.zeroHPImageContainer
         ]}>
-          <Ionicons 
-            name={getCategoryIconName(product)} 
-            size={40} 
-            color={isZeroHP ? "#888" : "#4CAF50"} 
-          />
+          <Ionicons name="cube-outline" size={40} color={isZeroHP ? "#888" : "#4CAF50"} />
           {isZeroHP && (
             <View style={styles.warningIconContainer}>
               <Ionicons name="warning" size={20} color="#FFF" />
@@ -116,15 +112,7 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
             ]}>
               {product.brand}
             </Text>
-            {product.category && (
-            <Text style={[
-              styles.category,
-              isZeroHP && styles.zeroHPCategory
-            ]}>
-              {/* category가 객체인 경우 name 속성 사용 */}
-              {product.category?.name || product.category}
-            </Text>
-            )}
+            {/* 카테고리 표시 제거 */}
           </View>
           
           {/* 영역 정보 표시 (showLocation이 true일 때만) */}
@@ -304,17 +292,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginRight: 8,
   },
-  category: {
-    fontSize: 12,
-    color: '#fff',
-    backgroundColor: '#4CAF50',
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: 10,
-  },
-  zeroHPCategory: {
-    backgroundColor: '#aaa',
-  },
+  // 카테고리 스타일 제거
   hpSection: {
     marginBottom: 6,
   },

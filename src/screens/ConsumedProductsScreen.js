@@ -76,24 +76,7 @@ const ConsumedProductsScreen = () => {
   };
   
   // 카테고리에 맞는 아이콘 선택
-  const getCategoryIcon = (category) => {
-    const categoryIcons = {
-      '식품': 'fast-food',
-      '화장품': 'color-palette',
-      '세제': 'water',
-      '욕실용품': 'water-outline',
-      '주방용품': 'restaurant',
-    };
-    
-    // category가 null이나 undefined인 경우 기본값 사용
-    if (!category) {
-      return 'cube-outline';
-    }
-    
-    // category가 객체인 경우 name 속성 사용
-    const categoryName = typeof category === 'object' ? category.name : category;
-    return categoryIcons[categoryName] || 'cube-outline';
-  };
+  const getCategoryIcon = () => 'cube-outline';
   
   // 목록 아이템 렌더링
   const renderItem = ({ item }) => (
@@ -102,7 +85,7 @@ const ConsumedProductsScreen = () => {
       onPress={() => navigation.navigate('ConsumedProductDetail', { productId: item.id })}
     >
       <View style={styles.iconContainer}>
-        <Ionicons name={getCategoryIcon(item.category)} size={30} color="#9E9E9E" />
+        <Ionicons name={getCategoryIcon()} size={30} color="#9E9E9E" />
       </View>
       <View style={styles.productInfo}>
         <Text style={styles.productName}>{item.name}</Text>
@@ -110,12 +93,7 @@ const ConsumedProductsScreen = () => {
           {item.brand && (
             <Text style={styles.brandText}>{item.brand}</Text>
           )}
-          <Text style={styles.categoryText}>
-            {item.category 
-              ? (typeof item.category === 'object' ? item.category.name : item.category)
-              : '미분류'
-            }
-          </Text>
+          {/* 카테고리 텍스트 제거 */}
         </View>
         <Text style={styles.consumedDate}>
           소진일: {formatConsumedDate(item.consumedAt)}

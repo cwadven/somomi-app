@@ -66,24 +66,8 @@ const ConsumedProductDetailScreen = () => {
   };
   
   // 카테고리에 맞는 아이콘 선택
-  const getCategoryIcon = () => {
-    if (!currentProduct || !currentProduct.category) return 'cube-outline';
-    
-    const categoryIcons = {
-      '식품': 'fast-food',
-      '화장품': 'color-palette',
-      '세제': 'water',
-      '욕실용품': 'water-outline',
-      '주방용품': 'restaurant',
-    };
-    
-    // category가 객체인 경우 name 속성 사용
-    const categoryName = typeof currentProduct.category === 'object' 
-      ? currentProduct.category.name 
-      : currentProduct.category;
-      
-    return categoryIcons[categoryName] || 'cube-outline';
-  };
+  // 카테고리 제거: 고정 아이콘 사용
+  const getCategoryIcon = () => 'cube-outline';
 
   // 소진 당시 영역 이름 결정 (현재 사용자의 영역 목록에서 id로 매칭)
   const consumedFromLocation = currentProduct && locations
@@ -243,13 +227,7 @@ const ConsumedProductDetailScreen = () => {
           
           <View style={styles.productInfo}>
             <Text style={styles.productName}>{currentProduct.name}</Text>
-            {currentProduct.category && (
-              <Text style={styles.productCategory}>
-                {typeof currentProduct.category === 'object' 
-                  ? currentProduct.category.name 
-                  : currentProduct.category}
-              </Text>
-            )}
+            {/* 카테고리 표시 제거 */}
             
             {consumedFromLocation && (
               <View style={styles.locationBadge}>

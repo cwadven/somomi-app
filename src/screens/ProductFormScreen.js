@@ -23,11 +23,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { addProductAsync, updateProductAsync, fetchProducts, fetchProductById, fetchProductsByLocation } from '../redux/slices/productsSlice';
 import { markProductSlotTemplateAsUsed } from '../redux/slices/authSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
-import { fetchCategories } from '../redux/slices/categoriesSlice';
 import { addNotification } from '../redux/slices/notificationsSlice';
 import { saveData, loadData, removeData, STORAGE_KEYS } from '../utils/storageUtils';
-import CategoryAddModal from '../components/CategoryAddModal';
-import CategorySelector from '../components/CategorySelector';
 import LocationSelector from '../components/LocationSelector';
 import SignupPromptModal from '../components/SignupPromptModal';
 import AlertModal from '../components/AlertModal';
@@ -53,7 +50,7 @@ const ProductFormScreen = () => {
   const isEditMode = mode === 'edit';
   
   // Redux 상태
-  const { categories, status: categoriesStatus } = useSelector(state => state.categories);
+  // 카테고리 슬라이스 사용 제거
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
   const { products, currentProduct, status: productsStatus, locationProducts } = useSelector(state => state.products);
   const { isLoggedIn, isAnonymous, slots, userProductSlotTemplateInstances, subscription, userLocationTemplateInstances } = useSelector(state => state.auth);
@@ -63,7 +60,6 @@ const ProductFormScreen = () => {
   const [brand, setBrand] = useState('');
   const [purchasePlace, setPurchasePlace] = useState('');
   const [price, setPrice] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [purchaseDate, setPurchaseDate] = useState(new Date());
   const [expiryDate, setExpiryDate] = useState(null);
@@ -95,7 +91,6 @@ const ProductFormScreen = () => {
   
   // 모달 상태
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [createdProduct, setCreatedProduct] = useState(null);
   const didSubmitRef = useRef(false);
@@ -117,7 +112,7 @@ const ProductFormScreen = () => {
   const scrollViewRef = useRef(null);
   const productNameInputRef = useRef(null);
   const purchaseDateSectionRef = useRef(null);
-  const categoryListRef = useRef(null);
+  // 카테고리 제거로 참조 삭제
   
   // 폼 유효성 검사 상태
   const [errors, setErrors] = useState({
@@ -133,14 +128,13 @@ const ProductFormScreen = () => {
     purchaseDate: false
   });
 
-  // 카테고리 및 영역 데이터 로드
+  // 영역 데이터 로드
   useEffect(() => {
-      dispatch(fetchCategories());
       dispatch(fetchLocations());
     dispatch(fetchProducts());
   }, [dispatch]);
 
-  // 초안 로드 (추가 모드에서만 적용)
+  // 초안 로드 (추가 모드에서만 1회)
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -152,7 +146,6 @@ const ProductFormScreen = () => {
           setBrand(draft.brand || '');
           setPurchasePlace(draft.purchasePlace || '');
           setPrice(draft.price || '');
-          setSelectedCategory(draft.selectedCategory || null);
           setSelectedLocation(draft.selectedLocation || null);
           setPurchaseDate(draft.purchaseDate ? new Date(draft.purchaseDate) : new Date());
           setExpiryDate(draft.expiryDate ? new Date(draft.expiryDate) : null);
@@ -175,7 +168,6 @@ const ProductFormScreen = () => {
         brand,
         purchasePlace,
         price,
-        selectedCategory,
         selectedLocation,
         purchaseDate: purchaseDate ? purchaseDate.toISOString() : null,
         expiryDate: expiryDate ? expiryDate.toISOString() : null,
@@ -185,7 +177,7 @@ const ProductFormScreen = () => {
       saveData(STORAGE_KEYS.PRODUCT_FORM_DRAFT, draft);
     }, 400);
     return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
-  }, [isEditMode, productName, brand, purchasePlace, price, selectedCategory, selectedLocation, purchaseDate, expiryDate, estimatedEndDate, memo]);
+  }, [isEditMode, productName, brand, purchasePlace, price, selectedLocation, purchaseDate, expiryDate, estimatedEndDate, memo]);
 
   // 폼 변경 여부 판단
   const hasUnsavedChanges = () => {
@@ -210,19 +202,6 @@ const ProductFormScreen = () => {
       brand: currentProduct.brand || '',
       purchasePlace: currentProduct.purchasePlace || '',
       price: typeof currentProduct.price === 'number' ? String(currentProduct.price) : '',
-      category: (() => {
-        // 원본 카테고리 정규화: id 우선, 없으면 name 문자열
-        const c = currentProduct.category || null;
-        if (currentProduct.categoryId) {
-          return { id: currentProduct.categoryId };
-        }
-        if (c && typeof c === 'object') {
-          if (c.id) return { id: c.id };
-          if (c.name) return { name: c.name };
-        }
-        if (typeof c === 'string') return { name: c };
-        return null;
-      })(),
       locationId: currentProduct.locationId || null,
       purchaseDate: currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate).toISOString().slice(0,10) : null,
       expiryDate: currentProduct.expiryDate ? new Date(currentProduct.expiryDate).toISOString().slice(0,10) : null,
@@ -234,16 +213,6 @@ const ProductFormScreen = () => {
       brand: brand || '',
       purchasePlace: purchasePlace || '',
       price: price ? String(price) : '',
-      category: (() => {
-        const c = selectedCategory || null;
-        if (!c) return null;
-        if (typeof c === 'object') {
-          if (c.id) return { id: c.id };
-          if (c.name) return { name: c.name };
-        }
-        if (typeof c === 'string') return { name: c };
-        return null;
-      })(),
       locationId: selectedLocation?.id || currentProduct.locationId || null,
       purchaseDate: purchaseDate ? new Date(purchaseDate).toISOString().slice(0,10) : null,
       expiryDate: expiryDate ? new Date(expiryDate).toISOString().slice(0,10) : null,
@@ -252,8 +221,7 @@ const ProductFormScreen = () => {
     };
     // 카테고리 비교: id 우선 → name 비교 폴백
     const categoryChanged = (() => {
-      const o = original.category;
-      const c = current.category;
+      const o = null; const c = null;
       const ov = o ? (o.id || o.name || null) : null;
       const cv = c ? (c.id || c.name || null) : null;
       return ov !== cv;
@@ -287,9 +255,9 @@ const ProductFormScreen = () => {
     setAlertModalVisible(true);
   };
 
-  // 뒤로가기/제스처 차단 및 확인 흐름
+  // 뒤로가기/제스처 차단 및 확인 흐름 (리스너 중복 등록 방지: 의존성 최소화)
   useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', async (e) => {
+    const handler = async (e) => {
       if (didSubmitRef.current) return; // 제출 완료 시 차단하지 않음
       if (isNavigatingAwayRef.current) return; // 확인 후 실제 내비게이션은 허용
       if (!hasUnsavedChanges()) {
@@ -308,9 +276,10 @@ const ProductFormScreen = () => {
           pendingNavActionRef.current = null;
         }
       });
-    });
+    };
+    const unsubscribe = navigation.addListener('beforeRemove', handler);
     return unsubscribe;
-  }, [navigation, isEditMode, productName, brand, purchasePlace, price, selectedCategory, selectedLocation, purchaseDate, expiryDate, estimatedEndDate, memo, currentProduct]);
+  }, [navigation, isEditMode]);
 
   // 헤더 뒤로가기 버튼 핸들러
   const handleBackPress = async () => {
@@ -363,35 +332,35 @@ const ProductFormScreen = () => {
         setEstimatedEndDate(new Date(editingProduct.estimatedEndDate));
       }
       
-      // 카테고리 설정 (객체/문자열/ID 모두 대응)
-      if (categories.length > 0) {
-        const resolveCategory = () => {
-          // 1) 제품에 categoryId가 있는 경우
-          if (editingProduct.categoryId) {
-            return categories.find(cat => cat.id === editingProduct.categoryId);
-          }
-          const c = editingProduct.category;
-          if (!c) return null;
-          // 2) 제품에 category가 객체로 저장된 경우
-          if (typeof c === 'object') {
-            if (c.id) {
-              return categories.find(cat => cat.id === c.id) || c;
-            }
-            if (c.name) {
-              return categories.find(cat => cat.name === c.name) || c;
-            }
-          }
-          // 3) 제품에 category가 문자열(이름)로 저장된 경우
-          if (typeof c === 'string') {
-            return categories.find(cat => cat.name === c);
-          }
-          return null;
-        };
-        const resolved = resolveCategory();
-        if (resolved) {
-          setSelectedCategory(resolved);
-        }
-      }
+      // 카테고리 설정 제거
+      // if (categories.length > 0) { // 카테고리 제거로 인한 변경
+      //   const resolveCategory = () => {
+      //     // 1) 제품에 categoryId가 있는 경우
+      //     if (editingProduct.categoryId) {
+      //       return categories.find(cat => cat.id === editingProduct.categoryId);
+      //     }
+      //     const c = editingProduct.category;
+      //     if (!c) return null;
+      //     // 2) 제품에 category가 객체로 저장된 경우
+      //     if (typeof c === 'object') {
+      //       if (c.id) {
+      //         return categories.find(cat => cat.id === c.id) || c;
+      //       }
+      //       if (c.name) {
+      //         return categories.find(cat => cat.name === c.name) || c;
+      //       }
+      //     }
+      //     // 3) 제품에 category가 문자열(이름)로 저장된 경우
+      //     if (typeof c === 'string') {
+      //       return categories.find(cat => cat.name === c);
+      //     }
+      //     return null;
+      //   };
+      //   const resolved = resolveCategory();
+      //   if (resolved) {
+      //     // setSelectedCategory(resolved); // 카테고리 제거로 인한 변경
+      //   }
+      // }
       
       // 영역 설정
       if (editingProduct.locationId && locations.length > 0) {
@@ -401,7 +370,7 @@ const ProductFormScreen = () => {
         }
       }
     }
-  }, [isEditMode, editingProduct, categories, locations]);
+  }, [isEditMode, editingProduct, locations]); // 카테고리 제거로 인한 변경
 
   // 초기 선택된 영역 설정 및 해당 영역의 제품 개수 확인 (추가 모드)
   useEffect(() => {
@@ -428,19 +397,19 @@ const ProductFormScreen = () => {
   }, [isEditMode, locationId, locations, products, dispatch]);
 
   // 카테고리 추가 모달 열기
-  const handleOpenCategoryModal = () => {
-    setShowCategoryModal(true);
-  };
+  // const handleOpenCategoryModal = () => {
+  //   setShowCategoryModal(true);
+  // };
 
   // 카테고리 추가 처리
-  const handleAddCategory = (newCategory) => {
-    // 카테고리 추가 후 선택
-    setSelectedCategory(newCategory);
-    setShowCategoryModal(false);
+  // const handleAddCategory = (newCategory) => {
+  //   // 카테고리 추가 후 선택
+  //   // setSelectedCategory(newCategory); // 카테고리 제거로 인한 변경
+  //   setShowCategoryModal(false);
     
-    // 성공 메시지 표시
-    showInfoAlert('알림', '새 카테고리가 추가되었습니다.');
-  };
+  //   // 성공 메시지 표시
+  //   showInfoAlert('알림', '새 카테고리가 추가되었습니다.');
+  // };
 
   // 영역 추가 화면으로 이동
   const handleAddLocation = () => {
@@ -739,7 +708,7 @@ const ProductFormScreen = () => {
       const productData = {
         name: productName,
         brand: brand || null,
-        category: selectedCategory,
+        // category: selectedCategory, // 카테고리 제거로 인한 변경
         purchasePlace: purchasePlace ? purchasePlace : null,
         price: price && price.trim() !== '' ? parseInt(price.replace(/[^0-9]/g, ''), 10) : null,
         // 영역 위치 이동 반영: 수정 모드에서는 selectedLocation 우선 적용
@@ -861,7 +830,7 @@ const ProductFormScreen = () => {
     } else {
       // 추가 모드: 폼 초기화 및 화면 이동
       setProductName('');
-      setSelectedCategory(null);
+      // setSelectedCategory(null); // 카테고리 제거로 인한 변경
       setBrand('');
       setPurchasePlace('');
       setPrice('');
@@ -999,13 +968,13 @@ const ProductFormScreen = () => {
   );
 
   // 카테고리 추가 모달
-  const CategoryModal = () => (
-    <CategoryAddModal
-      visible={showCategoryModal}
-      onClose={() => setShowCategoryModal(false)}
-      onCategoryAdded={handleAddCategory}
-    />
-  );
+  // const CategoryModal = () => (
+  //   <CategoryAddModal
+  //     visible={showCategoryModal}
+  //     onClose={() => setShowCategoryModal(false)}
+  //     onCategoryAdded={handleAddCategory}
+  //   />
+  // );
   
   // 로딩 중이면 로딩 화면 표시 (수정 모드만)
   if (isEditMode && productsStatus === 'loading' && !currentProduct) {
@@ -1139,16 +1108,6 @@ const ProductFormScreen = () => {
             />
           </View>
           
-          {/* 카테고리 선택 */}
-          <CategorySelector 
-            ref={categoryListRef}
-            categories={categories} 
-            selectedCategory={selectedCategory} 
-            onSelectCategory={setSelectedCategory} 
-            onAddCategory={handleOpenCategoryModal}
-            status={categoriesStatus}
-          />
-
           {/* 영역 이동 (수정 모드에서만 노출) */}
           {isEditMode && (
             <View style={styles.inputGroup}>
@@ -1327,7 +1286,7 @@ const ProductFormScreen = () => {
         <SuccessModal />
         
         {/* 카테고리 추가 모달 */}
-        <CategoryModal />
+        {/* <CategoryModal /> */}
         
         {/* 회원가입 유도 모달 (추가 모드만) */}
         {!isEditMode && showSignupPrompt && (

@@ -58,15 +58,4 @@ export const calculateConsumptionPercentage = (product) => {
   return result(percentage, remainingDays);
 };
 
-// 카테고리 → Ionicons 이름 매핑
-export const getCategoryIconName = (product) => {
-  const categoryIcons = {
-    '식품': 'fast-food',
-    '화장품': 'color-palette',
-    '세제': 'water',
-    '욕실용품': 'water-outline',
-    '주방용품': 'restaurant',
-  };
-  const name = product?.category?.name || product?.category;
-  return categoryIcons[name] || 'cube-outline';
-};
+// 카테고리 관련 유틸 제거
