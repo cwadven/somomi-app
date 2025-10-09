@@ -164,10 +164,19 @@ const AppContent = () => {
     if (isPrefetchingRef.current) return;
     try {
       isPrefetchingRef.current = true;
-      const update = await Updates.checkForUpdateAsync();
+      // 타임아웃 가드: 네트워크 이상으로 무기한 대기 방지
+      const checkWithTimeout = Promise.race([
+        Updates.checkForUpdateAsync(),
+        new Promise((resolve) => setTimeout(() => resolve({ isAvailable: false, _timeout: true }), 5000))
+      ]);
+      const update = await checkWithTimeout;
       if (update?.isAvailable) {
         try {
-          await Updates.fetchUpdateAsync();
+          const fetchWithTimeout = Promise.race([
+            Updates.fetchUpdateAsync(),
+            new Promise((resolve) => setTimeout(() => resolve({ _timeout: true }), 8000))
+          ]);
+          await fetchWithTimeout;
           addLog('업데이트 사전 다운로드 완료. 다음 재시작 시 적용됩니다.', 'info');
           // 다음 포그라운드 진입 시 자동 적용
           updateReadyRef.current = true;
@@ -318,6 +327,16 @@ const AppContent = () => {
   useEffect(() => {
     initializeApp();
   }, [dispatch]);
+
+  // 스플래시(로딩) 화면 워치독: 일정 시간 경과 시 메인 UI로 진행 (네트워크/업데이트 지연 대비)
+  useEffect(() => {
+    if (!isLoading) return;
+    const watchdog = setTimeout(() => {
+      addLog('초기화 타임아웃: 메인 UI로 진행합니다.', 'warning');
+      setIsLoading(false);
+    }, 15000); // 15초 후 강제 진행
+    return () => clearTimeout(watchdog);
+  }, [isLoading, addLog]);
 
   // 앱 상태 변경 리스너 등록
   useEffect(() => {
