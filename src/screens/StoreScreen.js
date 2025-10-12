@@ -261,9 +261,8 @@ const StoreScreen = () => {
           showErrorModal(msg);
         });
         if (item.category === 'productSlot') {
-          const slotTemplate = Array.isArray(item.templates) && item.templates[0] ? item.templates[0] : null;
-          // 서버 상품에는 템플릿/개수 정보가 없으므로 기본 1개로 처리
-          const count = slotTemplate?.count || 1;
+          // 신 스키마: templates 배열 길이를 추가 슬롯 개수로 사용
+          const count = Array.isArray(item.templates) && item.templates.length > 0 ? item.templates.length : 1;
           dispatch(addProductSlotTemplateInstances({ count }));
           showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.`);
           dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: count }));
@@ -656,9 +655,15 @@ const StoreScreen = () => {
       category: 'productSlot',
       name: p.title,
       description: p.description || '',
+      // 판매 종료 카운트다운은 end_at만 사용 (available_days는 사용 시작 후 유효기간)
       saleEndAt: p.end_at || null,
       originalPointPrice: null,
       realPointPrice: typeof p.price === 'number' ? p.price : 0,
+      // 신 스키마 반영: templates에 inventory_item_template_id, available_days 포함
+      templates: Array.isArray(p.templates) ? p.templates.map(t => ({
+        inventoryItemTemplateId: t.inventory_item_template_id,
+        availableDays: (t.available_days != null ? Number(t.available_days) : null),
+      })) : [],
     }));
     return (
       <View style={styles.slotsGrid}>
@@ -683,7 +688,30 @@ const StoreScreen = () => {
                   </View>
                 )}
               </View>
-              {/* 서버 스키마에는 개수 정보가 없어 칩은 숨김 */}
+              {/* 제품 슬롯 칩: 개수 + 유효기간(available_days가 모두 동일한 경우) */}
+              {(() => {
+                const templates = Array.isArray(item.templates) ? item.templates : [];
+                const count = templates.length;
+                const countLabel = getProductSlotChipLabel(count);
+                // available_days가 양수이며 모두 동일하면 표시
+                const daysList = templates
+                  .map(t => (t && t.availableDays != null ? Number(t.availableDays) : null))
+                  .filter(v => v != null && isFinite(v) && v > 0);
+                const uniqueDays = Array.from(new Set(daysList));
+                const showDuration = uniqueDays.length === daysList.length && uniqueDays.length === templates.filter(t => t && t.availableDays != null).length && uniqueDays.length === 1;
+                const durationLabel = showDuration ? `구매 후 ${uniqueDays[0]}일간 유효` : null;
+                if (!countLabel && !durationLabel) return null;
+                return (
+                  <View style={styles.summaryChipsRow}>
+                    {countLabel && (
+                      <View style={styles.chip}><Ionicons name="cube" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{countLabel}</Text></View>
+                    )}
+                    {durationLabel && (
+                      <View style={styles.chip}><Ionicons name="time" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{durationLabel}</Text></View>
+                    )}
+                  </View>
+                );
+              })()}
               {/* 판매 종료 카운트다운 */}
               <SaleEndCountdown endAt={item.saleEndAt} />
               <Text style={styles.slotTileSubtitle} numberOfLines={2}>{item.description}</Text>
