@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
-import { createLocation, updateLocation } from '../redux/slices/locationsSlice';
+import { createLocation, updateLocation, fetchLocations } from '../redux/slices/locationsSlice';
 import { markTemplateInstanceAsUsed, releaseTemplateInstance, addTemplateInstance, unassignProductSlotTemplate, assignProductSlotTemplateToLocation } from '../redux/slices/authSlice';
 import { useSelector as useReduxSelector } from 'react-redux';
 import { fetchProductsByLocation } from '../redux/slices/productsSlice';
@@ -36,6 +36,7 @@ const AddLocationScreen = () => {
   const { userLocationTemplateInstances, slots, userProductSlotTemplateInstances, subscription, isLoggedIn } = useSelector(state => state.auth);
   const additionalProductSlots = slots?.productSlots?.additionalSlots || 0;
   const { locationProducts } = useSelector(state => state.products);
+  const { locations: locationsList } = useSelector(state => state.locations);
   
   // 만료 템플릿 판단: 정책 기반(validWhile) 또는 expiresAt
   const isTemplateExpired = (t) => {
@@ -80,13 +81,24 @@ const AddLocationScreen = () => {
           if (!isLoggedIn) { setRemoteProductSlotTemplates(null); return; }
           const res = await fetchGuestInventoryItemTemplates();
           const list = Array.isArray(res) ? res : (Array.isArray(res?.guest_inventory_item_templates) ? res.guest_inventory_item_templates : res?.guest_inventory_item_template_products || []);
-          // 맵핑: assigned_in_section_id, used_in_inventory_item_id → 프론트 스키마 유사
+          // 현재 편집 중 영역의 연결 템플릿에서 expiresAt 매핑 정보 준비
+          let expiresMap = new Map();
+          if (isEditMode && locationToEdit) {
+            const reduxLoc = (locationsList || []).find(l => String(l.id) === String(locationToEdit.id));
+            const connected = reduxLoc?.feature?.connectedProductSlotTemplates || locationToEdit?.feature?.connectedProductSlotTemplates || [];
+            connected.forEach(ct => {
+              expiresMap.set(String(ct.id), (ct.expiresAt || null));
+            });
+          }
+
+          // 맵핑: assigned_in_section_id, used_in_inventory_item_id → 프론트 스키마 유사 + expiresAt 합류
           const mapped = list.map(t => ({
             id: String(t.id || t.template_id || t.product_slot_template_id || t.product_id || Math.random()),
             assignedLocationId: t.assigned_in_section_id ?? t.assigned_section_id ?? null,
             usedByProductId: t.used_in_inventory_item_id ?? t.used_by_inventory_item_id ?? null,
             feature: t.feature || t.template_feature || {},
             used: !!(t.used_in_inventory_item_id),
+            expiresAt: expiresMap.get(String(t.id)) || null,
           }));
           if (alive) setRemoteProductSlotTemplates(mapped);
         } catch (_) {
@@ -99,10 +111,19 @@ const AddLocationScreen = () => {
 
   const sourceProductSlotTemplates = Array.isArray(remoteProductSlotTemplates) ? remoteProductSlotTemplates : (userProductSlotTemplateInstances || []);
   const usedProductSlotTemplatesInThisLocation = sourceProductSlotTemplates.filter(t => t.used && currentProductIdSet.has(t.usedByProductId)).length;
-  // 이 영역에 등록된 슬롯은 유효성 여부와 무관하게 표시 (만료/비활성도 보여주기 위함)
-  const assignedProductSlotTemplatesForThisLocation = (isEditMode && locationToEdit)
-    ? sourceProductSlotTemplates.filter(t => String(t.assignedLocationId) === String(locationToEdit.id))
-    : [];
+  // 이 영역에 등록된 슬롯은 유효성 여부와 무관하게 표시 (만료/비활성도 포함)
+  // 기준: 섹션 API의 connected_guest_inventory_item_templates (expires_at 포함)
+  const assignedProductSlotTemplatesForThisLocation = (() => {
+    if (!(isEditMode && locationToEdit)) return [];
+    const reduxLoc = (locationsList || []).find(l => String(l.id) === String(locationToEdit.id));
+    const connected = reduxLoc?.feature?.connectedProductSlotTemplates || locationToEdit?.feature?.connectedProductSlotTemplates || [];
+    return connected.map(ct => ({
+      id: String(ct.id),
+      usedByProductId: ct.usedByProductId || null,
+      used: !!(ct.usedByProductId),
+      expiresAt: ct.expiresAt || null,
+    }));
+  })();
   const assignedCountForThisLocation = assignedProductSlotTemplatesForThisLocation.length;
   const availableProductSlotTemplates = sourceProductSlotTemplates.filter(t => !t.used && !t.assignedLocationId && isTemplateActive(t, subscription));
  
@@ -563,6 +584,8 @@ const AddLocationScreen = () => {
             const revokeIds = stagedUnassignTemplateIds.map(id => Number(id)).filter(n => Number.isFinite(n));
             const { assignGuestInventoryItemTemplatesToSection } = require('../api/inventoryApi');
             await assignGuestInventoryItemTemplatesToSection(Number(locationToEdit.id), { assign: assignIds, revoke: revokeIds });
+            // 연결/해제 반영 후 섹션 목록을 재조회하여 등록 템플릿 목록 즉시 최신화
+            try { await dispatch(fetchLocations()).unwrap(); } catch (_) {}
           }
         } catch (e) {
           setIsLoading(false);
@@ -974,15 +997,25 @@ const AddLocationScreen = () => {
                 <ScrollView style={styles.slotScrollableList} nestedScrollEnabled>
                   {previewAssignedTemplates.map(t => {
                     const linkedProduct = t.usedByProductId ? currentLocationProducts.find(p => p.id === t.usedByProductId) : null;
+                    const isExpired = (() => {
+                      if (!t.expiresAt) return false;
+                      const ts = new Date(t.expiresAt).getTime();
+                      return isFinite(ts) && ts <= Date.now();
+                    })();
                     return (
                       <View key={t.id} style={styles.productSlotItem}>
                         <View style={{ flex: 1 }}>
                           <View style={styles.productSlotInfo}>
-                            <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
-                            <Text style={styles.productSlotText}>등록됨</Text>
+                            <Ionicons name={isExpired ? 'alert-circle' : 'checkmark-circle'} size={18} color={isExpired ? '#F44336' : '#4CAF50'} />
+                            <Text style={styles.productSlotText}>{isExpired ? '만료됨' : '등록됨'}</Text>
                           </View>
                           {linkedProduct && (
                             <Text style={styles.productSlotLinkedText}>연결된 제품: {linkedProduct.name || linkedProduct.title || `제품(${linkedProduct.id})`}</Text>
+                          )}
+                          {isExpired && (
+                            <Text style={[styles.productSlotLinkedText, { color: '#F44336' }]}>
+                              만료 일시: {new Date(t.expiresAt).toLocaleString()}
+                            </Text>
                           )}
                         </View>
                         <TouchableOpacity

@@ -33,6 +33,7 @@ export const fetchLocations = createAsyncThunk(
                   ? it.feature.connected_guest_inventory_item_templates.map(ct => ({
                       id: String(ct.id),
                       usedByProductId: ct.used_in_guest_inventory_item_id != null ? String(ct.used_in_guest_inventory_item_id) : null,
+                      expiresAt: ct.expires_at || null,
                     }))
                   : []
               },
@@ -123,6 +124,7 @@ export const createLocation = createAsyncThunk(
               ? it.feature.connected_guest_inventory_item_templates.map(ct => ({
                   id: String(ct.id),
                   usedByProductId: ct.used_in_guest_inventory_item_id != null ? String(ct.used_in_guest_inventory_item_id) : null,
+                  expiresAt: ct.expires_at || null,
                 }))
               : []
           },
@@ -176,6 +178,7 @@ export const updateLocation = createAsyncThunk(
               ? it.feature.connected_guest_inventory_item_templates.map(ct => ({
                   id: String(ct.id),
                   usedByProductId: ct.used_in_guest_inventory_item_id != null ? String(ct.used_in_guest_inventory_item_id) : null,
+                  expiresAt: ct.expires_at || null,
                 }))
               : []
           },
