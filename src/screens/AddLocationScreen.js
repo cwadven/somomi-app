@@ -125,6 +125,15 @@ const AddLocationScreen = () => {
     }));
   })();
   const assignedCountForThisLocation = assignedProductSlotTemplatesForThisLocation.length;
+  // 만료 여부(connected.expiresAt 기준) 판단 헬퍼
+  const isAssignedExpired = (t) => {
+    if (!t || !t.expiresAt) return false;
+    const ts = new Date(t.expiresAt).getTime();
+    return isFinite(ts) && ts <= Date.now();
+  };
+  // 미만료(활성) 등록 템플릿 목록과 카운트
+  const assignedActiveTemplatesForThisLocation = assignedProductSlotTemplatesForThisLocation.filter(t => !isAssignedExpired(t));
+  const assignedActiveCountForThisLocation = assignedActiveTemplatesForThisLocation.length;
   const availableProductSlotTemplates = sourceProductSlotTemplates.filter(t => !t.used && !t.assignedLocationId && isTemplateActive(t, subscription));
  
   // 스테이징 계산은 아래 선언 이후에 수행됩니다.
@@ -224,7 +233,10 @@ const AddLocationScreen = () => {
   // 스테이징 미리보기 계산 (선언 이후)
   const stagedAssignCount = stagedAssignTemplateIds.length;
   const stagedUnassignCount = stagedUnassignTemplateIds.length;
-  const previewAssignedCount = Math.max(0, assignedCountForThisLocation - stagedUnassignCount + stagedAssignCount);
+  // 미만료 기준 프리뷰 등록 수 계산(해제는 활성에만 반영)
+  const activeAssignedIdSet = new Set(assignedActiveTemplatesForThisLocation.map(t => String(t.id)));
+  const stagedUnassignActiveCount = stagedUnassignTemplateIds.filter(id => activeAssignedIdSet.has(String(id))).length;
+  const previewAssignedActiveCount = Math.max(0, assignedActiveCountForThisLocation - stagedUnassignActiveCount + stagedAssignCount);
   const previewAvailableTemplates = availableProductSlotTemplates.filter(t => !stagedAssignTemplateIds.includes(t.id));
   const previewAssignedTemplates = assignedProductSlotTemplatesForThisLocation.filter(t => !stagedUnassignTemplateIds.includes(t.id));
   const stagedAssignTemplates = availableProductSlotTemplates.filter(t => stagedAssignTemplateIds.includes(t.id));
@@ -233,7 +245,8 @@ const AddLocationScreen = () => {
     const baseSlots = (isEditMode
       ? (selectedEditTemplateInstance?.feature?.baseSlots ?? currentTemplate?.feature?.baseSlots)
       : selectedTemplateInstance?.feature?.baseSlots);
-    const freeTemplates = sourceProductSlotTemplates.filter(t => !t.used).length;
+    // 보유(미등록/미사용) + 미만료 템플릿만 집계
+    const freeTemplates = sourceProductSlotTemplates.filter(t => !t.used && !t.assignedLocationId && isTemplateActive(t, subscription)).length;
     const used = isEditMode ? currentProductCount : 0;
     const usedHere = isEditMode ? usedProductSlotTemplatesInThisLocation : 0;
     const allowed = typeof baseSlots === 'number' && baseSlots === -1
@@ -538,7 +551,7 @@ const AddLocationScreen = () => {
               iconColor: '#F44336',
             });
             setAlertModalVisible(true);
-            return;
+      return;
           }
           newTemplateInstanceId = selectedEditTemplateInstance.id;
           newProductId = selectedEditTemplateInstance.productId;
@@ -597,9 +610,9 @@ const AddLocationScreen = () => {
             iconColor: '#F44336',
           });
           setAlertModalVisible(true);
-          return;
-        }
-
+      return;
+    }
+    
         // 스테이징 초기화
         setStagedAssignTemplateIds([]);
         setStagedUnassignTemplateIds([]);
@@ -867,16 +880,16 @@ const AddLocationScreen = () => {
         
           <View style={styles.formGroup}>
             <Text style={styles.label}>설명 (선택사항)</Text>
-            <TextInput
+          <TextInput
               style={[styles.input, styles.textArea, styles.placeholderLight]}
               value={locationData.description}
               onChangeText={(text) => handleInputChange('description', text)}
               placeholder={"영역 설명 입력..."}
               placeholderTextColor="#999"
-              multiline
+            multiline
               editable={!(isEditMode && isEditLockedByExpiry)}
-            />
-          </View>
+          />
+        </View>
         
           <View style={styles.formGroup}>
             <Text style={styles.label}>아이콘</Text>
@@ -906,9 +919,11 @@ const AddLocationScreen = () => {
           {(() => {
             const baseSlots = (isEditMode ? (selectedEditTemplateInstance?.feature?.baseSlots ?? currentTemplate?.feature?.baseSlots) : selectedTemplateInstance?.feature?.baseSlots);
             const baseDisplay = (typeof baseSlots === 'number') ? (baseSlots === -1 ? '무제한' : `${baseSlots}개`) : '선택 필요';
-            const allowedDisplay = (typeof baseSlots === 'number' && baseSlots === -1) ? '무제한' : (typeof baseSlots === 'number' ? `${(baseSlots || 0) + (isEditMode ? previewAssignedCount : 0)}개` : '-');
+            // 허용치: 기본 슬롯 + (미만료 등록 슬롯 수 프리뷰)
+            const allowedDisplay = (typeof baseSlots === 'number' && baseSlots === -1) ? '무제한' : (typeof baseSlots === 'number' ? `${(baseSlots || 0) + (isEditMode ? previewAssignedActiveCount : 0)}개` : '-');
             const used = isEditMode ? currentProductCount : 0;
-            const registered = isEditMode ? previewAssignedCount : 0;
+            // 등록됨: 미만료 등록 슬롯 수 프리뷰
+            const registered = isEditMode ? previewAssignedActiveCount : 0;
             return (
               <View style={styles.productSlotSummary}>
                 <View style={styles.productSlotRow}>
@@ -1015,7 +1030,7 @@ const AddLocationScreen = () => {
                           {isExpired && (
                             <Text style={[styles.productSlotLinkedText, { color: '#F44336' }]}>
                               만료 일시: {new Date(t.expiresAt).toLocaleString()}
-                            </Text>
+            </Text>
                           )}
                         </View>
                         <TouchableOpacity
@@ -1039,9 +1054,9 @@ const AddLocationScreen = () => {
                   <Ionicons name="add-circle-outline" size={28} color="#9E9E9E" style={{ marginBottom: 6 }} />
                   <Text style={styles.emptySlotTitle}>등록된 추가 제품 슬롯이 없습니다</Text>
                   <Text style={styles.emptySlotSubtitle}>{`위의 '보유한 추가 제품 슬롯 (미등록)'에서\n이 영역에 등록할 수 있습니다.`}</Text>
-                </View>
-               )}
-
+          </View>
+        )}
+        
               {/* 해제 예정 목록 */}
               {(isEditMode && stagedUnassignTemplateIds.length > 0) && (
                 <View style={[styles.emptySlotCard, { marginTop: 8 }]}> 
@@ -1052,7 +1067,7 @@ const AddLocationScreen = () => {
                         <Ionicons name="time-outline" size={18} color="#9E9E9E" />
                         <Text style={styles.productSlotText}>이 영역에서 해제 예정</Text>
                       </View>
-                      <TouchableOpacity
+        <TouchableOpacity 
                         style={styles.assignButton}
                         onPress={() => setStagedUnassignTemplateIds(prev => prev.filter(tid => tid !== id))}
                       >
@@ -1106,7 +1121,7 @@ const AddLocationScreen = () => {
           <AlertModal
             visible={quantityModalVisible}
             title="추가 제품 슬롯 등록"
-            message={`등록할 수량을 선택하세요. (보유: ${(userProductSlotTemplateInstances || []).filter(t => !t.used && !t.assignedLocationId).length}개)`}
+            message={`등록할 수량을 선택하세요. (보유: ${availableProductSlotTemplates.length}개)`}
             buttons={[
               { text: '1개', onPress: () => { setReserveQuantity(1); handleAssignProductSlots(); } },
               { text: '3개', onPress: () => { setReserveQuantity(3); handleAssignProductSlots(); } },
