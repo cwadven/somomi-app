@@ -85,16 +85,25 @@ export const fetchProductByIdApi = async (id) => {
   try {
     // 저장된 최신 데이터 로드
     const storedProducts = await loadData(STORAGE_KEYS.PRODUCTS);
+    const storedConsumedProducts = await loadData(STORAGE_KEYS.CONSUMED_PRODUCTS);
     if (storedProducts) {
       sampleProducts = storedProducts;
     }
-    
-      const product = sampleProducts.find(product => product.id === id);
-      if (product) {
-      return {...product}; // 객체 복사본 반환
-      } else {
+    if (storedConsumedProducts) {
+      consumedProducts = storedConsumedProducts;
+    }
+
+    const matchById = (p) => String(p.id) === String(id) || (p.localId != null && String(p.localId) === String(id));
+    let product = sampleProducts.find(matchById);
+    if (!product && Array.isArray(consumedProducts)) {
+      product = consumedProducts.find(matchById);
+    }
+
+    if (product) {
+      return { ...product }; // 객체 복사본 반환
+    } else {
       throw new Error('Product not found');
-      }
+    }
   } catch (error) {
     console.error('제품 상세 조회 중 오류 발생:', error);
     throw error;

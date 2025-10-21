@@ -510,9 +510,23 @@ export const scheduleDailyReminderIfNeeded = async () => {
     const todayKey = new Date().toISOString().split('T')[0];
     if (sentMap[todayKey]) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[9시] 스킵: 이미 예약/발송 기록 있음', 'warning'); } catch (e) {}; return; }
 
-    // 오늘 보낼 수 있는 알림 후보 계산
-    const notifications = await processAllNotifications(true); // 생성만, 전송은 하지 않음
-    if (!notifications || notifications.length === 0) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[9시] 스킵: 후보 없음', 'warning'); } catch (e) {}; return; }
+    // 오늘 보낼 수 있는 백엔드 알람 후보 확인
+    let backendHasAlarms = false;
+    try {
+      const { fetchGuestAlarms } = require('../api/alarmApi');
+      const res = await fetchGuestAlarms();
+      const items = Array.isArray(res?.guest_inventory_items) ? res.guest_inventory_items : [];
+      backendHasAlarms = items.length > 0;
+      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 백엔드 알람 갯수: ${items.length}`, items.length > 0 ? 'success' : 'warning'); } catch (e) {}
+    } catch (e) {
+      try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 백엔드 알람 조회 실패: ${e?.message || String(e)}`, 'error'); } catch (_) {}
+      backendHasAlarms = false;
+    }
+
+    // 프론트 계산 후보 (오프라인 대비)
+    const notifications = await processAllNotifications(true);
+    const hasFrontCandidates = !!(notifications && notifications.length > 0);
+    if (!backendHasAlarms && !hasFrontCandidates) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[9시] 스킵: 후보 없음(백엔드/프론트 모두)', 'warning'); } catch (e) {}; return; }
 
     // 오전 9시로 트리거 시간 설정
     const now = new Date();

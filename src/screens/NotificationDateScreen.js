@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { loadProcessedNotifications } from '../utils/notificationUtils';
+import { fetchGuestAlarmHistory } from '../api/alarmApi';
 
 const NotificationDateScreen = () => {
   const navigation = useNavigation();
@@ -67,11 +68,32 @@ const NotificationDateScreen = () => {
   const loadDateNotifications = async () => {
     try {
       setLoading(true);
-      // 해당 날짜의 최신 알림 데이터 로드
-      const dateNotifications = await loadProcessedNotifications(date);
+      // 1) 백엔드 히스토리에서 해당 날짜 찾기
+      let backendNotifications = [];
+      try {
+        const res = await fetchGuestAlarmHistory();
+        const items = Array.isArray(res?.guest_alarm_histories) ? res.guest_alarm_histories : [];
+        const match = items.find(h => h.target_date === date);
+        if (match && Array.isArray(match.guest_inventory_items)) {
+          backendNotifications = match.guest_inventory_items.map(it => ({
+            product_id: it.guest_inventory_item_id,
+            product_name: it.guest_inventory_item_name,
+            location_id: it.guest_section_id,
+            location_name: null,
+            notification_type: it.expire_at ? '유통기한' : '소진 예상',
+            message: it.expire_at
+              ? `${it.guest_inventory_item_name}의 유통기한 알림`
+              : `${it.guest_inventory_item_name}의 소진예상 알림`,
+            expire_at: it.expire_at || it.expected_expire_at || null,
+          }));
+        }
+      } catch (e) {}
+
+      const dateNotifications = backendNotifications.length > 0
+        ? backendNotifications
+        : await loadProcessedNotifications(date);
+
       setNotifications(dateNotifications);
-      
-      // 알림을 제품별로 그룹화
       const grouped = groupNotificationsByProduct(dateNotifications);
       setGroupedNotifications(grouped);
       

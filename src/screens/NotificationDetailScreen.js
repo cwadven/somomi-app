@@ -36,8 +36,16 @@ const NotificationDetailScreen = () => {
 
   // 제품 상세 화면으로 이동
   const navigateToProductDetail = () => {
+    // product_id가 없다면 이동하지 않음
+    if (!notification?.product_id) return;
     navigation.push('ProductDetail', { 
-      productId: notification.product_id,
+      productId: String(notification.product_id),
+      // 상세 캐시 탐색을 돕기 위해 기본 필드도 함께 전달(폴백용)
+      product: {
+        id: String(notification.product_id),
+        name: notification.product_name,
+        locationId: notification.location_id ? String(notification.location_id) : null,
+      },
       hideHeader: true
     });
   };

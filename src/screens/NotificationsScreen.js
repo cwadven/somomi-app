@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { loadAllProcessedNotifications, loadProcessedNotifications, processAllNotifications } from '../utils/notificationUtils';
+import { fetchGuestAlarmHistory } from '../api/alarmApi';
 
 const NotificationsScreen = () => {
   const navigation = useNavigation();
@@ -29,24 +30,44 @@ const NotificationsScreen = () => {
   const loadNotificationsData = async () => {
     try {
       setLoading(true);
-      
-      // 알림 처리 실행 (새로운 알림 생성 및 저장, 알림 전송은 건너뜀)
-      await processAllNotifications(true);
-      
-      // 저장된 모든 알림 로드
-      const allNotifications = await loadAllProcessedNotifications();
-      
-      // 날짜 목록 추출 및 내림차순 정렬
-      const datesList = Object.keys(allNotifications).sort((a, b) => b.localeCompare(a));
-      
-      // 날짜별 알림 개수 정보와 함께 저장
-      const datesWithCount = datesList.map(date => ({
-        date,
-        count: allNotifications[date]?.length || 0,
-        notifications: allNotifications[date] || []
-      }));
-      
-      setDates(datesWithCount);
+      // 1) 백엔드 알림 히스토리 우선 사용
+      let historyDates = [];
+      try {
+        const res = await fetchGuestAlarmHistory();
+        const items = Array.isArray(res?.guest_alarm_histories) ? res.guest_alarm_histories : [];
+        historyDates = items.map(h => ({
+          date: h.target_date,
+          count: Array.isArray(h.guest_inventory_items) ? h.guest_inventory_items.length : 0,
+          notifications: (h.guest_inventory_items || []).map(it => ({
+            product_id: it.guest_inventory_item_id,
+            product_name: it.guest_inventory_item_name,
+            location_id: it.guest_section_id,
+            location_name: null,
+            notification_type: it.expire_at ? '유통기한' : '소진 예상',
+            message: it.expire_at
+              ? `${it.guest_inventory_item_name}의 유통기한 알림`
+              : `${it.guest_inventory_item_name}의 소진예상 알림`,
+            expire_at: it.expire_at || it.expected_expire_at || null,
+          }))
+        })).sort((a, b) => b.date.localeCompare(a.date));
+      } catch (e) {
+        historyDates = [];
+      }
+
+      if (historyDates.length > 0) {
+        setDates(historyDates);
+      } else {
+        // 2) 백엔드 없으면 기존 로컬 히스토리 표시
+        await processAllNotifications(true);
+        const allNotifications = await loadAllProcessedNotifications();
+        const datesList = Object.keys(allNotifications).sort((a, b) => b.localeCompare(a));
+        const datesWithCount = datesList.map(date => ({
+          date,
+          count: allNotifications[date]?.length || 0,
+          notifications: allNotifications[date] || []
+        }));
+        setDates(datesWithCount);
+      }
       setLoading(false);
     } catch (error) {
       console.error('알림 데이터 로드 중 오류 발생:', error);
