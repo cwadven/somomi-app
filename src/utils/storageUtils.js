@@ -17,6 +17,7 @@ export const STORAGE_KEYS = {
   DAILY_REMINDER_SENT: 'somomi_daily_reminder_sent', // 일자별 리마인더 발송 기록
   DAILY_UPDATE_REMINDER_SENT: 'somomi_daily_update_reminder_sent', // 일자별 작성 리마인더 발송 기록
   PRODUCT_FORM_DRAFT: 'somomi_product_form_draft', // 제품 등록 초안
+  PUSH_DEVICE_TOKEN: 'somomi_push_device_token', // 서버에 등록된 디바이스 토큰 정보
 };
 
 // 데이터 저장 함수
@@ -246,3 +247,14 @@ export const saveDeviceId = async (deviceId) => {
 export const loadDeviceId = async () => {
   return loadData(STORAGE_KEYS.DEVICE_ID);
 }; 
+
+// 디바이스 푸시 토큰 저장/로드/삭제
+export const savePushDeviceToken = async (tokenObj) => {
+  return saveData(STORAGE_KEYS.PUSH_DEVICE_TOKEN, tokenObj);
+};
+export const loadPushDeviceToken = async () => {
+  return loadData(STORAGE_KEYS.PUSH_DEVICE_TOKEN);
+};
+export const removePushDeviceToken = async () => {
+  return removeData(STORAGE_KEYS.PUSH_DEVICE_TOKEN);
+};

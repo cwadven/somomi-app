@@ -106,6 +106,13 @@ export const kakaoLogin = createAsyncThunk(
         }
       };
       await saveJwtToken(response.token);
+      // 로그인 직후 디바이스 토큰 등록/갱신 시도
+      try {
+        const { pushNotificationService } = require('../../utils/pushNotificationService');
+        await pushNotificationService.registerForPushNotifications();
+      } catch (e) {
+        console.warn('카카오 로그인 후 디바이스 토큰 등록 실패:', e?.message || String(e));
+      }
       return response;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -128,6 +135,13 @@ export const loginUser = createAsyncThunk(
       // 로그인 직후 내 템플릿 최신화
       try { await dispatch(loadUserLocationTemplateInstances()).unwrap(); } catch (e) {}
       try { await dispatch(loadUserProductSlotTemplateInstances()).unwrap(); } catch (e) {}
+      // 로그인 직후 디바이스 토큰 등록/갱신 시도
+      try {
+        const { pushNotificationService } = require('../../utils/pushNotificationService');
+        await pushNotificationService.registerForPushNotifications();
+      } catch (e) {
+        console.warn('로그인 후 디바이스 토큰 등록 실패:', e?.message || String(e));
+      }
       return { token: accessToken, user };
     } catch (err) {
       const apiMsg = err?.response?.data?.message;

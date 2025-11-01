@@ -10,6 +10,8 @@ import notifee, {
   TimeUnit,
   RepeatFrequency,
 } from '@notifee/react-native';
+import { registerDeviceToken, deactivateDeviceToken } from '../api/pushApi';
+import { savePushDeviceToken, loadPushDeviceToken, removePushDeviceToken } from './storageUtils';
 
 // 웹 환경에서는 PermissionsAndroid를 조건부로 가져옴
 let PermissionsAndroid;
@@ -381,19 +383,21 @@ class PushNotificationService {
       // Firebase 토큰 가져오기
       const token = await messaging().getToken();
       addDebugLog(`Firebase 푸시 토큰: ${token}`, 'success');
-
-      // 여기에 서버에 토큰 등록 로직 추가
-      /*
+      // 서버에 디바이스 토큰 등록/갱신
       try {
-        await apiClient.post('/api/notifications/register', {
-          token: token,
-          deviceType: Platform.OS
-        });
-        addDebugLog('토큰 등록 성공', 'success');
+        const res = await registerDeviceToken({ token, deviceType: Platform.OS });
+        // 저장 포맷: 서버 응답 그대로 보존
+        try {
+          await savePushDeviceToken({
+            token: res?.token || token,
+            deviceType: res?.device_type || Platform.OS,
+            createdAt: res?.created_at || new Date().toISOString(),
+          });
+        } catch (e) {}
+        addDebugLog('디바이스 토큰 서버 등록 성공', 'success');
       } catch (tokenError) {
-        addDebugLog(`디바이스 토큰 등록 오류: ${tokenError.message}`, 'error');
+        addDebugLog(`디바이스 토큰 서버 등록 오류: ${tokenError?.message || String(tokenError)}`, 'error');
       }
-      */
 
       return token;
     } catch (error) {
@@ -472,6 +476,9 @@ class PushNotificationService {
     if (!remoteMessage) return;
     
     try {
+      // Android 8+에서 채널이 없으면 크래시가 발생할 수 있어 선제적으로 생성
+      await this.createNotificationChannels();
+
       const { notification, data } = remoteMessage;
       
       if (!notification) return;
