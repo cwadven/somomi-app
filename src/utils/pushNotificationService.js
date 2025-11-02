@@ -4,14 +4,12 @@ import messaging from '@react-native-firebase/messaging';
 import { Linking, NativeEventEmitter, NativeModules } from 'react-native';
 import notifee, { 
   AndroidImportance, 
-  AndroidStyle, 
-  EventType,
   TriggerType,
   TimeUnit,
   RepeatFrequency,
 } from '@notifee/react-native';
-import { registerDeviceToken, deactivateDeviceToken } from '../api/pushApi';
-import { savePushDeviceToken, loadPushDeviceToken, removePushDeviceToken } from './storageUtils';
+import { registerDeviceToken } from '../api/pushApi';
+import { savePushDeviceToken } from './storageUtils';
 
 // 웹 환경에서는 PermissionsAndroid를 조건부로 가져옴
 let PermissionsAndroid;

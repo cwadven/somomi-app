@@ -94,7 +94,7 @@ const LocationsScreen = () => {
             // 템플릿 사용 처리
             dispatch({ type: 'auth/markTemplateInstanceAsUsed', payload: { templateId: selected.id, locationId: templatePickerLocation.id } });
             setTemplatePickerVisible(false);
-            navigation.navigate('LocationDetail', { locationId: templatePickerLocation.id });
+            navigation.navigate('LocationDetail', { locationId: templatePickerLocation.id, from: 'Locations' });
           }
         }
       ],
@@ -304,13 +304,14 @@ const LocationsScreen = () => {
       }
       return;
     }
-    navigation.navigate('LocationDetail', { locationId: location.id });
+    navigation.navigate('LocationDetail', { locationId: location.id, from: 'Locations' });
   };
 
   const handleAllProductsPress = () => {
     navigation.navigate('LocationDetail', { 
       locationId: 'all',
-      isAllProducts: true 
+      isAllProducts: true,
+      from: 'Locations'
     });
   };
 

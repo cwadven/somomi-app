@@ -29,11 +29,11 @@ const LocationDetailScreen = () => {
   const route = useRoute();
   const dispatch = useDispatch();
   
-  const { locationId, isAllProducts } = route.params;
+  const { locationId, isAllProducts, from } = route.params;
   const isAllProductsView = isAllProducts || locationId === 'all';
   
   const { currentLocation, status, error, locations } = useSelector(state => state.locations);
-  const { products, locationProducts: locationProductsCache } = useSelector(state => state.products);
+  const { products, locationProducts: locationProductsCache, status: productsStatus, error: productsError } = useSelector(state => state.products);
   const { slots, userProductSlotTemplateInstances, subscription, userLocationTemplateInstances } = useSelector(state => state.auth);
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -42,6 +42,10 @@ const LocationDetailScreen = () => {
   const [activeTab, setActiveTab] = useState('products'); // 'products' 또는 'notifications'
   const [sortKey, setSortKey] = useState('created'); // null | 'estimated' | 'expiry' | 'created' | 'name' | 'estimatedRate' | 'expiryRate'
   const [sortDesc, setSortDesc] = useState(true); // 등록순 기본: 내림차순(가장 최근이 위)
+  const [productsTimedOut, setProductsTimedOut] = useState(false);
+  const PRODUCTS_TIMEOUT_MS = 8000;
+  const [productsTimerId, setProductsTimerId] = useState(null);
+  const didInitialFetchRef = React.useRef(false);
 
   // 만료된 구독 템플릿이어도 상세 접근은 허용. 대신 UI 상에서 편집 유도로 처리.
   
@@ -54,17 +58,38 @@ const LocationDetailScreen = () => {
   
   // 제품 목록 로드
   useEffect(() => {
-    dispatch(fetchProductsByLocation(isAllProductsView ? 'all' : locationId));
-  }, [dispatch, locationId, isAllProductsView]);
+    // 초기 진입: 내 영역에서 들어온 경우에만 초기 로딩/초기화 수행
+    if (!didInitialFetchRef.current && from === 'Locations') {
+      setProductsTimedOut(false);
+      try { if (productsTimerId) clearTimeout(productsTimerId); } catch (e) {}
+      setLocationProducts([]);
+      const id = setTimeout(() => {
+        if (productsStatus === 'loading') {
+          setProductsTimedOut(true);
+        }
+      }, PRODUCTS_TIMEOUT_MS);
+      setProductsTimerId(id);
+      dispatch(fetchProductsByLocation(isAllProductsView ? 'all' : locationId));
+      didInitialFetchRef.current = true;
+    }
+  }, [dispatch, locationId, isAllProductsView, from]);
 
   // 포커스 시점마다 제품/템플릿 최신화 (슬롯 계산 즉시 반영)
   useFocusEffect(
     React.useCallback(() => {
-      dispatch(fetchProductsByLocation(isAllProductsView ? 'all' : locationId));
+      // 포커스 시에는 제품 API 재호출 금지(요청사항), 템플릿만 최신화
       try { dispatch(loadUserProductSlotTemplateInstances()); } catch (e) {}
       return () => {};
-    }, [dispatch, locationId, isAllProductsView])
+    }, [dispatch])
   );
+
+  // 데이터가 도착하면 타임아웃 타이머 해제
+  useEffect(() => {
+    if (productsStatus !== 'loading') {
+      try { if (productsTimerId) clearTimeout(productsTimerId); } catch (e) {}
+      setProductsTimedOut(false);
+    }
+  }, [productsStatus]);
   
   // 활성화/만료 상태 헬퍼 (영역)
   const isLocExpired = useCallback((loc) => {
@@ -340,11 +365,11 @@ const LocationDetailScreen = () => {
             <TouchableOpacity 
             style={styles.retryButton}
             onPress={() => dispatch(fetchLocationById(locationId))}
-          >
+            >
             <Text style={styles.retryButtonText}>다시 시도</Text>
             </TouchableOpacity>
-        </View>
-      </View>
+          </View>
+            </View>
     );
   }
   
@@ -419,28 +444,72 @@ const LocationDetailScreen = () => {
               )}
             </TouchableOpacity>
           </ScrollView>
-        </View>
-        {locationProducts.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
-            {!isAllProductsView && (
-              <Text style={styles.emptySubText}>
-                오른쪽 하단의 + 버튼을 눌러 제품을 추가하세요.
-              </Text>
-            )}
-            </View>
+      </View>
+        {/* 정렬 바 아래에서 상태별로 렌더링 */}
+        {(!isAllProductsView && productsStatus === 'loading' && !productsTimedOut) ? (
+          <View style={styles.loadingListContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <Text style={styles.loadingInlineText}>제품 목록을 불러오는 중...</Text>
+          </View>
+        ) : (!isAllProductsView && productsTimedOut) ? (
+          <View style={styles.loadingListContainer}>
+            <Text style={styles.errorText}>연결 지연으로 제품 목록을 가져오지 못했습니다.</Text>
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={() => {
+                setProductsTimedOut(false);
+                try { if (productsTimerId) clearTimeout(productsTimerId); } catch (e) {}
+                const id = setTimeout(() => {
+                  if (productsStatus === 'loading') setProductsTimedOut(true);
+                }, PRODUCTS_TIMEOUT_MS);
+                setProductsTimerId(id);
+                setLocationProducts([]);
+                dispatch(fetchProductsByLocation(isAllProductsView ? 'all' : locationId));
+              }}
+            >
+              <Text style={styles.retryButtonText}>다시 시도</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (!isAllProductsView && productsStatus === 'failed') ? (
+          <View style={styles.loadingListContainer}>
+            <Text style={styles.errorText}>오류: {productsError || '제품 목록을 불러오지 못했습니다.'}</Text>
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={() => {
+                setProductsTimedOut(false);
+                setLocationProducts([]);
+                dispatch(fetchProductsByLocation(isAllProductsView ? 'all' : locationId));
+              }}
+            >
+              <Text style={styles.retryButtonText}>다시 시도</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
-          <FlatList
-            data={sortProducts(locationProducts)}
-            keyExtractor={(item) => String(item.localId || item.id)}
-            renderItem={({ item }) => (
-              <ProductCard 
-                product={item} 
-                onPress={() => handleProductPress(item)}
+          // 정상 데이터 렌더링
+          <>
+            {locationProducts.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
+                {!isAllProductsView && (
+                  <Text style={styles.emptySubText}>
+                    오른쪽 하단의 + 버튼을 눌러 제품을 추가하세요.
+                  </Text>
+                )}
+              </View>
+            ) : (
+              <FlatList
+                data={sortProducts(locationProducts)}
+                keyExtractor={(item) => String(item.localId || item.id)}
+                renderItem={({ item }) => (
+                  <ProductCard 
+                    product={item} 
+                    onPress={() => handleProductPress(item)}
+                  />
+                )}
+                contentContainerStyle={styles.productsList}
               />
             )}
-            contentContainerStyle={styles.productsList}
-          />
+          </>
         )}
         
         {/* 제품 추가 버튼 (모든 제품 보기가 아닐 때만 표시) */}
@@ -454,7 +523,7 @@ const LocationDetailScreen = () => {
             disabled={!canAddProduct}
         >
           <Ionicons name="add" size={30} color="white" />
-          </TouchableOpacity>
+        </TouchableOpacity>
           )}
       </View>
     );
@@ -483,10 +552,10 @@ const LocationDetailScreen = () => {
           
           {isAllProductsView ? (
             <>
-              <View style={styles.locationIconContainer}>
+            <View style={styles.locationIconContainer}>
                 <Ionicons name="albums-outline" size={24} color="#4CAF50" />
-              </View>
-              <View style={styles.headerTextContainer}>
+            </View>
+          <View style={styles.headerTextContainer}>
                 <Text style={styles.locationTitle}>모든 제품</Text>
                 <Text style={styles.locationDescription}>등록된 모든 제품을 확인합니다</Text>
               </View>
@@ -558,7 +627,7 @@ const LocationDetailScreen = () => {
               </Text>
             </TouchableOpacity>
               </View>
-      )}
+            )}
       
       {/* 탭 내용 */}
       {isAllProductsView || activeTab === 'products' ? renderProductsTab() : renderNotificationsTab()}
@@ -727,6 +796,32 @@ const styles = StyleSheet.create({
   productsContainer: {
     flex: 1,
     position: 'relative',
+  },
+  loadingContainerInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  loadingInlineText: {
+    marginLeft: 8,
+    color: '#666',
+  },
+  errorInlineContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  loadingListContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
   },
   sortBar: {
     flexDirection: 'row',

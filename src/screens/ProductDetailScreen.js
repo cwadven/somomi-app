@@ -180,13 +180,7 @@ const ProductDetailScreen = () => {
     }
   }, [dispatch, productId, currentProduct]);
 
-  // 제품 상세가 포커스되거나 라우트 파라미터가 갱신될 때, 해당 영역 캐시 최신화 시도 (수정 직후 반영 목적)
-  useEffect(() => {
-    const locId = currentProduct?.locationId || passedProduct?.locationId;
-    if (locId) {
-      try { dispatch(fetchProductsByLocation(String(locId))); } catch (e) {}
-    }
-  }, [dispatch, passedProduct, currentProduct?.locationId]);
+  // 목록 자동 재호출 제거 (요청사항): 제품 상세 진입/복귀 시 영역 목록 API 호출 금지
   
   // 소진 처리 날짜 상태 변화 감지 및 로깅
   useEffect(() => {
