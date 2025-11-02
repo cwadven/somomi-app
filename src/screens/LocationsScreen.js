@@ -292,11 +292,11 @@ const LocationsScreen = () => {
       } else {
         setAlertModalConfig({
           title: '템플릿 부족',
-          message: '이 영역은 템플릿이 없어 접근할 수 없습니다. 템플릿을 구매하고 연동해주세요.',
+          message: '이 영역은 템플릿이 없어 접근할 수 없습니다.\n템플릿을 구매하고 연동해주세요.',
           icon: 'alert-circle',
           iconColor: '#F44336',
           buttons: [
-            { text: '상점으로 이동', style: 'success', onPress: () => navigation.navigate('Store') },
+            { text: '상점으로 이동', style: 'success', onPress: () => { setAlertModalVisible(false); navigation.navigate('Store'); } },
             { text: '닫기', style: 'cancel' }
           ]
         });
