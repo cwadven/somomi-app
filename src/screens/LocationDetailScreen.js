@@ -47,6 +47,21 @@ const LocationDetailScreen = () => {
   const [productsTimerId, setProductsTimerId] = useState(null);
   const didInitialFetchRef = React.useRef(false);
 
+  // 백엔드 정렬 파라미터 계산
+  const getBackendSortParam = useCallback(() => {
+    // sortKey: 'created' | 'estimated' | 'expiry' | 'estimatedRate' | 'expiryRate' | 'name' | null
+    // sortDesc: true -> 내림차순 → 접두사 '-'
+    const prefix = sortDesc ? '-' : '';
+    if (!sortKey) return null; // 정렬 해제 시 서버 기본값 사용(-created)
+    if (sortKey === 'created') return `${prefix}created`;
+    if (sortKey === 'estimated') return `${prefix}expected_expire`;
+    if (sortKey === 'expiry') return `${prefix}expire`;
+    if (sortKey === 'estimatedRate') return `${prefix}percent_expected_expire`;
+    if (sortKey === 'expiryRate') return `${prefix}percent_expire`;
+    if (sortKey === 'name') return `${prefix}title`;
+    return null;
+  }, [sortKey, sortDesc]);
+
   // 만료된 구독 템플릿이어도 상세 접근은 허용. 대신 UI 상에서 편집 유도로 처리.
   
   // 영역 정보 로드
@@ -72,11 +87,11 @@ const LocationDetailScreen = () => {
       if (isAllProductsView) {
         dispatch(fetchProductsByLocation('all'));
       } else {
-        dispatch(fetchProductsByLocation({ locationId, size: 20 }));
+        dispatch(fetchProductsByLocation({ locationId, size: 20, sort: getBackendSortParam() }));
       }
       didInitialFetchRef.current = true;
     }
-  }, [dispatch, locationId, isAllProductsView, from]);
+  }, [dispatch, locationId, isAllProductsView, from, getBackendSortParam]);
 
   // 포커스 시점마다 제품/템플릿 최신화 (슬롯 계산 즉시 반영)
   useFocusEffect(
@@ -264,18 +279,42 @@ const LocationDetailScreen = () => {
 
   // 정렬 칩 클릭 시: 내림차순 → 오름차순 → 정렬 해제 순환
   const handleSortPress = useCallback((key) => {
+    // 다음 상태 계산
+    let nextKey = sortKey;
+    let nextDesc = sortDesc;
     if (sortKey !== key) {
-      setSortKey(key);
-      setSortDesc(true); // 새 키는 기본 내림차순
-      return;
+      nextKey = key;
+      nextDesc = true; // 새 키는 기본 내림차순
+    } else if (sortDesc) {
+      nextDesc = false; // 오름차순
+    } else {
+      nextKey = null; // 정렬 해제
     }
-    if (sortDesc) {
-      setSortDesc(false); // 오름차순
-      return;
+    setSortKey(nextKey);
+    setSortDesc(nextDesc);
+
+    // 서버 정렬 적용: '모든 제품' 보기가 아닐 때만, 정렬 해제가 아닌 경우만 호출
+    if (!isAllProductsView && nextKey) {
+      setProductsTimedOut(false);
+      try { if (productsTimerId) clearTimeout(productsTimerId); } catch (e) {}
+      setLocationProducts([]);
+      const id = setTimeout(() => {
+        if (productsStatus === 'loading') {
+          setProductsTimedOut(true);
+        }
+      }, PRODUCTS_TIMEOUT_MS);
+      setProductsTimerId(id);
+      const prefix = nextDesc ? '-' : '';
+      const sortParam =
+        nextKey === 'created' ? `${prefix}created` :
+        nextKey === 'estimated' ? `${prefix}expected_expire` :
+        nextKey === 'expiry' ? `${prefix}expire` :
+        nextKey === 'estimatedRate' ? `${prefix}percent_expected_expire` :
+        nextKey === 'expiryRate' ? `${prefix}percent_expire` :
+        nextKey === 'name' ? `${prefix}title` : null;
+      dispatch(fetchProductsByLocation({ locationId, size: 20, sort: sortParam }));
     }
-    // 정렬 해제
-    setSortKey(null);
-  }, [sortKey, sortDesc]);
+  }, [sortKey, sortDesc, isAllProductsView, productsTimerId, productsStatus, PRODUCTS_TIMEOUT_MS, dispatch, locationId]);
   
   // 뒤로가기 핸들러
   const handleGoBack = () => {
@@ -471,7 +510,7 @@ const LocationDetailScreen = () => {
                 if (isAllProductsView) {
                   dispatch(fetchProductsByLocation('all'));
                 } else {
-                  dispatch(fetchProductsByLocation({ locationId, size: 20 }));
+                  dispatch(fetchProductsByLocation({ locationId, size: 20, sort: getBackendSortParam() }));
                 }
               }}
             >
@@ -489,7 +528,7 @@ const LocationDetailScreen = () => {
                 if (isAllProductsView) {
                   dispatch(fetchProductsByLocation('all'));
                 } else {
-                  dispatch(fetchProductsByLocation({ locationId, size: 20 }));
+                  dispatch(fetchProductsByLocation({ locationId, size: 20, sort: getBackendSortParam() }));
                 }
               }}
             >
@@ -529,6 +568,7 @@ const LocationDetailScreen = () => {
                       locationId,
                       nextCursor: meta.nextCursor || null,
                       size: 20,
+                      sort: getBackendSortParam(),
                       append: true,
                     }));
                   }

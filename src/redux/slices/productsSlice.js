@@ -67,6 +67,7 @@ export const fetchProductsByLocation = createAsyncThunk(
       const nextCursorParam = isObj ? (arg.nextCursor || null) : null;
       const sizeParam = isObj && arg.size != null ? arg.size : null;
       const append = isObj ? !!arg.append : false;
+      const sortParam = isObj ? (arg.sort || null) : null;
 
       // 서버 호출: 전체/특정 영역 분기
       if (locId === 'all') {
@@ -95,7 +96,7 @@ export const fetchProductsByLocation = createAsyncThunk(
         }
       } else {
         try {
-          const res = await fetchInventoryItemsBySection(locId, { nextCursor: nextCursorParam, size: sizeParam });
+          const res = await fetchInventoryItemsBySection(locId, { nextCursor: nextCursorParam, size: sizeParam, sort: sortParam });
           const items = Array.isArray(res?.guest_inventory_items) ? res.guest_inventory_items : [];
           const mapped = items.map((it) => ({
             id: String(it.id),

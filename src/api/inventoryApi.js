@@ -5,13 +5,14 @@ export const fetchGuestInventoryItemTemplates = async () => {
   return request('/v1/inventory/guest-templates', { method: 'GET' });
 };
 
-export const fetchInventoryItemsBySection = async (guest_section_id, { nextCursor = null, size = null } = {}) => {
+export const fetchInventoryItemsBySection = async (guest_section_id, { nextCursor = null, size = null, sort = null } = {}) => {
   // GET /v1/inventory/section/{guest_section_id}?next_cursor=...&size=... 
   // → { guest_inventory_items: [...], has_more: boolean, next_cursor: string|null }
   let path = `/v1/inventory/section/${guest_section_id}`;
   const qs = [];
   if (nextCursor) qs.push(`next_cursor=${encodeURIComponent(nextCursor)}`);
   if (size != null) qs.push(`size=${encodeURIComponent(String(size))}`);
+  if (sort) qs.push(`sort=${encodeURIComponent(String(sort))}`);
   if (qs.length) path += `?${qs.join('&')}`;
   return request(path, { method: 'GET' });
 };
