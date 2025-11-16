@@ -60,10 +60,16 @@ export const fetchProductById = createAsyncThunk(
 // 특정 영역의 제품 목록 가져오기
 export const fetchProductsByLocation = createAsyncThunk(
   'products/fetchProductsByLocation',
-  async (locationId, { rejectWithValue, getState }) => {
+  async (arg, { rejectWithValue, getState }) => {
     try {
+      const isObj = typeof arg === 'object' && arg !== null;
+      const locId = isObj ? arg.locationId : arg;
+      const nextCursorParam = isObj ? (arg.nextCursor || null) : null;
+      const sizeParam = isObj && arg.size != null ? arg.size : null;
+      const append = isObj ? !!arg.append : false;
+
       // 서버 호출: 전체/특정 영역 분기
-      if (locationId === 'all') {
+      if (locId === 'all') {
         try {
           const res = await fetchAllInventoryItems();
           const items = Array.isArray(res?.guest_inventory_items) ? res.guest_inventory_items : [];
@@ -83,13 +89,13 @@ export const fetchProductsByLocation = createAsyncThunk(
             updatedAt: it.updated_at,
             isConsumed: false,
           }));
-          return mapped;
+          return { items: mapped, nextCursor: null, hasMore: false, locationId: locId, append: false };
         } catch (apiErr) {
           console.warn('전체 인벤토리 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
         }
       } else {
         try {
-          const res = await fetchInventoryItemsBySection(locationId);
+          const res = await fetchInventoryItemsBySection(locId, { nextCursor: nextCursorParam, size: sizeParam });
           const items = Array.isArray(res?.guest_inventory_items) ? res.guest_inventory_items : [];
           const mapped = items.map((it) => ({
             id: String(it.id),
@@ -107,7 +113,13 @@ export const fetchProductsByLocation = createAsyncThunk(
             updatedAt: it.updated_at,
             isConsumed: false,
           }));
-          return mapped;
+          return { 
+            items: mapped, 
+            nextCursor: res?.next_cursor ?? null, 
+            hasMore: !!res?.has_more,
+            locationId: locId,
+            append 
+          };
         } catch (apiErr) {
           console.warn('영역별 인벤토리 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
         }
@@ -116,22 +128,34 @@ export const fetchProductsByLocation = createAsyncThunk(
       // 폴백: 로컬 저장/상태 기반
       const { products } = getState().products;
       if (products.length > 0) {
-        if (locationId === 'all') {
-          return products;
+        if (locId === 'all') {
+          return { items: products, nextCursor: null, hasMore: false, locationId: locId, append: false };
         } else {
-          return products.filter(product => 
-            product.locationLocalId === locationId || product.locationId === locationId
-          );
+          return { 
+            items: products.filter(product => 
+              product.locationLocalId === locId || product.locationId === locId
+            ),
+            nextCursor: null,
+            hasMore: false,
+            locationId: locId,
+            append: false
+          };
         }
       }
 
       const storedProducts = await loadProducts();
-      if (locationId === 'all') {
-        return storedProducts;
+      if (locId === 'all') {
+        return { items: storedProducts, nextCursor: null, hasMore: false, locationId: locId, append: false };
       } else {
-        return storedProducts.filter(product => 
-          product.locationLocalId === locationId || product.locationId === locationId
-        );
+        return { 
+          items: storedProducts.filter(product => 
+            product.locationLocalId === locId || product.locationId === locId
+          ),
+          nextCursor: null,
+          hasMore: false,
+          locationId: locId,
+          append: false
+        };
       }
     } catch (error) {
       return rejectWithValue(error.message);
@@ -377,7 +401,8 @@ const initialState = {
   consumedStatus: 'idle', // 소진 처리된 제품 로딩 상태
   error: null,
   currentProduct: null,
-  locationProducts: {}, // 영역별 제품 목록 캐시
+  locationProducts: {}, // 영역별 제품 목록 캐시 (array)
+  locationProductsMeta: {}, // { [locationId]: { nextCursor, hasMore } }
 };
 
 export const productsSlice = createSlice({
@@ -420,17 +445,31 @@ export const productsSlice = createSlice({
       })
       
       // fetchProductsByLocation 처리
-      .addCase(fetchProductsByLocation.pending, (state) => {
-        state.status = 'loading';
+      .addCase(fetchProductsByLocation.pending, (state, action) => {
+        // 초기 로드 때만 전역 로딩 처리(리스트 상단 스피너 용)
+        const isObj = typeof action.meta.arg === 'object' && action.meta.arg !== null;
+        const locId = isObj ? action.meta.arg.locationId : action.meta.arg;
+        const append = isObj ? !!action.meta.arg.append : false;
+        if (!append) {
+          state.status = 'loading';
+        }
       })
       .addCase(fetchProductsByLocation.fulfilled, (state, action) => {
-        state.status = 'succeeded';
-        // 전체 제품 목록이 비어있으면 업데이트
-        if (state.products.length === 0 && action.meta.arg === 'all') {
-          state.products = action.payload;
+        const payload = action.payload || {};
+        const { items = [], nextCursor = null, hasMore = false, locationId, append = false } = payload;
+
+        // 초기 로드(append=false)에서만 전역 상태 업데이트
+        if (!append) state.status = 'succeeded';
+
+        // 전체 제품 캐시(all) 초기 로드 시만 보강
+        if (!append && state.products.length === 0 && locationId === 'all') {
+          state.products = items;
         }
-        // 영역별 제품 목록 캐시 업데이트
-        state.locationProducts[action.meta.arg] = action.payload;
+
+        // 영역별 캐시 업데이트 (append 시에는 이어 붙임)
+        const existing = state.locationProducts[locationId] || [];
+        state.locationProducts[locationId] = append ? [...existing, ...items] : items;
+        state.locationProductsMeta[locationId] = { nextCursor, hasMore };
       })
       .addCase(fetchProductsByLocation.rejected, (state, action) => {
         state.status = 'failed';

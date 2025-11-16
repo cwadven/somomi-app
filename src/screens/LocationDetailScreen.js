@@ -33,7 +33,7 @@ const LocationDetailScreen = () => {
   const isAllProductsView = isAllProducts || locationId === 'all';
   
   const { currentLocation, status, error, locations } = useSelector(state => state.locations);
-  const { products, locationProducts: locationProductsCache, status: productsStatus, error: productsError } = useSelector(state => state.products);
+  const { products, locationProducts: locationProductsCache, status: productsStatus, error: productsError, locationProductsMeta } = useSelector(state => state.products);
   const { slots, userProductSlotTemplateInstances, subscription, userLocationTemplateInstances } = useSelector(state => state.auth);
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -69,7 +69,11 @@ const LocationDetailScreen = () => {
         }
       }, PRODUCTS_TIMEOUT_MS);
       setProductsTimerId(id);
-      dispatch(fetchProductsByLocation(isAllProductsView ? 'all' : locationId));
+      if (isAllProductsView) {
+        dispatch(fetchProductsByLocation('all'));
+      } else {
+        dispatch(fetchProductsByLocation({ locationId, size: 20 }));
+      }
       didInitialFetchRef.current = true;
     }
   }, [dispatch, locationId, isAllProductsView, from]);
@@ -464,7 +468,11 @@ const LocationDetailScreen = () => {
                 }, PRODUCTS_TIMEOUT_MS);
                 setProductsTimerId(id);
                 setLocationProducts([]);
-                dispatch(fetchProductsByLocation(isAllProductsView ? 'all' : locationId));
+                if (isAllProductsView) {
+                  dispatch(fetchProductsByLocation('all'));
+                } else {
+                  dispatch(fetchProductsByLocation({ locationId, size: 20 }));
+                }
               }}
             >
               <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -478,7 +486,11 @@ const LocationDetailScreen = () => {
               onPress={() => {
                 setProductsTimedOut(false);
                 setLocationProducts([]);
-                dispatch(fetchProductsByLocation(isAllProductsView ? 'all' : locationId));
+                if (isAllProductsView) {
+                  dispatch(fetchProductsByLocation('all'));
+                } else {
+                  dispatch(fetchProductsByLocation({ locationId, size: 20 }));
+                }
               }}
             >
               <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -507,6 +519,33 @@ const LocationDetailScreen = () => {
                   />
                 )}
                 contentContainerStyle={styles.productsList}
+                onEndReachedThreshold={0.5}
+                onEndReached={() => {
+                  if (isAllProductsView) return;
+                  const meta = locationProductsMeta?.[locationId];
+                  const isLoadingMore = productsStatus === 'loading' && locationProducts.length > 0;
+                  if (meta?.hasMore && !isLoadingMore) {
+                    dispatch(fetchProductsByLocation({
+                      locationId,
+                      nextCursor: meta.nextCursor || null,
+                      size: 20,
+                      append: true,
+                    }));
+                  }
+                }}
+                ListFooterComponent={() => {
+                  if (isAllProductsView) return null;
+                  const meta = locationProductsMeta?.[locationId];
+                  const isLoadingMore = productsStatus === 'loading' && locationProducts.length > 0;
+                  if (meta?.hasMore && isLoadingMore) {
+                    return (
+                      <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                        <ActivityIndicator size="small" color="#4CAF50" />
+                      </View>
+                    );
+                  }
+                  return null;
+                }}
               />
             )}
           </>
