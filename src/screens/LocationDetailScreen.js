@@ -549,7 +549,7 @@ const LocationDetailScreen = () => {
               </View>
             ) : (
               <FlatList
-                data={sortProducts(locationProducts)}
+                data={locationProducts}
                 keyExtractor={(item) => String(item.localId || item.id)}
                 renderItem={({ item }) => (
                   <ProductCard 
