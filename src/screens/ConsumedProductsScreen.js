@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -21,21 +21,25 @@ const ConsumedProductsScreen = () => {
   
   const { consumedProducts, consumedStatus, consumedLoadingMore, consumedMeta, error } = useSelector(state => state.products);
 
+  // 첫 진입 1회만 초기 로드
+  const didInitialFetchRef = useRef(false);
+  useEffect(() => {
+    if (didInitialFetchRef.current) return;
+    didInitialFetchRef.current = true;
+    const sort = sortDesc ? '-consumed' : 'consumed';
+    dispatch(fetchConsumedProducts({ size: 20, sort, append: false }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 정렬 칩 클릭 핸들러 (내림 ↔ 오름)
   const handleSortPress = () => {
     const nextDesc = !sortDesc;
     setSortDesc(nextDesc);
-    // API 호출은 useFocusEffect에서 sortDesc 의존성으로 단일 실행되도록 위임
+    const sort = nextDesc ? '-consumed' : 'consumed';
+    dispatch(fetchConsumedProducts({ size: 20, sort, append: false }));
   };
 
-  
-  // 화면에 포커스가 올 때마다 데이터 새로고침
-  useFocusEffect(
-    useCallback(() => {
-      const sort = sortDesc ? '-consumed' : 'consumed';
-      dispatch(fetchConsumedProducts({ size: 20, sort, append: false }));
-    }, [dispatch, sortDesc])
-  );
+  // 화면 포커스 시 자동 재호출 방지: useFocusEffect 제거
   
   const loadMore = useCallback(() => {
     if (consumedLoadingMore) return;

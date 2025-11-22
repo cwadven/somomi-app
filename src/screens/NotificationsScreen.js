@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { loadAllProcessedNotifications, loadProcessedNotifications, processAllNotifications } from '../utils/notificationUtils';
 import { fetchGuestAlarmHistory } from '../api/alarmApi';
 
@@ -19,12 +19,14 @@ const NotificationsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [dates, setDates] = useState([]);
 
-  // 화면이 포커스를 받을 때마다 알림 데이터 로드
-  useFocusEffect(
-    React.useCallback(() => {
-      loadNotificationsData();
-    }, [])
-  );
+  // 최초 1회만 데이터 로드 (뒤로가기 시 재호출 방지)
+  const didInitialFetchRef = useRef(false);
+  useEffect(() => {
+    if (didInitialFetchRef.current) return;
+    didInitialFetchRef.current = true;
+    loadNotificationsData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 알림 데이터 로드 함수
   const loadNotificationsData = async () => {
