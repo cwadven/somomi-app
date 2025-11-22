@@ -85,7 +85,7 @@ const LocationDetailScreen = () => {
       }, PRODUCTS_TIMEOUT_MS);
       setProductsTimerId(id);
       if (isAllProductsView) {
-        dispatch(fetchProductsByLocation('all'));
+        dispatch(fetchProductsByLocation({ locationId: 'all', size: 20, sort: getBackendSortParam() }));
       } else {
         dispatch(fetchProductsByLocation({ locationId, size: 20, sort: getBackendSortParam() }));
       }
@@ -123,17 +123,23 @@ const LocationDetailScreen = () => {
   // 제품 목록 필터링
   useEffect(() => {
     if (isAllProductsView) {
-      // 활성화된 영역(비활성/만료 제외)에 속한 제품만 표시
-      const activeLocIds = new Set(
-        (locations || [])
-          .filter(loc => loc && loc.disabled !== true && !isLocExpired(loc))
-          .map(loc => loc.id)
-      );
-      const filtered = (products || []).filter(p => {
-        const key = p.locationLocalId || p.locationId;
-        return !!key && activeLocIds.has(key) && p.syncStatus !== 'deleted' && !p.isConsumed;
-      });
-      setLocationProducts(filtered);
+      // '모든 제품'은 서버 캐시('all')를 우선 사용하여 정렬/페이지네이션을 그대로 반영
+      const cachedAll = locationProductsCache?.['all'];
+      if (Array.isArray(cachedAll)) {
+        setLocationProducts(cachedAll);
+      } else {
+        // 캐시가 없으면 기존 로컬 데이터로 임시 표시(옵션)
+        const activeLocIds = new Set(
+          (locations || [])
+            .filter(loc => loc && loc.disabled !== true && !isLocExpired(loc))
+            .map(loc => loc.id)
+        );
+        const fallback = (products || []).filter(p => {
+          const key = p.locationLocalId || p.locationId;
+          return !!key && activeLocIds.has(key) && p.syncStatus !== 'deleted' && !p.isConsumed;
+        });
+        setLocationProducts(fallback);
+      }
     } else {
       // 우선 캐시된 서버 응답을 사용
       const cached = locationProductsCache?.[locationId];
@@ -293,8 +299,8 @@ const LocationDetailScreen = () => {
     setSortKey(nextKey);
     setSortDesc(nextDesc);
 
-    // 서버 정렬 적용: '모든 제품' 보기가 아닐 때만, 정렬 해제가 아닌 경우만 호출
-    if (!isAllProductsView && nextKey) {
+    // 서버 정렬 적용: 정렬 해제가 아닌 경우만 호출
+    if (nextKey) {
       setProductsTimedOut(false);
       try { if (productsTimerId) clearTimeout(productsTimerId); } catch (e) {}
       setLocationProducts([]);
@@ -312,7 +318,8 @@ const LocationDetailScreen = () => {
         nextKey === 'estimatedRate' ? `${prefix}percent_expected_expire` :
         nextKey === 'expiryRate' ? `${prefix}percent_expire` :
         nextKey === 'name' ? `${prefix}title` : null;
-      dispatch(fetchProductsByLocation({ locationId, size: 20, sort: sortParam }));
+      const targetId = isAllProductsView ? 'all' : locationId;
+      dispatch(fetchProductsByLocation({ locationId: targetId, size: 20, sort: sortParam }));
     }
   }, [sortKey, sortDesc, isAllProductsView, productsTimerId, productsStatus, PRODUCTS_TIMEOUT_MS, dispatch, locationId]);
   
@@ -507,11 +514,8 @@ const LocationDetailScreen = () => {
                 }, PRODUCTS_TIMEOUT_MS);
                 setProductsTimerId(id);
                 setLocationProducts([]);
-                if (isAllProductsView) {
-                  dispatch(fetchProductsByLocation('all'));
-                } else {
-                  dispatch(fetchProductsByLocation({ locationId, size: 20, sort: getBackendSortParam() }));
-                }
+                const targetId = isAllProductsView ? 'all' : locationId;
+                dispatch(fetchProductsByLocation({ locationId: targetId, size: 20, sort: getBackendSortParam() }));
               }}
             >
               <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -525,11 +529,8 @@ const LocationDetailScreen = () => {
               onPress={() => {
                 setProductsTimedOut(false);
                 setLocationProducts([]);
-                if (isAllProductsView) {
-                  dispatch(fetchProductsByLocation('all'));
-                } else {
-                  dispatch(fetchProductsByLocation({ locationId, size: 20, sort: getBackendSortParam() }));
-                }
+                const targetId = isAllProductsView ? 'all' : locationId;
+                dispatch(fetchProductsByLocation({ locationId: targetId, size: 20, sort: getBackendSortParam() }));
               }}
             >
               <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -560,12 +561,12 @@ const LocationDetailScreen = () => {
                 contentContainerStyle={styles.productsList}
                 onEndReachedThreshold={0.5}
                 onEndReached={() => {
-                  if (isAllProductsView) return;
-                  const meta = locationProductsMeta?.[locationId];
+                  const metaKey = isAllProductsView ? 'all' : locationId;
+                  const meta = locationProductsMeta?.[metaKey];
                   const isLoadingMore = productsStatus === 'loading' && locationProducts.length > 0;
                   if (meta?.hasMore && !isLoadingMore) {
                     dispatch(fetchProductsByLocation({
-                      locationId,
+                      locationId: metaKey,
                       nextCursor: meta.nextCursor || null,
                       size: 20,
                       sort: getBackendSortParam(),
@@ -574,8 +575,8 @@ const LocationDetailScreen = () => {
                   }
                 }}
                 ListFooterComponent={() => {
-                  if (isAllProductsView) return null;
-                  const meta = locationProductsMeta?.[locationId];
+                  const metaKey = isAllProductsView ? 'all' : locationId;
+                  const meta = locationProductsMeta?.[metaKey];
                   const isLoadingMore = productsStatus === 'loading' && locationProducts.length > 0;
                   if (meta?.hasMore && isLoadingMore) {
                     return (

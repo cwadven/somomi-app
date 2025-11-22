@@ -72,7 +72,7 @@ export const fetchProductsByLocation = createAsyncThunk(
       // 서버 호출: 전체/특정 영역 분기
       if (locId === 'all') {
         try {
-          const res = await fetchAllInventoryItems();
+          const res = await fetchAllInventoryItems({ nextCursor: nextCursorParam, size: sizeParam, sort: sortParam });
           const items = Array.isArray(res?.guest_inventory_items) ? res.guest_inventory_items : [];
           const mapped = items.map((it) => ({
             id: String(it.id),
@@ -90,7 +90,13 @@ export const fetchProductsByLocation = createAsyncThunk(
             updatedAt: it.updated_at,
             isConsumed: false,
           }));
-          return { items: mapped, nextCursor: null, hasMore: false, locationId: locId, append: false };
+          return { 
+            items: mapped, 
+            nextCursor: res?.next_cursor ?? null, 
+            hasMore: !!res?.has_more, 
+            locationId: locId, 
+            append,
+          };
         } catch (apiErr) {
           console.warn('전체 인벤토리 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
         }
