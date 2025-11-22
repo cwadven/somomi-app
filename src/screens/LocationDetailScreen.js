@@ -496,7 +496,7 @@ const LocationDetailScreen = () => {
           </ScrollView>
       </View>
         {/* 정렬 바 아래에서 상태별로 렌더링 */}
-        {(!isAllProductsView && productsStatus === 'loading' && !productsTimedOut) ? (
+        {(productsStatus === 'loading' && !productsTimedOut) ? (
           <View style={styles.loadingListContainer}>
             <ActivityIndicator size="large" color="#4CAF50" />
             <Text style={styles.loadingInlineText}>제품 목록을 불러오는 중...</Text>
