@@ -54,7 +54,7 @@ const ProductFormScreen = () => {
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
   const { products, currentProduct, status: productsStatus, locationProducts } = useSelector(state => state.products);
   const { isLoggedIn, isAnonymous, slots, userProductSlotTemplateInstances, subscription, userLocationTemplateInstances } = useSelector(state => state.auth);
-
+  
   // 폼 상태
   const [productName, setProductName] = useState('');
   const [brand, setBrand] = useState('');
@@ -376,23 +376,23 @@ const ProductFormScreen = () => {
   useEffect(() => {
     if (!isEditMode && locationId) {
       if (locations.length > 0) {
-        const location = locations.find(loc => loc.id === locationId);
-        if (location) {
-          setSelectedLocation(location);
-          
+      const location = locations.find(loc => loc.id === locationId);
+      if (location) {
+        setSelectedLocation(location);
+        
           // 해당 영역의 제품 목록 필터링 (소진 전 제품만 고려)
           const productsInLocation = (products || []).filter(p => p.locationId === locationId && !p.isConsumed);
-          setCurrentLocationProducts(productsInLocation);
+        setCurrentLocationProducts(productsInLocation);
         } else {
           // 영역을 찾지 못한 경우 다시 로드 시도
           console.log('영역을 찾지 못했습니다. 다시 로드합니다:', locationId);
           dispatch(fetchLocations());
-        }
+      }
       } else {
         // 영역 데이터가 없는 경우 다시 로드 시도
         console.log('영역 데이터가 없습니다. 다시 로드합니다.');
         dispatch(fetchLocations());
-      }
+    }
     }
   }, [isEditMode, locationId, locations, products, dispatch]);
 
@@ -465,7 +465,7 @@ const ProductFormScreen = () => {
     // 입력된 날짜 문자열 파싱
     const datePattern = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
     const match = tempDateString.match(datePattern);
-    
+        
     if (match) {
       const year = parseInt(match[1], 10);
       const month = parseInt(match[2], 10) - 1; // JavaScript 월은 0부터 시작
@@ -480,16 +480,16 @@ const ProductFormScreen = () => {
         parsedDate.getDate() === day
       ) {
         // 선택된 날짜 타입에 따라 상태 업데이트
-        if (currentDateType === 'purchase') {
+      if (currentDateType === 'purchase') {
           setPurchaseDate(parsedDate);
-        } else if (currentDateType === 'expiry') {
+      } else if (currentDateType === 'expiry') {
           setExpiryDate(parsedDate);
-        } else if (currentDateType === 'estimated') {
+      } else if (currentDateType === 'estimated') {
           setEstimatedEndDate(parsedDate);
-        }
-        
+      }
+      
         // 모달 닫기
-        setShowWebDateModal(false);
+      setShowWebDateModal(false);
       } else {
         showErrorAlert('유효한 날짜 형식이 아닙니다. (YYYY-MM-DD)');
       }
@@ -652,7 +652,7 @@ const ProductFormScreen = () => {
       const availableProductSlot = (userProductSlotTemplateInstances || []).find(t => !t.used);
       if (!availableProductSlot) {
         showErrorAlert('슬롯 한도 초과', '해당 영역의 제품 슬롯이 가득 찼습니다. 상점에서 제품 슬롯을 추가 구매하세요.');
-        return false;
+      return false;
       }
     }
     
@@ -677,7 +677,7 @@ const ProductFormScreen = () => {
       return;
     }
     // 폼 유효성 검사
-    if (!isFormValid()) {
+      if (!isFormValid()) {
       // 오류가 있으면 첫 번째 오류 필드로 스크롤
       if (errors.productName) {
         scrollToField('productName');
@@ -689,9 +689,9 @@ const ProductFormScreen = () => {
         scrollToField('purchaseDate');
         return;
       }
-      return;
-    }
-
+        return;
+      }
+      
     // 로그인/비로그인 여부에 따른 추가 제한 없이 슬롯 로직만 적용 (비회원도 슬롯 내에서 등록 가능)
 
     // 영역이 선택되지 않은 경우 확인
@@ -706,16 +706,16 @@ const ProductFormScreen = () => {
 
     try {
       const productData = {
-        name: productName,
+          name: productName,
         brand: brand || null,
         // category: selectedCategory, // 카테고리 제거로 인한 변경
         purchasePlace: purchasePlace ? purchasePlace : null,
         price: price && price.trim() !== '' ? parseInt(price.replace(/[^0-9]/g, ''), 10) : null,
         // 영역 위치 이동 반영: 수정 모드에서는 selectedLocation 우선 적용
         locationId: isEditMode ? ((selectedLocation && selectedLocation.id) || currentProduct.locationId) : (locationId || (selectedLocation ? selectedLocation.id : null)),
-        purchaseDate: purchaseDate.toISOString(),
-        expiryDate: expiryDate ? expiryDate.toISOString() : null,
-        estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
+          purchaseDate: purchaseDate.toISOString(),
+          expiryDate: expiryDate ? expiryDate.toISOString() : null,
+          estimatedEndDate: estimatedEndDate ? estimatedEndDate.toISOString() : null,
         memo: memo || null
       };
 
@@ -808,8 +808,8 @@ const ProductFormScreen = () => {
         }
       }
 
-      setCreatedProduct(result);
-      setShowSuccessModal(true);
+        setCreatedProduct(result);
+        setShowSuccessModal(true);
       // 성공 시 초안 제거 (추가 모드)
       if (!isEditMode) {
         try { await removeData(STORAGE_KEYS.PRODUCT_FORM_DRAFT); } catch (e) {}
@@ -1039,50 +1039,50 @@ const ProductFormScreen = () => {
           </Text>
           <View style={styles.headerPlaceholder} />
         </View>
-        <ScrollView 
-          ref={scrollViewRef}
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Text style={styles.title}>
-            {isEditMode ? '제품 수정' : '제품 등록'}
-          </Text>
-          
-          {/* 제품명 입력 */}
-          <View style={styles.inputGroup}>
-            <View style={styles.labelContainer}>
-              <Text style={styles.label}>제품명</Text>
-              <Text style={styles.requiredMark}>*</Text>
-            </View>
-            <TextInput
-              ref={productNameInputRef}
-              style={[
-                styles.input,
-                touched.productName && errors.productName ? styles.inputError : null
-              ]}
-              value={productName}
-              onChangeText={(text) => handleFieldChange('productName', text)}
-              onBlur={() => handleFieldBlur('productName', productName)}
+      <ScrollView 
+        ref={scrollViewRef}
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.title}>
+          {isEditMode ? '제품 수정' : '제품 등록'}
+        </Text>
+        
+        {/* 제품명 입력 */}
+        <View style={styles.inputGroup}>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>제품명</Text>
+            <Text style={styles.requiredMark}>*</Text>
+          </View>
+          <TextInput
+            ref={productNameInputRef}
+            style={[
+              styles.input,
+              touched.productName && errors.productName ? styles.inputError : null
+            ]}
+            value={productName}
+            onChangeText={(text) => handleFieldChange('productName', text)}
+            onBlur={() => handleFieldBlur('productName', productName)}
             placeholder="제품명을 입력하세요"
             placeholderTextColor="#999"
-            />
-            {touched.productName && errors.productName ? (
-              <Text style={styles.errorText}>{errors.productName}</Text>
-            ) : null}
-          </View>
-          
-          {/* 브랜드 입력 */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>브랜드 (선택)</Text>
-            <TextInput
-              style={styles.input}
-              value={brand}
-              onChangeText={setBrand}
+          />
+          {touched.productName && errors.productName ? (
+            <Text style={styles.errorText}>{errors.productName}</Text>
+          ) : null}
+        </View>
+        
+        {/* 브랜드 입력 */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>브랜드 (선택)</Text>
+          <TextInput
+            style={styles.input}
+            value={brand}
+            onChangeText={setBrand}
             placeholder="브랜드명을 입력하세요"
             placeholderTextColor="#999"
-            />
-          </View>
-
+          />
+        </View>
+        
           {/* 구매처 입력 */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>구매처 (선택)</Text>
@@ -1137,165 +1137,165 @@ const ProductFormScreen = () => {
                 }}
                 hideAddButton
                 isLoading={locationsStatus === 'loading'}
-              />
+        />
             </View>
           )}
-          
-          {/* 구매일 선택 */}
-          <View 
-            ref={purchaseDateSectionRef}
-            style={styles.inputGroup}
-          >
-            <View style={styles.labelContainer}>
-              <Text style={styles.label}>구매일</Text>
-              <Text style={styles.requiredMark}>*</Text>
-            </View>
-            <TouchableOpacity 
-              style={[
-                styles.dateInput,
-                touched.purchaseDate && errors.purchaseDate ? styles.inputError : null
-              ]}
-              onPress={() => {
-                if (Platform.OS === 'web') {
-                  handleWebDateSelect('purchase');
-                } else {
-                  setShowPurchaseDatePicker(true);
-                }
-                setTouched(prev => ({ ...prev, purchaseDate: true }));
-              }}
-            >
-              <Text style={styles.dateText}>
-                {formatDate(purchaseDate)}
-              </Text>
-              <Ionicons name="calendar-outline" size={20} color="#666" />
-            </TouchableOpacity>
-            {touched.purchaseDate && errors.purchaseDate ? (
-              <Text style={styles.errorText}>{errors.purchaseDate}</Text>
-            ) : null}
-            {Platform.OS !== 'web' && showPurchaseDatePicker && (
-              <DateTimePicker
-                value={purchaseDate || new Date()}
-                mode="date"
-                display="default"
-                onChange={(event, date) => {
-                  handleDateChange(event, date, 'purchase');
-                  handleFieldChange('purchaseDate', date);
-                }}
-              />
-            )}
+        
+        {/* 구매일 선택 */}
+        <View 
+          ref={purchaseDateSectionRef}
+          style={styles.inputGroup}
+        >
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>구매일</Text>
+            <Text style={styles.requiredMark}>*</Text>
           </View>
-          
-          {/* 유통기한 선택 */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>유통기한 (선택)</Text>
-            <TouchableOpacity 
-              style={styles.dateInput}
-              onPress={() => {
-                if (Platform.OS === 'web') {
-                  handleWebDateSelect('expiry');
-                } else {
-                  setShowExpiryDatePicker(true);
-                }
-              }}
-            >
-              <Text style={styles.dateText}>
-                {expiryDate ? formatDate(expiryDate) : '날짜 선택'}
-              </Text>
-              <Ionicons name="calendar-outline" size={20} color="#666" />
-            </TouchableOpacity>
-            {Platform.OS !== 'web' && showExpiryDatePicker && (
-              <DateTimePicker
-                value={expiryDate || new Date()}
-                mode="date"
-                display="default"
-                onChange={(event, date) => handleDateChange(event, date, 'expiry')}
-              />
-            )}
-          </View>
-          
-          {/* 소진 예상일 선택 */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>소진 예상일 (선택)</Text>
-            <TouchableOpacity 
-              style={styles.dateInput}
-              onPress={() => {
-                if (Platform.OS === 'web') {
-                  handleWebDateSelect('estimated');
-                } else {
-                  setShowEstimatedEndDatePicker(true);
-                }
-              }}
-            >
-              <Text style={styles.dateText}>
-                {estimatedEndDate ? formatDate(estimatedEndDate) : '날짜 선택'}
-              </Text>
-              <Ionicons name="calendar-outline" size={20} color="#666" />
-            </TouchableOpacity>
-            {Platform.OS !== 'web' && showEstimatedEndDatePicker && (
-              <DateTimePicker
-                value={estimatedEndDate || new Date()}
-                mode="date"
-                display="default"
-                onChange={(event, date) => handleDateChange(event, date, 'estimated')}
-              />
-            )}
-          </View>
-          
-          {/* 메모 입력 */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>메모 (선택)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={memo}
-              onChangeText={setMemo}
-            placeholder="메모를 입력하세요"
-            placeholderTextColor="#999"
-              multiline={true}
-              numberOfLines={4}
-            />
-          </View>
-          
-          {/* 등록/수정 버튼 */}
           <TouchableOpacity 
             style={[
-              styles.submitButton,
-              productsStatus === 'loading' && styles.disabledButton
+              styles.dateInput,
+              touched.purchaseDate && errors.purchaseDate ? styles.inputError : null
             ]}
-            onPress={handleSubmit}
-            disabled={productsStatus === 'loading'}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                handleWebDateSelect('purchase');
+              } else {
+                setShowPurchaseDatePicker(true);
+              }
+              setTouched(prev => ({ ...prev, purchaseDate: true }));
+            }}
           >
-            {productsStatus === 'loading' ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#ffffff" />
-                <Text style={[styles.submitButtonText, styles.loadingText]}>
-                  {isEditMode ? '수정 중...' : '등록 중...'}
-                </Text>
-              </View>
-            ) : (
-              <Text style={styles.submitButtonText}>
-                {isEditMode ? '제품 수정' : '제품 등록'}
-              </Text>
-            )}
+            <Text style={styles.dateText}>
+              {formatDate(purchaseDate)}
+            </Text>
+            <Ionicons name="calendar-outline" size={20} color="#666" />
           </TouchableOpacity>
-        </ScrollView>
+          {touched.purchaseDate && errors.purchaseDate ? (
+            <Text style={styles.errorText}>{errors.purchaseDate}</Text>
+          ) : null}
+          {Platform.OS !== 'web' && showPurchaseDatePicker && (
+            <DateTimePicker
+              value={purchaseDate || new Date()}
+              mode="date"
+              display="default"
+              onChange={(event, date) => {
+                handleDateChange(event, date, 'purchase');
+                handleFieldChange('purchaseDate', date);
+              }}
+            />
+          )}
+        </View>
         
-        {/* 웹용 날짜 선택 모달 */}
-        {Platform.OS === 'web' && <WebDatePickerModal />}
+        {/* 유통기한 선택 */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>유통기한 (선택)</Text>
+          <TouchableOpacity 
+            style={styles.dateInput}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                handleWebDateSelect('expiry');
+              } else {
+                setShowExpiryDatePicker(true);
+              }
+            }}
+          >
+            <Text style={styles.dateText}>
+              {expiryDate ? formatDate(expiryDate) : '날짜 선택'}
+            </Text>
+            <Ionicons name="calendar-outline" size={20} color="#666" />
+          </TouchableOpacity>
+          {Platform.OS !== 'web' && showExpiryDatePicker && (
+            <DateTimePicker
+              value={expiryDate || new Date()}
+              mode="date"
+              display="default"
+              onChange={(event, date) => handleDateChange(event, date, 'expiry')}
+            />
+          )}
+        </View>
         
-        {/* 성공 모달 */}
-        <SuccessModal />
+        {/* 소진 예상일 선택 */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>소진 예상일 (선택)</Text>
+          <TouchableOpacity 
+            style={styles.dateInput}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                handleWebDateSelect('estimated');
+              } else {
+                setShowEstimatedEndDatePicker(true);
+              }
+            }}
+          >
+            <Text style={styles.dateText}>
+              {estimatedEndDate ? formatDate(estimatedEndDate) : '날짜 선택'}
+            </Text>
+            <Ionicons name="calendar-outline" size={20} color="#666" />
+          </TouchableOpacity>
+          {Platform.OS !== 'web' && showEstimatedEndDatePicker && (
+            <DateTimePicker
+              value={estimatedEndDate || new Date()}
+              mode="date"
+              display="default"
+              onChange={(event, date) => handleDateChange(event, date, 'estimated')}
+            />
+          )}
+        </View>
         
-        {/* 카테고리 추가 모달 */}
-        {/* <CategoryModal /> */}
-        
-        {/* 회원가입 유도 모달 (추가 모드만) */}
-        {!isEditMode && showSignupPrompt && (
-          <SignupPromptModal 
-            visible={showSignupPrompt}
-            onClose={() => setShowSignupPrompt(false)}
-            onSignup={() => navigation.navigate('Signup')}
+        {/* 메모 입력 */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>메모 (선택)</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={memo}
+            onChangeText={setMemo}
+            placeholder="메모를 입력하세요"
+            placeholderTextColor="#999"
+            multiline={true}
+            numberOfLines={4}
           />
-        )}
+        </View>
+        
+        {/* 등록/수정 버튼 */}
+        <TouchableOpacity 
+          style={[
+            styles.submitButton,
+            productsStatus === 'loading' && styles.disabledButton
+          ]}
+          onPress={handleSubmit}
+          disabled={productsStatus === 'loading'}
+        >
+          {productsStatus === 'loading' ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#ffffff" />
+              <Text style={[styles.submitButtonText, styles.loadingText]}>
+                {isEditMode ? '수정 중...' : '등록 중...'}
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.submitButtonText}>
+              {isEditMode ? '제품 수정' : '제품 등록'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+      
+      {/* 웹용 날짜 선택 모달 */}
+      {Platform.OS === 'web' && <WebDatePickerModal />}
+      
+      {/* 성공 모달 */}
+      <SuccessModal />
+      
+      {/* 카테고리 추가 모달 */}
+        {/* <CategoryModal /> */}
+      
+      {/* 회원가입 유도 모달 (추가 모드만) */}
+      {!isEditMode && showSignupPrompt && (
+        <SignupPromptModal 
+          visible={showSignupPrompt}
+          onClose={() => setShowSignupPrompt(false)}
+          onSignup={() => navigation.navigate('Signup')}
+        />
+      )}
         
         {/* 알림 모달 */}
         <AlertModal

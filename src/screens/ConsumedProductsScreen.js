@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -16,57 +16,33 @@ import { fetchConsumedProducts } from '../redux/slices/productsSlice';
 const ConsumedProductsScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
-  // 정렬 상태: LocationDetailScreen과 동일한 인터랙션(내림차순 → 오름차순 → 해제)
-  const [sortKey, setSortKey] = useState('consumed'); // 'consumed' | null
+  // 정렬 상태: 서버 정렬만 사용 ('-consumed' | 'consumed')
   const [sortDesc, setSortDesc] = useState(true);
   
-  const { consumedProducts, consumedStatus, error } = useSelector(state => state.products);
-  // 정렬된 목록 (소진 처리 시점 기준)
-  const sortedConsumedProducts = useMemo(() => {
-    const list = Array.isArray(consumedProducts) ? [...consumedProducts] : [];
-    if (!sortKey) return list;
-    const getDate = (item) => {
-      const d = item?.consumedAt || item?.processedAt || null;
-      return d ? new Date(d).getTime() : -Infinity;
-    };
-    const dir = sortDesc ? -1 : 1;
-    const present = list.filter(i => !!(i?.consumedAt || i?.processedAt));
-    const missing = list.filter(i => !(i?.consumedAt || i?.processedAt));
-    present.sort((a, b) => {
-      const da = getDate(a);
-      const db = getDate(b);
-      if (da === db) return 0;
-      return da > db ? dir : -dir;
-    });
-    return [...present, ...missing];
-  }, [consumedProducts, sortKey, sortDesc]);
+  const { consumedProducts, consumedStatus, consumedLoadingMore, consumedMeta, error } = useSelector(state => state.products);
 
-  // 정렬 칩 클릭 핸들러 (내림 → 오름 → 해제)
+  // 정렬 칩 클릭 핸들러 (내림 ↔ 오름)
   const handleSortPress = () => {
-    if (sortKey !== 'consumed') {
-      setSortKey('consumed');
-      setSortDesc(true);
-      return;
-    }
-    if (sortDesc) {
-      setSortDesc(false);
-      return;
-    }
-    setSortKey(null);
+    const nextDesc = !sortDesc;
+    setSortDesc(nextDesc);
+    // API 호출은 useFocusEffect에서 sortDesc 의존성으로 단일 실행되도록 위임
   };
 
-  
-  // 컴포넌트 마운트 시 데이터 로드
-  useEffect(() => {
-    dispatch(fetchConsumedProducts());
-  }, [dispatch]);
   
   // 화면에 포커스가 올 때마다 데이터 새로고침
   useFocusEffect(
     useCallback(() => {
-      dispatch(fetchConsumedProducts());
-    }, [dispatch])
+      const sort = sortDesc ? '-consumed' : 'consumed';
+      dispatch(fetchConsumedProducts({ size: 20, sort, append: false }));
+    }, [dispatch, sortDesc])
   );
+  
+  const loadMore = useCallback(() => {
+    if (consumedLoadingMore) return;
+    if (!consumedMeta?.hasMore) return;
+    const sort = sortDesc ? '-consumed' : 'consumed';
+    dispatch(fetchConsumedProducts({ nextCursor: consumedMeta.nextCursor, size: 20, sort, append: true }));
+  }, [dispatch, consumedMeta, sortDesc, consumedLoadingMore]);
   
   // 소진 처리된 날짜 포맷팅
   const formatConsumedDate = (dateString) => {
@@ -110,15 +86,6 @@ const ConsumedProductsScreen = () => {
     </View>
   );
   
-  // 로딩 중 표시
-  if (consumedStatus === 'loading') {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
-  }
-  
   // 에러 표시
   if (consumedStatus === 'failed') {
     return (
@@ -153,21 +120,32 @@ const ConsumedProductsScreen = () => {
         {/* 정렬 바 - LocationDetailScreen 스타일 준용, 기준은 소진 처리순만 */}
         <View style={styles.sortBar}>
           <View style={styles.sortBarContent}>
-            <TouchableOpacity style={[styles.sortChip, sortKey === 'consumed' && styles.sortChipActive]} onPress={handleSortPress}>
-              <Text style={[styles.sortChipText, sortKey === 'consumed' && styles.sortChipTextActive]}>소진순</Text>
-              {sortKey === 'consumed' && (
-                <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
-              )}
+            <TouchableOpacity style={[styles.sortChip, styles.sortChipActive]} onPress={handleSortPress}>
+              <Text style={[styles.sortChipText, styles.sortChipTextActive]}>소진순</Text>
+              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
             </TouchableOpacity>
           </View>
         </View>
-        <FlatList
-          data={sortedConsumedProducts}
-          renderItem={renderItem}
-          keyExtractor={item => `consumed-${String(item.localId || item.id)}-${item.processedAt || item.consumedAt || ''}`}
-          ListEmptyComponent={renderEmptyList}
-          contentContainerStyle={styles.listContent}
-        />
+        {consumedStatus === 'loading' ? (
+          <View style={styles.loadingInlineContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+          </View>
+        ) : (
+          <FlatList
+            data={consumedProducts}
+            renderItem={renderItem}
+            keyExtractor={item => `consumed-${String(item.localId || item.id)}-${item.processedAt || item.consumedAt || ''}`}
+            ListEmptyComponent={renderEmptyList}
+            contentContainerStyle={styles.listContent}
+            onEndReachedThreshold={0.3}
+            onEndReached={loadMore}
+            ListFooterComponent={consumedLoadingMore ? (
+              <View style={{ paddingVertical: 16 }}>
+                <ActivityIndicator size="small" color="#4CAF50" />
+              </View>
+            ) : null}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -252,6 +230,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingInlineContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 32,
   },
   errorContainer: {
     flex: 1,

@@ -301,16 +301,21 @@ export const markProductAsConsumedAsync = createAsyncThunk(
   }
 );
 
-// 소진 처리된 제품 조회 액션
+// 소진 처리된 제품 조회 액션 (커서 페이지네이션 + 서버 정렬)
 export const fetchConsumedProducts = createAsyncThunk(
   'products/fetchConsumedProducts',
-  async (_, { rejectWithValue, getState }) => {
+  async (arg, { rejectWithValue, getState }) => {
     try {
       const state = getState();
       const isLoggedIn = !!state?.auth?.isLoggedIn;
+      const isObj = typeof arg === 'object' && arg !== null;
+      const nextCursorParam = isObj ? (arg.nextCursor || null) : null;
+      const sizeParam = isObj && arg.size != null ? arg.size : null;
+      const sortParam = isObj ? (arg.sort || null) : (state.products?.consumedMeta?.sort || '-consumed');
+      const append = isObj ? !!arg.append : false;
       if (isLoggedIn) {
         try {
-          const res = await fetchConsumedInventoryItems();
+          const res = await fetchConsumedInventoryItems({ nextCursor: nextCursorParam, size: sizeParam, sort: sortParam });
           const items = Array.isArray(res?.guest_inventory_consumed_items) ? res.guest_inventory_consumed_items : [];
           const mapped = items.map((it) => ({
             id: String(it.id),
@@ -330,14 +335,9 @@ export const fetchConsumedProducts = createAsyncThunk(
             updatedAt: it.updated_at,
             isConsumed: true,
           }));
-          // 정렬: 최근 처리 순
-          mapped.sort((a, b) => {
-            const ta = a.processedAt ? new Date(a.processedAt).getTime() : (a.consumedAt ? new Date(a.consumedAt).getTime() : 0);
-            const tb = b.processedAt ? new Date(b.processedAt).getTime() : (b.consumedAt ? new Date(b.consumedAt).getTime() : 0);
-            return tb - ta;
-          });
-          try { await saveConsumedProducts(mapped); } catch (e) {}
-          return mapped;
+          // 서버 정렬 순서를 그대로 사용
+          try { if (!append) await saveConsumedProducts(mapped); } catch (e) {}
+          return { items: mapped, nextCursor: res?.next_cursor ?? null, hasMore: !!res?.has_more, append, sort: sortParam };
         } catch (apiErr) {
           console.warn('소진 목록 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
         }
@@ -345,13 +345,9 @@ export const fetchConsumedProducts = createAsyncThunk(
 
       // 폴백: 현재 상태 또는 AsyncStorage
       const currentConsumedProducts = state.products.consumedProducts;
-      if (currentConsumedProducts.length > 0) return currentConsumedProducts;
+      if (currentConsumedProducts.length > 0) return { items: currentConsumedProducts, nextCursor: null, hasMore: false, append: false, sort: sortParam };
       const storedConsumedProducts = await loadConsumedProducts();
-      return (storedConsumedProducts || []).slice().sort((a, b) => {
-        const ta = a.consumedAt ? new Date(a.consumedAt).getTime() : 0;
-        const tb = b.consumedAt ? new Date(b.consumedAt).getTime() : 0;
-        return tb - ta;
-      });
+      return { items: storedConsumedProducts || [], nextCursor: null, hasMore: false, append: false, sort: sortParam };
     } catch (error) {
       console.error('소진된 제품 목록 가져오기 오류:', error);
       return rejectWithValue(error.message);
@@ -400,10 +396,12 @@ const initialState = {
   consumedProducts: [], // 소진 처리된 제품 목록
   status: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
   consumedStatus: 'idle', // 소진 처리된 제품 로딩 상태
+  consumedLoadingMore: false, // 소진 목록 추가 로딩 상태
   error: null,
   currentProduct: null,
   locationProducts: {}, // 영역별 제품 목록 캐시 (array)
   locationProductsMeta: {}, // { [locationId]: { nextCursor, hasMore } }
+  consumedMeta: { nextCursor: null, hasMore: false, sort: '-consumed' }, // 소진 목록 메타
 };
 
 export const productsSlice = createSlice({
@@ -579,21 +577,37 @@ export const productsSlice = createSlice({
         state.error = action.payload;
       })
       
-      // 소진 처리된 제품 조회 액션 처리
-      .addCase(fetchConsumedProducts.pending, (state) => {
-        state.consumedStatus = 'loading';
+      // 소진 처리된 제품 조회 액션 처리 (커서 페이지네이션)
+      .addCase(fetchConsumedProducts.pending, (state, action) => {
+        const isObj = typeof action.meta.arg === 'object' && action.meta.arg !== null;
+        const append = isObj ? !!action.meta.arg.append : false;
+        if (append) {
+          state.consumedLoadingMore = true;
+        } else {
+          state.consumedStatus = 'loading';
+        }
       })
       .addCase(fetchConsumedProducts.fulfilled, (state, action) => {
-        state.consumedStatus = 'succeeded';
-        state.consumedProducts = (action.payload || []).slice().sort((a, b) => {
-          const ta = a.processedAt ? new Date(a.processedAt).getTime() : (a.consumedAt ? new Date(a.consumedAt).getTime() : 0);
-          const tb = b.processedAt ? new Date(b.processedAt).getTime() : (b.consumedAt ? new Date(b.consumedAt).getTime() : 0);
-          return tb - ta;
-        });
+        const payload = action.payload || {};
+        const { items = [], nextCursor = null, hasMore = false, append = false, sort = '-consumed' } = payload;
+        if (append) {
+          state.consumedLoadingMore = false;
+          state.consumedProducts = [...state.consumedProducts, ...items];
+        } else {
+          state.consumedStatus = 'succeeded';
+          state.consumedProducts = items;
+        }
+        state.consumedMeta = { nextCursor, hasMore, sort };
       })
       .addCase(fetchConsumedProducts.rejected, (state, action) => {
-        state.consumedStatus = 'failed';
-        state.error = action.payload;
+        const isObj = typeof action.meta.arg === 'object' && action.meta.arg !== null;
+        const append = isObj ? !!action.meta.arg.append : false;
+        if (append) {
+          state.consumedLoadingMore = false;
+        } else {
+          state.consumedStatus = 'failed';
+          state.error = action.payload;
+        }
       })
       
       // 소진 철회 액션 처리

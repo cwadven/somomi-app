@@ -176,10 +176,10 @@ const ProductDetailScreen = () => {
   useEffect(() => {
     // 리스트/캐시/파라미터에 데이터가 없을 때만 개별 상세 로드
     if (!currentProduct && productId) {
-      dispatch(fetchProductById(productId));
+    dispatch(fetchProductById(productId));
     }
   }, [dispatch, productId, currentProduct]);
-
+  
   // 목록 자동 재호출 제거 (요청사항): 제품 상세 진입/복귀 시 영역 목록 API 호출 금지
   
   // 소진 처리 날짜 상태 변화 감지 및 로깅
@@ -344,7 +344,7 @@ const ProductDetailScreen = () => {
                 // 약간의 지연 후 성공 모달 표시 (애니메이션 충돌 방지)
                 setTimeout(() => {
                   // 성공 모달 설정 및 표시
-                   setSuccessModalConfig({
+                  setSuccessModalConfig({
                     title: '소진 처리 완료',
                     message: `${productName} 제품이 ${formattedDate}에 소진 처리되었습니다.`,
                     onConfirm: () => {
@@ -546,8 +546,8 @@ const ProductDetailScreen = () => {
           <Text style={styles.headerTitle}>제품 상세</Text>
           <View style={styles.headerRight} />
         </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
         </View>
       </View>
     );
@@ -564,14 +564,14 @@ const ProductDetailScreen = () => {
           <Text style={styles.headerTitle}>제품 상세</Text>
           <View style={styles.headerRight} />
         </View>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.errorText}>오류: {error}</Text>
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={() => dispatch(fetchProductById(productId))}
-          >
-            <Text style={styles.retryButtonText}>다시 시도</Text>
-          </TouchableOpacity>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.errorText}>오류: {error}</Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={() => dispatch(fetchProductById(productId))}
+        >
+          <Text style={styles.retryButtonText}>다시 시도</Text>
+        </TouchableOpacity>
         </View>
       </View>
     );
@@ -588,8 +588,8 @@ const ProductDetailScreen = () => {
           <Text style={styles.headerTitle}>제품 상세</Text>
           <View style={styles.headerRight} />
         </View>
-        <View style={styles.loadingContainer}>
-          <Text>제품을 찾을 수 없습니다.</Text>
+      <View style={styles.loadingContainer}>
+        <Text>제품을 찾을 수 없습니다.</Text>
         </View>
       </View>
     );
@@ -977,7 +977,7 @@ const ProductDetailScreen = () => {
             value={currentProduct.createdAt ? new Date(currentProduct.createdAt).toLocaleDateString() : null} 
             icon="time-outline" 
           />
-
+          
           <InfoItem 
             label="구매일" 
             value={currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate).toLocaleDateString() : null} 
@@ -1093,29 +1093,29 @@ const ProductDetailScreen = () => {
           };
           return (
             <>
-              <TouchableOpacity 
-                style={styles.bottomActionButton}
-                onPress={handleEdit}
-              >
-                <Ionicons name="create-outline" size={24} color="#4CAF50" />
-                <Text style={styles.bottomActionText}>수정</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
+        <TouchableOpacity 
+          style={styles.bottomActionButton}
+          onPress={handleEdit}
+        >
+          <Ionicons name="create-outline" size={24} color="#4CAF50" />
+          <Text style={styles.bottomActionText}>수정</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
                 style={[styles.bottomActionButton, isLocationExpired ? { opacity: 0.5 } : null]}
                 onPress={() => isLocationExpired ? onBlocked('만료된 영역에서는 소진 처리를 할 수 없습니다.') : handleMarkAsConsumed()}
-              >
-                <Ionicons name="checkmark-circle-outline" size={24} color="#FF9800" />
-                <Text style={styles.bottomActionText}>소진 처리</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
+        >
+          <Ionicons name="checkmark-circle-outline" size={24} color="#FF9800" />
+          <Text style={styles.bottomActionText}>소진 처리</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
                 style={[styles.bottomActionButton, isLocationExpired ? { opacity: 0.5 } : null]}
                 onPress={() => isLocationExpired ? onBlocked('만료된 영역에서는 제품을 삭제할 수 없습니다.') : handleDelete()}
-              >
-                <Ionicons name="trash-outline" size={24} color="#F44336" />
-                <Text style={styles.bottomActionText}>삭제</Text>
-              </TouchableOpacity>
+        >
+          <Ionicons name="trash-outline" size={24} color="#F44336" />
+          <Text style={styles.bottomActionText}>삭제</Text>
+        </TouchableOpacity>
             </>
           );
         })()}

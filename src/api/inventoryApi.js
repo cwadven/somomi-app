@@ -41,9 +41,16 @@ export const revokeConsumeInventoryItem = async (guest_inventory_item_id, body =
   });
 };
 
-export const fetchConsumedInventoryItems = async () => {
-  // GET /v1/inventory/items/consumed → { guest_inventory_items: [...] }
-  return request('/v1/inventory/items/consumed', { method: 'GET' });
+export const fetchConsumedInventoryItems = async ({ nextCursor = null, size = null, sort = null } = {}) => {
+  // GET /v1/inventory/items/consumed?next_cursor=...&size=...&sort=... 
+  // → { guest_inventory_consumed_items: [...], has_more: boolean, next_cursor: string|null }
+  let path = '/v1/inventory/items/consumed';
+  const qs = [];
+  if (nextCursor) qs.push(`next_cursor=${encodeURIComponent(nextCursor)}`);
+  if (size != null) qs.push(`size=${encodeURIComponent(String(size))}`);
+  if (sort) qs.push(`sort=${encodeURIComponent(String(sort))}`);
+  if (qs.length) path += `?${qs.join('&')}`;
+  return request(path, { method: 'GET' });
 };
 
 export const fetchAllInventoryItems = async () => {
