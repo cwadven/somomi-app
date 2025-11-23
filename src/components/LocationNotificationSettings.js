@@ -17,7 +17,7 @@ import {
 } from '../redux/slices/notificationsSlice';
 import AlertModal from './AlertModal';
 import { isLocationExpired as isLocationExpiredUtil } from '../utils/locationUtils';
-import { fetchGuestSectionAlarm } from '../api/alarmApi';
+import { fetchGuestSectionAlarm, updateGuestSectionAlarm } from '../api/alarmApi';
 
 /**
  * 영역별 알림 설정 컴포넌트
@@ -168,69 +168,22 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
   // 알림 설정 저장
   const saveNotificationSettings = async () => {
     try {
-      // 유통기한 알림 설정 저장
-      const expiryNotification = currentNotifications.find(n => n.notifyType === 'expiry');
-      // 일수 값 처리 - 빈 값이면 null 사용
+      // 백엔드 섹션 알림 설정 저장 (PUT)
       const parsedExpiryDays = expiryDays.trim() === '' ? null : parseInt(expiryDays);
-      // 0 이상인 경우 유효한 값으로 처리
-      const safeExpiryDays = (parsedExpiryDays !== null && !isNaN(parsedExpiryDays) && parsedExpiryDays >= 0) ? parsedExpiryDays : null;
-      
-      if (expiryNotification) {
-        // 기존 설정 업데이트
-        await dispatch(updateNotification({
-          id: expiryNotification.id,
-          data: {
-            isActive: expiryEnabled,
-            daysBeforeTarget: safeExpiryDays,
-            isRepeating: isExpiryRepeating // 유통기한 연속 알림 설정
-          }
-        })).unwrap();
-      } else {
-        // 새 설정 추가
-        await dispatch(addNotification({
-          type: 'location',
-          targetId: locationId,
-          title: `${locationTitle} 유통기한 알림`,
-          message: `${locationTitle} 영역의 제품 유통기한 알림 설정입니다.`,
-          notifyType: 'expiry',
-          daysBeforeTarget: safeExpiryDays,
-          isActive: expiryEnabled,
-          isRepeating: isExpiryRepeating // 유통기한 연속 알림 설정
-        })).unwrap();
-      }
-      
-      // 소진예상 알림 설정 저장
-      const estimatedNotification = currentNotifications.find(n => n.notifyType === 'estimated');
-      // 일수 값 처리 - 빈 값이면 null 사용
       const parsedEstimatedDays = estimatedDays.trim() === '' ? null : parseInt(estimatedDays);
-      // 0 이상인 경우 유효한 값으로 처리
-      const safeEstimatedDays = (parsedEstimatedDays !== null && !isNaN(parsedEstimatedDays) && parsedEstimatedDays >= 0) ? parsedEstimatedDays : null;
+      const safeExpiryDays = (parsedExpiryDays !== null && !isNaN(parsedExpiryDays) && parsedExpiryDays >= 0) ? parsedExpiryDays : 0;
+      const safeEstimatedDays = (parsedEstimatedDays !== null && !isNaN(parsedEstimatedDays) && parsedEstimatedDays >= 0) ? parsedEstimatedDays : 0;
+      const body = {
+        is_alarm_activated_for_expected_expire_at: !!estimatedEnabled,
+        alarm_expected_expire_at_before_days_from_today: safeEstimatedDays,
+        is_repeatable_alarm_expected_expire_at: !!isEstimatedRepeating,
+        is_alarm_activated_for_expire_at: !!expiryEnabled,
+        alarm_expire_at_before_days_from_today: safeExpiryDays,
+        is_repeatable_alarm_expire_at: !!isExpiryRepeating,
+      };
+      await updateGuestSectionAlarm(locationId, body);
       
-      if (estimatedNotification) {
-        // 기존 설정 업데이트
-        await dispatch(updateNotification({
-          id: estimatedNotification.id,
-          data: {
-            isActive: estimatedEnabled,
-            daysBeforeTarget: safeEstimatedDays,
-            isRepeating: isEstimatedRepeating // 소진예상 연속 알림 설정
-          }
-        })).unwrap();
-      } else {
-        // 새 설정 추가
-        await dispatch(addNotification({
-          type: 'location',
-          targetId: locationId,
-          title: `${locationTitle} 소진예상 알림`,
-          message: `${locationTitle} 영역의 제품 소진예상 알림 설정입니다.`,
-          notifyType: 'estimated',
-          daysBeforeTarget: safeEstimatedDays,
-          isActive: estimatedEnabled,
-          isRepeating: isEstimatedRepeating // 소진예상 연속 알림 설정
-        })).unwrap();
-      }
-      
-      // AI 알림 설정 저장
+      // AI 알림 설정 저장(백엔드 스펙 외 항목은 기존 로컬 로직 유지)
       const aiNotification = currentNotifications.find(n => n.notifyType === 'ai');
       if (aiNotification) {
         // 기존 설정 업데이트

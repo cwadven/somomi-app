@@ -18,6 +18,15 @@ export const fetchGuestSectionAlarm = async (guest_section_id) => {
   return await request(`/v1/alarm/guest-section/${guest_section_id}`, { method: 'GET' });
 };
 
+// 특정 영역(게스트 섹션) 알림 설정 수정
+// PUT /v1/alarm/guest-section/{guest_section_id}
+export const updateGuestSectionAlarm = async (guest_section_id, body) => {
+  return await request(`/v1/alarm/guest-section/${guest_section_id}`, {
+    method: 'PUT',
+    body,
+  });
+};
+
 export default { fetchGuestAlarms };
 
 
