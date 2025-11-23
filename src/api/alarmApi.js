@@ -12,6 +12,12 @@ export const fetchGuestAlarmHistory = async () => {
   return await request('/v1/alarm/guest/history', { method: 'GET' });
 };
 
+// 특정 영역(게스트 섹션) 알림 설정 조회
+// GET /v1/alarm/guest-section/{guest_section_id}
+export const fetchGuestSectionAlarm = async (guest_section_id) => {
+  return await request(`/v1/alarm/guest-section/${guest_section_id}`, { method: 'GET' });
+};
+
 export default { fetchGuestAlarms };
 
 

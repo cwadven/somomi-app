@@ -17,6 +17,7 @@ import {
 } from '../redux/slices/notificationsSlice';
 import AlertModal from './AlertModal';
 import { isLocationExpired as isLocationExpiredUtil } from '../utils/locationUtils';
+import { fetchGuestSectionAlarm } from '../api/alarmApi';
 
 /**
  * 영역별 알림 설정 컴포넌트
@@ -53,6 +54,8 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
   const [aiEnabled, setAiEnabled] = useState(false);
   const [isExpiryRepeating, setIsExpiryRepeating] = useState(false); // 유통기한 연속 알림
   const [isEstimatedRepeating, setIsEstimatedRepeating] = useState(false); // 소진예상 연속 알림
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiError, setApiError] = useState(null);
   
   // 알림 모달 상태
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -67,7 +70,45 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
   // 컴포넌트 마운트 시 영역 알림 설정 로드
   useEffect(() => {
     if (locationId) {
-      console.log('영역 알림 설정 로드:', locationId);
+      console.log('영역 알림 설정 로드(백엔드):', locationId);
+      // 백엔드 섹션 알림 설정 우선 로드
+      const load = async () => {
+        try {
+          setApiLoading(true);
+          setApiError(null);
+          const res = await fetchGuestSectionAlarm(locationId);
+          // 맵핑
+          const a = res || {};
+          if (typeof a.is_alarm_activated_for_expire_at === 'boolean') {
+            setExpiryEnabled(!!a.is_alarm_activated_for_expire_at);
+          }
+          if (typeof a.alarm_expire_at_before_days_from_today === 'number') {
+            setExpiryDays(String(a.alarm_expire_at_before_days_from_today));
+          }
+          if (typeof a.is_repeatable_alarm_expire_at === 'boolean') {
+            setIsExpiryRepeating(!!a.is_repeatable_alarm_expire_at);
+          }
+          if (typeof a.is_alarm_activated_for_expected_expire_at === 'boolean') {
+            setEstimatedEnabled(!!a.is_alarm_activated_for_expected_expire_at);
+          }
+          if (typeof a.alarm_expected_expire_at_before_days_from_today === 'number') {
+            setEstimatedDays(String(a.alarm_expected_expire_at_before_days_from_today));
+          }
+          if (typeof a.is_repeatable_alarm_expected_expire_at === 'boolean') {
+            setIsEstimatedRepeating(!!a.is_repeatable_alarm_expected_expire_at);
+          }
+        } catch (e) {
+          // 400 not_exists는 기본값 유지
+          const msg = e?.response?.data?.message || e?.message || '';
+          if (e?.response?.status !== 400) {
+            setApiError(msg || '알림 설정을 가져오지 못했습니다.');
+          }
+        } finally {
+          setApiLoading(false);
+        }
+      };
+      load();
+      // 기존 로컬/리덕스 알림도 병행 유지(백엔드 없을 때 폴백)
       dispatch(fetchLocationNotifications(locationId));
     }
   }, [dispatch, locationId]);
@@ -240,7 +281,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
   };
 
   // 로딩 중 표시
-  if (status === 'loading') {
+  if (status === 'loading' || apiLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color="#4CAF50" />
@@ -250,14 +291,43 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
   }
 
   // 오류 발생 시 표시
-  if (status === 'failed') {
+  if (status === 'failed' || apiError) {
     return (
       <View style={[styles.container, styles.errorContainer]}>
         <Ionicons name="alert-circle" size={50} color="#F44336" />
         <Text style={styles.errorText}>알림 설정을 불러오는 데 실패했습니다.</Text>
         <TouchableOpacity 
           style={styles.retryButton}
-          onPress={() => dispatch(fetchLocationNotifications(locationId))}
+          onPress={() => {
+            // 재시도: 백엔드+리덕스 모두 재호출
+            setApiError(null);
+            setApiLoading(true);
+            fetchGuestSectionAlarm(locationId)
+              .then((res) => {
+                const a = res || {};
+                if (typeof a.is_alarm_activated_for_expire_at === 'boolean') {
+                  setExpiryEnabled(!!a.is_alarm_activated_for_expire_at);
+                }
+                if (typeof a.alarm_expire_at_before_days_from_today === 'number') {
+                  setExpiryDays(String(a.alarm_expire_at_before_days_from_today));
+                }
+                if (typeof a.is_repeatable_alarm_expire_at === 'boolean') {
+                  setIsExpiryRepeating(!!a.is_repeatable_alarm_expire_at);
+                }
+                if (typeof a.is_alarm_activated_for_expected_expire_at === 'boolean') {
+                  setEstimatedEnabled(!!a.is_alarm_activated_for_expected_expire_at);
+                }
+                if (typeof a.alarm_expected_expire_at_before_days_from_today === 'number') {
+                  setEstimatedDays(String(a.alarm_expected_expire_at_before_days_from_today));
+                }
+                if (typeof a.is_repeatable_alarm_expected_expire_at === 'boolean') {
+                  setIsEstimatedRepeating(!!a.is_repeatable_alarm_expected_expire_at);
+                }
+              })
+              .catch(() => {})
+              .finally(() => setApiLoading(false));
+            dispatch(fetchLocationNotifications(locationId));
+          }}
         >
           <Text style={styles.retryButtonText}>다시 시도</Text>
         </TouchableOpacity>
