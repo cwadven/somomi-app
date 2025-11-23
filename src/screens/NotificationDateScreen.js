@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 import { loadProcessedNotifications } from '../utils/notificationUtils';
 import { fetchGuestAlarmHistory } from '../api/alarmApi';
 
@@ -17,6 +18,7 @@ const NotificationDateScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { date, formattedDate } = route.params;
+  const { locations } = useSelector(state => state.locations);
   
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
@@ -75,17 +77,21 @@ const NotificationDateScreen = () => {
         const items = Array.isArray(res?.guest_alarm_histories) ? res.guest_alarm_histories : [];
         const match = items.find(h => h.target_date === date);
         if (match && Array.isArray(match.guest_inventory_items)) {
-          backendNotifications = match.guest_inventory_items.map(it => ({
-            product_id: it.guest_inventory_item_id,
-            product_name: it.guest_inventory_item_name,
-            location_id: it.guest_section_id,
-            location_name: null,
-            notification_type: it.expire_at ? '유통기한' : '소진 예상',
-            message: it.expire_at
-              ? `${it.guest_inventory_item_name}의 유통기한 알림`
-              : `${it.guest_inventory_item_name}의 소진예상 알림`,
-            expire_at: it.expire_at || it.expected_expire_at || null,
-          }));
+          backendNotifications = match.guest_inventory_items.map(it => {
+            const locId = it.guest_section_id != null ? String(it.guest_section_id) : null;
+            const loc = locId ? (locations || []).find(l => String(l.id) === locId) : null;
+            return {
+              product_id: it.guest_inventory_item_id,
+              product_name: it.guest_inventory_item_name,
+              location_id: it.guest_section_id,
+              location_name: loc ? (loc.title || null) : null,
+              notification_type: it.expire_at ? '유통기한' : '소진 예상',
+              message: it.expire_at
+                ? `${it.guest_inventory_item_name}의 유통기한 알림`
+                : `${it.guest_inventory_item_name}의 소진예상 알림`,
+              expire_at: it.expire_at || it.expected_expire_at || null,
+            };
+          });
         }
       } catch (e) {}
 
@@ -93,8 +99,16 @@ const NotificationDateScreen = () => {
         ? backendNotifications
         : await loadProcessedNotifications(date);
 
-      setNotifications(dateNotifications);
-      const grouped = groupNotificationsByProduct(dateNotifications);
+      // 로컬 폴백인 경우에도 위치명 보강
+      const enriched = (dateNotifications || []).map(n => {
+        if (n.location_name) return n;
+        const locId = n.location_id != null ? String(n.location_id) : null;
+        const loc = locId ? (locations || []).find(l => String(l.id) === locId) : null;
+        return { ...n, location_name: loc ? (loc.title || null) : n.location_name || null };
+      });
+
+      setNotifications(enriched);
+      const grouped = groupNotificationsByProduct(enriched);
       setGroupedNotifications(grouped);
       
       setLoading(false);
