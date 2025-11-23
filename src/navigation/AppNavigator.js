@@ -221,11 +221,6 @@ const MainTabs = ({ linking }) => {
             e.preventDefault();
             navigation.navigate('Locations', { screen: 'LocationsScreen' });
           }
-            // 프로필 탭 선택 시 항상 루트(ProfileScreen)로 이동
-            if (route.name === 'Profile') {
-              e.preventDefault();
-              navigation.navigate('Profile', { screen: 'ProfileScreen' });
-            }
         },
       })}
     >

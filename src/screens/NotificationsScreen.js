@@ -14,17 +14,36 @@ import { useNavigation } from '@react-navigation/native';
 import { loadAllProcessedNotifications, loadProcessedNotifications, processAllNotifications } from '../utils/notificationUtils';
 import { fetchGuestAlarmHistory } from '../api/alarmApi';
 
+// 화면 재진입 시 API 재호출 방지 및 스크롤 위치 복원을 위한 간단 캐시
+let __notificationsDatesCache = null;
+let __notificationsScrollOffsetY = 0;
+
 const NotificationsScreen = () => {
   const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
   const [dates, setDates] = useState([]);
+  const listRef = useRef(null);
 
   // 최초 1회만 데이터 로드 (뒤로가기 시 재호출 방지)
   const didInitialFetchRef = useRef(false);
   useEffect(() => {
     if (didInitialFetchRef.current) return;
     didInitialFetchRef.current = true;
-    loadNotificationsData();
+    // 캐시가 있으면 그대로 사용(API 미호출, 스크롤 위치 복원)
+    if (Array.isArray(__notificationsDatesCache) && __notificationsDatesCache.length > 0) {
+      setDates(__notificationsDatesCache);
+      setLoading(false);
+      // 콘텐츠 렌더 후 스크롤 복원
+      setTimeout(() => {
+        try {
+          if (listRef.current && __notificationsScrollOffsetY > 0) {
+            listRef.current.scrollToOffset({ offset: __notificationsScrollOffsetY, animated: false });
+          }
+        } catch (e) {}
+      }, 0);
+    } else {
+      loadNotificationsData();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -58,6 +77,7 @@ const NotificationsScreen = () => {
 
       if (historyDates.length > 0) {
         setDates(historyDates);
+        __notificationsDatesCache = historyDates;
       } else {
         // 2) 백엔드 없으면 기존 로컬 히스토리 표시
         await processAllNotifications(true);
@@ -69,6 +89,7 @@ const NotificationsScreen = () => {
           notifications: allNotifications[date] || []
         }));
         setDates(datesWithCount);
+        __notificationsDatesCache = datesWithCount;
       }
       setLoading(false);
     } catch (error) {
@@ -137,10 +158,15 @@ const NotificationsScreen = () => {
       ) : (
         dates.length > 0 ? (
           <FlatList
+            ref={listRef}
             data={dates}
             keyExtractor={(item) => item.date}
             renderItem={renderDateCard}
             contentContainerStyle={styles.datesList}
+            onScroll={(e) => {
+              __notificationsScrollOffsetY = e?.nativeEvent?.contentOffset?.y || 0;
+            }}
+            scrollEventThrottle={16}
           />
         ) : (
           <View style={styles.emptyContainer}>
