@@ -12,7 +12,7 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchConsumedProducts } from '../redux/slices/productsSlice';
+import { fetchConsumedProducts, removeConsumedProductById } from '../redux/slices/productsSlice';
 import { revokeConsumeInventoryItem } from '../api/inventoryApi';
 import LocationSelectionModal from '../components/LocationSelectionModal';
 import AlertModal from '../components/AlertModal';
@@ -81,6 +81,7 @@ const ConsumedProductDetailScreen = () => {
     setIsRestoring(true);
     revokeConsumeInventoryItem(currentProduct.id)
       .then(() => {
+        try { dispatch(removeConsumedProductById(currentProduct.id)); } catch (e) {}
         navigation.goBack();
       })
       .catch((error) => {
@@ -131,6 +132,7 @@ const ConsumedProductDetailScreen = () => {
       }
       revokeConsumeInventoryItem(currentProduct.id, body)
       .then(() => {
+        try { dispatch(removeConsumedProductById(currentProduct.id)); } catch (e) {}
         navigation.goBack();
       })
       .catch((error) => {

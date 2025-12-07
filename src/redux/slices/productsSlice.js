@@ -420,6 +420,10 @@ export const productsSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    removeConsumedProductById: (state, action) => {
+      const id = String(action.payload);
+      state.consumedProducts = state.consumedProducts.filter(p => String(p.id) !== id);
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -675,6 +679,6 @@ export const productsSlice = createSlice({
   },
 });
 
-export const { clearCurrentProduct, clearError } = productsSlice.actions;
+export const { clearCurrentProduct, clearError, removeConsumedProductById } = productsSlice.actions;
 
 export default productsSlice.reducer; 
