@@ -36,6 +36,22 @@ const ProfileScreen = () => {
     }
   }, [route.params]);
 
+  // 세션 만료 모달 처리
+  useEffect(() => {
+    if (route.params?.sessionExpired) {
+      setModalTitle('로그인 만료');
+      setModalMessage('세션이 만료되어 자동으로 로그아웃되었습니다. 다시 로그인해 주세요.');
+      setModalButtons([
+        { text: '확인', onPress: () => { setModalVisible(false); } }
+      ]);
+      setModalVisible(true);
+      // 한 번만 표시되도록 파라미터 제거
+      try {
+        navigation.setParams({ sessionExpired: undefined });
+      } catch (e) {}
+    }
+  }, [route.params?.sessionExpired]);
+
   // 초기 큐 상태 로드
   useEffect(() => {
     (async () => {

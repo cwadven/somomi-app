@@ -24,7 +24,23 @@ export const request = async (path, { method = 'GET', headers = {}, body, skipAu
     if (!skipAuth && !_retry && errorCode === 'expired-jwt-token') {
       try {
         const refreshToken = await loadRefreshToken();
-        if (!refreshToken) throw new Error('no-refresh-token');
+        if (!refreshToken) {
+          // 리프레시 토큰 없음 → 즉시 로그아웃 및 프로필 탭 이동
+          try {
+            const { store } = require('../redux/store');
+            const { logout } = require('../redux/slices/authSlice');
+            store.dispatch(logout());
+          } catch (e) {}
+          try {
+            const { navigationRef } = require('../navigation/RootNavigation');
+            setTimeout(() => {
+              if (navigationRef?.isReady?.()) {
+                navigationRef.navigate('Profile', { screen: 'ProfileScreen', params: { sessionExpired: true } });
+              }
+            }, 0);
+          } catch (e) {}
+          throw new Error('no-refresh-token');
+        }
         const refreshRes = await fetch(`${API_BASE_URL}/v1/member/refresh-token`, {
           method: 'POST',
           headers: {
@@ -37,9 +53,23 @@ export const request = async (path, { method = 'GET', headers = {}, body, skipAu
         const refreshJson = refreshText ? JSON.parse(refreshText) : null;
         if (!refreshRes.ok) {
           const msg = refreshJson?.message || '토큰 갱신 실패';
-          const e = new Error(msg);
-          e.response = { status: refreshRes.status, data: refreshJson };
-          throw e;
+          // 리프레시 실패 → 로그아웃 및 프로필 탭 이동
+          try {
+            const { store } = require('../redux/store');
+            const { logout } = require('../redux/slices/authSlice');
+            store.dispatch(logout());
+          } catch (e) {}
+          try {
+            const { navigationRef } = require('../navigation/RootNavigation');
+            setTimeout(() => {
+              if (navigationRef?.isReady?.()) {
+                navigationRef.navigate('Profile', { screen: 'ProfileScreen', params: { sessionExpired: true } });
+              }
+            }, 0);
+          } catch (e) {}
+          const err = new Error(msg);
+          err.response = { status: refreshRes.status, data: refreshJson };
+          throw err;
         }
         const newAccess = refreshJson?.access_token;
         const newRefresh = refreshJson?.refresh_token;
@@ -52,6 +82,20 @@ export const request = async (path, { method = 'GET', headers = {}, body, skipAu
         const message = json?.message || '요청에 실패했습니다.';
         const error = new Error(message);
         error.response = { status: res.status, data: json };
+        // 갱신 처리 중 예외 발생 시에도 로그아웃 및 이동 시도
+        try {
+          const { store } = require('../redux/store');
+          const { logout } = require('../redux/slices/authSlice');
+          store.dispatch(logout());
+        } catch (e) {}
+        try {
+          const { navigationRef } = require('../navigation/RootNavigation');
+          setTimeout(() => {
+            if (navigationRef?.isReady?.()) {
+              navigationRef.navigate('Profile', { screen: 'ProfileScreen', params: { sessionExpired: true } });
+            }
+          }, 0);
+        } catch (e) {}
         throw error;
       }
     }

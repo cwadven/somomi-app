@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import { navigationRef } from './RootNavigation';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -268,6 +269,7 @@ const AppNavigator = ({ linking }) => {
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       <SafeAreaView style={{ flex: 1 }}>
         <NavigationContainer
+          ref={navigationRef}
           linking={linking}
           initialState={initialState}
           onStateChange={(state) => {
