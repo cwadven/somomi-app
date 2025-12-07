@@ -25,20 +25,7 @@ export const request = async (path, { method = 'GET', headers = {}, body, skipAu
       try {
         const refreshToken = await loadRefreshToken();
         if (!refreshToken) {
-          // 리프레시 토큰 없음 → 즉시 로그아웃 및 프로필 탭 이동
-          try {
-            const { store } = require('../redux/store');
-            const { logout } = require('../redux/slices/authSlice');
-            store.dispatch(logout());
-          } catch (e) {}
-          try {
-            const { navigationRef } = require('../navigation/RootNavigation');
-            setTimeout(() => {
-              if (navigationRef?.isReady?.()) {
-                navigationRef.navigate('Profile', { screen: 'ProfileScreen', params: { sessionExpired: true } });
-              }
-            }, 0);
-          } catch (e) {}
+          // 리프레시 토큰 없음: 최초 진입 등 케이스 → 모달/리다이렉트 없음
           throw new Error('no-refresh-token');
         }
         const refreshRes = await fetch(`${API_BASE_URL}/v1/member/refresh-token`, {
@@ -53,7 +40,7 @@ export const request = async (path, { method = 'GET', headers = {}, body, skipAu
         const refreshJson = refreshText ? JSON.parse(refreshText) : null;
         if (!refreshRes.ok) {
           const msg = refreshJson?.message || '토큰 갱신 실패';
-          // 리프레시 실패 → 로그아웃 및 프로필 탭 이동
+          // 실패 시: 로그아웃 + 프로필로 이동하면서 세션 만료 모달 표시
           try {
             const { store } = require('../redux/store');
             const { logout } = require('../redux/slices/authSlice');
@@ -82,13 +69,11 @@ export const request = async (path, { method = 'GET', headers = {}, body, skipAu
         const message = json?.message || '요청에 실패했습니다.';
         const error = new Error(message);
         error.response = { status: res.status, data: json };
-        // 갱신 처리 중 예외 발생 시에도 로그아웃 및 이동 시도
+        // 갱신 처리 중 예외: 세션 만료로 간주하고 모달 표시
         try {
           const { store } = require('../redux/store');
           const { logout } = require('../redux/slices/authSlice');
           store.dispatch(logout());
-        } catch (e) {}
-        try {
           const { navigationRef } = require('../navigation/RootNavigation');
           setTimeout(() => {
             if (navigationRef?.isReady?.()) {
