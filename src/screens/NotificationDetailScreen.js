@@ -1,19 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView
+  SafeAreaView,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { fetchInventoryItemById } from '../api/inventoryApi';
 
 const NotificationDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { notification } = route.params;
+  const [loadingDetail, setLoadingDetail] = useState(false);
   
   // 결합된 알림인지 확인
   const isCombined = notification.combined && notification.allNotifications;
@@ -34,20 +38,41 @@ const NotificationDetailScreen = () => {
     return '#4CAF50';
   };
 
-  // 제품 상세 화면으로 이동
-  const navigateToProductDetail = () => {
-    // product_id가 없다면 이동하지 않음
+  // 제품 상세 화면으로 이동 (게스트 인벤토리 단건 조회 후 매핑)
+  const navigateToProductDetail = async () => {
     if (!notification?.product_id) return;
-    navigation.push('ProductDetail', { 
-      productId: String(notification.product_id),
-      // 상세 캐시 탐색을 돕기 위해 기본 필드도 함께 전달(폴백용)
-      product: {
-        id: String(notification.product_id),
-        name: notification.product_name,
-        locationId: notification.location_id ? String(notification.location_id) : null,
-      },
-      hideHeader: true
-    });
+    try {
+      setLoadingDetail(true);
+      const res = await fetchInventoryItemById(notification.product_id);
+      // API 응답을 ProductDetailScreen에서 사용하는 필드로 매핑
+      const mappedProduct = {
+        id: String(res.id),
+        name: res.name,
+        memo: res.memo || null,
+        brand: res.brand || null,
+        purchasePlace: res.point_of_purchase || null,
+        price: res.purchase_price != null ? Number(res.purchase_price) : null,
+        purchaseDate: res.purchase_at || null,
+        createdAt: res.created_at || null,
+        updatedAt: res.updated_at || null,
+        image: res.icon_url || null,
+        estimatedEndDate: res.expected_expire_at || null,
+        expiryDate: res.expire_at || null,
+        isConsumed: res.is_consumed === true,
+        consumedAt: res.consumed_at || null,
+        locationId: res.guest_section_id != null ? String(res.guest_section_id) : null,
+        // 화면 표시용: 이름만 있는 경우를 위해 문자열 전달
+        location: notification?.location_name || null,
+      };
+      navigation.push('ProductDetail', { 
+        product: mappedProduct,
+        hideHeader: true
+      });
+    } catch (e) {
+      Alert.alert('오류', e?.message || '제품 상세 정보를 불러오지 못했습니다.');
+    } finally {
+      setLoadingDetail(false);
+    }
   };
 
   // 결합된 알림 렌더링
@@ -148,8 +173,14 @@ const NotificationDetailScreen = () => {
           style={styles.productDetailButton}
           onPress={navigateToProductDetail}
         >
-          <Text style={styles.productDetailButtonText}>제품 상세 보기</Text>
-          <Ionicons name="chevron-forward" size={20} color="#fff" />
+          {loadingDetail ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.productDetailButtonText}>제품 상세 보기</Text>
+              <Ionicons name="chevron-forward" size={20} color="#fff" />
+            </>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

@@ -62,7 +62,8 @@ const HomeStack = () => {
         name="ProductForm" 
         component={ProductFormScreen} 
         options={({ route }) => ({ 
-          title: route.params?.mode === 'edit' ? '제품 수정' : '제품 등록' 
+          title: route.params?.mode === 'edit' ? '제품 수정' : '제품 등록',
+          headerShown: false
         })}
       />
       <Stack.Screen 
@@ -100,7 +101,8 @@ const LocationsStack = () => (
       component={ProductFormScreen} 
       options={{ 
         animation: 'slide_from_bottom',
-        presentation: 'modal'
+        presentation: 'modal',
+        headerShown: false
       }}
     />
     <Stack.Screen 
@@ -127,6 +129,14 @@ const ProfileStack = () => {
         name="ProfileScreen" 
         component={ProfileScreen} 
         options={{ title: '프로필', headerShown: false }}
+      />
+      <Stack.Screen 
+        name="ProductForm" 
+        component={ProductFormScreen} 
+        options={({ route }) => ({ 
+          title: route.params?.mode === 'edit' ? '제품 수정' : '제품 등록',
+          headerShown: false
+        })}
       />
       <Stack.Screen 
         name="ConsumedProducts" 

@@ -5,6 +5,11 @@ export const fetchGuestInventoryItemTemplates = async () => {
   return request('/v1/inventory/guest-templates', { method: 'GET' });
 };
 
+export const fetchInventoryItemById = async (guest_inventory_item_id) => {
+  // GET /v1/inventory/item/{guest_inventory_item_id}
+  return request(`/v1/inventory/item/${guest_inventory_item_id}`, { method: 'GET' });
+};
+
 export const fetchInventoryItemsBySection = async (guest_section_id, { nextCursor = null, size = null, sort = null } = {}) => {
   // GET /v1/inventory/section/{guest_section_id}?next_cursor=...&size=... 
   // → { guest_inventory_items: [...], has_more: boolean, next_cursor: string|null }
@@ -90,6 +95,7 @@ export const assignGuestInventoryItemTemplatesToSection = async (guest_section_i
 
 export default {
   fetchGuestInventoryItemTemplates,
+  fetchInventoryItemById,
   fetchInventoryItemsBySection,
   createInventoryItemInSection,
   consumeInventoryItem,
