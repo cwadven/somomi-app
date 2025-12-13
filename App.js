@@ -46,8 +46,10 @@ if (Platform.OS !== 'web') {
     // 백그라운드 메시지 핸들러 설정 (앱이 로드되기 전에 설정해야 함)
     messaging().setBackgroundMessageHandler(async remoteMessage => {
       try {
-        // pushNotificationService를 사용하여 알림 표시
-        if (remoteMessage.notification) {
+        // 중복 방지:
+        // - remoteMessage.notification(FCM notification payload)이 있으면 OS가 자체적으로 알림을 표시할 수 있음
+        // - 이 경우 Notifee로 추가 표시하면 2번 뜰 수 있으므로 data-only 메시지에서만 직접 표시
+        if (!remoteMessage?.notification && remoteMessage?.data) {
           await pushNotificationService.displayNotification(remoteMessage);
         }
       } catch (error) {

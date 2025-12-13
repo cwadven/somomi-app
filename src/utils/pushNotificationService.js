@@ -179,7 +179,7 @@ class PushNotificationService {
       if (Platform.OS === 'android') {
         notificationConfig.android = {
           channelId,
-          smallIcon: 'ic_launcher',
+          smallIcon: 'ic_stat_notification',
           pressAction: {
             id: 'default',
           },
@@ -274,7 +274,7 @@ class PushNotificationService {
       if (Platform.OS === 'android') {
         notificationConfig.android = {
           channelId,
-          smallIcon: 'ic_launcher',
+          smallIcon: 'ic_stat_notification',
           pressAction: { id: 'default' },
           importance: AndroidImportance.HIGH,
         };
@@ -511,7 +511,7 @@ class PushNotificationService {
       if (Platform.OS === 'android') {
         notificationConfig.android = {
           channelId,
-          smallIcon: 'ic_launcher',
+          smallIcon: 'ic_stat_notification',
           pressAction: {
             id: 'default',
           },
