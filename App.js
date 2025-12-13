@@ -196,12 +196,15 @@ const AppContent = () => {
     const previousState = prevAppStateRef.current;
     setAppState(nextAppState);
     
-    // 앱이 백그라운드/비활성 → 활성으로 전환될 때만 처리
-    if (previousState?.match(/inactive|background/) && nextAppState === 'active' && Platform.OS !== 'web') {
-      pushNotificationService.requestNotificationPermission();
+    // 앱이 'background' → 'active'로 돌아올 때만 처리
+    // 권한 팝업(inactive → active)에서는 재시작/스케줄링/권한 재요청을 수행하지 않음
+    const cameFromBackground = previousState === 'background';
+    if (cameFromBackground && nextAppState === 'active' && Platform.OS !== 'web') {
+      // 권한 확인은 실제 백그라운드 복귀 시점에만 수행
+      try { pushNotificationService.requestNotificationPermission(); } catch (e) {}
       try { scheduleDailyReminderIfNeeded(); } catch (e) { }
       try { scheduleDailyUpdateReminderIfNeeded(); } catch (e) { }
-      // 포그라운드 복귀 시 업데이트가 준비되어 있으면 즉시 적용
+      // 포그라운드 복귀 시 업데이트가 준비되어 있으면 적용
       if (updateReadyRef.current) {
         updateReadyRef.current = false;
         try {
