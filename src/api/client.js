@@ -8,7 +8,9 @@ export const request = async (path, { method = 'GET', headers = {}, body, skipAu
     'Content-Type': 'application/json',
     ...headers,
   };
-  if (!skipAuth && token && typeof token === 'string' && !reqHeaders.Authorization) {
+  // 최신 토큰으로 Authorization을 항상 주입(기존 헤더에 stale 토큰이 남는 케이스 방지)
+  if (!skipAuth && token && typeof token === 'string') {
+    try { if (reqHeaders.authorization) delete reqHeaders.authorization; } catch (e) {}
     reqHeaders.Authorization = `jwt ${token}`;
   }
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -17,16 +19,26 @@ export const request = async (path, { method = 'GET', headers = {}, body, skipAu
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
-  const json = text ? JSON.parse(text) : null;
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch (e) {
+    // JSON이 아닌 응답이 올 수 있음(특히 401/5xx) → 리프레시 로직까지 진행되도록 파싱 실패는 무시
+    json = null;
+  }
   if (!res.ok) {
     // 토큰 만료(expired-jwt-token) 처리 → 리프레시 후 1회 재시도
     const errorCode = json?.error_code || json?.errorCode;
-    if (!skipAuth && !_retry && errorCode === 'expired-jwt-token') {
+    const shouldTryRefresh = !skipAuth && !_retry && (errorCode === 'expired-jwt-token' || res.status === 401);
+    if (shouldTryRefresh) {
       try {
         const refreshToken = await loadRefreshToken();
         if (!refreshToken) {
-          // 리프레시 토큰 없음: 최초 진입 등 케이스 → 모달/리다이렉트 없음
-          throw new Error('no-refresh-token');
+          // 리프레시 토큰 없음: 최초 진입 등 케이스 → 리프레시/리다이렉트/모달 없음
+          const message = json?.message || '요청에 실패했습니다.';
+          const error = new Error(message);
+          error.response = { status: res.status, data: json };
+          throw error;
         }
         const refreshRes = await fetch(`${API_BASE_URL}/v1/member/refresh-token`, {
           method: 'POST',
@@ -37,7 +49,8 @@ export const request = async (path, { method = 'GET', headers = {}, body, skipAu
           body: JSON.stringify({ refresh_token: refreshToken })
         });
         const refreshText = await refreshRes.text();
-        const refreshJson = refreshText ? JSON.parse(refreshText) : null;
+        let refreshJson = null;
+        try { refreshJson = refreshText ? JSON.parse(refreshText) : null; } catch (e) { refreshJson = null; }
         if (!refreshRes.ok) {
           const msg = refreshJson?.message || '토큰 갱신 실패';
           // 실패 시: 로그아웃 + 프로필로 이동하면서 세션 만료 모달 표시
@@ -64,23 +77,30 @@ export const request = async (path, { method = 'GET', headers = {}, body, skipAu
         await saveJwtToken(newAccess);
         if (newRefresh) await saveRefreshToken(newRefresh);
         // 재시도 (1회)
-        return await request(path, { method, headers, body, skipAuth, _retry: true });
+        const sanitizedHeaders = { ...(headers || {}) };
+        delete sanitizedHeaders.Authorization;
+        delete sanitizedHeaders.authorization;
+        return await request(path, { method, headers: sanitizedHeaders, body, skipAuth, _retry: true });
       } catch (refreshErr) {
-        const message = json?.message || '요청에 실패했습니다.';
-        const error = new Error(message);
-        error.response = { status: res.status, data: json };
-        // 갱신 처리 중 예외: 세션 만료로 간주하고 모달 표시
+        // refresh 자체가 실패한 경우에만 “세션 만료” 처리(리프레시 토큰이 존재할 때)
         try {
-          const { store } = require('../redux/store');
-          const { logout } = require('../redux/slices/authSlice');
-          store.dispatch(logout());
-          const { navigationRef } = require('../navigation/RootNavigation');
-          setTimeout(() => {
-            if (navigationRef?.isReady?.()) {
-              navigationRef.navigate('Profile', { screen: 'ProfileScreen', params: { sessionExpired: true } });
-            }
-          }, 0);
+          const existingRefresh = await loadRefreshToken();
+          if (existingRefresh) {
+            const { store } = require('../redux/store');
+            const { logout } = require('../redux/slices/authSlice');
+            store.dispatch(logout());
+            const { navigationRef } = require('../navigation/RootNavigation');
+            setTimeout(() => {
+              if (navigationRef?.isReady?.()) {
+                navigationRef.navigate('Profile', { screen: 'ProfileScreen', params: { sessionExpired: true } });
+              }
+            }, 0);
+          }
         } catch (e) {}
+        // 원래 에러를 그대로 던지되, refreshErr가 Error면 그 메시지를 우선 사용
+        const message = refreshErr?.message || json?.message || '요청에 실패했습니다.';
+        const error = new Error(message);
+        error.response = refreshErr?.response || { status: res.status, data: json };
         throw error;
       }
     }
