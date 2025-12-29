@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -21,15 +21,10 @@ const ToastAndroid = Platform.OS === 'android' ? require('react-native').ToastAn
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { navigate as rootNavigate } from '../navigation/RootNavigation';
-import ProductCard from '../components/ProductCard';
-import { fetchPopularProductsApi } from '../api/productsApi';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
-  const [popularProducts, setPopularProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [exitApp, setExitApp] = useState(false);
   const flatListRef = useRef(null);
@@ -39,10 +34,6 @@ const HomeScreen = ({ navigation }) => {
 
   // 팁 데이터
   const tips = [];
-
-  useEffect(() => {
-    loadPopularProducts();
-  }, []);
 
   // 뒤로가기 버튼 처리
   useFocusEffect(
@@ -83,20 +74,6 @@ const HomeScreen = ({ navigation }) => {
     }, [exitApp])
   );
 
-  const loadPopularProducts = async () => {
-    try {
-      setLoading(true);
-      const data = await fetchPopularProductsApi();
-      setPopularProducts(data);
-      setError(null);
-    } catch (err) {
-      setError('인기 상품을 불러오는데 실패했습니다.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // 배너 렌더링
   const renderBanner = ({ item }) => (
     <TouchableOpacity style={styles.bannerItem}>
@@ -113,26 +90,6 @@ const HomeScreen = ({ navigation }) => {
     const index = Math.round(scrollPosition / width);
     setCurrentBannerIndex(index);
   };
-
-  // 추천 상품 렌더링
-  const renderRecommendedProduct = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.recommendedProductItem}
-      onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
-    >
-      <View style={styles.recommendedProductImageContainer}>
-        <View style={styles.recommendedProductImage}>
-          <Ionicons name="cube-outline" size={32} color="#4CAF50" />
-        </View>
-      </View>
-      <Text style={styles.recommendedProductBrand}>{item.brand}</Text>
-      <Text style={styles.recommendedProductName}>{item.name}</Text>
-      <View style={styles.recommendedProductPopularity}>
-        <Ionicons name="star" size={12} color="#FFD700" />
-        <Text style={styles.recommendedProductPopularityText}>{item.popularity}</Text>
-      </View>
-    </TouchableOpacity>
-  );
 
   // 팁 렌더링
   const renderTip = ({ item }) => (
@@ -197,35 +154,6 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
         )}
-        
-        {/* 추천 상품 섹션 */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>인기 상품</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>전체보기</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#4CAF50" />
-            </View>
-          ) : error ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>데이터를 불러올 수 없습니다.</Text>
-            </View>
-          ) : (
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={popularProducts}
-              renderItem={renderRecommendedProduct}
-              keyExtractor={item => String(item.localId || item.id)}
-              contentContainerStyle={styles.recommendedProductsList}
-            />
-          )}
-        </View>
         
         {/* 팁 섹션 */}
         <View style={styles.section}>
@@ -341,48 +269,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  recommendedProductsList: {
-    paddingLeft: 16,
-  },
-  recommendedProductItem: {
-    width: 120,
-    marginRight: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 12,
-  },
-  recommendedProductImageContainer: {
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  recommendedProductImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  recommendedProductBrand: {
-    fontSize: 12,
-    color: '#888',
-  },
-  recommendedProductName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 4,
-  },
-  recommendedProductPopularity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  recommendedProductPopularityText: {
-    fontSize: 12,
-    color: '#888',
-    marginLeft: 4,
-  },
   tipsList: {
     paddingHorizontal: 16,
   },
@@ -408,19 +294,6 @@ const styles = StyleSheet.create({
   tipText: {
     fontSize: 14,
     color: '#666',
-  },
-  loadingContainer: {
-    height: 150,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorContainer: {
-    height: 150,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    color: 'red',
   },
 });
 
