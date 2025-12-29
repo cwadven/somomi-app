@@ -20,6 +20,7 @@ const ToastAndroid = Platform.OS === 'android' ? require('react-native').ToastAn
 
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { navigate as rootNavigate } from '../navigation/RootNavigation';
 import ProductCard from '../components/ProductCard';
 import { fetchPopularProductsApi } from '../api/productsApi';
 
@@ -154,6 +155,25 @@ const HomeScreen = ({ navigation }) => {
       </View>
       
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* 콘텐츠 WebView 테스트 버튼 */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>테스트</Text>
+          </View>
+          <View style={{ paddingHorizontal: 16 }}>
+            <TouchableOpacity
+              style={styles.testBtn}
+              onPress={() => rootNavigate('ContentWebView', { contentId: 1, title: '콘텐츠' })}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="document-text-outline" size={18} color="#4CAF50" />
+                <Text style={styles.testBtnText}>콘텐츠 테스트 열기 (content_id=1)</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#999" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* 배너 섹션 (데이터가 있을 때만 표시) */}
         {banners.length > 0 && (
           <View style={styles.bannerSection}>
@@ -263,6 +283,23 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
+  },
+  testBtn: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  testBtnText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '700',
     color: '#333',
   },
   seeAllText: {
