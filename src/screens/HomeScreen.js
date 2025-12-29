@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -6,7 +6,6 @@ import {
   FlatList, 
   TouchableOpacity, 
   SafeAreaView,
-  Image,
   ScrollView,
   ActivityIndicator,
   Dimensions,
@@ -21,6 +20,7 @@ const ToastAndroid = Platform.OS === 'android' ? require('react-native').ToastAn
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { navigate as rootNavigate } from '../navigation/RootNavigation';
+import { fetchManageTipsApi } from '../api/promotionApi';
 
 const { width } = Dimensions.get('window');
 
@@ -32,8 +32,31 @@ const HomeScreen = ({ navigation }) => {
   // 배너 데이터
   const banners = [];
 
-  // 팁 데이터
-  const tips = [];
+  // 관리 팁 데이터
+  const [tips, setTips] = useState([]);
+  const [tipsLoading, setTipsLoading] = useState(true);
+  const [tipsError, setTipsError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setTipsLoading(true);
+        setTipsError('');
+        const res = await fetchManageTipsApi();
+        const list = Array.isArray(res?.manage_tips) ? res.manage_tips : [];
+        if (!mounted) return;
+        setTips(list.slice(0, 10));
+      } catch (e) {
+        if (!mounted) return;
+        setTips([]);
+        setTipsError('관리 팁을 불러오지 못했습니다.');
+      } finally {
+        if (mounted) setTipsLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   // 뒤로가기 버튼 처리
   useFocusEffect(
@@ -91,17 +114,33 @@ const HomeScreen = ({ navigation }) => {
     setCurrentBannerIndex(index);
   };
 
+  const handleTipPress = useCallback((tip) => {
+    const contentId = tip?.content_id;
+    if (!contentId) return;
+    rootNavigate('ContentWebView', { contentId, title: tip?.title || '콘텐츠' });
+  }, []);
+
   // 팁 렌더링
   const renderTip = ({ item }) => (
-    <View style={styles.tipItem}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      style={styles.tipItem}
+      onPress={() => handleTipPress(item)}
+      disabled={!item?.content_id}
+    >
       <View style={styles.tipIcon}>
         <Ionicons name="bulb-outline" size={24} color="#4CAF50" />
       </View>
       <View style={styles.tipContent}>
-        <Text style={styles.tipTitle}>{item.title}</Text>
-        <Text style={styles.tipText}>{item.text}</Text>
+        <Text style={styles.tipTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <Text style={styles.tipMeta}>
+          {item?.content_id ? '자세히 보기' : '콘텐츠 없음'}
+        </Text>
       </View>
-    </View>
+      <Ionicons name="chevron-forward" size={18} color="#bbb" />
+    </TouchableOpacity>
   );
 
   return (
@@ -112,25 +151,6 @@ const HomeScreen = ({ navigation }) => {
       </View>
       
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* 콘텐츠 WebView 테스트 버튼 */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>테스트</Text>
-          </View>
-          <View style={{ paddingHorizontal: 16 }}>
-            <TouchableOpacity
-              style={styles.testBtn}
-              onPress={() => rootNavigate('ContentWebView', { contentId: 1, title: '콘텐츠' })}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="document-text-outline" size={18} color="#4CAF50" />
-                <Text style={styles.testBtnText}>콘텐츠 테스트 열기 (content_id=1)</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#999" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* 배너 섹션 (데이터가 있을 때만 표시) */}
         {banners.length > 0 && (
           <View style={styles.bannerSection}>
@@ -160,13 +180,27 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>소모품 관리 팁</Text>
           </View>
-          <FlatList
-            data={tips}
-            renderItem={renderTip}
-            keyExtractor={item => String(item.id)}
-            scrollEnabled={false}
-            contentContainerStyle={styles.tipsList}
-          />
+          {tipsLoading ? (
+            <View style={styles.tipsLoadingWrap}>
+              <ActivityIndicator size="small" color="#4CAF50" />
+              <Text style={styles.tipsLoadingText}>관리 팁 불러오는 중...</Text>
+              <View style={styles.tipsSkeletonItem} />
+              <View style={styles.tipsSkeletonItem} />
+              <View style={styles.tipsSkeletonItem} />
+            </View>
+          ) : tipsError ? (
+            <View style={styles.tipsLoadingWrap}>
+              <Text style={[styles.tipsLoadingText, { color: '#d32f2f' }]}>{tipsError}</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={tips}
+              renderItem={renderTip}
+              keyExtractor={item => String(item.id)}
+              scrollEnabled={false}
+              contentContainerStyle={styles.tipsList}
+            />
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -213,27 +247,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  testBtn: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
-  },
-  testBtnText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#333',
-  },
-  seeAllText: {
-    fontSize: 14,
-    color: '#4CAF50',
-  },
   bannerItem: {
     width: width,
     height: 150,
@@ -272,12 +285,31 @@ const styles = StyleSheet.create({
   tipsList: {
     paddingHorizontal: 16,
   },
+  tipsLoadingWrap: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  tipsLoadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#333',
+    textAlign: 'center',
+  },
+  tipsSkeletonItem: {
+    marginTop: 10,
+    width: '100%',
+    height: 64,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+  },
   tipItem: {
     flexDirection: 'row',
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    alignItems: 'center',
   },
   tipIcon: {
     marginRight: 12,
@@ -291,7 +323,7 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 4,
   },
-  tipText: {
+  tipMeta: {
     fontSize: 14,
     color: '#666',
   },
