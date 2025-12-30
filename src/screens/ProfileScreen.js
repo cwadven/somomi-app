@@ -193,13 +193,13 @@ const ProfileScreen = () => {
     navigation.navigate('RootHelp');
   };
 
-  // 문의하기 표시
-  const showContact = () => {
-    setModalTitle('알림');
-    setModalMessage('문의하기 기능은 아직 구현되지 않았습니다.');
-    setModalAction(null);
-    setModalVisible(true);
-  };
+  // 문의하기(미구현) - 추후 기능 추가 예정
+  // const showContact = () => {
+  //   setModalTitle('알림');
+  //   setModalMessage('문의하기 기능은 아직 구현되지 않았습니다.');
+  //   setModalAction(null);
+  //   setModalVisible(true);
+  // };
 
   // 설정 메뉴 아이템 컴포넌트
   const SettingItem = ({ icon, title, onPress, showBadge = false }) => (
@@ -315,14 +315,7 @@ const ProfileScreen = () => {
           onPress={showHelp}
         />
         
-        {/* 문의하기는 로그인한 사용자에게만 표시 */}
-        {isLoggedIn && (
-          <SettingItem
-            icon="mail-outline"
-            title="문의하기"
-            onPress={showContact}
-          />
-        )}
+        {/* 문의하기(미구현): 추후 기능 추가 예정 */}
       </View>
 
       {/* 앱 버전 표시는 앱 정보 화면에서 제공 */}
