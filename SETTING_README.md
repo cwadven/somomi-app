@@ -28,6 +28,87 @@ rm -rf node_modules/.cache && npx expo prebuild -p android --clean
 ./build_script.sh
 ```
 
+---
+
+## iOS 빌드 (Archive → IPA Export) - 단계별 가이드
+
+이 프로젝트는 `expo` 기반이지만 `ios/` 네이티브 폴더가 있으므로, Android처럼 로컬에서 iOS도 빌드할 수 있습니다.
+
+### 1) Xcode 설치 및 선택 (필수)
+
+- App Store에서 **Xcode 설치**
+- Xcode 실행 후 라이선스 동의/초기 구성 완료
+
+터미널에서 아래 실행:
+
+```bash
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -license accept
+```
+
+### 2) CocoaPods 설치 (필수)
+
+```bash
+sudo gem install cocoapods
+```
+
+또는 Homebrew 사용 시:
+
+```bash
+brew install cocoapods
+```
+
+### 3) iOS 의존성 설치(pod install)
+
+```bash
+cd ios
+pod install
+```
+
+정상이라면 `ios/app.xcworkspace` 가 생성됩니다. (Xcode로 열 때는 `.xcodeproj`가 아니라 `.xcworkspace`를 여세요.)
+
+### 4) 번들ID/서명(Signing) 설정
+
+현재 iOS 번들ID는 `com.nextstory.somomi` 입니다. (`app.json` 및 iOS 프로젝트 설정에 반영됨)
+
+Xcode에서:
+- `ios/app.xcworkspace` 열기
+- Target `app` → **Signing & Capabilities**
+  - **Team** 선택 (Apple Developer 계정 필요)
+  - **Automatically manage signing** 체크 권장
+  - 배포 목적에 맞게 프로비저닝 설정
+
+> 참고: 푸시용 entitlements는 Debug(개발) / Release(배포)로 분리되어 있습니다.
+
+### 5) (권장) 스크립트로 IPA 생성
+
+루트에서 실행:
+
+```bash
+./build_ios.sh app-store
+```
+
+옵션:
+- `./build_ios.sh app-store` : App Store / TestFlight 업로드용
+- `./build_ios.sh ad-hoc` : Ad-Hoc 배포용(등록된 기기 UDID 필요)
+- `./build_ios.sh development` : 개발용 Export
+
+출력 폴더:
+- `build/ios/app-<method>/` 아래에 보통 `*.ipa`가 생성됩니다.
+
+### 6) Firebase/푸시(iOS) 주의사항
+
+Android는 `google-services.json`을 사용하지만, iOS는 **`GoogleService-Info.plist`** 가 필요합니다.
+
+- Firebase Console → iOS 앱 추가(번들ID: `com.nextstory.somomi`)
+- `GoogleService-Info.plist` 다운로드
+- Xcode에서 `ios/app/` 아래로 추가(“Copy items if needed” 체크)
+
+또한 APNs/푸시를 쓰려면 Apple Developer / App Store Connect에서:
+- Push Notifications capability
+- APNs Key(또는 인증서) 설정
+등이 필요합니다.
+
 5. my-release-key.keystore 생성
 
 ```bash
