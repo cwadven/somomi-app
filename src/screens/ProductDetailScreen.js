@@ -20,7 +20,8 @@ import { loadUserProductSlotTemplateInstances } from '../redux/slices/authSlice'
 import { consumeInventoryItem } from '../api/inventoryApi';
 import { isTemplateActive } from '../utils/validityUtils';
 import AlertModal from '../components/AlertModal';
-import ProductNotificationSettings from '../components/ProductNotificationSettings';
+// ProductNotificationSettings는 아직 미구현(요청사항: 사용자에게 노출하지 않음)
+// import ProductNotificationSettings from '../components/ProductNotificationSettings';
 import CalendarView from '../components/CalendarView';
 import { 
   getDaysInMonth, 
@@ -1008,17 +1009,7 @@ const ProductDetailScreen = () => {
     );
   };
   
-  // 알림 설정 탭 내용 렌더링
-  const renderNotificationsTab = () => (
-    <ScrollView style={styles.notificationsScrollContainer}>
-      <View style={styles.notificationsContainer}>
-        <ProductNotificationSettings 
-          productId={productId}
-          product={currentProduct}
-        />
-      </View>
-    </ScrollView>
-  );
+  // 알림 설정 탭은 아직 미구현(요청사항: 사용자에게 노출하지 않음)
 
   // 제품 상세 화면 렌더링
   return (
@@ -1047,30 +1038,11 @@ const ProductDetailScreen = () => {
             제품 상세
           </Text>
         </TouchableOpacity>
-        {!isConsumed && (
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'notifications' && styles.activeTabButton
-          ]}
-          onPress={() => setActiveTab('notifications')}
-        >
-          <Text style={[
-            styles.tabButtonText,
-            activeTab === 'notifications' && styles.activeTabButtonText
-          ]}>
-            알림 설정
-          </Text>
-        </TouchableOpacity>
-        )}
+        {/* 알림 설정 탭 숨김 (미구현) */}
       </View>
 
       {/* 탭 내용 */}
-      {activeTab === 'details' || isConsumed ? (
-        renderProductDetails()
-      ) : (
-        renderNotificationsTab()
-      )}
+      {renderProductDetails()}
 
       {/* 하단 액션 버튼 */}
       {!isConsumed && (
