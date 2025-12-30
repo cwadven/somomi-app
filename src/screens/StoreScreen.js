@@ -14,20 +14,18 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { updateSubscription, updateSlots, addPurchase, usePoints, addPoints, addBasicTemplateInstance, addTemplateInstance, addProductSlotTemplateInstances, applySubscriptionToTemplates } from '../redux/slices/authSlice';
-import { isTemplateActive } from '../utils/validityUtils';
-import { fetchSectionTemplateProducts, fetchPointProducts, fetchInventoryItemTemplateProducts } from '../api/productApi';
-import { getLocationSlotChipLabels, getDurationChipLabel, getProductSlotChipLabel } from '../utils/badgeLabelUtils';
+import { updateSlots, addPurchase, usePoints, addPoints, addTemplateInstance } from '../redux/slices/authSlice';
+import { fetchSectionTemplateProducts, fetchPointProducts } from '../api/productApi';
+import { getLocationSlotChipLabels, getDurationChipLabel } from '../utils/badgeLabelUtils';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
-import SignupPromptModal from '../components/SignupPromptModal';
 import { fetchAvailablePoint } from '../api/pointApi';
 import { buyPointWithKakao, buyGuestTemplateProductWithPoint } from '../api/paymentApi';
 
 const StoreScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
-  const { isLoggedIn, isAnonymous, user, subscription, slots, points, pointHistory, userProductSlotTemplateInstances } = useSelector(state => state.auth);
+  const { isLoggedIn, user, slots, points, pointHistory } = useSelector(state => state.auth);
   const { locations, status: locationsStatus } = useSelector(state => state.locations);
   
   const [showPointHistory, setShowPointHistory] = useState(false);
@@ -77,10 +75,6 @@ const StoreScreen = () => {
         const res = await fetchSectionTemplateProducts();
         const list = Array.isArray(res?.guest_section_template_products) ? res.guest_section_template_products : [];
         setRemoteLocationTemplateProducts(list);
-      } else if (tab === 'productSlot') {
-        const res = await fetchInventoryItemTemplateProducts();
-        const list = Array.isArray(res?.guest_inventory_item_template_products) ? res.guest_inventory_item_template_products : [];
-        setRemoteInventoryItemTemplateProducts(list);
       }
     } catch (_) {}
   };
@@ -133,11 +127,10 @@ const StoreScreen = () => {
     icon: '',
     iconColor: '',
   });
-  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [purchaseConfirmVisible, setPurchaseConfirmVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null); // kept for compatibility
   const [selectedItem, setSelectedItem] = useState(null); // new generic selected item
-  const [activeShopTab, setActiveShopTab] = useState('productSlot'); // 'productSlot' | 'locationSlot' | 'points'
+  const [activeShopTab, setActiveShopTab] = useState('locationSlot'); // 'locationSlot' | 'points'
   const [pointPurchaseConfirmVisible, setPointPurchaseConfirmVisible] = useState(false);
   const [selectedPointPackage, setSelectedPointPackage] = useState(null);
   
@@ -161,7 +154,7 @@ const StoreScreen = () => {
     : [];
 
   // 제품 슬롯(Inventory Item Template) 상품 목록
-  const [remoteInventoryItemTemplateProducts, setRemoteInventoryItemTemplateProducts] = useState(null);
+  // (제거) 제품 슬롯 상품
 
   // 포인트 상품은 points 탭에서만 로드 (위 탭 이펙트에서 처리)
 
@@ -173,11 +166,7 @@ const StoreScreen = () => {
   // 카탈로그 아이템 구매 처리(슬롯/스페셜/번들 등 확장형)
   const handlePurchaseItem = (item) => {
     if (!isLoggedIn) {
-      if (isAnonymous) {
-        setShowSignupPrompt(true);
-      } else {
-        goToProfileTab();
-      }
+      goToProfileTab();
       return;
     }
     
@@ -204,48 +193,7 @@ const StoreScreen = () => {
         return;
       }
       
-      if (item.category === 'subscription') {
-        // 포인트 사용 - usePoints 액션 호출
-        dispatch(usePoints({
-          amount: pointCost,
-          description: `${item.name} 구독 구매`,
-          itemId: item.id,
-          itemType: 'subscription'
-        }));
-        
-        // 구독 처리 - 플랜 만료일 계산 (기본: 30일)
-        const durationDays = typeof item.durationDays === 'number' ? item.durationDays : 30;
-        const expiryDate = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
-        
-        dispatch(updateSubscription({
-          isSubscribed: true,
-          plan: item.id,
-          expiresAt: expiryDate.toISOString()
-        }));
-        
-        // 템플릿 인스턴스 동기화: 신 스키마(locationTemplate/productTemplate) 우선 적용, 없으면 구 스키마도 처리됨
-        dispatch(applySubscriptionToTemplates({
-          locationTemplate: Array.isArray(item.locationTemplate) ? item.locationTemplate : undefined,
-          productTemplate: Array.isArray(item.productTemplate) ? item.productTemplate : undefined,
-          locationSlots: item.locationSlots,
-          productSlotsPerLocation: item.productSlotsPerLocation,
-          planId: item.id,
-          expiresAt: expiryDate.toISOString(),
-        }));
-        
-        // 구매 내역 추가
-        dispatch(addPurchase({
-          id: `sub_${Date.now()}`,
-          type: 'subscription',
-          planId: item.id,
-          planName: item.name,
-          price: item.realPointPrice ?? item.pointPrice,
-          pointsUsed: pointCost,
-          expiresAt: expiryDate.toISOString()
-        }));
-        
-        showSuccessModal('구독 완료', `${item.name} 구독이 완료되었습니다. 이제 더 많은 영역과 제품을 등록할 수 있습니다.`);
-      } else if (item.category === 'productSlot' || item.category === 'locationTemplateBundle' || item.category === 'locationTemplateSpecial') {
+      if (item.category === 'locationTemplateBundle' || item.category === 'locationTemplateSpecial') {
         // 포인트 사용 - usePoints 액션 호출
         dispatch(usePoints({
           amount: pointCost,
@@ -260,22 +208,6 @@ const StoreScreen = () => {
           const msg = e?.response?.data?.message || '포인트 결제 중 오류가 발생했습니다.';
           showErrorModal(msg);
         });
-        if (item.category === 'productSlot') {
-          // 신 스키마: templates 배열 길이를 추가 슬롯 개수로 사용
-          const count = Array.isArray(item.templates) && item.templates.length > 0 ? item.templates.length : 1;
-          dispatch(addProductSlotTemplateInstances({ count }));
-          showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.`);
-          dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: count }));
-          // 구매 후 가용 포인트 최신화
-          fetchAvailablePoint()
-            .then(res => {
-              const raw = res?.available_point;
-              const num = raw != null ? Number(raw) : null;
-              const value = (num != null && isFinite(num)) ? num : null;
-              setRemotePoint(value);
-            })
-            .catch(() => {});
-        }
         if (item.category === 'locationTemplateBundle') {
           const templates = Array.isArray(item.templates) ? item.templates : [];
           const count = templates.length;
@@ -316,13 +248,13 @@ const StoreScreen = () => {
           dispatch(addTemplateInstance({
             productId: specialTemplate?.locationTemplateId || 'special_location',
             name: specialTemplate?.locationTemplateName || '스페셜 영역',
-            description: days ? `${days}일 유효 / 제품 슬롯 무제한` : '제품 슬롯 무제한',
+            description: days ? `${days}일 유효` : '기간 제한 없음',
             icon: 'star',
             feature: { baseSlots, validWhile: { type: 'fixed', expiresAt } },
             used: false,
             usedInLocationId: null,
           }));
-          showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.\n유효기간: ${days}일, 제품 슬롯: 무제한`);
+          showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.\n유효기간: ${days}일`);
           dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: 1 }));
           // 구매 후 가용 포인트 최신화
           fetchAvailablePoint()
@@ -344,11 +276,7 @@ const StoreScreen = () => {
   // 포인트 충전 처리
   const handlePurchasePoints = (pkg) => {
     if (!isLoggedIn) {
-      if (isAnonymous) {
-        setShowSignupPrompt(true);
-      } else {
-        goToProfileTab();
-      }
+      goToProfileTab();
       return;
     }
     
@@ -437,18 +365,7 @@ const StoreScreen = () => {
                 <Text style={styles.modalProductPrice}>{(item.originalPointPrice ?? item.realPointPrice ?? item.pointPrice).toLocaleString()}G</Text>
               )}
               
-              {item.category === 'subscription' && (
-                <View style={styles.modalFeatures}>
-                  {item.features.map((feature, index) => (
-                    <View key={index} style={styles.modalFeatureItem}>
-                      <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                      <Text style={styles.modalFeatureText}>{feature}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-              
-              {(item.category === 'productSlot' || item.category === 'locationTemplateBundle' || item.category === 'locationTemplateSpecial') && (
+              {(item.category === 'locationTemplateBundle' || item.category === 'locationTemplateSpecial') && (
                 <Text style={styles.modalDescription}>
                   {item.description}
                 </Text>
@@ -647,94 +564,7 @@ const StoreScreen = () => {
     );
   };
   
-  // 제품 슬롯만 렌더링
-  const renderProductSlotItems = () => {
-    const apiItems = Array.isArray(remoteInventoryItemTemplateProducts) ? remoteInventoryItemTemplateProducts : [];
-    const items = apiItems.map((p) => ({
-      id: String(p.product_id),
-      category: 'productSlot',
-      name: p.title,
-      description: p.description || '',
-      // 판매 종료 카운트다운은 end_at만 사용 (available_days는 사용 시작 후 유효기간)
-      saleEndAt: p.end_at || null,
-      originalPointPrice: null,
-      realPointPrice: typeof p.price === 'number' ? p.price : 0,
-      // 신 스키마 반영: templates에 inventory_item_template_id, available_days 포함
-      templates: Array.isArray(p.templates) ? p.templates.map(t => ({
-        inventoryItemTemplateId: t.inventory_item_template_id,
-        availableDays: (t.available_days != null ? Number(t.available_days) : null),
-      })) : [],
-    }));
-    return (
-      <View style={styles.slotsGrid}>
-        {items.length === 0 ? (
-          <Text style={styles.emptyText}>판매 중인 제품 슬롯 상품이 없습니다.</Text>
-        ) : items.map((item) => (
-          <View key={item.id} style={styles.slotTile}>
-            <View style={styles.slotTileLeft}>
-              <View style={styles.slotTileIconWrap}>
-                <Ionicons name="cube" size={22} color="#4CAF50" />
-            </View>
-            </View>
-            <View style={styles.slotTileCenter}>
-              <View style={styles.slotTileTitleRow}>
-                <Text style={styles.slotTileTitle}>{item.name}</Text>
-                {(item.originalPointPrice != null && item.realPointPrice != null && item.originalPointPrice !== item.realPointPrice) && (
-                  <View style={[styles.saleBadge, { marginLeft: 6 }]}>
-                    <Ionicons name="pricetag" size={12} color="#fff" />
-                    <Text style={styles.saleBadgeText}>
-                      {`-${Math.max(0, Math.round((1 - (item.realPointPrice / item.originalPointPrice)) * 100))}%`}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              {/* 제품 슬롯 칩: 개수 + 유효기간(available_days가 모두 동일한 경우) */}
-              {(() => {
-                const templates = Array.isArray(item.templates) ? item.templates : [];
-                const count = templates.length;
-                const countLabel = getProductSlotChipLabel(count);
-                // available_days가 양수이며 모두 동일하면 표시
-                const daysList = templates
-                  .map(t => (t && t.availableDays != null ? Number(t.availableDays) : null))
-                  .filter(v => v != null && isFinite(v) && v > 0);
-                const uniqueDays = Array.from(new Set(daysList));
-                const showDuration = uniqueDays.length === daysList.length && uniqueDays.length === templates.filter(t => t && t.availableDays != null).length && uniqueDays.length === 1;
-                const durationLabel = showDuration ? `구매 후 ${uniqueDays[0]}일간 유효` : null;
-                if (!countLabel && !durationLabel) return null;
-                return (
-                  <View style={styles.summaryChipsRow}>
-                    {countLabel && (
-                      <View style={styles.chip}><Ionicons name="cube" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{countLabel}</Text></View>
-                    )}
-                    {durationLabel && (
-                      <View style={styles.chip}><Ionicons name="time" size={12} color="#4CAF50" style={{ marginRight: 4 }} /><Text style={styles.chipText}>{durationLabel}</Text></View>
-                    )}
-                  </View>
-                );
-              })()}
-              {/* 판매 종료 카운트다운 */}
-              <SaleEndCountdown endAt={item.saleEndAt} />
-              <Text style={styles.slotTileSubtitle} numberOfLines={2}>{item.description}</Text>
-            </View>
-            <View style={styles.slotTileRight}>
-              {(item.originalPointPrice != null && item.realPointPrice != null && item.originalPointPrice !== item.realPointPrice) ? (
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[styles.slotPriceOriginal, styles.strike]}>{item.originalPointPrice.toLocaleString()}G</Text>
-                  <Text style={styles.slotPriceReal}>{item.realPointPrice.toLocaleString()}G</Text>
-                </View>
-              ) : (
-                <Text style={styles.slotPrice}>{(item.originalPointPrice ?? item.realPointPrice ?? item.pointPrice).toLocaleString()}G</Text>
-              )}
-              <TouchableOpacity style={[styles.slotBuyButton, { marginTop: 6 }]} onPress={() => handlePurchaseItem(item)}>
-                <Ionicons name="cart" size={16} color="#fff" />
-                <Text style={styles.slotBuyButtonText}>구매</Text>
-          </TouchableOpacity>
-            </View>
-          </View>
-        ))}
-      </View>
-    );
-  };
+  // (제거) 제품 슬롯 렌더링
   
   // 포인트 패키지 렌더링
   const renderPointPackages = () => {
@@ -886,7 +716,7 @@ const StoreScreen = () => {
             <Ionicons name="lock-closed" size={40} color="#999" />
             <Text style={styles.loginPromptTitle}>로그인이 필요합니다</Text>
             <Text style={styles.loginPromptText}>
-              구독 및 슬롯 구매를 위해 로그인이 필요합니다.
+              영역 슬롯 구매 및 G 충전을 위해 로그인이 필요합니다.
             </Text>
             <TouchableOpacity 
               style={styles.loginButton}
@@ -919,22 +749,10 @@ const StoreScreen = () => {
         <View style={styles.shopTabsContainer}>
           <View style={styles.shopTabs}>
             <TouchableOpacity
-              style={[styles.shopTabItem, activeShopTab === 'productSlot' && styles.shopTabItemActive]}
-              onPress={() => handleTabChange('productSlot')}
-            >
-              <Text style={[styles.shopTabText, activeShopTab === 'productSlot' && styles.shopTabTextActive]}>제품 슬롯</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
               style={[styles.shopTabItem, activeShopTab === 'locationSlot' && styles.shopTabItemActive]}
               onPress={() => handleTabChange('locationSlot')}
             >
               <Text style={[styles.shopTabText, activeShopTab === 'locationSlot' && styles.shopTabTextActive]}>영역 슬롯</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.shopTabItem, activeShopTab === 'subscription' && styles.shopTabItemActive]}
-              onPress={() => handleTabChange('subscription')}
-            >
-              <Text style={[styles.shopTabText, activeShopTab === 'subscription' && styles.shopTabTextActive]}>구독 플랜</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.shopTabItem, activeShopTab === 'points' && styles.shopTabItemActive]}
@@ -946,26 +764,10 @@ const StoreScreen = () => {
         </View>
         
         {/* 탭 내용 */}
-        {activeShopTab === 'productSlot' && (
-        <View style={styles.section}>
-            <Text style={styles.sectionTitle}>제품 슬롯</Text>
-            {renderProductSlotItems()}
-        </View>
-        )}
-
         {activeShopTab === 'locationSlot' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>영역 슬롯</Text>
             {renderLocationSlotItems()}
-          </View>
-        )}
-
-        {activeShopTab === 'subscription' && (
-          <View className="subscription-section" style={styles.section}>
-            <Text style={styles.sectionTitle}>구독 플랜</Text>
-            <View style={styles.plansContainer}>
-              <Text style={{ color: '#666' }}>현재 판매 중인 구독 플랜이 없습니다.</Text>
-            </View>
           </View>
         )}
 
@@ -1020,12 +822,6 @@ const StoreScreen = () => {
         icon={alertModalConfig.icon}
         iconColor={alertModalConfig.iconColor}
         onClose={() => setAlertModalVisible(false)}
-      />
-      
-      <SignupPromptModal 
-        visible={showSignupPrompt}
-        onClose={() => setShowSignupPrompt(false)}
-        message="회원 가입하여 구독 및 슬롯 구매를 이용하세요."
       />
     </View>
   );
