@@ -193,13 +193,13 @@ const HomeScreen = ({ navigation }) => {
               <Text style={[styles.tipsLoadingText, { color: '#d32f2f' }]}>{tipsError}</Text>
             </View>
           ) : (
-            <FlatList
-              data={tips}
-              renderItem={renderTip}
-              keyExtractor={item => String(item.id)}
-              scrollEnabled={false}
-              contentContainerStyle={styles.tipsList}
-            />
+          <FlatList
+            data={tips}
+            renderItem={renderTip}
+            keyExtractor={item => String(item.id)}
+            scrollEnabled={false}
+            contentContainerStyle={styles.tipsList}
+          />
           )}
         </View>
       </ScrollView>

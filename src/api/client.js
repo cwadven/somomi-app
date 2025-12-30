@@ -8,13 +8,15 @@ let refreshInFlight = null; // Promise<void> | null
 
 export const request = async (path, { method = 'GET', headers = {}, body, skipAuth = false, _retry = false } = {}) => {
   const token = await loadJwtToken();
+  const isAnonymousToken = typeof token === 'string' && token.startsWith('anonymous_');
   const reqHeaders = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
     ...headers,
   };
   // 최신 토큰으로 Authorization을 항상 주입(기존 헤더에 stale 토큰이 남는 케이스 방지)
-  if (!skipAuth && token && typeof token === 'string') {
+  // 익명 토큰(anonymous_*)은 서버에 Authorization으로 보내지 않음 (요청사항)
+  if (!skipAuth && token && typeof token === 'string' && !isAnonymousToken) {
     try { if (reqHeaders.authorization) delete reqHeaders.authorization; } catch (e) {}
     reqHeaders.Authorization = `jwt ${token}`;
   }
@@ -34,41 +36,44 @@ export const request = async (path, { method = 'GET', headers = {}, body, skipAu
   if (!res.ok) {
     // 토큰 만료(expired-jwt-token) 처리 → 리프레시 후 1회 재시도
     const errorCode = json?.error_code || json?.errorCode;
-    const shouldTryRefresh = !skipAuth && !_retry && (errorCode === 'expired-jwt-token' || res.status === 401);
+    const refreshCandidate = !skipAuth && !_retry && (errorCode === 'expired-jwt-token' || res.status === 401);
+    // refresh token이 존재할 때만 refresh 시도 (익명/초기 진입 등에서는 시도하지 않음)
+    const existingRefreshToken = refreshCandidate ? await loadRefreshToken() : null;
+    const shouldTryRefresh = refreshCandidate && !!existingRefreshToken;
     if (shouldTryRefresh) {
       try {
         // 이미 다른 요청이 refresh 중이면 그 결과를 기다린 뒤 재시도
         if (!refreshInFlight) {
           refreshInFlight = (async () => {
-            const refreshToken = await loadRefreshToken();
+        const refreshToken = await loadRefreshToken();
             if (!refreshToken) {
               // 리프레시 토큰 없음: 최초 진입 등 케이스
               const err = new Error('no-refresh-token');
               err.response = { status: 401, data: { message: 'no-refresh-token' } };
               throw err;
             }
-            const refreshRes = await fetch(`${API_BASE_URL}/v1/member/refresh-token`, {
-              method: 'POST',
-              headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ refresh_token: refreshToken })
-            });
-            const refreshText = await refreshRes.text();
+        const refreshRes = await fetch(`${API_BASE_URL}/v1/member/refresh-token`, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refresh_token: refreshToken })
+        });
+        const refreshText = await refreshRes.text();
             let refreshJson = null;
             try { refreshJson = refreshText ? JSON.parse(refreshText) : null; } catch (e) { refreshJson = null; }
-            if (!refreshRes.ok) {
-              const msg = refreshJson?.message || '토큰 갱신 실패';
+        if (!refreshRes.ok) {
+          const msg = refreshJson?.message || '토큰 갱신 실패';
               const err = new Error(msg);
               err.response = { status: refreshRes.status, data: refreshJson };
               throw err;
-            }
-            const newAccess = refreshJson?.access_token;
-            const newRefresh = refreshJson?.refresh_token;
-            if (!newAccess) throw new Error('no-access-token');
-            await saveJwtToken(newAccess);
-            if (newRefresh) await saveRefreshToken(newRefresh);
+        }
+        const newAccess = refreshJson?.access_token;
+        const newRefresh = refreshJson?.refresh_token;
+        if (!newAccess) throw new Error('no-access-token');
+        await saveJwtToken(newAccess);
+        if (newRefresh) await saveRefreshToken(newRefresh);
           })()
             .finally(() => {
               refreshInFlight = null;

@@ -1,5 +1,5 @@
 import { store } from '../redux/store';
-import { getAnonymousToken, verifyToken } from '../redux/slices/authSlice';
+import { verifyToken } from '../redux/slices/authSlice';
 
 // 사용되지 않는 getToken/setAuthHeader/ensureToken 제거됨
 

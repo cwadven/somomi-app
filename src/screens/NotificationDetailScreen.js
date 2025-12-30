@@ -64,10 +64,10 @@ const NotificationDetailScreen = () => {
         // 화면 표시용: 이름만 있는 경우를 위해 문자열 전달
         location: notification?.location_name || null,
       };
-      navigation.push('ProductDetail', { 
+    navigation.push('ProductDetail', { 
         product: mappedProduct,
-        hideHeader: true
-      });
+      hideHeader: true
+    });
     } catch (e) {
       Alert.alert('오류', e?.message || '제품 상세 정보를 불러오지 못했습니다.');
     } finally {
@@ -177,8 +177,8 @@ const NotificationDetailScreen = () => {
             <ActivityIndicator color="#fff" />
           ) : (
             <>
-              <Text style={styles.productDetailButtonText}>제품 상세 보기</Text>
-              <Ionicons name="chevron-forward" size={20} color="#fff" />
+          <Text style={styles.productDetailButtonText}>제품 상세 보기</Text>
+          <Ionicons name="chevron-forward" size={20} color="#fff" />
             </>
           )}
         </TouchableOpacity>

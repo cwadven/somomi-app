@@ -4,7 +4,7 @@ import { Provider, useDispatch, useSelector } from 'react-redux';
 import { Platform, StyleSheet, Linking, AppState, View, ActivityIndicator, Text, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
-import { verifyToken, getAnonymousToken, logout, loadUserLocationTemplateInstances, loadUserProductSlotTemplateInstances, updateSubscription } from './src/redux/slices/authSlice';
+import { verifyToken, logout, loadUserLocationTemplateInstances, loadUserProductSlotTemplateInstances, updateSubscription } from './src/redux/slices/authSlice';
 import { reconcileLocationTemplates } from './src/redux/slices/authSlice';
 import * as Updates from 'expo-updates';
 import Constants from 'expo-constants';
@@ -77,7 +77,7 @@ if (typeof localStorage === 'undefined') {
 // 앱 내부 컴포넌트 - 토큰 검증 및 초기화 로직을 포함
 const AppContent = () => {
   const dispatch = useDispatch();
-  const { isLoggedIn, isAnonymous, user, subscription, slots } = useSelector(state => state.auth);
+  const { isLoggedIn, user, subscription, slots } = useSelector(state => state.auth);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
   const [pushToken, setPushToken] = useState('');
@@ -311,18 +311,6 @@ const AppContent = () => {
       setDataInitialized(true);
     } catch (error) {
       console.error('앱 초기화 오류:', error);
-      
-      // 오류 발생 시 익명 토큰 발급 시도
-      // 단, 기존에 저장된 Access Token(비-익명)이 있으면 절대 덮어쓰지 않음
-      try {
-        const existingToken = await loadData(STORAGE_KEYS.JWT_TOKEN);
-        const isAnonymousToken = existingToken && typeof existingToken === 'string' && existingToken.startsWith('anonymous_');
-        if (!existingToken || isAnonymousToken) {
-          await dispatch(getAnonymousToken()).unwrap();
-        }
-      } catch (anonymousError) {
-        console.error('익명 토큰 발급 실패:', anonymousError);
-      }
     } finally {
       setIsLoading(false);
     }
@@ -432,21 +420,7 @@ const AppContent = () => {
                 </TouchableOpacity>
               )}
               
-              {!isAnonymous && !isLoggedIn && (
-                <TouchableOpacity 
-                  style={[styles.loginButton, styles.anonymousBtn]}
-                  onPress={async () => {
-                    try {
-                      await dispatch(getAnonymousToken()).unwrap();
-                      addLog('익명 사용자로 전환됨', 'info');
-                    } catch (error) {
-                      addLog(`익명 로그인 실패: ${error.message}`, 'error');
-                    }
-                  }}
-                >
-                  <Text style={styles.loginButtonText}>익명 사용자 전환</Text>
-                </TouchableOpacity>
-              )}
+              {/* 익명(anonymous_*) 토큰은 더 이상 생성/사용하지 않음 */}
             </View>
 
             {/* 로그인 상태 표시 및 전환 버튼 */}
@@ -454,10 +428,10 @@ const AppContent = () => {
               <Text style={styles.statusLabel}>로그인 상태:</Text>
               <View style={[
                 styles.statusBadge, 
-                isLoggedIn ? styles.status_ready : (isAnonymous ? styles.status_checking : styles.status_idle)
+                isLoggedIn ? styles.status_ready : styles.status_idle
               ]}>
                 <Text style={styles.statusText}>
-                  {isLoggedIn ? '로그인됨' : (isAnonymous ? '비회원' : '로그아웃됨')}
+                  {isLoggedIn ? '로그인됨' : '로그아웃됨'}
                 </Text>
               </View>
             </View>

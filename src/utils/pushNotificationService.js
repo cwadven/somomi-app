@@ -690,4 +690,4 @@ export const initializePushNotificationService = async () => {
     console.error('푸시 알림 서비스 초기화 오류:', error);
     return null;
   }
-};
+}; 

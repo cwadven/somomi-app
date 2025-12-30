@@ -24,7 +24,8 @@ const ContentWebViewScreen = () => {
         const headers = {
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         };
-        if (token && typeof token === 'string') {
+        // 익명 토큰(anonymous_*)은 서버에 Authorization으로 보내지 않음 (요청사항)
+        if (token && typeof token === 'string' && !token.startsWith('anonymous_')) {
           headers.Authorization = `jwt ${token}`;
         }
         const res = await fetch(startUrl, { method: 'GET', headers });

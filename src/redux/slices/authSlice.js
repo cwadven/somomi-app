@@ -60,36 +60,7 @@ export const reconcileLocationTemplates = createAsyncThunk(
   }
 );
 
-// JWT 토큰 발급 API 호출 (실제 구현 시 서버에서 가져옴)
-export const getAnonymousToken = createAsyncThunk(
-  'auth/getAnonymousToken',
-  async (_, { rejectWithValue }) => {
-    try {
-      // 저장된 토큰/디바이스ID 우선 로드 (AsyncStorage)
-      const storedToken = await loadJwtToken();
-      if (storedToken && typeof storedToken === 'string' && storedToken.startsWith('anonymous_')) {
-        console.log('AsyncStorage의 기존 익명 토큰 재사용:', storedToken);
-        const deviceId = await loadDeviceId();
-        return { token: storedToken, deviceId };
-      }
-
-      let deviceId = await loadDeviceId();
-      if (!deviceId) {
-        deviceId = `device_${Math.random().toString(36).substring(2, 15)}`;
-        await saveDeviceId(deviceId);
-      }
-      const token = `anonymous_${deviceId}`;
-      console.log('새 익명 토큰 생성:', token);
-
-      // 토큰을 AsyncStorage에 저장
-      await saveJwtToken(token);
-
-      return { token, deviceId };
-    } catch (error) {
-      return rejectWithValue(error.message);
-    }
-  }
-);
+// (주의) anonymous_* 토큰은 더 이상 생성/사용하지 않습니다.
 
 // 카카오/일반 로그인 시에도 토큰을 AsyncStorage에 저장
 export const kakaoLogin = createAsyncThunk(
@@ -190,56 +161,30 @@ export const verifyToken = createAsyncThunk(
         return { token: null, deviceId };
       }
       
-      const isAnonymous = token.startsWith('anonymous_');
+      // anonymous_* 토큰이 저장되어 있던 구버전 사용자: 즉시 제거하고 로그아웃 상태로 전환
+      if (typeof token === 'string' && token.startsWith('anonymous_')) {
+        try { await removeJwtToken(); } catch (e) {}
+        return { token: null, deviceId };
+      }
+      const isAnonymous = false;
       
       // 저장된 템플릿 인스턴스 로드
       const savedTemplates = await loadUserLocationTemplates();
       console.log('저장된 템플릿 인스턴스:', savedTemplates);
       
-      if (isAnonymous) {
-        console.log('익명 토큰 검증 성공:', token);
-        
-        // 현재 템플릿 인스턴스 상태 확인
-        const { userLocationTemplateInstances } = getState().auth;
-        
-        // 이미 사용된 템플릿이 있는지 확인
-        if (userLocationTemplateInstances && userLocationTemplateInstances.length > 0) {
-          const usedTemplates = userLocationTemplateInstances.filter(t => t.used);
-          console.log('사용 중인 템플릿:', usedTemplates);
-          
-          if (usedTemplates.length >= 1) {
-            // 이미 사용 중인 템플릿이 있으면 새 템플릿을 생성하지 않음
-            console.log('비회원 사용자가 이미 템플릿을 사용 중입니다. 추가 템플릿 생성 안함.');
-            return {
-              token,
-              isAnonymous: true,
-              templates: savedTemplates || userLocationTemplateInstances,
-              deviceId,
-            };
-          }
-        }
-        
-        return {
-          token,
-          isAnonymous: true,
-          templates: savedTemplates,
-          deviceId,
-        };
-      } else {
-        // 회원 토큰인 경우 사용자 정보 포함 (임시)
-        console.log('회원 토큰 검증 성공:', token);
-        return {
-          token,
-          isAnonymous: false,
-          user: {
-            id: '1',
-            username: '사용자',
-            email: 'user@example.com',
-          },
-          templates: savedTemplates,
-          deviceId,
-        };
-      }
+      // 회원 토큰인 경우 사용자 정보 포함 (임시)
+      console.log('회원 토큰 검증 성공:', token);
+      return {
+        token,
+        isAnonymous: false,
+        user: {
+          id: '1',
+          username: '사용자',
+          email: 'user@example.com',
+        },
+        templates: savedTemplates,
+        deviceId,
+      };
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -815,25 +760,6 @@ export const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // 익명 토큰 발급 처리
-      .addCase(getAnonymousToken.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(getAnonymousToken.fulfilled, (state, action) => {
-        state.loading = false;
-        state.token = action.payload.token;
-        state.isAnonymous = true;
-        state.deviceId = action.payload.deviceId || state.deviceId;
-        state.error = null;
-        // 게스트는 템플릿을 생성/저장하지 않음
-        state.userLocationTemplateInstances = [];
-        try { removeData(STORAGE_KEYS.USER_LOCATION_TEMPLATES); } catch (e) {}
-      })
-      .addCase(getAnonymousToken.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-      
       // 카카오 로그인 처리
       .addCase(kakaoLogin.pending, (state) => {
         state.loading = true;
