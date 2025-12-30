@@ -67,6 +67,26 @@ pod install
 
 정상이라면 `ios/app.xcworkspace` 가 생성됩니다. (Xcode로 열 때는 `.xcodeproj`가 아니라 `.xcworkspace`를 여세요.)
 
+만약 아래와 같은 CocoaPods 오류가 난다면(UTF-8 인코딩 관련):
+- `CocoaPods requires your terminal to be using UTF-8 encoding`
+- `Encoding::CompatibilityError (ASCII-8BIT)`
+
+다음 중 하나로 해결합니다.
+
+1) 현재 터미널에서만 임시로 실행:
+
+```bash
+cd ios
+LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 RUBYOPT='-EUTF-8:UTF-8' pod install
+```
+
+2) 영구 설정(예: `~/.zshrc`에 추가 후 터미널 재시작):
+
+```bash
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+```
+
 ### 4) 번들ID/서명(Signing) 설정
 
 현재 iOS 번들ID는 `com.nextstory.somomi` 입니다. (`app.json` 및 iOS 프로젝트 설정에 반영됨)
