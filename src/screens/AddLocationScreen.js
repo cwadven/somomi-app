@@ -759,7 +759,7 @@ const AddLocationScreen = () => {
             {/* 단일 스크롤 리스트로 통합 */}
             {availableTemplates.length > 0 ? (
               <View style={styles.templateOptionsContainer}>
-                <ScrollView style={styles.templateOptionsScroll}>
+                <ScrollView style={styles.templateOptionsScroll} nestedScrollEnabled>
                   <View style={styles.templateOptions}>
                     {availableTemplates.map(template => (
           <TouchableOpacity 
@@ -1105,7 +1105,7 @@ const styles = StyleSheet.create({
     maxHeight: 280,
   },
   templateOptionsScroll: {
-    // no-op: 스타일 확장 여지
+    flexGrow: 0,
   },
   templateOption: {
     flexDirection: 'row',
