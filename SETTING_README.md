@@ -98,6 +98,31 @@ Xcode에서:
   - **Automatically manage signing** 체크 권장
   - 배포 목적에 맞게 프로비저닝 설정
 
+만약 빌드 중 아래 에러가 나오면:
+`Signing for "app" requires a development team`
+
+위 화면에서 **Team을 선택**하면 해결됩니다.
+또는 스크립트 빌드 시 `TEAM_ID`를 지정할 수도 있습니다:
+
+```bash
+TEAM_ID=ABCDE12345 ./build_ios.sh app-store
+```
+
+### (중요) Personal Team(무료 계정) + Push Notifications 제약
+
+아래 에러가 나오면:
+`Personal development teams ... do not support the Push Notifications capability`
+
+이는 **무료/개인 팀은 Push Notifications capability(aps-environment)를 지원하지 않기 때문**입니다.
+
+- **정식 배포/푸시 포함 빌드**를 하려면: **Apple Developer Program(유료)** 팀/조직 계정이 필요합니다.
+- 임시로 “IPA만 뽑기/빌드 통과”가 목적이면: Push entitlement를 제거하고 빌드할 수 있습니다(푸시 기능은 동작하지 않음).
+
+```bash
+# 개인팀 임시 빌드(푸시 기능 제외)
+NO_PUSH=1 ./build_ios.sh development
+```
+
 > 참고: 푸시용 entitlements는 Debug(개발) / Release(배포)로 분리되어 있습니다.
 
 ### 5) (권장) 스크립트로 IPA 생성
