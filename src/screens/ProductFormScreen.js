@@ -411,10 +411,7 @@ const ProductFormScreen = () => {
   //   showInfoAlert('알림', '새 카테고리가 추가되었습니다.');
   // };
 
-  // 영역 추가 화면으로 이동
-  const handleAddLocation = () => {
-    navigation.navigate('AddLocation');
-  };
+  // (제거) 영역 생성 화면으로 이동 (요청사항: 영역 생성/수정 UI 숨김)
 
   // 날짜 선택 핸들러 (네이티브)
   const handleDateChange = (event, selectedDate, dateType) => {
@@ -651,8 +648,8 @@ const ProductFormScreen = () => {
       // 사용 가능한 제품 슬롯 템플릿이 있는지 확인
       const availableProductSlot = (userProductSlotTemplateInstances || []).find(t => !t.used);
       if (!availableProductSlot) {
-        showErrorAlert('슬롯 한도 초과', '해당 영역의 제품 슬롯이 가득 찼습니다. 상점에서 제품 슬롯을 추가 구매하세요.');
-      return false;
+        showErrorAlert('슬롯 한도 초과', '해당 영역의 등록 가능한 제품 수가 가득 찼습니다. 다른 영역을 선택하거나, 기존 제품을 정리한 뒤 다시 시도해주세요.');
+        return false;
       }
     }
     
@@ -696,11 +693,7 @@ const ProductFormScreen = () => {
 
     // 영역이 선택되지 않은 경우 확인
     if (!selectedLocation && !locationId) {
-      showConfirmAlert(
-        '영역 선택 필요',
-        '영역이 선택되지 않았습니다. 영역을 선택하시겠습니까?',
-        handleAddLocation
-      );
+      showErrorAlert('영역 선택 필요', '영역을 선택해 주세요.');
       return;
     }
 

@@ -353,13 +353,7 @@ const LocationDetailScreen = () => {
     }
   };
   
-  // 영역 수정 화면으로 이동
-  const handleEditPress = () => {
-    navigation.navigate('AddLocation', { 
-      isEditMode: true,
-      location: currentLocation
-    });
-  };
+  // (제거) 영역 수정 화면으로 이동 UI (요청사항)
   
   // 제품 추가 화면으로 이동
   const handleAddProduct = () => {
@@ -662,11 +656,18 @@ const LocationDetailScreen = () => {
             <View style={styles.headerActions}>
               <TouchableOpacity 
                 style={styles.headerActionButton}
-              onPress={handleEditPress}
+                onPress={() => {
+                  try {
+                    navigation.navigate('AddLocation', { 
+                      isEditMode: true,
+                      location: currentLocation
+                    });
+                  } catch (e) {}
+                }}
               >
                 <Ionicons name="create-outline" size={24} color="#4CAF50" />
               </TouchableOpacity>
-              
+
               <TouchableOpacity 
                 style={styles.headerActionButton}
               onPress={handleDeletePress}

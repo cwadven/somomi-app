@@ -190,47 +190,8 @@ const LocationsScreen = () => {
     };
   }, [isFocused, navigation]);
 
+  // 영역 추가 화면으로 이동 (영역 생성/수정 UI는 최소화하고, 제품 슬롯 관련 UI는 제거됨)
   const handleAddLocation = () => {
-    // 생성은 전체 정책에 따르되, 템플릿 만료는 기존 영역 접근에서만 제한함 (생성은 보유 템플릿 유효성으로 자동 제한됨)
-    // 사용자의 템플릿 인스턴스 확인
-    const availableTemplates = userLocationTemplateInstances.filter(template => !template.used && !isTemplateExpired(template));
-    
-    console.log('영역 추가 시도:', {
-      userLocationTemplateInstances,
-      availableTemplates,
-      usedTemplates: userLocationTemplateInstances.filter(template => template.used)
-    });
-    
-    // 사용 가능한 템플릿이 없는 경우
-    if (availableTemplates.length === 0) {
-      // 비회원인 경우 회원가입 유도 모달 표시
-      if (isAnonymous) {
-        setShowSignupPrompt(true);
-      } else {
-        // 로그인 사용자인 경우 템플릿 부족 알림
-        setAlertModalConfig({
-          title: '템플릿 부족',
-          message: '사용 가능한 영역 템플릿이 없습니다. 상점에서 템플릿을 구매하거나, 새로운 기본 템플릿을 추가할 수 있습니다.',
-          icon: 'information-circle',
-          iconColor: '#2196F3',
-          buttons: [
-            { 
-              text: '상점으로 이동', 
-              style: 'success',
-              onPress: () => { setAlertModalVisible(false); navigation.navigate('Store'); }
-            },
-            { 
-              text: '닫기',
-              style: 'cancel'
-            }
-          ]
-        });
-        setAlertModalVisible(true);
-      }
-      return;
-    }
-    
-    // 템플릿이 있는 경우 영역 추가 화면으로 이동
     navigation.navigate('AddLocation');
   };
   
@@ -492,20 +453,9 @@ const LocationsScreen = () => {
               />
             )}
             
-            {/* 영역 추가 버튼 (우측 하단에 고정) - 사용 가능한 템플릿이 있을 때만 배지 표시 */}
-            <TouchableOpacity 
-              style={[
-                styles.addButton,
-                availableTemplates.length === 0 ? styles.disabledAddButton : null
-              ]}
-              onPress={handleAddLocation}
-            >
+            {/* 영역 추가 버튼 (우측 하단에 고정) */}
+            <TouchableOpacity style={styles.addButton} onPress={handleAddLocation}>
               <Ionicons name="add" size={30} color="white" />
-              {availableTemplates.length > 0 && (
-                <View style={styles.slotCountBadge}>
-                  <Text style={styles.slotCountText}>{availableTemplates.length}</Text>
-                </View>
-              )}
             </TouchableOpacity>
           </View>
           

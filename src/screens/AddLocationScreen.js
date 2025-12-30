@@ -743,7 +743,7 @@ const AddLocationScreen = () => {
         <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
           <Ionicons name="chevron-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isEditMode ? '영역 수정' : '영역 생성'}</Text>
+        <Text style={styles.headerTitle}>영역</Text>
         <View style={styles.headerRight} />
           </View>
       
@@ -862,7 +862,7 @@ const AddLocationScreen = () => {
           <Text style={styles.sectionTitle}>영역 정보</Text>
           {isEditMode && isEditLockedByExpiry && (
             <View style={{ backgroundColor: '#fff8e1', borderWidth: 1, borderColor: '#ffe082', borderRadius: 8, padding: 10, marginBottom: 10 }}>
-              <Text style={{ color: '#ff6f00', fontSize: 12 }}>이 영역은 만료된 영역 템플릿에 연결되어 있어 영역 정보는 수정할 수 없습니다. 상단의 템플릿 변경 또는 아래의 제품 슬롯을 수정하세요.</Text>
+              <Text style={{ color: '#ff6f00', fontSize: 12 }}>이 영역은 만료된 영역 템플릿에 연결되어 있어 영역 정보는 수정할 수 없습니다. 상단의 템플릿 변경을 이용해주세요.</Text>
           </View>
           )}
           
@@ -907,182 +907,9 @@ const AddLocationScreen = () => {
           </View>
         </View>
 
-        {/* 제품 슬롯 섹션 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>제품 슬롯</Text>
-          {(isEditMode && (stagedAssignCount > 0 || stagedUnassignCount > 0)) && (
-            <View style={styles.stagingNotice}>
-              <Ionicons name="information-circle" size={16} color="#4CAF50" style={{ marginRight: 6 }} />
-              <Text style={styles.stagingNoticeText}>변경 사항이 있습니다. 아래 "영역 수정"을 눌러 적용하세요.</Text>
-        </View>
-          )}
-          {(() => {
-            const baseSlots = (isEditMode ? (selectedEditTemplateInstance?.feature?.baseSlots ?? currentTemplate?.feature?.baseSlots) : selectedTemplateInstance?.feature?.baseSlots);
-            const baseDisplay = (typeof baseSlots === 'number') ? (baseSlots === -1 ? '무제한' : `${baseSlots}개`) : '선택 필요';
-            // 허용치: 기본 슬롯 + (미만료 등록 슬롯 수 프리뷰)
-            const allowedDisplay = (typeof baseSlots === 'number' && baseSlots === -1) ? '무제한' : (typeof baseSlots === 'number' ? `${(baseSlots || 0) + (isEditMode ? previewAssignedActiveCount : 0)}개` : '-');
-            const used = isEditMode ? currentProductCount : 0;
-            // 등록됨: 미만료 등록 슬롯 수 프리뷰
-            const registered = isEditMode ? previewAssignedActiveCount : 0;
-            return (
-              <View style={styles.productSlotSummary}>
-                <View style={styles.productSlotRow}>
-                  <Text style={styles.productSlotLabel}>기본 슬롯</Text>
-                  <Text style={styles.productSlotValue}>{baseDisplay}</Text>
-                </View>
-                <View style={styles.productSlotRow}>
-                  <Text style={styles.productSlotLabel}>추가 슬롯(등록됨)</Text>
-                  <Text style={styles.productSlotValue}>{registered}개</Text>
-                </View>
-                <View style={styles.productSlotRow}>
-                  <Text style={styles.productSlotLabel}>허용</Text>
-                  <Text style={styles.productSlotValue}>{allowedDisplay}</Text>
-                </View>
-                <View style={styles.productSlotRow}>
-                  <Text style={styles.productSlotLabel}>사용</Text>
-                  <Text style={styles.productSlotValue}>{used}개</Text>
-                </View>
-              </View>
-            );
-          })()}
+        {/* (제거) 제품 슬롯 / 보유한 추가 제품 슬롯 섹션 (요청사항) */}
 
-          {/* 보유한 추가 제품 슬롯 리스트 */}
-          <View style={styles.productSlotList}>
-            <Text style={styles.productSlotSectionTitle}>보유한 추가 제품 슬롯 (미등록)</Text>
-            {previewAvailableTemplates && previewAvailableTemplates.length > 0 ? (
-              <ScrollView style={styles.slotScrollableList} nestedScrollEnabled>
-                {previewAvailableTemplates.map(t => (
-                  <View key={t.id} style={styles.productSlotItem}>
-                    <View style={styles.productSlotInfo}>
-                      <Ionicons name="cube" size={18} color="#4CAF50" />
-                      <Text style={styles.productSlotText}>추가 제품 슬롯</Text>
-                    </View>
-                    {isEditMode && locationToEdit ? (
-                      <TouchableOpacity
-                        style={styles.assignButton}
-                        onPress={() => {
-                          setStagedAssignTemplateIds(prev => prev.includes(t.id) ? prev : [...prev, t.id]);
-                          setTimeout(() => {}, 0);
-                        }}
-                      >
-                        <Text style={styles.assignButtonText}>등록</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <Text style={styles.productSlotSubText}>영역 생성 후 등록 가능</Text>
-                    )}
-                  </View>
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={styles.emptySlotCard}>
-                <Ionicons name="cart-outline" size={28} color="#9E9E9E" style={{ marginBottom: 6 }} />
-                <Text style={styles.emptySlotTitle}>보유한 추가 제품 슬롯이 없습니다</Text>
-                <Text style={styles.emptySlotSubtitle}>{`상점에서 추가 제품 슬롯을 구매한 뒤\n이 영역에 등록해 사용할 수 있습니다.`}</Text>
-          </View>
-        )}
-        
-            {/* 등록 예정 목록 */}
-            {(isEditMode && stagedAssignTemplates.length > 0) && (
-              <View style={[styles.emptySlotCard, { marginTop: 8 }]}> 
-                <Text style={styles.productSlotSectionTitle}>추가 제품 슬롯 (영역 수정 필요) {stagedAssignTemplates.length}개</Text>
-                {stagedAssignTemplates.map(t => (
-                  <View key={`staged-${t.id}`} style={[styles.productSlotItem, { marginBottom: 6 }]}> 
-                    <View style={styles.productSlotInfo}>
-                      <Ionicons name="time-outline" size={18} color="#4CAF50" />
-                      <Text style={styles.productSlotText}>이 영역에 등록 예정</Text>
-                    </View>
-        <TouchableOpacity 
-                      style={[styles.assignButton, { backgroundColor: '#9E9E9E' }]}
-                      onPress={() => setStagedAssignTemplateIds(prev => prev.filter(id => id !== t.id))}
-                    >
-                      <Text style={styles.assignButtonText}>취소</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                <Text style={styles.stagingHelpText}>아래 "영역 수정" 버튼을 눌러야 실제로 등록됩니다.</Text>
-              </View>
-            )}
-          </View>
-
-          {/* 이 영역에 등록된 추가 제품 슬롯 리스트 (수정 모드에서만) */}
-          {isEditMode && (
-            <View style={styles.productSlotList}>
-              <Text style={styles.productSlotSectionTitle}>이 영역에 등록된 추가 제품 슬롯</Text>
-              {previewAssignedTemplates.length > 0 ? (
-                <ScrollView style={styles.slotScrollableList} nestedScrollEnabled>
-                  {previewAssignedTemplates.map(t => {
-                    const linkedProduct = t.usedByProductId ? currentLocationProducts.find(p => p.id === t.usedByProductId) : null;
-                    const isExpired = (() => {
-                      if (!t.expiresAt) return false;
-                      const ts = new Date(t.expiresAt).getTime();
-                      return isFinite(ts) && ts <= Date.now();
-                    })();
-                    return (
-                      <View key={t.id} style={styles.productSlotItem}>
-                        <View style={{ flex: 1 }}>
-                          <View style={styles.productSlotInfo}>
-                            <Ionicons name={isExpired ? 'alert-circle' : 'checkmark-circle'} size={18} color={isExpired ? '#F44336' : '#4CAF50'} />
-                            <Text style={styles.productSlotText}>{isExpired ? '만료됨' : '등록됨'}</Text>
-                          </View>
-                          {linkedProduct && (
-                            <Text style={styles.productSlotLinkedText}>연결된 제품: {linkedProduct.name || linkedProduct.title || `제품(${linkedProduct.id})`}</Text>
-                          )}
-                          {isExpired && (
-                            <Text style={[styles.productSlotLinkedText, { color: '#F44336' }]}>
-                              만료 일시: {new Date(t.expiresAt).toLocaleString()}
-            </Text>
-                          )}
-                        </View>
-                        <TouchableOpacity
-                          style={[styles.assignButton, { backgroundColor: '#9E9E9E' }]}
-                          onPress={() => {
-                            if (t.used && t.usedByProductId) {
-                              navigation.navigate('ProductDetail', { productId: t.usedByProductId });
-                            } else {
-                              setStagedUnassignTemplateIds(prev => prev.includes(t.id) ? prev : [...prev, t.id]);
-                            }
-                          }}
-                        >
-                          <Text style={styles.assignButtonText}>{(t.used && t.usedByProductId) ? '제품 확인' : '해제'}</Text>
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  })}
-                </ScrollView>
-                               ) : (
-                <View style={styles.emptySlotCard}>
-                  <Ionicons name="add-circle-outline" size={28} color="#9E9E9E" style={{ marginBottom: 6 }} />
-                  <Text style={styles.emptySlotTitle}>등록된 추가 제품 슬롯이 없습니다</Text>
-                  <Text style={styles.emptySlotSubtitle}>{`위의 '보유한 추가 제품 슬롯 (미등록)'에서\n이 영역에 등록할 수 있습니다.`}</Text>
-          </View>
-        )}
-        
-              {/* 해제 예정 목록 */}
-              {(isEditMode && stagedUnassignTemplateIds.length > 0) && (
-                <View style={[styles.emptySlotCard, { marginTop: 8 }]}> 
-                  <Text style={styles.productSlotSectionTitle}>추가 제품 슬롯 (영역 수정 필요) 해제 {stagedUnassignTemplateIds.length}개</Text>
-                  {stagedUnassignTemplateIds.map(id => (
-                    <View key={`un-${id}`} style={[styles.productSlotItem, { marginBottom: 6 }]}> 
-                      <View style={styles.productSlotInfo}>
-                        <Ionicons name="time-outline" size={18} color="#9E9E9E" />
-                        <Text style={styles.productSlotText}>이 영역에서 해제 예정</Text>
-                      </View>
-        <TouchableOpacity 
-                        style={styles.assignButton}
-                        onPress={() => setStagedUnassignTemplateIds(prev => prev.filter(tid => tid !== id))}
-                      >
-                        <Text style={styles.assignButtonText}>취소</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                  <Text style={styles.stagingHelpText}>아래 "영역 수정" 버튼을 눌러야 실제로 해제됩니다.</Text>
-                </View>
-              )}
-            </View>
-          )}
-        </View>
-
-        {/* 영역 생성/수정 버튼 */}
+        {/* 저장 버튼 (영역 생성/수정은 기능적으로 수행하되 문구는 '저장'으로 통일) */}
         <TouchableOpacity
           style={styles.createButton}
           onPress={handleCreateLocation}
@@ -1091,9 +918,7 @@ const AddLocationScreen = () => {
           {isLoading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.createButtonText}>
-              {isEditMode ? '영역 수정' : '영역 생성'}
-            </Text>
+            <Text style={styles.createButtonText}>저장</Text>
           )}
         </TouchableOpacity>
         
@@ -1116,23 +941,7 @@ const AddLocationScreen = () => {
         iconColor={alertModalConfig.iconColor}
       />
       
-        {/* 수량 선택 모달 (간단 구현: AlertModal의 content로 입력 UI 구성 가능하나, 여기서는 프리셋 버튼 제공) */}
-        {quantityModalVisible && (
-          <AlertModal
-            visible={quantityModalVisible}
-            title="추가 제품 슬롯 등록"
-            message={`등록할 수량을 선택하세요. (보유: ${availableProductSlotTemplates.length}개)`}
-            buttons={[
-              { text: '1개', onPress: () => { setReserveQuantity(1); handleAssignProductSlots(); } },
-              { text: '3개', onPress: () => { setReserveQuantity(3); handleAssignProductSlots(); } },
-              { text: '5개', onPress: () => { setReserveQuantity(5); handleAssignProductSlots(); } },
-              { text: '취소', onPress: () => setQuantityModalVisible(false) },
-            ]}
-            onClose={() => setQuantityModalVisible(false)}
-            icon="list"
-            iconColor="#4CAF50"
-          />
-        )}
+        {/* (제거) 추가 제품 슬롯 등록 수량 선택 모달 */}
       </ScrollView>
     </SafeAreaView>
   );

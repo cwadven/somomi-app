@@ -310,15 +310,7 @@ const PointScreen = () => {
             <Text style={styles.infoTitle}>포인트로 할 수 있는 것</Text>
             <View style={styles.infoItem}>
               <Ionicons name="checkmark-circle" size={18} color="#4CAF50" style={styles.infoIcon} />
-              <Text style={styles.infoText}>구독 플랜 구매</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Ionicons name="checkmark-circle" size={18} color="#4CAF50" style={styles.infoIcon} />
               <Text style={styles.infoText}>추가 영역 슬롯 구매</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Ionicons name="checkmark-circle" size={18} color="#4CAF50" style={styles.infoIcon} />
-              <Text style={styles.infoText}>추가 제품 슬롯 구매</Text>
             </View>
           </View>
         </View>
