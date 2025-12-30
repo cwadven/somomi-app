@@ -8,27 +8,15 @@ const HPBar = ({ percentage, type }) => {
   // percentage가 NaN이면 0으로 처리
   const safePercentage = isNaN(percentage) ? 0 : percentage;
   
-  // HP 바 색상 계산
-  const getHPColor = (value, type) => {
-    if (type === 'expiry') {
-      // 유통기한용 색상 (파란색 계열)
-      if (value > 70) return '#2196F3'; // 파란색
-      if (value > 30) return '#03A9F4'; // 밝은 파란색
-      return '#F44336'; // 빨간색 (위험)
-    } else {
-      // 소진용 색상 (녹색 계열)
-      if (value > 70) return '#4CAF50'; // 녹색
-      if (value > 30) return '#FFC107'; // 노란색
-      return '#FF9800'; // 주황색
-    }
-  };
+  // HP 바 색상은 퍼센트에 따라 변하지 않도록 고정 (요청사항)
+  const barColor = type === 'expiry' ? '#2196F3' : '#4CAF50';
 
   return (
     <View style={styles.hpBarContainer}>
       <View 
         style={[
           styles.hpBar, 
-          { width: `${safePercentage}%`, backgroundColor: getHPColor(safePercentage, type) }
+          { width: `${safePercentage}%`, backgroundColor: barColor }
         ]} 
       />
     </View>
