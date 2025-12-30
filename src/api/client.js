@@ -89,10 +89,19 @@ export const request = async (path, { method = 'GET', headers = {}, body, skipAu
         delete sanitizedHeaders.authorization;
         return await request(path, { method, headers: sanitizedHeaders, body, skipAuth, _retry: true });
       } catch (refreshErr) {
-        // refresh 자체가 실패한 경우에만 “세션 만료” 처리(리프레시 토큰이 존재할 때)
+        // refresh 자체가 실패한 경우:
+        // - refresh token이 "진짜" 만료/무효인 경우(대개 401/403)만 세션 만료 처리
+        // - 네트워크 오류/일시적 5xx 등은 세션 만료로 보지 않음 (요청사항)
         try {
+          const status = refreshErr?.response?.status;
+          const msg = String(refreshErr?.message || '').toLowerCase();
+          const isRefreshAuthInvalid =
+            status === 401 ||
+            status === 403 ||
+            (status === 400 && (msg.includes('expired') || msg.includes('만료') || msg.includes('invalid') || msg.includes('unauthorized')));
+
           const existingRefresh = await loadRefreshToken();
-          if (existingRefresh) {
+          if (existingRefresh && isRefreshAuthInvalid) {
             const { store } = require('../redux/store');
             const { logout } = require('../redux/slices/authSlice');
             store.dispatch(logout());
