@@ -22,7 +22,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { addProductAsync, updateProductAsync, fetchProducts, fetchProductById, fetchProductsByLocation } from '../redux/slices/productsSlice';
+import { addProductAsync, updateProductAsync, fetchProducts, fetchProductById, fetchProductsByLocation, patchProductById } from '../redux/slices/productsSlice';
 import { markProductSlotTemplateAsUsed } from '../redux/slices/authSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { addNotification } from '../redux/slices/notificationsSlice';
@@ -895,6 +895,24 @@ const ProductFormScreen = () => {
         } catch (e) {
           throw e;
         }
+        // 수정 완료 즉시: 제품 목록/상세 캐시에 반영해서 화면에서 바로 새 이미지가 보이도록 처리
+        try {
+          dispatch(patchProductById({
+            id: String(productId),
+            patch: {
+              iconUrl: iconUrlForBody,
+              name: body.name,
+              memo: body.memo,
+              brand: body.brand,
+              purchasePlace: body.point_of_purchase,
+              price: body.purchase_price,
+              purchaseDate: body.purchase_at,
+              expiryDate: body.expire_at,
+              estimatedEndDate: body.expected_expire_at,
+              locationId: locIdAfter ? String(locIdAfter) : null,
+            }
+          }));
+        } catch (e) {}
         // 수정 후: 해당 영역 목록 최신화 + 제품 상세 화면을 위해 최신 데이터 확보
         if (locIdAfter) {
           try { await dispatch(fetchProductsByLocation(String(locIdAfter))).unwrap(); } catch (e) {}

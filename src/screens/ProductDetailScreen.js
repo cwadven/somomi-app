@@ -75,6 +75,13 @@ const ProductDetailScreen = () => {
   const currentProduct = cachedFromSections || selectedProduct || passedProduct;
   const { userLocationTemplateInstances, subscription } = useSelector(state => state.auth);
   const isConsumed = currentProduct?.isConsumed === true || currentProduct?.is_consumed === true;
+  const [iconLoadFailed, setIconLoadFailed] = useState(false);
+  const iconUri = typeof currentProduct?.iconUrl === 'string' && currentProduct.iconUrl.trim() !== '' ? currentProduct.iconUrl : null;
+
+  // 이미지가 바뀌면 로드 실패 상태를 초기화
+  useEffect(() => {
+    setIconLoadFailed(false);
+  }, [iconUri]);
   
   // 최신 상태를 참조하기 위한 ref
   const consumptionDateRef = useRef({
@@ -928,11 +935,12 @@ const ProductDetailScreen = () => {
         {/* 제품 이미지 및 기본 정보 */}
         <View style={styles.productHeader}>
           <View style={styles.imageContainer}>
-            {currentProduct.image ? (
+            {iconUri && !iconLoadFailed ? (
               <Image 
-                source={{ uri: currentProduct.image }} 
+                source={{ uri: iconUri }} 
                 style={styles.productImage} 
                 resizeMode="cover"
+                onError={() => setIconLoadFailed(true)}
               />
             ) : (
               <View style={styles.noImageContainer}>

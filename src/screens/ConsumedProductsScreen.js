@@ -3,6 +3,7 @@ import {
   View, 
   Text, 
   StyleSheet, 
+  Image,
   FlatList, 
   TouchableOpacity, 
   ActivityIndicator,
@@ -57,6 +58,21 @@ const ConsumedProductsScreen = () => {
   
   // 카테고리에 맞는 아이콘 선택
   const getCategoryIcon = () => 'cube-outline';
+
+  const ConsumedItemIcon = ({ uri }) => {
+    const [failed, setFailed] = useState(false);
+    const hasUri = typeof uri === 'string' && uri.trim() !== '';
+    if (hasUri && !failed) {
+      return (
+        <Image
+          source={{ uri }}
+          style={styles.iconImage}
+          onError={() => setFailed(true)}
+        />
+      );
+    }
+    return <Ionicons name={getCategoryIcon()} size={30} color="#9E9E9E" />;
+  };
   
   // 목록 아이템 렌더링
   const renderItem = ({ item }) => (
@@ -65,7 +81,7 @@ const ConsumedProductsScreen = () => {
       onPress={() => navigation.navigate('ConsumedProductDetail', { productId: item.id })}
     >
       <View style={styles.iconContainer}>
-        <Ionicons name={getCategoryIcon()} size={30} color="#9E9E9E" />
+        <ConsumedItemIcon uri={item?.iconUrl} />
       </View>
       <View style={styles.productInfo}>
         <Text style={styles.productName}>{item.name}</Text>
@@ -302,6 +318,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+  },
+  iconImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 25,
+    resizeMode: 'cover',
   },
   productInfo: {
     flex: 1,

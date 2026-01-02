@@ -420,6 +420,39 @@ export const productsSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    // 서버/화면에서 이미 알고 있는 변경사항을 즉시 캐시에 반영 (목록/상세 즉시 갱신용)
+    patchProductById: (state, action) => {
+      const id = String(action.payload?.id ?? '');
+      const patch = action.payload?.patch || {};
+      if (!id) return;
+
+      // products(내 제품 목록) 업데이트
+      const idx = state.products.findIndex(p => String(p.id) === id);
+      if (idx !== -1) {
+        state.products[idx] = { ...state.products[idx], ...patch };
+      }
+
+      // currentProduct 업데이트
+      if (state.currentProduct && String(state.currentProduct.id) === id) {
+        state.currentProduct = { ...state.currentProduct, ...patch };
+      }
+
+      // consumedProducts 업데이트(혹시 동일 id가 들어있는 경우)
+      const cIdx = state.consumedProducts.findIndex(p => String(p.id) === id);
+      if (cIdx !== -1) {
+        state.consumedProducts[cIdx] = { ...state.consumedProducts[cIdx], ...patch };
+      }
+
+      // locationProducts 캐시 업데이트
+      Object.keys(state.locationProducts || {}).forEach((locId) => {
+        const list = state.locationProducts[locId];
+        if (!Array.isArray(list)) return;
+        const pIdx = list.findIndex(p => String(p.id) === id);
+        if (pIdx !== -1) {
+          state.locationProducts[locId][pIdx] = { ...state.locationProducts[locId][pIdx], ...patch };
+        }
+      });
+    },
     removeConsumedProductById: (state, action) => {
       const id = String(action.payload);
       state.consumedProducts = state.consumedProducts.filter(p => String(p.id) !== id);
@@ -679,6 +712,6 @@ export const productsSlice = createSlice({
   },
 });
 
-export const { clearCurrentProduct, clearError, removeConsumedProductById } = productsSlice.actions;
+export const { clearCurrentProduct, clearError, patchProductById, removeConsumedProductById } = productsSlice.actions;
 
 export default productsSlice.reducer; 
