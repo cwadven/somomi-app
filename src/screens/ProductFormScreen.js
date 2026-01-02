@@ -73,6 +73,7 @@ const ProductFormScreen = () => {
   const [pickedImage, setPickedImage] = useState(null); // { uri, fileName, mimeType }
   const [imageUploading, setImageUploading] = useState(false);
   const [uploadedImageKey, setUploadedImageKey] = useState(null); // presigned 업로드 후 key
+  const [uploadedImageUrl, setUploadedImageUrl] = useState(null); // read_host + key (icon_url로 저장할 값)
   // 초안 저장용 디바운스 타이머
   const draftTimerRef = useRef(null);
   
@@ -440,6 +441,7 @@ const ProductFormScreen = () => {
         mimeType: asset.mimeType || guessMimeTypeFromExtension(ext),
       });
       setUploadedImageKey(null); // 새 이미지 선택 시 업로드 키 초기화
+      setUploadedImageUrl(null);
     } catch (e) {
       showErrorAlert('오류', `이미지 선택 중 오류가 발생했습니다: ${e?.message || String(e)}`);
     }
@@ -449,11 +451,21 @@ const ProductFormScreen = () => {
     setImagePreviewUri(null);
     setPickedImage(null);
     setUploadedImageKey(null);
+    setUploadedImageUrl(null);
+  };
+
+  const joinReadHostAndKey = (readHost, key) => {
+    if (!readHost || !key) return null;
+    const host = String(readHost);
+    const k = String(key);
+    if (host.endsWith('/') && k.startsWith('/')) return host + k.slice(1);
+    if (!host.endsWith('/') && !k.startsWith('/')) return `${host}/${k}`;
+    return host + k;
   };
 
   const uploadPickedImageIfNeeded = async ({ transactionPk }) => {
     if (!pickedImage) return null; // 새로 선택한 이미지가 없으면 업로드하지 않음
-    if (uploadedImageKey) return uploadedImageKey;
+    if (uploadedImageUrl) return uploadedImageUrl;
 
     const ext = getFileExtension(pickedImage.fileName || pickedImage.uri);
     if (!ext || !ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
@@ -467,6 +479,7 @@ const ProductFormScreen = () => {
       const url = presigned?.url;
       const fields = presigned?.data;
       const key = fields?.key;
+      const readHost = presigned?.read_host;
       if (!url || !fields || !key) throw new Error('invalid-presigned-response');
 
       // 2) S3 업로드 (presigned POST)
@@ -504,7 +517,11 @@ const ProductFormScreen = () => {
       }
 
       setUploadedImageKey(key);
-      return key;
+      const full = joinReadHostAndKey(readHost, key);
+      // read_host가 없는 케이스를 대비해 key만이라도 반환(구버전 호환)
+      const iconUrl = full || key;
+      setUploadedImageUrl(iconUrl);
+      return iconUrl;
     } finally {
       setImageUploading(false);
     }
@@ -837,11 +854,11 @@ const ProductFormScreen = () => {
 
     try {
       // 이미지 업로드(선택): 첫 생성은 transaction_pk=0, 수정은 productId 사용
-      const imageKey = await uploadPickedImageIfNeeded({
+      const uploadedIconUrl = await uploadPickedImageIfNeeded({
         transactionPk: isEditMode ? String(productId) : '0',
       });
       // 수정 모드에서 이미지를 새로 선택하지 않았다면 기존 값을 유지(의도치 않은 null 초기화 방지)
-      const iconUrlForBody = pickedImage ? (imageKey || null) : (imagePreviewUri || null);
+      const iconUrlForBody = pickedImage ? (uploadedIconUrl || null) : (imagePreviewUri || null);
 
       const productData = {
           name: productName,
@@ -920,7 +937,7 @@ const ProductFormScreen = () => {
           point_of_purchase: purchasePlace || null,
           purchase_price: price && String(price).trim() !== '' ? parseFloat(String(price)) : null,
           purchase_at: purchaseDate.toISOString(),
-          icon_url: pickedImage ? (imageKey || null) : null,
+          icon_url: pickedImage ? (uploadedIconUrl || null) : null,
           expected_expire_at: estimatedEndDate ? estimatedEndDate.toISOString() : null,
           expire_at: expiryDate ? expiryDate.toISOString() : null,
         };

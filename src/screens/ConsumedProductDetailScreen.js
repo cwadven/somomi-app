@@ -30,6 +30,7 @@ const ConsumedProductDetailScreen = () => {
   // 제품 정보를 로컬 상태로 관리
   const [localProduct, setLocalProduct] = useState(null);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [iconLoadFailed, setIconLoadFailed] = useState(false);
   
   // 알림 모달 상태
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -43,6 +44,7 @@ const ConsumedProductDetailScreen = () => {
   
   // 현재 제품 찾기
   const currentProduct = consumedProducts.find(product => product.id === productId) || localProduct;
+  const iconUri = typeof currentProduct?.iconUrl === 'string' && currentProduct.iconUrl.trim() !== '' ? currentProduct.iconUrl : null;
   
   // 컴포넌트 마운트 시 한 번만 실행
   useEffect(() => {
@@ -227,11 +229,12 @@ const ConsumedProductDetailScreen = () => {
         {/* 제품 이미지 및 기본 정보 */}
         <View style={styles.productHeader}>
           <View style={styles.imageContainer}>
-            {currentProduct.image ? (
+            {iconUri && !iconLoadFailed ? (
               <Image 
-                source={{ uri: currentProduct.image }} 
+                source={{ uri: iconUri }} 
                 style={styles.productImage} 
                 resizeMode="cover"
+                onError={() => setIconLoadFailed(true)}
               />
             ) : (
               <View style={styles.noImageContainer}>

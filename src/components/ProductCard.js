@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { calculateExpiryPercentage, calculateConsumptionPercentage } from '../utils/productUtils';
@@ -24,6 +24,7 @@ const HPBar = ({ percentage, type }) => {
 };
 
 const ProductCard = ({ product, onPress, locationName, showLocation = false }) => {
+  const [iconLoadFailed, setIconLoadFailed] = useState(false);
   const expiryResult = calculateExpiryPercentage(product);
   const consumptionResult = calculateConsumptionPercentage(product);
   
@@ -61,6 +62,8 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
     return '#FFC107'; // 노란색 (D-3)
   };
 
+  const iconUri = typeof product?.iconUrl === 'string' && product.iconUrl.trim() !== '' ? product.iconUrl : null;
+
   return (
     <TouchableOpacity style={styles.container} onPress={onPress}>
       <View style={[
@@ -71,7 +74,15 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
           styles.characterImageContainer,
           isZeroHP && styles.zeroHPImageContainer
         ]}>
-          <Ionicons name="cube-outline" size={40} color={isZeroHP ? "#888" : "#4CAF50"} />
+          {iconUri && !iconLoadFailed ? (
+            <Image
+              source={{ uri: iconUri }}
+              style={styles.iconImage}
+              onError={() => setIconLoadFailed(true)}
+            />
+          ) : (
+            <Ionicons name="cube-outline" size={40} color={isZeroHP ? "#888" : "#4CAF50"} />
+          )}
           {isZeroHP && (
             <View style={styles.warningIconContainer}>
               <Ionicons name="warning" size={20} color="#FFF" />
@@ -239,6 +250,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
     position: 'relative',
+  },
+  iconImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+    borderRadius: 10,
   },
   zeroHPImageContainer: {
     backgroundColor: '#e0e0e0',
