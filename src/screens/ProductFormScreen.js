@@ -6,6 +6,7 @@ import {
   StyleSheet, 
   TextInput, 
   TouchableOpacity, 
+  Image,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -20,6 +21,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 import { addProductAsync, updateProductAsync, fetchProducts, fetchProductById, fetchProductsByLocation } from '../redux/slices/productsSlice';
 import { markProductSlotTemplateAsUsed } from '../redux/slices/authSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
@@ -29,6 +31,7 @@ import LocationSelector from '../components/LocationSelector';
 import SignupPromptModal from '../components/SignupPromptModal';
 import AlertModal from '../components/AlertModal';
 import { createInventoryItemInSection, updateInventoryItem } from '../api/inventoryApi';
+import { givePresignedUrl } from '../api/commonApi';
 
 // 조건부 DateTimePicker 임포트
 let DateTimePicker;
@@ -65,6 +68,11 @@ const ProductFormScreen = () => {
   const [expiryDate, setExpiryDate] = useState(null);
   const [estimatedEndDate, setEstimatedEndDate] = useState(null);
   const [memo, setMemo] = useState('');
+  // 제품 이미지(선택)
+  const [imagePreviewUri, setImagePreviewUri] = useState(null); // 원격 URL 또는 로컬 URI
+  const [pickedImage, setPickedImage] = useState(null); // { uri, fileName, mimeType }
+  const [imageUploading, setImageUploading] = useState(false);
+  const [uploadedImageKey, setUploadedImageKey] = useState(null); // presigned 업로드 후 key
   // 초안 저장용 디바운스 타이머
   const draftTimerRef = useRef(null);
   
@@ -318,6 +326,10 @@ const ProductFormScreen = () => {
           : ''
       );
       setMemo(editingProduct.memo || '');
+      // 기존 이미지(있다면) 프리뷰로 표시. (수정 모드에서 새 이미지 선택 전까진 업로드하지 않음)
+      setImagePreviewUri(editingProduct.iconUrl || null);
+      setPickedImage(null);
+      setUploadedImageKey(null);
       
       // 날짜 설정
       if (editingProduct.purchaseDate) {
@@ -371,6 +383,132 @@ const ProductFormScreen = () => {
       }
     }
   }, [isEditMode, editingProduct, locations]); // 카테고리 제거로 인한 변경
+
+  const ALLOWED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
+
+  const getFileExtension = (nameOrUri) => {
+    if (!nameOrUri || typeof nameOrUri !== 'string') return null;
+    const clean = nameOrUri.split('?')[0].split('#')[0];
+    const last = clean.split('/').pop() || clean;
+    const idx = last.lastIndexOf('.');
+    if (idx === -1) return null;
+    return last.slice(idx + 1).toLowerCase();
+  };
+
+  const guessMimeTypeFromExtension = (ext) => {
+    switch ((ext || '').toLowerCase()) {
+      case 'png': return 'image/png';
+      case 'jpg':
+      case 'jpeg': return 'image/jpeg';
+      case 'gif': return 'image/gif';
+      case 'webp': return 'image/webp';
+      default: return 'application/octet-stream';
+    }
+  };
+
+  const pickProductImage = async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm?.granted) {
+          showErrorAlert('권한 필요', '갤러리 접근 권한이 필요합니다.');
+          return;
+        }
+      }
+
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.85,
+      });
+
+      if (res.canceled) return;
+      const asset = Array.isArray(res.assets) ? res.assets[0] : null;
+      if (!asset?.uri) return;
+
+      const fileName = asset.fileName || null;
+      const ext = getFileExtension(fileName || asset.uri);
+      if (!ext || !ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
+        showErrorAlert('이미지 업로드 불가', 'png, jpg, jpeg, gif, webp 파일만 업로드할 수 있어요.');
+        return;
+      }
+
+      setImagePreviewUri(asset.uri);
+      setPickedImage({
+        uri: asset.uri,
+        fileName: fileName || `inventory_item_${Date.now()}.${ext}`,
+        mimeType: asset.mimeType || guessMimeTypeFromExtension(ext),
+      });
+      setUploadedImageKey(null); // 새 이미지 선택 시 업로드 키 초기화
+    } catch (e) {
+      showErrorAlert('오류', `이미지 선택 중 오류가 발생했습니다: ${e?.message || String(e)}`);
+    }
+  };
+
+  const removePickedImage = () => {
+    setImagePreviewUri(null);
+    setPickedImage(null);
+    setUploadedImageKey(null);
+  };
+
+  const uploadPickedImageIfNeeded = async ({ transactionPk }) => {
+    if (!pickedImage) return null; // 새로 선택한 이미지가 없으면 업로드하지 않음
+    if (uploadedImageKey) return uploadedImageKey;
+
+    const ext = getFileExtension(pickedImage.fileName || pickedImage.uri);
+    if (!ext || !ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
+      throw new Error('invalid-image-extension');
+    }
+
+    setImageUploading(true);
+    try {
+      // 1) presigned url 발급
+      const presigned = await givePresignedUrl('inventory-item-image', transactionPk, pickedImage.fileName);
+      const url = presigned?.url;
+      const fields = presigned?.data;
+      const key = fields?.key;
+      if (!url || !fields || !key) throw new Error('invalid-presigned-response');
+
+      // 2) S3 업로드 (presigned POST)
+      const form = new FormData();
+      Object.entries(fields).forEach(([k, v]) => {
+        if (v == null) return;
+        form.append(k, String(v));
+      });
+      // ⚠️ 중요: 웹에서는 FormData에 객체({uri,name,type})를 넣으면 "[object Object]"로 전송될 수 있음
+      // - web: blob/file로 append
+      // - native: { uri, name, type }로 append
+      if (Platform.OS === 'web') {
+        const mime = pickedImage.mimeType || guessMimeTypeFromExtension(ext);
+        const blob = await fetch(pickedImage.uri).then(r => r.blob());
+        // 브라우저/웹뷰 환경에 따라 File이 없을 수 있어 2단계 폴백
+        if (typeof File !== 'undefined') {
+          const file = new File([blob], pickedImage.fileName, { type: mime });
+          form.append('file', file);
+        } else {
+          // FormData.append(name, blob, filename)
+          form.append('file', blob, pickedImage.fileName);
+        }
+      } else {
+        form.append('file', {
+          uri: pickedImage.uri,
+          name: pickedImage.fileName,
+          type: pickedImage.mimeType || guessMimeTypeFromExtension(ext),
+        });
+      }
+
+      const uploadRes = await fetch(url, { method: 'POST', body: form });
+      if (!uploadRes.ok) {
+        const t = await uploadRes.text().catch(() => '');
+        throw new Error(`s3-upload-failed:${uploadRes.status}:${t}`);
+      }
+
+      setUploadedImageKey(key);
+      return key;
+    } finally {
+      setImageUploading(false);
+    }
+  };
 
   // 초기 선택된 영역 설정 및 해당 영역의 제품 개수 확인 (추가 모드)
   useEffect(() => {
@@ -698,6 +836,13 @@ const ProductFormScreen = () => {
     }
 
     try {
+      // 이미지 업로드(선택): 첫 생성은 transaction_pk=0, 수정은 productId 사용
+      const imageKey = await uploadPickedImageIfNeeded({
+        transactionPk: isEditMode ? String(productId) : '0',
+      });
+      // 수정 모드에서 이미지를 새로 선택하지 않았다면 기존 값을 유지(의도치 않은 null 초기화 방지)
+      const iconUrlForBody = pickedImage ? (imageKey || null) : (imagePreviewUri || null);
+
       const productData = {
           name: productName,
         brand: brand || null,
@@ -724,7 +869,7 @@ const ProductFormScreen = () => {
           point_of_purchase: purchasePlace || null,
           purchase_price: price && String(price).trim() !== '' ? parseFloat(String(price)) : null,
           purchase_at: purchaseDate.toISOString(),
-          icon_url: null,
+          icon_url: iconUrlForBody,
           expected_expire_at: estimatedEndDate ? estimatedEndDate.toISOString() : null,
           expire_at: expiryDate ? expiryDate.toISOString() : null,
         };
@@ -775,7 +920,7 @@ const ProductFormScreen = () => {
           point_of_purchase: purchasePlace || null,
           purchase_price: price && String(price).trim() !== '' ? parseFloat(String(price)) : null,
           purchase_at: purchaseDate.toISOString(),
-          icon_url: null,
+          icon_url: pickedImage ? (imageKey || null) : null,
           expected_expire_at: estimatedEndDate ? estimatedEndDate.toISOString() : null,
           expire_at: expiryDate ? expiryDate.toISOString() : null,
         };
@@ -1040,6 +1185,48 @@ const ProductFormScreen = () => {
         <Text style={styles.title}>
           {isEditMode ? '제품 수정' : '제품 등록'}
         </Text>
+
+        {/* 제품 이미지 (선택) */}
+        <View style={styles.imageSection}>
+          <View style={styles.imageHeader}>
+            <Text style={styles.label}>제품 이미지 (선택)</Text>
+            {imageUploading ? (
+              <View style={styles.imageUploading}>
+                <ActivityIndicator size="small" color="#4CAF50" />
+                <Text style={styles.imageUploadingText}>업로드 중...</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.imageRow}>
+            <View style={styles.imagePreviewBox}>
+              {imagePreviewUri ? (
+                <Image source={{ uri: imagePreviewUri }} style={styles.imagePreview} />
+              ) : (
+                <View style={styles.imagePlaceholder}>
+                  <Ionicons name="image-outline" size={28} color="#999" />
+                  <Text style={styles.imagePlaceholderText}>이미지 없음</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.imageButtons}>
+              <TouchableOpacity style={styles.imagePickButton} onPress={pickProductImage} disabled={imageUploading}>
+                <Ionicons name="images-outline" size={18} color="#fff" />
+                <Text style={styles.imagePickButtonText}>선택</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.imageRemoveButton, (!imagePreviewUri || imageUploading) && styles.imageRemoveButtonDisabled]}
+                onPress={removePickedImage}
+                disabled={!imagePreviewUri || imageUploading}
+              >
+                <Ionicons name="trash-outline" size={18} color="#666" />
+                <Text style={styles.imageRemoveButtonText}>제거</Text>
+              </TouchableOpacity>
+              <Text style={styles.imageHint}>png, jpg, jpeg, gif, webp만 가능</Text>
+            </View>
+          </View>
+        </View>
         
         {/* 제품명 입력 */}
         <View style={styles.inputGroup}>
@@ -1346,6 +1533,101 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 24,
     color: '#333',
+  },
+  imageSection: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  imageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  imageUploading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  imageUploadingText: {
+    marginLeft: 6,
+    color: '#4CAF50',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  imageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  imagePreviewBox: {
+    width: 92,
+    height: 92,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  imagePlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagePlaceholderText: {
+    marginTop: 4,
+    fontSize: 11,
+    color: '#999',
+  },
+  imageButtons: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  imagePickButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  imagePickButtonText: {
+    marginLeft: 6,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  imageRemoveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 8,
+  },
+  imageRemoveButtonDisabled: {
+    opacity: 0.5,
+  },
+  imageRemoveButtonText: {
+    marginLeft: 6,
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  imageHint: {
+    marginTop: 8,
+    fontSize: 11,
+    color: '#999',
   },
   inputGroup: {
     marginBottom: 20,
