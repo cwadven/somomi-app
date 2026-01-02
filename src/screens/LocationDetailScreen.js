@@ -667,7 +667,7 @@ const LocationDetailScreen = () => {
               >
                 <Ionicons name="create-outline" size={24} color="#4CAF50" />
               </TouchableOpacity>
-
+              
               <TouchableOpacity 
                 style={styles.headerActionButton}
               onPress={handleDeletePress}

@@ -7,7 +7,9 @@ import {
   Image, 
   TouchableOpacity,
   ActivityIndicator,
-  SafeAreaView
+  SafeAreaView,
+  Modal,
+  Platform
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -31,6 +33,7 @@ const ConsumedProductDetailScreen = () => {
   const [localProduct, setLocalProduct] = useState(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const [iconLoadFailed, setIconLoadFailed] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
   
   // 알림 모달 상태
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -45,6 +48,11 @@ const ConsumedProductDetailScreen = () => {
   // 현재 제품 찾기
   const currentProduct = consumedProducts.find(product => product.id === productId) || localProduct;
   const iconUri = typeof currentProduct?.iconUrl === 'string' && currentProduct.iconUrl.trim() !== '' ? currentProduct.iconUrl : null;
+
+  useEffect(() => {
+    setIconLoadFailed(false);
+    setImageViewerVisible(false);
+  }, [iconUri]);
   
   // 컴포넌트 마운트 시 한 번만 실행
   useEffect(() => {
@@ -230,12 +238,17 @@ const ConsumedProductDetailScreen = () => {
         <View style={styles.productHeader}>
           <View style={styles.imageContainer}>
             {iconUri && !iconLoadFailed ? (
-              <Image 
-                source={{ uri: iconUri }} 
-                style={styles.productImage} 
-                resizeMode="cover"
-                onError={() => setIconLoadFailed(true)}
-              />
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => setImageViewerVisible(true)}
+              >
+                <Image 
+                  source={{ uri: iconUri }} 
+                  style={styles.productImage} 
+                  resizeMode="cover"
+                  onError={() => setIconLoadFailed(true)}
+                />
+              </TouchableOpacity>
             ) : (
               <View style={styles.noImageContainer}>
                 <Ionicons 
@@ -260,6 +273,28 @@ const ConsumedProductDetailScreen = () => {
             )}
           </View>
         </View>
+
+        {/* 이미지 전체보기 모달 */}
+        <Modal
+          visible={imageViewerVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setImageViewerVisible(false)}
+        >
+          <View style={styles.imageViewerOverlay}>
+            <TouchableOpacity
+              style={styles.imageViewerClose}
+              onPress={() => setImageViewerVisible(false)}
+            >
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.imageViewerBody}>
+              {iconUri ? (
+                <Image source={{ uri: iconUri }} style={styles.imageViewerImage} resizeMode="contain" />
+              ) : null}
+            </View>
+          </View>
+        </Modal>
         
         {/* 소진 정보 섹션 */}
         <View style={styles.consumedSection}>
@@ -429,6 +464,27 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     resizeMode: 'cover',
+  },
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 30,
+    right: 16,
+    zIndex: 2,
+    padding: 8,
+  },
+  imageViewerBody: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  imageViewerImage: {
+    width: '100%',
+    height: '100%',
   },
   noImageContainer: {
     width: 100,

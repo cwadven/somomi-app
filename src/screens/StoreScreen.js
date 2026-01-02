@@ -166,7 +166,7 @@ const StoreScreen = () => {
   // 카탈로그 아이템 구매 처리(슬롯/스페셜/번들 등 확장형)
   const handlePurchaseItem = (item) => {
     if (!isLoggedIn) {
-      goToProfileTab();
+        goToProfileTab();
       return;
     }
     
@@ -276,7 +276,7 @@ const StoreScreen = () => {
   // 포인트 충전 처리
   const handlePurchasePoints = (pkg) => {
     if (!isLoggedIn) {
-      goToProfileTab();
+        goToProfileTab();
       return;
     }
     

@@ -77,10 +77,14 @@ const ProductDetailScreen = () => {
   const isConsumed = currentProduct?.isConsumed === true || currentProduct?.is_consumed === true;
   const [iconLoadFailed, setIconLoadFailed] = useState(false);
   const iconUri = typeof currentProduct?.iconUrl === 'string' && currentProduct.iconUrl.trim() !== '' ? currentProduct.iconUrl : null;
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
 
   // 이미지가 바뀌면 로드 실패 상태를 초기화
   useEffect(() => {
     setIconLoadFailed(false);
+  }, [iconUri]);
+  useEffect(() => {
+    setImageViewerVisible(false);
   }, [iconUri]);
   
   // 최신 상태를 참조하기 위한 ref
@@ -936,12 +940,17 @@ const ProductDetailScreen = () => {
         <View style={styles.productHeader}>
           <View style={styles.imageContainer}>
             {iconUri && !iconLoadFailed ? (
-              <Image 
-                source={{ uri: iconUri }} 
-                style={styles.productImage} 
-                resizeMode="cover"
-                onError={() => setIconLoadFailed(true)}
-              />
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => setImageViewerVisible(true)}
+              >
+                <Image 
+                  source={{ uri: iconUri }} 
+                  style={styles.productImage} 
+                  resizeMode="cover"
+                  onError={() => setIconLoadFailed(true)}
+                />
+              </TouchableOpacity>
             ) : (
               <View style={styles.noImageContainer}>
                 <Ionicons 
@@ -971,6 +980,28 @@ const ProductDetailScreen = () => {
         
         {/* 유통기한 및 소진 예상일 정보 */}
         {renderInfoSection()}
+
+        {/* 이미지 전체보기 모달 */}
+        <Modal
+          visible={imageViewerVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setImageViewerVisible(false)}
+        >
+          <View style={styles.imageViewerOverlay}>
+            <TouchableOpacity
+              style={styles.imageViewerClose}
+              onPress={() => setImageViewerVisible(false)}
+            >
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.imageViewerBody}>
+              {iconUri ? (
+                <Image source={{ uri: iconUri }} style={styles.imageViewerImage} resizeMode="contain" />
+              ) : null}
+            </View>
+          </View>
+        </Modal>
         
         {/* 추가 정보 섹션 */}
         <View style={styles.detailsSection}>
@@ -1498,6 +1529,27 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     resizeMode: 'cover',
+  },
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 30,
+    right: 16,
+    zIndex: 2,
+    padding: 8,
+  },
+  imageViewerBody: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  imageViewerImage: {
+    width: '100%',
+    height: '100%',
   },
   noImageContainer: {
     width: 100,

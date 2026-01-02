@@ -172,19 +172,19 @@ export const verifyToken = createAsyncThunk(
       const savedTemplates = await loadUserLocationTemplates();
       console.log('저장된 템플릿 인스턴스:', savedTemplates);
       
-      // 회원 토큰인 경우 사용자 정보 포함 (임시)
-      console.log('회원 토큰 검증 성공:', token);
-      return {
-        token,
-        isAnonymous: false,
-        user: {
-          id: '1',
-          username: '사용자',
-          email: 'user@example.com',
-        },
-        templates: savedTemplates,
-        deviceId,
-      };
+        // 회원 토큰인 경우 사용자 정보 포함 (임시)
+        console.log('회원 토큰 검증 성공:', token);
+        return {
+          token,
+          isAnonymous: false,
+          user: {
+            id: '1',
+            username: '사용자',
+            email: 'user@example.com',
+          },
+          templates: savedTemplates,
+          deviceId,
+        };
     } catch (error) {
       return rejectWithValue(error.message);
     }
