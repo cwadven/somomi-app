@@ -453,6 +453,42 @@ export const productsSlice = createSlice({
         }
       });
     },
+    // 소진 철회 등으로 "활성 제품 목록"에 다시 들어오는 경우를 즉시 반영
+    upsertActiveProduct: (state, action) => {
+      const product = action.payload?.product;
+      if (!product || product.id == null) return;
+      const id = String(product.id);
+      const locId = product.locationId != null ? String(product.locationId) : null;
+
+      // 소진 목록에서 제거
+      state.consumedProducts = (state.consumedProducts || []).filter(p => String(p?.id) !== id);
+
+      // products(전체/내 제품) upsert
+      const pIdx = state.products.findIndex(p => String(p?.id) === id);
+      if (pIdx !== -1) state.products[pIdx] = { ...state.products[pIdx], ...product, isConsumed: false };
+      else state.products.unshift({ ...product, isConsumed: false });
+
+      // locationProducts 캐시 upsert (해당 locId, 그리고 'all' 캐시가 있다면 거기도)
+      if (locId) {
+        const list = state.locationProducts[locId];
+        if (Array.isArray(list)) {
+          const i = list.findIndex(p => String(p?.id) === id);
+          if (i !== -1) state.locationProducts[locId][i] = { ...state.locationProducts[locId][i], ...product, isConsumed: false };
+          else state.locationProducts[locId].unshift({ ...product, isConsumed: false });
+        }
+      }
+      if (Array.isArray(state.locationProducts['all'])) {
+        const all = state.locationProducts['all'];
+        const i = all.findIndex(p => String(p?.id) === id);
+        if (i !== -1) all[i] = { ...all[i], ...product, isConsumed: false };
+        else all.unshift({ ...product, isConsumed: false });
+      }
+
+      // currentProduct도 해당 id면 갱신
+      if (state.currentProduct && String(state.currentProduct.id) === id) {
+        state.currentProduct = { ...state.currentProduct, ...product, isConsumed: false };
+      }
+    },
     removeConsumedProductById: (state, action) => {
       const id = String(action.payload);
       state.consumedProducts = state.consumedProducts.filter(p => String(p.id) !== id);
@@ -712,6 +748,6 @@ export const productsSlice = createSlice({
   },
 });
 
-export const { clearCurrentProduct, clearError, patchProductById, removeConsumedProductById } = productsSlice.actions;
+export const { clearCurrentProduct, clearError, patchProductById, upsertActiveProduct, removeConsumedProductById } = productsSlice.actions;
 
 export default productsSlice.reducer; 

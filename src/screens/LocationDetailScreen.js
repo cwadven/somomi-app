@@ -24,7 +24,6 @@ import SlotStatusBar from '../components/SlotStatusBar';
 import SlotPlaceholder from '../components/SlotPlaceholder';
 import LocationNotificationSettings from '../components/LocationNotificationSettings';
 import { onEvent, EVENT_NAMES } from '../utils/eventBus';
-import { getScrollOffset, setScrollOffset } from '../utils/scrollMemory';
 
 const LocationDetailScreen = () => {
   const navigation = useNavigation();
@@ -48,7 +47,10 @@ const LocationDetailScreen = () => {
   const PRODUCTS_TIMEOUT_MS = 8000;
   const [productsTimerId, setProductsTimerId] = useState(null);
   const didInitialFetchRef = React.useRef(false);
+  const listKeyRef = React.useRef(null); // 'all' | locationId (화면 전환 감지용)
   const productsListRef = React.useRef(null);
+  const lastScrollOffsetRef = React.useRef(0);
+  const shouldRestoreScrollRef = React.useRef(false);
 
   // 백엔드 정렬 파라미터 계산
   const getBackendSortParam = useCallback(() => {
@@ -108,19 +110,28 @@ const LocationDetailScreen = () => {
     React.useCallback(() => {
       // 포커스 시에는 제품 API 재호출 금지(요청사항), 템플릿만 최신화
       try { dispatch(loadUserProductSlotTemplateInstances()); } catch (e) {}
-      // ✅ 스크롤 위치 복원 (무한 스크롤 페이지네이션 유지)
-      const key = isAllProductsView ? 'all' : locationId;
-      const offset = getScrollOffset(`LocationDetail:${key}`);
-      if (offset > 0) {
-        setTimeout(() => {
-          try {
-            productsListRef.current?.scrollToOffset?.({ offset, animated: false });
-          } catch (e) {}
-        }, 0);
-      }
+      // ✅ ProductForm(수정/생성) 다녀온 뒤 FlatList 스크롤이 0으로 리셋되는 케이스 방지
+      // (detachInactiveScreens를 쓰지 않는 대신, 화면 포커스 복귀 시 1회만 복원 시도)
+      shouldRestoreScrollRef.current = true;
       return () => {};
     }, [dispatch, isAllProductsView, locationId])
   );
+
+  const tryRestoreScroll = React.useCallback(() => {
+    if (!shouldRestoreScrollRef.current) return;
+    const offset = lastScrollOffsetRef.current || 0;
+    // 0이면 복원할 게 없음
+    if (offset <= 0) {
+      shouldRestoreScrollRef.current = false;
+      return;
+    }
+    // 데이터가 없으면 다음 기회에
+    if (!Array.isArray(locationProducts) || locationProducts.length === 0) return;
+    try {
+      productsListRef.current?.scrollToOffset?.({ offset, animated: false });
+      shouldRestoreScrollRef.current = false;
+    } catch (e) {}
+  }, [locationProducts]);
 
   // ✅ Event-driven refresh: 생성/수정 이벤트를 받아 현재 리스트만 부분 업데이트 (refetch/초기화 없이)
   useEffect(() => {
@@ -180,37 +191,53 @@ const LocationDetailScreen = () => {
 
   // 제품 목록 필터링
   useEffect(() => {
-    if (isAllProductsView) {
-      // '모든 제품'은 서버 캐시('all')를 우선 사용하여 정렬/페이지네이션을 그대로 반영
-      const cachedAll = locationProductsCache?.['all'];
-      if (Array.isArray(cachedAll)) {
-        setLocationProducts(cachedAll);
-      } else {
-        // 캐시가 없으면 기존 로컬 데이터로 임시 표시(옵션)
-        const activeLocIds = new Set(
-          (locations || [])
-            .filter(loc => loc && loc.disabled !== true && !isLocExpired(loc))
-            .map(loc => loc.id)
-        );
-        const fallback = (products || []).filter(p => {
-          const key = p.locationLocalId || p.locationId;
-          return !!key && activeLocIds.has(key) && p.syncStatus !== 'deleted' && !p.isConsumed;
-        });
-        setLocationProducts(fallback);
+    const key = isAllProductsView ? 'all' : String(locationId);
+    const prevKey = listKeyRef.current;
+    const keyChanged = prevKey !== key;
+    if (keyChanged) listKeyRef.current = key;
+
+    // ✅ 스크롤 점프 방지:
+    // - 화면 key가 바뀐 경우(다른 영역/모든 제품으로 이동)만 캐시/필터 결과를 주입
+    // - 같은 화면 key에서 Redux 캐시가 갱신되더라도(예: 수정 patch), 여기서 리스트를 통째로 set 하지 않음
+    //   → 이벤트 기반 부분 업데이트로만 반영
+    if (!keyChanged) {
+      // 단, 초기 상태(비어있음)이고 캐시가 있다면 1회 채움은 허용
+      if (locationProducts.length === 0) {
+        const cached = locationProductsCache?.[key];
+        if (Array.isArray(cached) && cached.length > 0) {
+          setLocationProducts(cached);
+        }
       }
-    } else {
-      // 우선 캐시된 서버 응답을 사용
-      const cached = locationProductsCache?.[locationId];
-      if (Array.isArray(cached)) {
-        setLocationProducts(cached);
-      } else {
-        const filteredProducts = (products || []).filter(product => 
-          product.locationId === locationId && product.syncStatus !== 'deleted' && !product.isConsumed
-        );
-        setLocationProducts(filteredProducts);
-      }
+      return;
     }
-  }, [products, locationProductsCache, locationId, isAllProductsView, locations, isLocExpired]);
+
+    // keyChanged === true: 새 화면으로 전환된 경우에만 리스트 구성
+    const cached = locationProductsCache?.[key];
+    if (Array.isArray(cached)) {
+      setLocationProducts(cached);
+      return;
+    }
+
+    // 캐시가 없으면 로컬 필터 폴백
+    if (isAllProductsView) {
+      const activeLocIds = new Set(
+        (locations || [])
+          .filter(loc => loc && loc.disabled !== true && !isLocExpired(loc))
+          .map(loc => loc.id)
+      );
+      const fallback = (products || []).filter(p => {
+        const k = p.locationLocalId || p.locationId;
+        return !!k && activeLocIds.has(k) && p.syncStatus !== 'deleted' && !p.isConsumed;
+      });
+      setLocationProducts(fallback);
+    } else {
+      const filteredProducts = (products || []).filter(product =>
+        String(product.locationId) === String(locationId) && product.syncStatus !== 'deleted' && !product.isConsumed
+      );
+      setLocationProducts(filteredProducts);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, locationProductsCache, locationId, isAllProductsView, locations, isLocExpired, locationProducts.length]);
 
   // 비율 계산 헬퍼
   const computeRate = useCallback((startIso, endIso) => {
@@ -415,7 +442,9 @@ const LocationDetailScreen = () => {
   
   // 제품 추가 화면으로 이동
   const handleAddProduct = () => {
-    navigation.navigate('ProductForm', { locationId });
+    // NOTE: ProductDetail 기반 create 모드는 아직 구현 전이므로,
+    // 생성은 기존 ProductForm으로 이동하여 정상 동작을 보장합니다.
+    navigation.navigate('ProductForm', { mode: 'add', locationId });
   };
   
   // 제품 상세 화면으로 이동
@@ -614,9 +643,16 @@ const LocationDetailScreen = () => {
                 contentContainerStyle={styles.productsList}
                 scrollEventThrottle={16}
                 onScroll={(e) => {
-                  const key = isAllProductsView ? 'all' : locationId;
                   const y = e?.nativeEvent?.contentOffset?.y ?? 0;
-                  setScrollOffset(`LocationDetail:${key}`, typeof y === 'number' ? y : 0);
+                  if (typeof y === 'number') lastScrollOffsetRef.current = y;
+                }}
+                onLayout={() => {
+                  // 레이아웃이 잡힌 뒤 복원 시도
+                  tryRestoreScroll();
+                }}
+                onContentSizeChange={() => {
+                  // 데이터 변경으로 콘텐츠가 준비된 뒤 복원 시도
+                  tryRestoreScroll();
                 }}
                 onEndReachedThreshold={0.5}
                 onEndReached={() => {

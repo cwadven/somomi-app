@@ -94,8 +94,9 @@ const LocationsStack = () => (
       name="AddLocation" 
       component={AddLocationScreen} 
       options={{ 
-        animation: 'slide_from_bottom',
-        presentation: 'modal'
+        // 스택 내 modal presentation 혼용 시(특히 react-native-screens) 이전 화면 detach로
+        // 무한 스크롤 FlatList 스크롤이 0으로 리셋되는 문제가 발생할 수 있어 일반 push로 처리
+        animation: 'slide_from_bottom'
       }}
     />
     <Stack.Screen 
@@ -103,14 +104,18 @@ const LocationsStack = () => (
       component={ProductFormScreen} 
       options={{ 
         animation: 'slide_from_bottom',
-        presentation: 'modal',
+        // modal presentation은 이전 화면을 네이티브에서 분리(detach)시키며 FlatList 스크롤이 0으로 리셋될 수 있음
+        // 무한스크롤 스크롤 유지가 더 중요하므로 일반 push(card)로 동작하게 둠
+        detachPreviousScreen: false,
         headerShown: false
       }}
     />
     <Stack.Screen 
       name="ProductDetail" 
       component={ProductDetailScreen} 
-      options={{ animation: 'slide_from_right' }}
+      options={{
+        animation: 'slide_from_right',
+      }}
     />
   </Stack.Navigator>
 );

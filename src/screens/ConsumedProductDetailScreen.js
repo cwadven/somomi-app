@@ -14,10 +14,11 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchConsumedProducts, removeConsumedProductById } from '../redux/slices/productsSlice';
+import { fetchConsumedProducts, removeConsumedProductById, upsertActiveProduct } from '../redux/slices/productsSlice';
 import { revokeConsumeInventoryItem } from '../api/inventoryApi';
 import LocationSelectionModal from '../components/LocationSelectionModal';
 import AlertModal from '../components/AlertModal';
+import { emitEvent, EVENT_NAMES } from '../utils/eventBus';
 
 const ConsumedProductDetailScreen = () => {
   const route = useRoute();
@@ -91,6 +92,17 @@ const ConsumedProductDetailScreen = () => {
     setIsRestoring(true);
     revokeConsumeInventoryItem(currentProduct.id)
       .then(() => {
+        // ✅ Optimistic update: 철회된 제품을 즉시 활성 목록/영역 캐시에 추가
+        try {
+          const restored = {
+            ...currentProduct,
+            isConsumed: false,
+            // 철회 시 기본은 기존 locationId로 복귀한다고 가정
+            locationId: currentProduct.locationId ? String(currentProduct.locationId) : null,
+          };
+          dispatch(upsertActiveProduct({ product: restored }));
+          emitEvent(EVENT_NAMES.PRODUCT_CREATED, { product: restored });
+        } catch (e) {}
         try { dispatch(removeConsumedProductById(currentProduct.id)); } catch (e) {}
         navigation.goBack();
       })
@@ -142,6 +154,17 @@ const ConsumedProductDetailScreen = () => {
       }
       revokeConsumeInventoryItem(currentProduct.id, body)
       .then(() => {
+        // ✅ Optimistic update: 지정한 영역으로 즉시 복원 표시
+        try {
+          const restoredLocId = location?.id != null ? String(location.id) : null;
+          const restored = {
+            ...currentProduct,
+            isConsumed: false,
+            locationId: restoredLocId,
+          };
+          dispatch(upsertActiveProduct({ product: restored }));
+          emitEvent(EVENT_NAMES.PRODUCT_CREATED, { product: restored });
+        } catch (e) {}
         try { dispatch(removeConsumedProductById(currentProduct.id)); } catch (e) {}
         navigation.goBack();
       })

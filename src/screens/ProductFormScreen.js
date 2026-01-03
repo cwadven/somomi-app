@@ -23,7 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { addProductAsync, updateProductAsync, fetchProducts, fetchProductById, fetchProductsByLocation, patchProductById } from '../redux/slices/productsSlice';
+import { addProductAsync, updateProductAsync, fetchProducts, fetchProductById, fetchProductsByLocation, patchProductById, upsertActiveProduct } from '../redux/slices/productsSlice';
 import { markProductSlotTemplateAsUsed } from '../redux/slices/authSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { addNotification } from '../redux/slices/notificationsSlice';
@@ -1087,6 +1087,16 @@ const ProductFormScreen = () => {
           expiryDate: body.expire_at,
           estimatedEndDate: body.expected_expire_at,
         };
+        // ✅ Optimistic update: Redux 캐시에 즉시 반영 (MyProductsScreen 등에서도 바로 보이도록)
+        try {
+          dispatch(upsertActiveProduct({
+            product: {
+              ...result,
+              iconUrl: body.icon_url || null,
+              isConsumed: false,
+            }
+          }));
+        } catch (e) {}
         try {
           emitEvent(EVENT_NAMES.PRODUCT_CREATED, {
             product: {
@@ -1122,31 +1132,8 @@ const ProductFormScreen = () => {
       // 수정 모드: 이전 화면으로 돌아가기
       navigation.goBack();
     } else {
-      // 추가 모드: 폼 초기화 및 화면 이동
-      setProductName('');
-      // setSelectedCategory(null); // 카테고리 제거로 인한 변경
-      setBrand('');
-      setPurchasePlace('');
-      setPrice('');
-      setPurchaseDate(new Date());
-      setExpiryDate(null);
-      setEstimatedEndDate(null);
-      setMemo('');
-      
-      if (locationId) {
-        navigation.reset({
-          index: 1,
-          routes: [
-            { name: 'LocationsScreen' },
-            { name: 'LocationDetail', params: { locationId } }
-          ],
-        });
-      } else {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'LocationsScreen' }],
-        });
-      }
+      // ✅ 추가 모드: reset(리다이렉트) 대신 goBack으로 복귀 (무한스크롤/화면 상태 유지)
+      navigation.goBack();
     }
   };
 
