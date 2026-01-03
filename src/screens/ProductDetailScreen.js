@@ -6,6 +6,7 @@ import {
   ScrollView, 
   Image, 
   TouchableOpacity,
+  TextInput,
   Alert,
   ActivityIndicator,
   Modal,
@@ -15,14 +16,18 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchProductById, deleteProductAsync, fetchProductsByLocation } from '../redux/slices/productsSlice';
-import { loadUserProductSlotTemplateInstances } from '../redux/slices/authSlice';
-import { consumeInventoryItem } from '../api/inventoryApi';
+import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { fetchProductById, deleteProductAsync, fetchProductsByLocation, patchProductById, upsertActiveProduct } from '../redux/slices/productsSlice';
+import { loadUserProductSlotTemplateInstances, markProductSlotTemplateAsUsed } from '../redux/slices/authSlice';
+import { consumeInventoryItem, createInventoryItemInSection, updateInventoryItem } from '../api/inventoryApi';
+import { givePresignedUrl } from '../api/commonApi';
 import { isTemplateActive } from '../utils/validityUtils';
 import AlertModal from '../components/AlertModal';
 // ProductNotificationSettings는 아직 미구현(요청사항: 사용자에게 노출하지 않음)
 // import ProductNotificationSettings from '../components/ProductNotificationSettings';
 import CalendarView from '../components/CalendarView';
+import { emitEvent, EVENT_NAMES } from '../utils/eventBus';
 import { 
   getDaysInMonth, 
   getFirstDayOfMonth, 
@@ -57,8 +62,9 @@ const ProductDetailScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
   
-  const { productId, product: passedProduct } = route.params || {};
-  const { currentProduct: selectedProduct, status, error, locationProducts } = useSelector(state => state.products);
+  const { productId, product: passedProduct, mode: routeMode, locationId: createLocationId } = route.params || {};
+  const [screenMode, setScreenMode] = useState(routeMode === 'create' ? 'create' : (routeMode === 'edit' ? 'edit' : 'view')); // view | edit | create
+  const { currentProduct: selectedProduct, status, error, locationProducts, products } = useSelector(state => state.products);
   // 섹션 인벤토리 API로 채워진 캐시에서 우선 탐색
   const cachedFromSections = (() => {
     try {
@@ -73,7 +79,8 @@ const ProductDetailScreen = () => {
     }
   })();
   const currentProduct = cachedFromSections || selectedProduct || passedProduct;
-  const { userLocationTemplateInstances, subscription } = useSelector(state => state.auth);
+  const { userLocationTemplateInstances, userProductSlotTemplateInstances, subscription, slots } = useSelector(state => state.auth);
+  const { locations } = useSelector(state => state.locations);
   const isConsumed = currentProduct?.isConsumed === true || currentProduct?.is_consumed === true;
   const [iconLoadFailed, setIconLoadFailed] = useState(false);
   const iconUri = typeof currentProduct?.iconUrl === 'string' && currentProduct.iconUrl.trim() !== '' ? currentProduct.iconUrl : null;
@@ -542,8 +549,8 @@ const ProductDetailScreen = () => {
     );
   };
   
-  // 제품 데이터가 로딩 중일 경우 로딩 화면 표시
-  if (!currentProduct && status === 'loading') {
+  // 제품 데이터가 로딩 중일 경우 로딩 화면 표시 (create 모드 제외)
+  if (screenMode !== 'create' && !currentProduct && status === 'loading') {
     return (
       <View style={styles.mainContainer}>
         <View style={styles.headerBar}>
@@ -560,8 +567,8 @@ const ProductDetailScreen = () => {
     );
   }
   
-  // 에러가 발생한 경우 에러 메시지 표시
-  if (!currentProduct && status === 'failed') {
+  // 에러가 발생한 경우 에러 메시지 표시 (create 모드 제외)
+  if (screenMode !== 'create' && !currentProduct && status === 'failed') {
     return (
       <View style={styles.mainContainer}>
         <View style={styles.headerBar}>
@@ -584,8 +591,8 @@ const ProductDetailScreen = () => {
     );
   }
   
-  // 제품 데이터가 없을 경우 메시지 표시
-  if (!currentProduct) {
+  // 제품 데이터가 없을 경우 메시지 표시 (create 모드 제외)
+  if (screenMode !== 'create' && !currentProduct) {
     return (
       <View style={styles.mainContainer}>
         <View style={styles.headerBar}>
@@ -700,6 +707,216 @@ const ProductDetailScreen = () => {
 
   // 카테고리 제거: 고정 아이콘 사용
   const getCategoryIcon = () => 'cube-outline';
+
+  // ====== create/edit 폼 상태 ======
+  const [productName, setProductName] = useState('');
+  const [memo, setMemo] = useState('');
+  const [brand, setBrand] = useState('');
+  const [purchasePlace, setPurchasePlace] = useState('');
+  const [price, setPrice] = useState('');
+  const [purchaseDateText, setPurchaseDateText] = useState('');
+  const [expiryDateText, setExpiryDateText] = useState('');
+  const [estimatedEndDateText, setEstimatedEndDateText] = useState('');
+
+  // 이미지 업로드 상태 (선택 즉시 presigned + S3 업로드)
+  const [imagePreviewUri, setImagePreviewUri] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [uploadedIconUrl, setUploadedIconUrl] = useState(null); // read_host + key
+  const [pickedImageMeta, setPickedImageMeta] = useState(null); // { uri, fileName, mimeType, ext }
+
+  const ALLOWED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
+  const getFileExtension = (nameOrUri) => {
+    if (!nameOrUri || typeof nameOrUri !== 'string') return null;
+    const clean = nameOrUri.split('?')[0].split('#')[0];
+    const last = clean.split('/').pop() || clean;
+    const idx = last.lastIndexOf('.');
+    if (idx === -1) return null;
+    return last.slice(idx + 1).toLowerCase();
+  };
+  const guessMimeTypeFromExtension = (ext) => {
+    switch ((ext || '').toLowerCase()) {
+      case 'png': return 'image/png';
+      case 'jpg':
+      case 'jpeg': return 'image/jpeg';
+      case 'gif': return 'image/gif';
+      case 'webp': return 'image/webp';
+      default: return 'application/octet-stream';
+    }
+  };
+  const guessExtensionFromMimeType = (mimeType) => {
+    switch ((mimeType || '').toLowerCase()) {
+      case 'image/png': return 'png';
+      case 'image/jpeg': return 'jpg';
+      case 'image/gif': return 'gif';
+      case 'image/webp': return 'webp';
+      default: return null;
+    }
+  };
+  const buildSafeFileName = (ext) => `inventory_item_${Date.now()}.${String(ext || '').toLowerCase()}`;
+  const joinReadHostAndKey = (readHost, key) => {
+    if (!readHost || !key) return null;
+    const host = String(readHost);
+    const k = String(key);
+    if (host.endsWith('/') && k.startsWith('/')) return host + k.slice(1);
+    if (!host.endsWith('/') && !k.startsWith('/')) return `${host}/${k}`;
+    return host + k;
+  };
+  const parseYMD = (text) => {
+    const t = (text || '').trim();
+    if (!t) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
+    const [y, m, d] = t.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    if (isNaN(dt.getTime())) return null;
+    if (dt.getFullYear() !== y || dt.getMonth() !== (m - 1) || dt.getDate() !== d) return null;
+    return dt;
+  };
+  const formatYMD = (date) => {
+    if (!(date instanceof Date) || isNaN(date.getTime())) return '';
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const optimizeImageIfNeeded = async ({ uri, ext }) => {
+    if (ext === 'gif') return { uri, ext };
+    const MAX_DIM = 1280;
+    let format = SaveFormat.JPEG;
+    let outExt = 'jpg';
+    let compress = 0.78;
+    if (ext === 'png' || ext === 'webp') {
+      format = SaveFormat.WEBP;
+      outExt = 'webp';
+      compress = 0.8;
+    }
+    // 리사이즈는 화면 크기 정보가 없어도 웹/모바일 공통으로 안전하게 width 기준
+    const result = await manipulateAsync(uri, [{ resize: { width: MAX_DIM } }], { compress, format });
+    return { uri: result?.uri || uri, ext: outExt };
+  };
+
+  const uploadPickedImage = async ({ transactionPk, meta }) => {
+    if (!meta?.uri || !meta?.fileName) return null;
+    setImageUploading(true);
+    try {
+      const presigned = await givePresignedUrl('inventory-item-image', String(transactionPk), meta.fileName);
+      const url = presigned?.url;
+      const fields = presigned?.data;
+      const key = fields?.key;
+      const readHost = presigned?.read_host;
+      if (!url || !fields || !key) throw new Error('invalid-presigned-response');
+
+      const form = new FormData();
+      Object.entries(fields).forEach(([k, v]) => {
+        if (v == null) return;
+        form.append(k, String(v));
+      });
+
+      const ext = meta.ext || getFileExtension(meta.fileName) || 'jpg';
+      const mime = meta.mimeType || guessMimeTypeFromExtension(ext);
+      if (Platform.OS === 'web') {
+        const blob = await fetch(meta.uri).then(r => r.blob());
+        if (typeof File !== 'undefined') {
+          const file = new File([blob], meta.fileName, { type: mime });
+          form.append('file', file);
+        } else {
+          form.append('file', blob, meta.fileName);
+        }
+      } else {
+        form.append('file', { uri: meta.uri, name: meta.fileName, type: mime });
+      }
+
+      const uploadRes = await fetch(url, { method: 'POST', body: form });
+      if (!uploadRes.ok) {
+        const t = await uploadRes.text().catch(() => '');
+        throw new Error(`s3-upload-failed:${uploadRes.status}:${t}`);
+      }
+      const full = joinReadHostAndKey(readHost, key);
+      const iconUrl = full || key;
+      setUploadedIconUrl(iconUrl);
+      return iconUrl;
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const pickImageForForm = async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm?.granted) {
+          showErrorAlert('갤러리 접근 권한이 필요합니다.');
+          return;
+        }
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.85,
+      });
+      if (res.canceled) return;
+      const asset = Array.isArray(res.assets) ? res.assets[0] : null;
+      if (!asset?.uri) return;
+
+      const extFromNameOrUri = getFileExtension(asset.fileName || asset.uri);
+      const extFromMime = guessExtensionFromMimeType(asset.mimeType);
+      const ext = (extFromNameOrUri || extFromMime || '').toLowerCase();
+      if (!ext || !ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
+        showErrorAlert('png, jpg, jpeg, gif, webp 파일만 업로드할 수 있어요.');
+        return;
+      }
+
+      const optimized = await optimizeImageIfNeeded({ uri: asset.uri, ext }).catch(() => ({ uri: asset.uri, ext }));
+      const finalExt = optimized.ext || ext;
+      const meta = {
+        uri: optimized.uri,
+        ext: finalExt,
+        fileName: buildSafeFileName(finalExt),
+        mimeType: guessMimeTypeFromExtension(finalExt),
+      };
+      setPickedImageMeta(meta);
+      setImagePreviewUri(meta.uri);
+      setUploadedIconUrl(null);
+      // ✅ 선택 즉시 업로드
+      await uploadPickedImage({
+        transactionPk: screenMode === 'create' ? 0 : (currentProduct?.id || 0),
+        meta,
+      });
+    } catch (e) {
+      showErrorAlert(`이미지 선택 중 오류가 발생했습니다: ${e?.message || String(e)}`);
+    }
+  };
+
+  const enterEditMode = () => {
+    if (!currentProduct) return;
+    setProductName(currentProduct.name || '');
+    setMemo(currentProduct.memo || '');
+    setBrand(currentProduct.brand || '');
+    setPurchasePlace(currentProduct.purchasePlace || '');
+    setPrice(currentProduct.price != null ? String(currentProduct.price) : '');
+    setPurchaseDateText(currentProduct.purchaseDate ? formatYMD(new Date(currentProduct.purchaseDate)) : formatYMD(new Date()));
+    setExpiryDateText(currentProduct.expiryDate ? formatYMD(new Date(currentProduct.expiryDate)) : '');
+    setEstimatedEndDateText(currentProduct.estimatedEndDate ? formatYMD(new Date(currentProduct.estimatedEndDate)) : '');
+    setImagePreviewUri(currentProduct.iconUrl || null);
+    setPickedImageMeta(null);
+    setUploadedIconUrl(null);
+    setScreenMode('edit');
+  };
+
+  useEffect(() => {
+    if (screenMode === 'create') {
+      setProductName('');
+      setMemo('');
+      setBrand('');
+      setPurchasePlace('');
+      setPrice('');
+      setPurchaseDateText(formatYMD(new Date()));
+      setExpiryDateText('');
+      setEstimatedEndDateText('');
+      setImagePreviewUri(null);
+      setPickedImageMeta(null);
+      setUploadedIconUrl(null);
+    }
+  }, [screenMode]);
   
   // 제품 삭제 처리
   const handleDelete = () => {
@@ -729,9 +946,9 @@ const ProductDetailScreen = () => {
     setAlertModalVisible(true);
   };
   
-  // 제품 수정 화면으로 이동
+  // 제품 수정: 별도 화면 이동 없이 현재 화면에서 edit 모드로 전환
   const handleEdit = () => {
-            navigation.navigate('ProductForm', { mode: 'edit', productId: currentProduct.id, product: currentProduct });
+    enterEditMode();
   };
   
   // 알림 설정 탭으로 전환
@@ -751,10 +968,206 @@ const ProductDetailScreen = () => {
     setAlertModalVisible(true);
   };
 
-  const expiryPercentage = calculateExpiryPercentage();
-  const consumptionPercentage = calculateConsumptionPercentage();
-  const expiryDays = calculateExpiryDays();
-  const consumptionDays = calculateConsumptionDays();
+  const renderCreateEditForm = () => {
+    const isCreate = screenMode === 'create';
+    const canSave = (productName || '').trim().length > 0 && !imageUploading;
+
+    const onCancel = () => {
+      if (isCreate) navigation.goBack();
+      else setScreenMode('view');
+    };
+
+    const onSave = async () => {
+      try {
+        if (!canSave) {
+          showErrorAlert('제품명을 입력해 주세요.');
+          return;
+        }
+        const purchaseDateObj = parseYMD(purchaseDateText) || new Date();
+        const expiryDateObj = parseYMD(expiryDateText);
+        const estimatedEndDateObj = parseYMD(estimatedEndDateText);
+
+        const iconUrlForBody = imagePreviewUri
+          ? (uploadedIconUrl || (currentProduct?.iconUrl || null))
+          : null;
+
+        if (isCreate) {
+          if (!createLocationId) {
+            showErrorAlert('영역 정보가 없습니다. 다시 시도해 주세요.');
+            return;
+          }
+          const locIdAfter = String(createLocationId);
+          const location = (locations || []).find(l => String(l.id) === locIdAfter) || null;
+          const baseSlotsInSubmit = location?.feature?.baseSlots ?? slots?.productSlots?.baseSlots ?? 0;
+          const cachedList = (locationProducts && (locationProducts[String(locIdAfter)] || locationProducts[locIdAfter])) || [];
+          const productsInLocation = (cachedList && cachedList.length > 0)
+            ? cachedList.filter(p => !p.isConsumed)
+            : (products || []).filter(p => String(p.locationId) === String(locIdAfter) && !p.isConsumed);
+          const usedCount = productsInLocation.length;
+          const availableAssignedTemplates = (userProductSlotTemplateInstances || []).filter(t =>
+            String(t.assignedLocationId) === String(locIdAfter) && (t.usedByProductId == null)
+          );
+          const needTemplate = baseSlotsInSubmit !== -1 && usedCount >= baseSlotsInSubmit && availableAssignedTemplates.length > 0;
+          const availableAssigned = needTemplate ? availableAssignedTemplates[0] : null;
+          const templateIdForBody = (availableAssigned && !isNaN(Number(availableAssigned.id))) ? Number(availableAssigned.id) : null;
+
+          const body = {
+            name: productName,
+            memo: memo || null,
+            guest_inventory_item_template_id: templateIdForBody,
+            brand: brand || null,
+            point_of_purchase: purchasePlace || null,
+            purchase_price: price && String(price).trim() !== '' ? parseFloat(String(price)) : null,
+            purchase_at: purchaseDateObj.toISOString(),
+            icon_url: uploadedIconUrl || null,
+            expected_expire_at: estimatedEndDateObj ? estimatedEndDateObj.toISOString() : null,
+            expire_at: expiryDateObj ? expiryDateObj.toISOString() : null,
+          };
+          const createRes = await createInventoryItemInSection(locIdAfter, body);
+          const newId = createRes?.guest_inventory_item_id ? String(createRes.guest_inventory_item_id) : undefined;
+          const created = {
+            id: newId,
+            locationId: String(locIdAfter),
+            name: body.name,
+            memo: body.memo,
+            brand: body.brand,
+            purchasePlace: body.point_of_purchase,
+            price: body.purchase_price,
+            purchaseDate: body.purchase_at,
+            expiryDate: body.expire_at,
+            estimatedEndDate: body.expected_expire_at,
+            iconUrl: body.icon_url || null,
+            isConsumed: false,
+          };
+          try { dispatch(upsertActiveProduct({ product: created })); } catch (e) {}
+          try { emitEvent(EVENT_NAMES.PRODUCT_CREATED, { product: created }); } catch (e) {}
+          if (availableAssigned && created.id) {
+            try { dispatch(markProductSlotTemplateAsUsed({ templateId: availableAssigned.id, productId: created.id })); } catch (e) {}
+          }
+          navigation.goBack();
+          return;
+        }
+
+        // edit
+        if (!currentProduct?.id) return;
+        const body = {
+          guest_section_id: currentProduct.locationId ? Number(currentProduct.locationId) : null,
+          name: productName,
+          memo: memo || null,
+          brand: brand || null,
+          point_of_purchase: purchasePlace || null,
+          purchase_price: price && String(price).trim() !== '' ? parseFloat(String(price)) : null,
+          purchase_at: purchaseDateObj.toISOString(),
+          icon_url: uploadedIconUrl || currentProduct.iconUrl || null,
+          expected_expire_at: estimatedEndDateObj ? estimatedEndDateObj.toISOString() : null,
+          expire_at: expiryDateObj ? expiryDateObj.toISOString() : null,
+        };
+        await updateInventoryItem(String(currentProduct.id), body);
+        try {
+          dispatch(patchProductById({
+            id: String(currentProduct.id),
+            patch: {
+              iconUrl: body.icon_url,
+              name: body.name,
+              memo: body.memo,
+              brand: body.brand,
+              purchasePlace: body.point_of_purchase,
+              price: body.purchase_price,
+              purchaseDate: body.purchase_at,
+              expiryDate: body.expire_at,
+              estimatedEndDate: body.expected_expire_at,
+            }
+          }));
+        } catch (e) {}
+        // ✅ Event-driven refresh: 목록 refetch 없이 현재 아이템만 부분 업데이트
+        try {
+          emitEvent(EVENT_NAMES.PRODUCT_UPDATED, {
+            id: String(currentProduct.id),
+            patch: {
+              iconUrl: body.icon_url,
+              name: body.name,
+              memo: body.memo,
+              brand: body.brand,
+              purchasePlace: body.point_of_purchase,
+              price: body.purchase_price,
+              purchaseDate: body.purchase_at,
+              expiryDate: body.expire_at,
+              estimatedEndDate: body.expected_expire_at,
+            },
+            locationId: currentProduct.locationId != null ? String(currentProduct.locationId) : null,
+          });
+        } catch (e) {}
+        setScreenMode('view');
+      } catch (e) {
+        showErrorAlert(`저장 중 오류가 발생했습니다: ${e?.message || String(e)}`);
+      }
+    };
+
+    return (
+      <ScrollView style={styles.container}>
+        <View style={styles.productHeader}>
+          <View style={styles.imageContainer}>
+            {imagePreviewUri ? (
+              <Image source={{ uri: imagePreviewUri }} style={styles.productImage} resizeMode="cover" />
+            ) : (
+              <View style={styles.noImageContainer}>
+                <Ionicons name={getCategoryIcon()} size={60} color="#4CAF50" />
+                <Text style={styles.noImageText}>이미지 없음</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.productInfo}>
+            <Text style={styles.sectionTitle}>{isCreate ? '제품 등록' : '제품 수정'}</Text>
+            <TouchableOpacity style={styles.formImageButton} onPress={pickImageForForm} disabled={imageUploading}>
+              <Ionicons name="images-outline" size={18} color="#fff" />
+              <Text style={styles.formImageButtonText}>{imageUploading ? '업로드 중...' : '이미지 선택'}</Text>
+            </TouchableOpacity>
+            <Text style={styles.formHint}>png, jpg, jpeg, gif, webp</Text>
+          </View>
+        </View>
+
+        <View style={styles.detailsSection}>
+          <Text style={styles.formLabel}>제품명 *</Text>
+          <TextInput style={styles.formInput} value={productName} onChangeText={setProductName} placeholder="제품명을 입력하세요" />
+
+          <Text style={styles.formLabel}>구매일 (YYYY-MM-DD)</Text>
+          <TextInput style={styles.formInput} value={purchaseDateText} onChangeText={setPurchaseDateText} placeholder="2026-01-03" />
+
+          <Text style={styles.formLabel}>유통기한 (YYYY-MM-DD)</Text>
+          <TextInput style={styles.formInput} value={expiryDateText} onChangeText={setExpiryDateText} placeholder="선택" />
+
+          <Text style={styles.formLabel}>소진 예상일 (YYYY-MM-DD)</Text>
+          <TextInput style={styles.formInput} value={estimatedEndDateText} onChangeText={setEstimatedEndDateText} placeholder="선택" />
+
+          <Text style={styles.formLabel}>브랜드</Text>
+          <TextInput style={styles.formInput} value={brand} onChangeText={setBrand} placeholder="선택" />
+
+          <Text style={styles.formLabel}>구매처</Text>
+          <TextInput style={styles.formInput} value={purchasePlace} onChangeText={setPurchasePlace} placeholder="선택" />
+
+          <Text style={styles.formLabel}>가격</Text>
+          <TextInput style={styles.formInput} value={price} onChangeText={(t) => setPrice(t.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="숫자만 입력" />
+
+          <Text style={styles.formLabel}>메모</Text>
+          <TextInput style={[styles.formInput, styles.formTextArea]} value={memo} onChangeText={setMemo} placeholder="선택" multiline />
+
+          <TouchableOpacity style={[styles.formSaveButton, !canSave && { opacity: 0.5 }]} disabled={!canSave} onPress={onSave}>
+            <Text style={styles.formSaveButtonText}>{isCreate ? '등록' : '저장'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.formCancelButton} onPress={onCancel}>
+            <Text style={styles.formCancelButtonText}>취소</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  };
+
+  // create/edit 모드에서는 currentProduct가 없을 수 있으므로(특히 create),
+  // 상세 계산 로직을 실행하지 않도록 가드해서 빈 화면(런타임 에러)을 방지합니다.
+  const expiryPercentage = screenMode === 'view' ? calculateExpiryPercentage() : null;
+  const consumptionPercentage = screenMode === 'view' ? calculateConsumptionPercentage() : null;
+  const expiryDays = screenMode === 'view' ? calculateExpiryDays() : null;
+  const consumptionDays = screenMode === 'view' ? calculateConsumptionDays() : null;
   
   // 소진 처리가 필요한지 확인 (남은 일수가 0일 이하인 경우)
   const needsConsumption = 
@@ -944,12 +1357,12 @@ const ProductDetailScreen = () => {
                 activeOpacity={0.85}
                 onPress={() => setImageViewerVisible(true)}
               >
-                <Image 
+              <Image 
                   source={{ uri: iconUri }} 
-                  style={styles.productImage} 
-                  resizeMode="cover"
+                style={styles.productImage} 
+                resizeMode="cover"
                   onError={() => setIconLoadFailed(true)}
-                />
+              />
               </TouchableOpacity>
             ) : (
               <View style={styles.noImageContainer}>
@@ -1058,7 +1471,9 @@ const ProductDetailScreen = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#4CAF50" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>제품 상세</Text>
+        <Text style={styles.headerTitle}>
+          {screenMode === 'create' ? '제품 등록' : (screenMode === 'edit' ? '제품 수정' : '제품 상세')}
+        </Text>
         <View style={styles.headerRight} />
       </View>
       {/* 탭 메뉴 */}
@@ -1081,10 +1496,10 @@ const ProductDetailScreen = () => {
       </View>
 
       {/* 탭 내용 */}
-      {renderProductDetails()}
+      {(screenMode === 'edit' || screenMode === 'create') ? renderCreateEditForm() : renderProductDetails()}
 
       {/* 하단 액션 버튼 */}
-      {!isConsumed && (
+      {(screenMode === 'view' && !isConsumed) && (
       <View style={styles.bottomActionBar}>
         {(() => {
           const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === currentProduct.locationId);
@@ -1197,6 +1612,70 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 32,
+  },
+  formLabel: {
+    marginTop: 12,
+    marginBottom: 6,
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+  },
+  formInput: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  formTextArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  formImageButton: {
+    marginTop: 10,
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+  },
+  formImageButtonText: {
+    marginLeft: 6,
+    color: '#fff',
+    fontWeight: '700',
+  },
+  formHint: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#666',
+  },
+  formSaveButton: {
+    marginTop: 18,
+    backgroundColor: '#4CAF50',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  formSaveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  formCancelButton: {
+    marginTop: 10,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  formCancelButtonText: {
+    color: '#333',
+    fontSize: 14,
+    fontWeight: '700',
   },
   loadingContainer: {
     flex: 1,

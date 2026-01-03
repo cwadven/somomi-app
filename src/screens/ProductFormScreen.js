@@ -1026,7 +1026,18 @@ const ProductFormScreen = () => {
         try {
           emitEvent(EVENT_NAMES.PRODUCT_UPDATED, {
             id: String(productId),
-            patch: { iconUrl: iconUrlForBody },
+            patch: {
+              iconUrl: iconUrlForBody,
+              name: body.name,
+              memo: body.memo,
+              brand: body.brand,
+              purchasePlace: body.point_of_purchase,
+              price: body.purchase_price,
+              purchaseDate: body.purchase_at,
+              expiryDate: body.expire_at,
+              estimatedEndDate: body.expected_expire_at,
+              locationId: locIdAfter ? String(locIdAfter) : null,
+            },
             locationId: locIdAfter ? String(locIdAfter) : null,
           });
         } catch (e) {}

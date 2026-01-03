@@ -442,9 +442,7 @@ const LocationDetailScreen = () => {
   
   // 제품 추가 화면으로 이동
   const handleAddProduct = () => {
-    // NOTE: ProductDetail 기반 create 모드는 아직 구현 전이므로,
-    // 생성은 기존 ProductForm으로 이동하여 정상 동작을 보장합니다.
-    navigation.navigate('ProductForm', { mode: 'add', locationId });
+    navigation.navigate('ProductDetail', { mode: 'create', locationId });
   };
   
   // 제품 상세 화면으로 이동

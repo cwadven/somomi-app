@@ -59,7 +59,11 @@ const MyProductsScreen = ({ navigation }) => {
       
       <TouchableOpacity 
         style={styles.addButton}
-                  onPress={() => navigation.navigate('ProductForm', { mode: 'add' })}
+        // MyProducts에서는 특정 영역이 정해져 있지 않으므로, 우선 기존 흐름을 유지하거나
+        // UX 결정 후 locationId 선택 화면을 추가해야 합니다.
+        // 현재 요구사항(한 화면에서 view/edit/create) 기준으로는 locationId가 필요하므로,
+        // 여기서는 ProductDetail create로 바로 이동하지 않습니다.
+        onPress={() => navigation.navigate('ProductForm', { mode: 'add' })}
       >
         <Ionicons name="add" size={30} color="white" />
       </TouchableOpacity>
