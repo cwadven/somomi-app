@@ -737,6 +737,7 @@ const ProductDetailScreen = () => {
   const [showExpiryDatePicker, setShowExpiryDatePicker] = useState(false);
   const [showEstimatedEndDatePicker, setShowEstimatedEndDatePicker] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null); // create 모드에서 locationId 없을 때 사용
+  const didInitEditLocationRef = useRef(false);
 
   useEffect(() => {
     // create 모드인데 locationId가 없으면, 영역 선택을 위해 locations를 보장
@@ -746,6 +747,23 @@ const ProductDetailScreen = () => {
       }
     }
   }, [screenMode, createLocationId, locations, dispatch]);
+
+  useEffect(() => {
+    // edit 모드에서도 영역 변경이 가능해야 하므로 locations 로드 보장
+    if (screenMode === 'edit') {
+      if (!Array.isArray(locations) || locations.length === 0) {
+        try { dispatch(fetchLocations()); } catch (e) {}
+      }
+      // locations가 로드된 뒤, 현재 제품의 locationId로 초기 선택값 세팅(1회)
+      if (!didInitEditLocationRef.current && currentProduct?.locationId && Array.isArray(locations) && locations.length > 0) {
+        const found = locations.find(l => String(l.id) === String(currentProduct.locationId)) || null;
+        if (found) setSelectedLocation(found);
+        didInitEditLocationRef.current = true;
+      }
+    } else {
+      didInitEditLocationRef.current = false;
+    }
+  }, [screenMode, locations, currentProduct]);
 
   // 이미지 업로드 상태 (선택 즉시 presigned + S3 업로드)
   const [imagePreviewUri, setImagePreviewUri] = useState(null);
@@ -940,10 +958,11 @@ const ProductDetailScreen = () => {
       return;
     }
 
-    // edit
-    if (!currentProduct?.id) return;
-    const body = {
-      guest_section_id: currentProduct.locationId ? Number(currentProduct.locationId) : null,
+        // edit (영역 변경 포함)
+        if (!currentProduct?.id) return;
+        const locIdAfter = (selectedLocation?.id || currentProduct.locationId || null);
+        const body = {
+          guest_section_id: locIdAfter ? Number(locIdAfter) : null,
       name: productName,
       memo: memo || null,
       brand: brand || null,
@@ -968,6 +987,7 @@ const ProductDetailScreen = () => {
           purchaseDate: body.purchase_at,
           expiryDate: body.expire_at,
           estimatedEndDate: body.expected_expire_at,
+              locationId: locIdAfter ? String(locIdAfter) : null,
         }
       }));
     } catch (e) {}
@@ -984,8 +1004,9 @@ const ProductDetailScreen = () => {
           purchaseDate: body.purchase_at,
           expiryDate: body.expire_at,
           estimatedEndDate: body.expected_expire_at,
+              locationId: locIdAfter ? String(locIdAfter) : null,
         },
-        locationId: currentProduct.locationId != null ? String(currentProduct.locationId) : null,
+            locationId: locIdAfter ? String(locIdAfter) : (currentProduct.locationId != null ? String(currentProduct.locationId) : null),
       });
     } catch (e) {}
     setScreenMode('view');
@@ -1228,10 +1249,11 @@ const ProductDetailScreen = () => {
           return;
         }
 
-        // edit
+        // edit (영역 변경 포함)
         if (!currentProduct?.id) return;
+        const locIdAfter = (selectedLocation?.id || currentProduct.locationId || null);
         const body = {
-          guest_section_id: currentProduct.locationId ? Number(currentProduct.locationId) : null,
+          guest_section_id: locIdAfter ? Number(locIdAfter) : null,
           name: productName,
           memo: memo || null,
           brand: brand || null,
@@ -1307,6 +1329,23 @@ const ProductDetailScreen = () => {
         </View>
 
         <View style={styles.detailsSection}>
+          {/* edit 모드에서는 영역 변경 가능하도록 노출 */}
+          {screenMode === 'edit' ? (
+            <>
+              <Text style={styles.formLabel}>영역</Text>
+              <LocationSelector
+                locations={Array.isArray(locations) ? locations : []}
+                selectedLocation={selectedLocation}
+                onSelectLocation={setSelectedLocation}
+                hideAddButton={true}
+                isLoading={locationsStatus === 'loading'}
+                error={locationsError ? String(locationsError) : ''}
+                onRetry={() => { try { dispatch(fetchLocations()); } catch (e) {} }}
+                onAddLocation={() => {}}
+              />
+            </>
+          ) : null}
+
           {/* create 모드에서 locationId가 없으면 여기서 영역 선택 */}
           {isCreate && !createLocationId ? (
             <>
@@ -1324,13 +1363,17 @@ const ProductDetailScreen = () => {
             </>
           ) : null}
 
-          <Text style={styles.formLabel}>제품명 *</Text>
+          <Text style={[styles.formLabel, styles.requiredLabel]}>
+            제품명 <Text style={styles.requiredAsterisk}>*</Text>
+          </Text>
           <TextInput style={styles.formInput} value={productName} onChangeText={setProductName} placeholder="제품명을 입력하세요" />
 
           {/* 날짜 입력: 웹은 텍스트, 앱(iOS/Android)은 DateTimePicker UI */}
           {Platform.OS === 'web' ? (
             <>
-              <Text style={styles.formLabel}>구매일 (YYYY-MM-DD)</Text>
+              <Text style={[styles.formLabel, styles.requiredLabel]}>
+                구매일 <Text style={styles.requiredAsterisk}>*</Text> <Text style={styles.requiredHint}>(YYYY-MM-DD)</Text>
+              </Text>
               <TextInput style={styles.formInput} value={purchaseDateText} onChangeText={setPurchaseDateText} placeholder="2026-01-03" />
 
               <Text style={styles.formLabel}>유통기한 (YYYY-MM-DD)</Text>
@@ -1341,7 +1384,9 @@ const ProductDetailScreen = () => {
             </>
           ) : (
             <>
-              <Text style={styles.formLabel}>구매일</Text>
+              <Text style={[styles.formLabel, styles.requiredLabel]}>
+                구매일 <Text style={styles.requiredAsterisk}>*</Text>
+              </Text>
               <TouchableOpacity
                 style={styles.datePickButton}
                 onPress={() => setShowPurchaseDatePicker(true)}
@@ -1911,6 +1956,17 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     fontSize: 14,
     color: '#333',
+    fontWeight: '600',
+  },
+  requiredLabel: {
+    color: '#F44336',
+  },
+  requiredAsterisk: {
+    color: '#F44336',
+    fontWeight: '800',
+  },
+  requiredHint: {
+    color: '#F44336',
     fontWeight: '600',
   },
   formInput: {

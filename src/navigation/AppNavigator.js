@@ -13,7 +13,6 @@ import HomeScreen from '../screens/HomeScreen';
 import LocationsScreen from '../screens/LocationsScreen';
 import LocationDetailScreen from '../screens/LocationDetailScreen';
 import AddLocationScreen from '../screens/AddLocationScreen';
-import ProductFormScreen from '../screens/ProductFormScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import CategoryScreen from '../screens/CategoryScreen';
@@ -61,14 +60,6 @@ const HomeStack = () => {
         })}
       />
       <Stack.Screen 
-        name="ProductForm" 
-        component={ProductFormScreen} 
-        options={({ route }) => ({ 
-          title: route.params?.mode === 'edit' ? '제품 수정' : '제품 등록',
-          headerShown: false
-        })}
-      />
-      <Stack.Screen 
         name="Category" 
         component={CategoryScreen} 
         options={{ title: '카테고리' }}
@@ -100,17 +91,6 @@ const LocationsStack = () => (
       }}
     />
     <Stack.Screen 
-      name="ProductForm" 
-      component={ProductFormScreen} 
-      options={{ 
-        animation: 'slide_from_bottom',
-        // modal presentation은 이전 화면을 네이티브에서 분리(detach)시키며 FlatList 스크롤이 0으로 리셋될 수 있음
-        // 무한스크롤 스크롤 유지가 더 중요하므로 일반 push(card)로 동작하게 둠
-        detachPreviousScreen: false,
-        headerShown: false
-      }}
-    />
-    <Stack.Screen 
       name="ProductDetail" 
       component={ProductDetailScreen} 
       options={{
@@ -136,14 +116,6 @@ const ProfileStack = () => {
         name="ProfileScreen" 
         component={ProfileScreen} 
         options={{ title: '프로필', headerShown: false }}
-      />
-      <Stack.Screen 
-        name="ProductForm" 
-        component={ProductFormScreen} 
-        options={({ route }) => ({ 
-          title: route.params?.mode === 'edit' ? '제품 수정' : '제품 등록',
-          headerShown: false
-        })}
       />
       <Stack.Screen 
         name="ConsumedProducts" 

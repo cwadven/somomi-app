@@ -425,9 +425,11 @@ export const productsSlice = createSlice({
       const id = String(action.payload?.id ?? '');
       const patch = action.payload?.patch || {};
       if (!id) return;
+      const nextLocId = patch.locationId != null ? String(patch.locationId) : null;
 
       // products(내 제품 목록) 업데이트
       const idx = state.products.findIndex(p => String(p.id) === id);
+      const prevLocId = idx !== -1 && state.products[idx]?.locationId != null ? String(state.products[idx].locationId) : null;
       if (idx !== -1) {
         state.products[idx] = { ...state.products[idx], ...patch };
       }
@@ -452,6 +454,22 @@ export const productsSlice = createSlice({
           state.locationProducts[locId][pIdx] = { ...state.locationProducts[locId][pIdx], ...patch };
         }
       });
+
+      // ✅ locationId가 변경된 경우: 캐시 리스트 간 이동 처리
+      if (nextLocId && prevLocId && nextLocId !== prevLocId) {
+        // 이전 location 캐시에서 제거
+        if (Array.isArray(state.locationProducts[prevLocId])) {
+          state.locationProducts[prevLocId] = state.locationProducts[prevLocId].filter(p => String(p?.id) !== id);
+        }
+        // 새 location 캐시가 이미 존재하면(해당 화면에서 보고 있는 경우) prepend로 추가
+        if (Array.isArray(state.locationProducts[nextLocId])) {
+          const updated = idx !== -1 ? state.products[idx] : (state.currentProduct && String(state.currentProduct.id) === id ? state.currentProduct : null);
+          if (updated && !state.locationProducts[nextLocId].some(p => String(p?.id) === id)) {
+            state.locationProducts[nextLocId] = [{ ...updated }, ...state.locationProducts[nextLocId]];
+          }
+        }
+        // 'all' 캐시는 유지(이미 patch로 locationId만 갱신됨)
+      }
     },
     // 소진 철회 등으로 "활성 제품 목록"에 다시 들어오는 경우를 즉시 반영
     upsertActiveProduct: (state, action) => {

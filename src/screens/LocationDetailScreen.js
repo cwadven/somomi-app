@@ -110,7 +110,7 @@ const LocationDetailScreen = () => {
     React.useCallback(() => {
       // 포커스 시에는 제품 API 재호출 금지(요청사항), 템플릿만 최신화
       try { dispatch(loadUserProductSlotTemplateInstances()); } catch (e) {}
-      // ✅ ProductForm(수정/생성) 다녀온 뒤 FlatList 스크롤이 0으로 리셋되는 케이스 방지
+      // ✅ 제품 등록/수정 화면 다녀온 뒤 FlatList 스크롤이 0으로 리셋되는 케이스 방지
       // (detachInactiveScreens를 쓰지 않는 대신, 화면 포커스 복귀 시 1회만 복원 시도)
       shouldRestoreScrollRef.current = true;
       return () => {};
@@ -142,6 +142,12 @@ const LocationDetailScreen = () => {
         if (!Array.isArray(prev) || prev.length === 0) return prev;
         const idx = prev.findIndex((p) => String(p?.id) === id);
         if (idx === -1) return prev;
+        // 영역이 변경된 수정이라면, 현재 화면이 특정 영역 보기일 때 리스트에서 제거
+        const newLocId = payload?.patch?.locationId != null ? String(payload.patch.locationId) : (payload?.locationId != null ? String(payload.locationId) : null);
+        if (!isAllProductsView && newLocId && String(locationId) !== String(newLocId)) {
+          const next = prev.filter((p) => String(p?.id) !== id);
+          return next;
+        }
         const next = [...prev];
         next[idx] = { ...next[idx], ...(payload?.patch || {}) };
         return next;
