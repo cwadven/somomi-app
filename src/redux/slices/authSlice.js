@@ -1,5 +1,4 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-
 import { saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, loadDeviceId, saveLocations, saveProducts, saveConsumedProducts, saveRefreshToken, removeRefreshToken, removeData, STORAGE_KEYS } from '../../utils/storageUtils';
 import { loginMember } from '../../api/memberApi';
 import { fetchGuestSectionTemplates } from '../../api/sectionApi';

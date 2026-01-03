@@ -3,15 +3,6 @@ import { fetchLocations, reconcileLocationsDisabled } from '../redux/slices/loca
 import { reconcileLocationTemplates } from '../redux/slices/authSlice';
 import { fetchProducts } from '../redux/slices/productsSlice';
 
-
-
-
-
-
-
-
-
-
 export const processSyncQueueIfOnline = async (dispatch, getState) => {
   // 오프라인 모드 제거: 항상 큐를 처리 (서버 미도입 상태에서는 로컬 커밋만 수행)
 

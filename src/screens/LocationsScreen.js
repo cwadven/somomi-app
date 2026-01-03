@@ -1,9 +1,7 @@
 import { isTemplateActive } from '../utils/validityUtils';
-
 import { useEffect, useState, useCallback, useMemo } from 'react';
-
-
 import {
+
 View,
 Text,
 StyleSheet,
