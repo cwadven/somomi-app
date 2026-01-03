@@ -28,6 +28,8 @@ import AlertModal from '../components/AlertModal';
 // import ProductNotificationSettings from '../components/ProductNotificationSettings';
 import CalendarView from '../components/CalendarView';
 import { emitEvent, EVENT_NAMES } from '../utils/eventBus';
+import LocationSelector from '../components/LocationSelector';
+import { fetchLocations } from '../redux/slices/locationsSlice';
 import { 
   getDaysInMonth, 
   getFirstDayOfMonth, 
@@ -90,7 +92,7 @@ const ProductDetailScreen = () => {
   })();
   const currentProduct = cachedFromSections || selectedProduct || passedProduct;
   const { userLocationTemplateInstances, userProductSlotTemplateInstances, subscription, slots } = useSelector(state => state.auth);
-  const { locations } = useSelector(state => state.locations);
+  const { locations, status: locationsStatus, error: locationsError } = useSelector(state => state.locations);
   const isConsumed = currentProduct?.isConsumed === true || currentProduct?.is_consumed === true;
   const [iconLoadFailed, setIconLoadFailed] = useState(false);
   const iconUri = typeof currentProduct?.iconUrl === 'string' && currentProduct.iconUrl.trim() !== '' ? currentProduct.iconUrl : null;
@@ -734,6 +736,16 @@ const ProductDetailScreen = () => {
   const [showPurchaseDatePicker, setShowPurchaseDatePicker] = useState(false);
   const [showExpiryDatePicker, setShowExpiryDatePicker] = useState(false);
   const [showEstimatedEndDatePicker, setShowEstimatedEndDatePicker] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState(null); // create 모드에서 locationId 없을 때 사용
+
+  useEffect(() => {
+    // create 모드인데 locationId가 없으면, 영역 선택을 위해 locations를 보장
+    if (screenMode === 'create' && !createLocationId) {
+      if (!Array.isArray(locations) || locations.length === 0) {
+        try { dispatch(fetchLocations()); } catch (e) {}
+      }
+    }
+  }, [screenMode, createLocationId, locations, dispatch]);
 
   // 이미지 업로드 상태 (선택 즉시 presigned + S3 업로드)
   const [imagePreviewUri, setImagePreviewUri] = useState(null);
@@ -870,12 +882,13 @@ const ProductDetailScreen = () => {
     const estimatedEndDateObj = parseYMD(estimatedEndDateText);
 
     if (isCreate) {
-      if (!createLocationId) {
+      const resolvedLocationId = createLocationId || selectedLocation?.id || null;
+      if (!resolvedLocationId) {
         showErrorAlert('영역 정보가 없습니다. 다시 시도해 주세요.');
         return;
       }
 
-      const locIdAfter = String(createLocationId);
+      const locIdAfter = String(resolvedLocationId);
       const location = (locations || []).find(l => String(l.id) === locIdAfter) || null;
       const baseSlotsInSubmit = location?.feature?.baseSlots ?? slots?.productSlots?.baseSlots ?? 0;
       const cachedList = (locationProducts && (locationProducts[String(locIdAfter)] || locationProducts[locIdAfter])) || [];
@@ -1294,6 +1307,23 @@ const ProductDetailScreen = () => {
         </View>
 
         <View style={styles.detailsSection}>
+          {/* create 모드에서 locationId가 없으면 여기서 영역 선택 */}
+          {isCreate && !createLocationId ? (
+            <>
+              <Text style={styles.formLabel}>영역 선택 *</Text>
+              <LocationSelector
+                locations={Array.isArray(locations) ? locations : []}
+                selectedLocation={selectedLocation}
+                onSelectLocation={setSelectedLocation}
+                hideAddButton={true}
+                isLoading={locationsStatus === 'loading'}
+                error={locationsError ? String(locationsError) : ''}
+                onRetry={() => { try { dispatch(fetchLocations()); } catch (e) {} }}
+                onAddLocation={() => { /* create 화면에서는 우선 추가 이동 UX는 생략 */ }}
+              />
+            </>
+          ) : null}
+
           <Text style={styles.formLabel}>제품명 *</Text>
           <TextInput style={styles.formInput} value={productName} onChangeText={setProductName} placeholder="제품명을 입력하세요" />
 
