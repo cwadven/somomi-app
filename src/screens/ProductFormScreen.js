@@ -22,6 +22,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { addProductAsync, updateProductAsync, fetchProducts, fetchProductById, fetchProductsByLocation, patchProductById } from '../redux/slices/productsSlice';
 import { markProductSlotTemplateAsUsed } from '../redux/slices/authSlice';
 import { fetchLocations } from '../redux/slices/locationsSlice';
@@ -32,6 +33,7 @@ import SignupPromptModal from '../components/SignupPromptModal';
 import AlertModal from '../components/AlertModal';
 import { createInventoryItemInSection, updateInventoryItem } from '../api/inventoryApi';
 import { givePresignedUrl } from '../api/commonApi';
+import { emitEvent, EVENT_NAMES } from '../utils/eventBus';
 
 // 조건부 DateTimePicker 임포트
 let DateTimePicker;
@@ -71,7 +73,9 @@ const ProductFormScreen = () => {
   // 제품 이미지(선택)
   const [imagePreviewUri, setImagePreviewUri] = useState(null); // 원격 URL 또는 로컬 URI
   const [pickedImage, setPickedImage] = useState(null); // { uri, fileName, mimeType }
+  const [imageProcessing, setImageProcessing] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
+  const [uploadTakesLong, setUploadTakesLong] = useState(false);
   const [uploadedImageKey, setUploadedImageKey] = useState(null); // presigned 업로드 후 key
   const [uploadedImageUrl, setUploadedImageUrl] = useState(null); // read_host + key (icon_url로 저장할 값)
   // 초안 저장용 디바운스 타이머
@@ -407,6 +411,82 @@ const ProductFormScreen = () => {
     }
   };
 
+  const guessExtensionFromMimeType = (mimeType) => {
+    switch ((mimeType || '').toLowerCase()) {
+      case 'image/png': return 'png';
+      case 'image/jpeg': return 'jpg';
+      case 'image/gif': return 'gif';
+      case 'image/webp': return 'webp';
+      default: return null;
+    }
+  };
+
+  const buildSafeFileName = (ext) => {
+    const safeExt = String(ext || '').toLowerCase();
+    return `inventory_item_${Date.now()}.${safeExt}`;
+  };
+
+  const optimizeImageIfNeeded = async ({ uri, ext, width, height }) => {
+    // gif는 애니메이션 보존을 위해 최적화/변환하지 않음
+    if (ext === 'gif') return { uri, ext };
+
+    const MAX_DIM = 1280;
+    const w = typeof width === 'number' ? width : null;
+    const h = typeof height === 'number' ? height : null;
+    const shouldResize = (w && w > MAX_DIM) || (h && h > MAX_DIM);
+
+    const actions = [];
+    if (shouldResize) {
+      if (w && h) {
+        if (w >= h) actions.push({ resize: { width: MAX_DIM } });
+        else actions.push({ resize: { height: MAX_DIM } });
+      } else {
+        actions.push({ resize: { width: MAX_DIM } });
+      }
+    }
+
+    // 포맷/압축 정책
+    // - png: webp로 변환(투명도 유지 + 용량 절감 기대)
+    // - jpg/jpeg: jpeg 유지(압축)
+    // - webp: webp 유지(압축)
+    let format = SaveFormat.JPEG;
+    let outExt = 'jpg';
+    let compress = 0.78;
+    if (ext === 'png' || ext === 'webp') {
+      format = SaveFormat.WEBP;
+      outExt = 'webp';
+      compress = 0.8;
+    } else if (ext === 'jpg' || ext === 'jpeg') {
+      format = SaveFormat.JPEG;
+      outExt = 'jpg';
+      compress = 0.78;
+    }
+
+    // resize도 아니고, jpg/jpeg인데 굳이 재인코딩하지 않게: 그대로 사용
+    if (!actions.length && (ext === 'jpg' || ext === 'jpeg')) {
+      return { uri, ext: 'jpg' };
+    }
+
+    const result = await manipulateAsync(
+      uri,
+      actions,
+      { compress, format }
+    );
+    return { uri: result?.uri || uri, ext: outExt };
+  };
+
+  // 업로드가 오래 걸릴 때 안내 문구 표시
+  useEffect(() => {
+    let t;
+    if (imageUploading) {
+      setUploadTakesLong(false);
+      t = setTimeout(() => setUploadTakesLong(true), 2000);
+    } else {
+      setUploadTakesLong(false);
+    }
+    return () => { if (t) clearTimeout(t); };
+  }, [imageUploading]);
+
   const pickProductImage = async () => {
     try {
       if (Platform.OS !== 'web') {
@@ -427,18 +507,46 @@ const ProductFormScreen = () => {
       const asset = Array.isArray(res.assets) ? res.assets[0] : null;
       if (!asset?.uri) return;
 
-      const fileName = asset.fileName || null;
-      const ext = getFileExtension(fileName || asset.uri);
+      const extFromNameOrUri = getFileExtension(asset.fileName || asset.uri);
+      const extFromMime = guessExtensionFromMimeType(asset.mimeType);
+      const ext = (extFromNameOrUri || extFromMime || '').toLowerCase();
       if (!ext || !ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
         showErrorAlert('이미지 업로드 불가', 'png, jpg, jpeg, gif, webp 파일만 업로드할 수 있어요.');
         return;
       }
 
+      // 선택 즉시 프리뷰 표시
       setImagePreviewUri(asset.uri);
+      setUploadedImageKey(null); // 새 이미지 선택 시 업로드 키 초기화
+      setUploadedImageUrl(null);
+
+      // 큰 이미지는 자동 최적화(리사이즈/압축)해서 업로드 시간/용량 절감
+      setImageProcessing(true);
+      let optimized = { uri: asset.uri, ext };
+      try {
+        optimized = await optimizeImageIfNeeded({
+          uri: asset.uri,
+          ext,
+          width: asset.width,
+          height: asset.height,
+        });
+      } catch (e) {
+        // 최적화 실패해도 원본으로 계속 진행
+        optimized = { uri: asset.uri, ext };
+      } finally {
+        setImageProcessing(false);
+      }
+
+      const finalExt = optimized.ext || ext;
+      const safeName = buildSafeFileName(finalExt);
+      const mime = guessMimeTypeFromExtension(finalExt);
+
+      // 최적화 후 프리뷰를 교체(웹/플랫폼에 따라 uri가 달라질 수 있음)
+      setImagePreviewUri(optimized.uri);
       setPickedImage({
-        uri: asset.uri,
-        fileName: fileName || `inventory_item_${Date.now()}.${ext}`,
-        mimeType: asset.mimeType || guessMimeTypeFromExtension(ext),
+        uri: optimized.uri,
+        fileName: safeName,
+        mimeType: mime,
       });
       setUploadedImageKey(null); // 새 이미지 선택 시 업로드 키 초기화
       setUploadedImageUrl(null);
@@ -450,6 +558,7 @@ const ProductFormScreen = () => {
   const removePickedImage = () => {
     setImagePreviewUri(null);
     setPickedImage(null);
+    setImageProcessing(false);
     setUploadedImageKey(null);
     setUploadedImageUrl(null);
   };
@@ -913,10 +1022,14 @@ const ProductFormScreen = () => {
             }
           }));
         } catch (e) {}
-        // 수정 후: 해당 영역 목록 최신화 + 제품 상세 화면을 위해 최신 데이터 확보
-        if (locIdAfter) {
-          try { await dispatch(fetchProductsByLocation(String(locIdAfter))).unwrap(); } catch (e) {}
-        }
+        // ✅ Event-driven refresh: refetch로 리스트를 갈아끼우지 않고, 변경 이벤트만 발행
+        try {
+          emitEvent(EVENT_NAMES.PRODUCT_UPDATED, {
+            id: String(productId),
+            patch: { iconUrl: iconUrlForBody },
+            locationId: locIdAfter ? String(locIdAfter) : null,
+          });
+        } catch (e) {}
         result = {
           id: String(productId),
           locationId: locIdAfter ? String(locIdAfter) : null,
@@ -961,8 +1074,7 @@ const ProductFormScreen = () => {
         };
         const createRes = await createInventoryItemInSection(locIdAfter, body);
         const newId = createRes?.guest_inventory_item_id ? String(createRes.guest_inventory_item_id) : undefined;
-        // 생성 후 목록 최신화
-        try { await dispatch(fetchProductsByLocation(locIdAfter)).unwrap(); } catch (e) {}
+        // ✅ Event-driven refresh: 생성 후 refetch 없이 이벤트로만 알림 (리스트 스크롤 초기화 방지)
         result = {
           id: newId,
           locationId: String(locIdAfter),
@@ -975,6 +1087,15 @@ const ProductFormScreen = () => {
           expiryDate: body.expire_at,
           estimatedEndDate: body.expected_expire_at,
         };
+        try {
+          emitEvent(EVENT_NAMES.PRODUCT_CREATED, {
+            product: {
+              ...result,
+              iconUrl: body.icon_url || null,
+              isConsumed: false,
+            }
+          });
+        } catch (e) {}
         // 템플릿으로 생성한 경우 프론트 상태 동기화를 위해 사용 처리
         if (availableAssigned && result.id) {
           dispatch(markProductSlotTemplateAsUsed({ templateId: availableAssigned.id, productId: result.id }));
@@ -1225,10 +1346,12 @@ const ProductFormScreen = () => {
         <View style={styles.imageSection}>
           <View style={styles.imageHeader}>
             <Text style={styles.label}>제품 이미지 (선택)</Text>
-            {imageUploading ? (
+            {(imageUploading || imageProcessing) ? (
               <View style={styles.imageUploading}>
                 <ActivityIndicator size="small" color="#4CAF50" />
-                <Text style={styles.imageUploadingText}>업로드 중...</Text>
+                <Text style={styles.imageUploadingText}>
+                  {imageProcessing ? '이미지 최적화 중...' : (uploadTakesLong ? '업로드 중... (시간이 조금 걸려요)' : '업로드 중...')}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -1474,16 +1597,20 @@ const ProductFormScreen = () => {
         <TouchableOpacity 
           style={[
             styles.submitButton,
-            productsStatus === 'loading' && styles.disabledButton
+            (productsStatus === 'loading' || imageUploading || imageProcessing) && styles.disabledButton
           ]}
           onPress={handleSubmit}
-          disabled={productsStatus === 'loading'}
+          disabled={productsStatus === 'loading' || imageUploading || imageProcessing}
         >
-          {productsStatus === 'loading' ? (
+          {(productsStatus === 'loading' || imageUploading || imageProcessing) ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#ffffff" />
               <Text style={[styles.submitButtonText, styles.loadingText]}>
-                {isEditMode ? '수정 중...' : '등록 중...'}
+                {imageProcessing
+                  ? '이미지 최적화 중...'
+                  : imageUploading
+                    ? (uploadTakesLong ? '이미지 업로드 중... (시간이 조금 걸려요)' : '이미지 업로드 중...')
+                    : (isEditMode ? '수정 중...' : '등록 중...')}
               </Text>
             </View>
           ) : (

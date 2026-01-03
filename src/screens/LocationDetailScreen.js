@@ -23,6 +23,8 @@ import ProductCard from '../components/ProductCard';
 import SlotStatusBar from '../components/SlotStatusBar';
 import SlotPlaceholder from '../components/SlotPlaceholder';
 import LocationNotificationSettings from '../components/LocationNotificationSettings';
+import { onEvent, EVENT_NAMES } from '../utils/eventBus';
+import { getScrollOffset, setScrollOffset } from '../utils/scrollMemory';
 
 const LocationDetailScreen = () => {
   const navigation = useNavigation();
@@ -46,6 +48,7 @@ const LocationDetailScreen = () => {
   const PRODUCTS_TIMEOUT_MS = 8000;
   const [productsTimerId, setProductsTimerId] = useState(null);
   const didInitialFetchRef = React.useRef(false);
+  const productsListRef = React.useRef(null);
 
   // 백엔드 정렬 파라미터 계산
   const getBackendSortParam = useCallback(() => {
@@ -75,6 +78,13 @@ const LocationDetailScreen = () => {
   useEffect(() => {
     // 초기 진입: 내 영역에서 들어온 경우에만 초기 로딩/초기화 수행
     if (!didInitialFetchRef.current && from === 'Locations') {
+      const metaKey = isAllProductsView ? 'all' : locationId;
+      const cachedAlready = locationProductsCache?.[metaKey];
+      // ✅ 이미 무한스크롤로 쌓아둔 캐시가 있으면, 다시 첫 페이지 fetch로 덮어쓰지 않음
+      if (Array.isArray(cachedAlready) && cachedAlready.length > 0) {
+        didInitialFetchRef.current = true;
+        return;
+      }
       setProductsTimedOut(false);
       try { if (productsTimerId) clearTimeout(productsTimerId); } catch (e) {}
       setLocationProducts([]);
@@ -91,16 +101,64 @@ const LocationDetailScreen = () => {
       }
       didInitialFetchRef.current = true;
     }
-  }, [dispatch, locationId, isAllProductsView, from, getBackendSortParam]);
+  }, [dispatch, locationId, isAllProductsView, from, getBackendSortParam, locationProductsCache, productsStatus, productsTimerId]);
 
   // 포커스 시점마다 제품/템플릿 최신화 (슬롯 계산 즉시 반영)
   useFocusEffect(
     React.useCallback(() => {
       // 포커스 시에는 제품 API 재호출 금지(요청사항), 템플릿만 최신화
       try { dispatch(loadUserProductSlotTemplateInstances()); } catch (e) {}
+      // ✅ 스크롤 위치 복원 (무한 스크롤 페이지네이션 유지)
+      const key = isAllProductsView ? 'all' : locationId;
+      const offset = getScrollOffset(`LocationDetail:${key}`);
+      if (offset > 0) {
+        setTimeout(() => {
+          try {
+            productsListRef.current?.scrollToOffset?.({ offset, animated: false });
+          } catch (e) {}
+        }, 0);
+      }
       return () => {};
-    }, [dispatch])
+    }, [dispatch, isAllProductsView, locationId])
   );
+
+  // ✅ Event-driven refresh: 생성/수정 이벤트를 받아 현재 리스트만 부분 업데이트 (refetch/초기화 없이)
+  useEffect(() => {
+    const unsubUpdated = onEvent(EVENT_NAMES.PRODUCT_UPDATED, (payload) => {
+      const id = String(payload?.id ?? '');
+      if (!id) return;
+      setLocationProducts((prev) => {
+        if (!Array.isArray(prev) || prev.length === 0) return prev;
+        const idx = prev.findIndex((p) => String(p?.id) === id);
+        if (idx === -1) return prev;
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...(payload?.patch || {}) };
+        return next;
+      });
+    });
+
+    const unsubCreated = onEvent(EVENT_NAMES.PRODUCT_CREATED, (payload) => {
+      const product = payload?.product;
+      const id = product?.id != null ? String(product.id) : '';
+      if (!id) return;
+      const targetLocId = product?.locationId != null ? String(product.locationId) : null;
+
+      // 현재 화면이 특정 영역 보기라면 해당 영역일 때만 반영
+      if (!isAllProductsView && String(locationId) !== String(targetLocId)) return;
+
+      setLocationProducts((prev) => {
+        if (!Array.isArray(prev)) return prev;
+        if (prev.some((p) => String(p?.id) === id)) return prev;
+        // 정렬/페이지네이션을 깨지 않기 위해 "prepend"만 수행 (스크롤 리셋 없음)
+        return [product, ...prev];
+      });
+    });
+
+    return () => {
+      try { unsubUpdated(); } catch (e) {}
+      try { unsubCreated(); } catch (e) {}
+    };
+  }, [isAllProductsView, locationId]);
 
   // 데이터가 도착하면 타임아웃 타이머 해제
   useEffect(() => {
@@ -544,6 +602,7 @@ const LocationDetailScreen = () => {
               </View>
             ) : (
               <FlatList
+                ref={productsListRef}
                 data={locationProducts}
                 keyExtractor={(item) => String(item.localId || item.id)}
                 renderItem={({ item }) => (
@@ -553,6 +612,12 @@ const LocationDetailScreen = () => {
                   />
                 )}
                 contentContainerStyle={styles.productsList}
+                scrollEventThrottle={16}
+                onScroll={(e) => {
+                  const key = isAllProductsView ? 'all' : locationId;
+                  const y = e?.nativeEvent?.contentOffset?.y ?? 0;
+                  setScrollOffset(`LocationDetail:${key}`, typeof y === 'number' ? y : 0);
+                }}
                 onEndReachedThreshold={0.5}
                 onEndReached={() => {
                   const metaKey = isAllProductsView ? 'all' : locationId;
