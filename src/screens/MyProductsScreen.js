@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { fetchProducts } from '../redux/slices/productsSlice';

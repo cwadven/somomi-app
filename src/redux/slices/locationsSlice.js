@@ -1,8 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { saveLocations, loadLocations } from '../../utils/storageUtils';
-import { refreshAfterMutation } from '../../utils/dataRefresh';
-import { ENTITY_TYPES } from '../../api/syncApi';
-import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
 import { createGuestSection, updateGuestSection, deleteGuestSection, fetchGuestSections } from '../../api/sectionApi';
 
 // 영역 목록 가져오기

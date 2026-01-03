@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -14,10 +14,6 @@ import {
   updateNotification, 
   addNotification 
 } from '../redux/slices/notificationsSlice';
-import { 
-  scheduleProductExpiryNotification,
-  cancelNotification
-} from '../utils/notificationUtils';
 import AlertModal from './AlertModal';
 import { isLocationExpired as isLocationExpiredUtil } from '../utils/locationUtils';
 

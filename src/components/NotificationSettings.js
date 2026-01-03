@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, Switch, StyleSheet, Platform, Linking } from 'react-native';
 import AlertModal from './AlertModal';
 

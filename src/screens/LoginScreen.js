@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { useDispatch } from 'react-redux';
-import { registerUser, verifyToken } from '../redux/slices/authSlice';
+
+
+
+import { verifyToken } from '../redux/slices/authSlice';
 import { sendVerificationToken, verifyVerificationToken, emailSignUp } from '../api/memberApi';
 import { saveJwtToken, saveRefreshToken } from '../utils/storageUtils';
 import BasicLoginForm from '../components/BasicLoginForm';

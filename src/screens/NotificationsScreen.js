@@ -1,17 +1,31 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-  SafeAreaView,
-  Platform
-} from 'react-native';
+View,
+Text,
+StyleSheet,
+TouchableOpacity,
+FlatList,
+ActivityIndicator,
+SafeAreaView } from
+
+'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { loadAllProcessedNotifications, loadProcessedNotifications, processAllNotifications } from '../utils/notificationUtils';
+
+
+
+
+
+
+
+
+
+
+
+
+
+import { loadAllProcessedNotifications, processAllNotifications } from '../utils/notificationUtils';
 import { fetchGuestAlarmHistory } from '../api/alarmApi';
 
 // 화면 재진입 시 API 재호출 방지 및 스크롤 위치 복원을 위한 간단 캐시

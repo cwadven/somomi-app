@@ -1,26 +1,62 @@
 import { isTemplateActive } from '../utils/validityUtils';
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
-  ActivityIndicator,
-  Alert,
-  Image,
-  BackHandler,
-  ScrollView
-} from 'react-native';
+
+import { useEffect, useState, useCallback, useMemo } from 'react';
+
+
+import {
+View,
+Text,
+StyleSheet,
+FlatList,
+TouchableOpacity,
+ActivityIndicator,
+
+
+BackHandler,
+ScrollView } from
+'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation, useIsFocused, useRoute } from '@react-navigation/native';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import { useNavigation, useIsFocused, useRoute } from '@react-navigation/native';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { updateLocation } from '../redux/slices/locationsSlice';
-import { addBasicTemplateInstance, loadUserLocationTemplateInstances, loadUserProductSlotTemplateInstances } from '../redux/slices/authSlice';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import { loadUserLocationTemplateInstances, loadUserProductSlotTemplateInstances } from '../redux/slices/authSlice';
 import SignupPromptModal from '../components/SignupPromptModal';
-import { checkAnonymousLimits } from '../utils/authUtils';
-import SlotPlaceholder from '../components/SlotPlaceholder';
 import SlotStatusBar from '../components/SlotStatusBar';
 import AlertModal from '../components/AlertModal';
 // 로그인 폼/소셜 버튼은 내 영역에서 노출하지 않음

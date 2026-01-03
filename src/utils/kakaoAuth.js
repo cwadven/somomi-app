@@ -1,6 +1,5 @@
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { Platform } from 'react-native';
 
 // 웹 브라우저 결과를 처리하기 위해 필요
 WebBrowser.maybeCompleteAuthSession();

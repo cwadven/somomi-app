@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -12,7 +12,21 @@ import {
   Platform
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchConsumedProducts, removeConsumedProductById, upsertActiveProduct } from '../redux/slices/productsSlice';
 import { revokeConsumeInventoryItem } from '../api/inventoryApi';

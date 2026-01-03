@@ -18,10 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { fetchLocationById, deleteLocation } from '../redux/slices/locationsSlice';
 import { fetchProductsByLocation } from '../redux/slices/productsSlice';
 import { releaseTemplateInstance, loadUserProductSlotTemplateInstances } from '../redux/slices/authSlice';
-import { useSelector as useReduxSelector } from 'react-redux';
 import ProductCard from '../components/ProductCard';
 import SlotStatusBar from '../components/SlotStatusBar';
-import SlotPlaceholder from '../components/SlotPlaceholder';
 import LocationNotificationSettings from '../components/LocationNotificationSettings';
 import { onEvent, EVENT_NAMES } from '../utils/eventBus';
 

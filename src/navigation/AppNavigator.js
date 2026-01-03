@@ -1,11 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { navigationRef } from './RootNavigation';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar, Platform } from 'react-native';
+
+
+
+
+
+
+
+import { StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // 스크린 임포트
@@ -22,8 +29,6 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import NotificationDetailScreen from '../screens/NotificationDetailScreen';
 import NotificationDateScreen from '../screens/NotificationDateScreen';
 import StoreScreen from '../screens/StoreScreen';
-import PointScreen from '../screens/PointScreen';
-import MyProductsScreen from '../screens/MyProductsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import HelpScreen from '../screens/HelpScreen';
 // 결제 결과 딥링크 스크린 제거

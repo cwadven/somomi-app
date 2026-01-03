@@ -1,11 +1,12 @@
 import React from 'react';
-import { 
-  TouchableOpacity, 
-  Text, 
-  StyleSheet, 
-  View,
-  ActivityIndicator
-} from 'react-native';
+
+import {
+TouchableOpacity,
+Text,
+StyleSheet,
+
+ActivityIndicator } from
+'react-native';
 import { useDispatch } from 'react-redux';
 import { requestKakaoLogin } from '../utils/kakaoAuth';
 import { kakaoLogin } from '../redux/slices/authSlice';

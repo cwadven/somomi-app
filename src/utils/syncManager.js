@@ -3,14 +3,14 @@ import { fetchLocations, reconcileLocationsDisabled } from '../redux/slices/loca
 import { reconcileLocationTemplates } from '../redux/slices/authSlice';
 import { fetchProducts } from '../redux/slices/productsSlice';
 
-const markSyncedMeta = (entity) => {
-  if (!entity) return entity;
-  const next = { ...entity };
-  next.syncStatus = 'synced';
-  next.lastSyncedAt = new Date().toISOString();
-  if (!next.updatedAt) next.updatedAt = next.lastSyncedAt;
-  return next;
-};
+
+
+
+
+
+
+
+
 
 export const processSyncQueueIfOnline = async (dispatch, getState) => {
   // 오프라인 모드 제거: 항상 큐를 처리 (서버 미도입 상태에서는 로컬 커밋만 수행)
@@ -25,8 +25,8 @@ export const processSyncQueueIfOnline = async (dispatch, getState) => {
   // 큐 제거로 처리 루프 없음
 
   // 저장 반영
-  try { await saveLocations(locations); } catch (e) {}
-  try { await saveProducts(products); } catch (e) {}
+  try {await saveLocations(locations);} catch (e) {}
+  try {await saveProducts(products);} catch (e) {}
 
   // 큐 비우기
   // 큐 제거: 초기화 불필요
@@ -38,8 +38,6 @@ export const processSyncQueueIfOnline = async (dispatch, getState) => {
     await dispatch(reconcileLocationsDisabled()).unwrap();
     await dispatch(fetchProducts()).unwrap();
   } catch (e) {
+
     // 상태 동기화 실패는 치명적이지 않음
-  }
-};
-
-
+  }};

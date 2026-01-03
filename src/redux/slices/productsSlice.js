@@ -1,14 +1,15 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { 
-  fetchProductsApi, 
-  fetchProductByIdApi, 
-  addProductApi, 
-  updateProductApi, 
-  deleteProductApi,
-  markProductAsConsumedApi,
-  fetchConsumedProductsApi,
-  restoreConsumedProductApi
-} from '../../api/productsApi';
+
+import {
+
+fetchProductByIdApi,
+addProductApi,
+updateProductApi,
+
+markProductAsConsumedApi,
+
+restoreConsumedProductApi } from
+'../../api/productsApi';
 import { ENTITY_TYPES } from '../../api/syncApi';
 import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
 import { deleteLocation } from './locationsSlice';
@@ -16,7 +17,27 @@ import { fetchInventoryItemsBySection, fetchAllInventoryItems, deleteInventoryIt
 import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { saveProducts, loadProducts, saveConsumedProducts, loadConsumedProducts } from '../../utils/storageUtils';
 import { fetchConsumedInventoryItems } from '../../api/inventoryApi';
-import { unassignProductSlotTemplate, releaseProductSlotTemplateByProduct, loadUserProductSlotTemplateInstances } from './authSlice';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import { releaseProductSlotTemplateByProduct, loadUserProductSlotTemplateInstances } from './authSlice';
+
+// 비동기 액션 생성
 
 // 비동기 액션 생성
 export const fetchProducts = createAsyncThunk(

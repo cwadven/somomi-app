@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -10,7 +10,19 @@ import {
   SafeAreaView
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+
+
+
+
+
+
+
+
+
+
+
+
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchConsumedProducts } from '../redux/slices/productsSlice';
 

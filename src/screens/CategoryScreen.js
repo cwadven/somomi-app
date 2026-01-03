@@ -1,23 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
+
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  Modal,
-  TextInput,
-  Alert,
-  ActivityIndicator
-} from 'react-native';
+View,
+Text,
+StyleSheet,
+FlatList,
+TouchableOpacity,
+Modal,
+TextInput,
+Alert } from
+
+'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import {
-  fetchCategories,
-  addCategory,
-  updateCategory,
-  deleteCategory
-} from '../redux/slices/categoriesSlice';
+
+addCategory,
+updateCategory,
+deleteCategory } from
+'../redux/slices/categoriesSlice';
 import { generateId } from '../utils/idUtils';
 
 const CategoryScreen = () => {
