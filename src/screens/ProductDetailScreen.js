@@ -723,6 +723,7 @@ const ProductDetailScreen = () => {
   const [imageUploading, setImageUploading] = useState(false);
   const [uploadedIconUrl, setUploadedIconUrl] = useState(null); // read_host + key
   const [pickedImageMeta, setPickedImageMeta] = useState(null); // { uri, fileName, mimeType, ext }
+  const pendingSubmitRef = useRef(false);
 
   const ALLOWED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
   const getFileExtension = (nameOrUri) => {
@@ -838,6 +839,138 @@ const ProductDetailScreen = () => {
       setImageUploading(false);
     }
   };
+
+  const submitCreateOrEdit = async () => {
+    const isCreate = screenMode === 'create';
+    const canSaveNow = (productName || '').trim().length > 0;
+    if (!canSaveNow) {
+      showErrorAlert('제품명을 입력해 주세요.');
+      return;
+    }
+
+    const purchaseDateObj = parseYMD(purchaseDateText) || new Date();
+    const expiryDateObj = parseYMD(expiryDateText);
+    const estimatedEndDateObj = parseYMD(estimatedEndDateText);
+
+    if (isCreate) {
+      if (!createLocationId) {
+        showErrorAlert('영역 정보가 없습니다. 다시 시도해 주세요.');
+        return;
+      }
+
+      const locIdAfter = String(createLocationId);
+      const location = (locations || []).find(l => String(l.id) === locIdAfter) || null;
+      const baseSlotsInSubmit = location?.feature?.baseSlots ?? slots?.productSlots?.baseSlots ?? 0;
+      const cachedList = (locationProducts && (locationProducts[String(locIdAfter)] || locationProducts[locIdAfter])) || [];
+      const productsInLocation = (cachedList && cachedList.length > 0)
+        ? cachedList.filter(p => !p.isConsumed)
+        : (products || []).filter(p => String(p.locationId) === String(locIdAfter) && !p.isConsumed);
+      const usedCount = productsInLocation.length;
+      const availableAssignedTemplates = (userProductSlotTemplateInstances || []).filter(t =>
+        String(t.assignedLocationId) === String(locIdAfter) && (t.usedByProductId == null)
+      );
+      const needTemplate = baseSlotsInSubmit !== -1 && usedCount >= baseSlotsInSubmit && availableAssignedTemplates.length > 0;
+      const availableAssigned = needTemplate ? availableAssignedTemplates[0] : null;
+      const templateIdForBody = (availableAssigned && !isNaN(Number(availableAssigned.id))) ? Number(availableAssigned.id) : null;
+
+      const body = {
+        name: productName,
+        memo: memo || null,
+        guest_inventory_item_template_id: templateIdForBody,
+        brand: brand || null,
+        point_of_purchase: purchasePlace || null,
+        purchase_price: price && String(price).trim() !== '' ? parseFloat(String(price)) : null,
+        purchase_at: purchaseDateObj.toISOString(),
+        icon_url: uploadedIconUrl || null,
+        expected_expire_at: estimatedEndDateObj ? estimatedEndDateObj.toISOString() : null,
+        expire_at: expiryDateObj ? expiryDateObj.toISOString() : null,
+      };
+      const createRes = await createInventoryItemInSection(locIdAfter, body);
+      const newId = createRes?.guest_inventory_item_id ? String(createRes.guest_inventory_item_id) : undefined;
+      const created = {
+        id: newId,
+        locationId: String(locIdAfter),
+        name: body.name,
+        memo: body.memo,
+        brand: body.brand,
+        purchasePlace: body.point_of_purchase,
+        price: body.purchase_price,
+        purchaseDate: body.purchase_at,
+        expiryDate: body.expire_at,
+        estimatedEndDate: body.expected_expire_at,
+        iconUrl: body.icon_url || null,
+        isConsumed: false,
+      };
+      try { dispatch(upsertActiveProduct({ product: created })); } catch (e) {}
+      try { emitEvent(EVENT_NAMES.PRODUCT_CREATED, { product: created }); } catch (e) {}
+      if (availableAssigned && created.id) {
+        try { dispatch(markProductSlotTemplateAsUsed({ templateId: availableAssigned.id, productId: created.id })); } catch (e) {}
+      }
+      navigation.goBack();
+      return;
+    }
+
+    // edit
+    if (!currentProduct?.id) return;
+    const body = {
+      guest_section_id: currentProduct.locationId ? Number(currentProduct.locationId) : null,
+      name: productName,
+      memo: memo || null,
+      brand: brand || null,
+      point_of_purchase: purchasePlace || null,
+      purchase_price: price && String(price).trim() !== '' ? parseFloat(String(price)) : null,
+      purchase_at: purchaseDateObj.toISOString(),
+      icon_url: uploadedIconUrl || currentProduct.iconUrl || null,
+      expected_expire_at: estimatedEndDateObj ? estimatedEndDateObj.toISOString() : null,
+      expire_at: expiryDateObj ? expiryDateObj.toISOString() : null,
+    };
+    await updateInventoryItem(String(currentProduct.id), body);
+    try {
+      dispatch(patchProductById({
+        id: String(currentProduct.id),
+        patch: {
+          iconUrl: body.icon_url,
+          name: body.name,
+          memo: body.memo,
+          brand: body.brand,
+          purchasePlace: body.point_of_purchase,
+          price: body.purchase_price,
+          purchaseDate: body.purchase_at,
+          expiryDate: body.expire_at,
+          estimatedEndDate: body.expected_expire_at,
+        }
+      }));
+    } catch (e) {}
+    try {
+      emitEvent(EVENT_NAMES.PRODUCT_UPDATED, {
+        id: String(currentProduct.id),
+        patch: {
+          iconUrl: body.icon_url,
+          name: body.name,
+          memo: body.memo,
+          brand: body.brand,
+          purchasePlace: body.point_of_purchase,
+          price: body.purchase_price,
+          purchaseDate: body.purchase_at,
+          expiryDate: body.expire_at,
+          estimatedEndDate: body.expected_expire_at,
+        },
+        locationId: currentProduct.locationId != null ? String(currentProduct.locationId) : null,
+      });
+    } catch (e) {}
+    setScreenMode('view');
+  };
+
+  // 업로드 중 "등록/저장"을 눌렀다면 업로드 완료 후 자동으로 제출
+  useEffect(() => {
+    if (!imageUploading && pendingSubmitRef.current) {
+      pendingSubmitRef.current = false;
+      // 업로드가 끝난 시점에 자동 저장
+      submitCreateOrEdit().catch((e) => {
+        showErrorAlert(`저장 중 오류가 발생했습니다: ${e?.message || String(e)}`);
+      });
+    }
+  }, [imageUploading, submitCreateOrEdit]);
 
   const pickImageForForm = async () => {
     try {
@@ -970,7 +1103,8 @@ const ProductDetailScreen = () => {
 
   const renderCreateEditForm = () => {
     const isCreate = screenMode === 'create';
-    const canSave = (productName || '').trim().length > 0 && !imageUploading;
+    // 업로드 중이어도 "등록/저장" 버튼은 항상 보이고 누를 수 있게 유지
+    const canSave = (productName || '').trim().length > 0;
 
     const onCancel = () => {
       if (isCreate) navigation.goBack();
@@ -981,6 +1115,12 @@ const ProductDetailScreen = () => {
       try {
         if (!canSave) {
           showErrorAlert('제품명을 입력해 주세요.');
+          return;
+        }
+        // 업로드 중이라면 일단 "누를 수는 있게" 하고, 완료 후 자동 저장되도록 큐잉
+        if (imageUploading) {
+          pendingSubmitRef.current = true;
+          showErrorAlert('이미지 업로드 중입니다. 업로드가 완료되면 자동으로 등록/저장됩니다.');
           return;
         }
         const purchaseDateObj = parseYMD(purchaseDateText) || new Date();

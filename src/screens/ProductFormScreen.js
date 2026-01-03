@@ -922,6 +922,12 @@ const ProductFormScreen = () => {
 
   // 제품 등록/수정 처리
   const handleSubmit = async () => {
+    // 업로드/최적화 중에도 버튼을 누를 수 있게 했기 때문에,
+    // 실제 제출은 업로드/최적화 완료 후 자동으로 이어지도록 안내합니다.
+    if (imageUploading || imageProcessing) {
+      showErrorAlert('처리 중', '이미지 업로드/최적화가 완료되면 등록/수정이 정상적으로 진행됩니다. 잠시만 기다려 주세요.');
+      return;
+    }
     // 해당 영역에 연결된 템플릿이 구독 만료일 때만 작업 차단
     const locId = locationId || selectedLocation?.id;
     const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locId);
@@ -1595,10 +1601,11 @@ const ProductFormScreen = () => {
         <TouchableOpacity 
           style={[
             styles.submitButton,
-            (productsStatus === 'loading' || imageUploading || imageProcessing) && styles.disabledButton
+            (productsStatus === 'loading') && styles.disabledButton
           ]}
           onPress={handleSubmit}
-          disabled={productsStatus === 'loading' || imageUploading || imageProcessing}
+          // 업로드/최적화 중에도 버튼은 누를 수 있게 유지 (요청사항)
+          disabled={productsStatus === 'loading'}
         >
           {(productsStatus === 'loading' || imageUploading || imageProcessing) ? (
             <View style={styles.loadingContainer}>
