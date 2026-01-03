@@ -33,6 +33,7 @@ export const emitEvent = (eventName, payload) => {
 export const EVENT_NAMES = {
   PRODUCT_UPDATED: 'product.updated',
   PRODUCT_CREATED: 'product.created',
+  PRODUCT_REMOVED: 'product.removed', // 소진/삭제 등으로 "활성 목록"에서 빠질 때
 };
 
 

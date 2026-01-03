@@ -12,7 +12,7 @@ import {
 import { ENTITY_TYPES } from '../../api/syncApi';
 import { commitCreate, commitUpdate, commitDelete } from '../../utils/syncHelpers';
 import { deleteLocation } from './locationsSlice';
-import { fetchInventoryItemsBySection, fetchAllInventoryItems, deleteInventoryItem } from '../../api/inventoryApi';
+import { fetchInventoryItemsBySection, fetchAllInventoryItems, deleteInventoryItem, consumeInventoryItem } from '../../api/inventoryApi';
 import { refreshAfterMutation } from '../../utils/dataRefresh';
 import { saveProducts, loadProducts, saveConsumedProducts, loadConsumedProducts } from '../../utils/storageUtils';
 import { fetchConsumedInventoryItems } from '../../api/inventoryApi';
@@ -262,7 +262,7 @@ export const deleteProductAsync = createAsyncThunk(
       try { await refreshAfterMutation(dispatch); } catch (e) {}
       return id;
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.message || String(error));
     }
   }
 );
@@ -272,7 +272,32 @@ export const markProductAsConsumedAsync = createAsyncThunk(
   'products/markProductAsConsumed',
   async ({ id, consumptionDate }, { rejectWithValue, getState, dispatch }) => {
     try {
-      const response = await markProductAsConsumedApi(id, consumptionDate);
+      const state = getState();
+      const isLoggedIn = !!state?.auth?.isLoggedIn;
+
+      let response;
+      if (isLoggedIn) {
+        const consumedAt = consumptionDate || new Date().toISOString();
+        // ✅ 서버 소진 처리 API 호출
+        await consumeInventoryItem(id, consumedAt);
+
+        // 서버가 상세 payload를 주지 않는 경우를 대비해, 현재 캐시에서 최소 payload 구성
+        const existing =
+          (state.products?.products || []).find(p => String(p?.id) === String(id)) ||
+          (state.products?.currentProduct && String(state.products.currentProduct?.id) === String(id) ? state.products.currentProduct : null) ||
+          null;
+
+        response = {
+          ...(existing || {}),
+          id: String(id),
+          isConsumed: true,
+          consumedAt,
+          processedAt: new Date().toISOString(),
+        };
+      } else {
+        // 비로그인/오프라인: 로컬 mock 로직 유지
+        response = await markProductAsConsumedApi(id, consumptionDate);
+      }
       // 동기화 큐에 업데이트 기록(소진 처리)
       try {
         await commitUpdate(ENTITY_TYPES.PRODUCT, {
@@ -302,7 +327,7 @@ export const markProductAsConsumedAsync = createAsyncThunk(
       try { await refreshAfterMutation(dispatch); } catch (e) {}
       return response;
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.message || String(error));
     }
   }
 );

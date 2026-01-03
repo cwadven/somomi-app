@@ -18,9 +18,9 @@ import { useRoute, useNavigation, CommonActions } from '@react-navigation/native
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { fetchProductById, deleteProductAsync, fetchProductsByLocation, patchProductById, upsertActiveProduct } from '../redux/slices/productsSlice';
+import { fetchProductById, deleteProductAsync, markProductAsConsumedAsync, patchProductById, upsertActiveProduct } from '../redux/slices/productsSlice';
 import { loadUserProductSlotTemplateInstances, markProductSlotTemplateAsUsed } from '../redux/slices/authSlice';
-import { consumeInventoryItem, createInventoryItemInSection, updateInventoryItem } from '../api/inventoryApi';
+import { createInventoryItemInSection, updateInventoryItem } from '../api/inventoryApi';
 import { givePresignedUrl } from '../api/commonApi';
 import { isTemplateActive } from '../utils/validityUtils';
 import AlertModal from '../components/AlertModal';
@@ -364,9 +364,17 @@ const ProductDetailScreen = () => {
             // 알림 모달 닫기
             setAlertModalVisible(false);
             
-            // 소진 처리 API 호출 (서버)
-            consumeInventoryItem(currentProduct.id, date.toISOString())
+            // ✅ Event-driven refresh: refetch 없이 소진 처리 thunk로 처리 + 이벤트로 목록에서 제거
+            dispatch(markProductAsConsumedAsync({ id: currentProduct.id, consumptionDate: date.toISOString() }))
+              .unwrap()
               .then(() => {
+                try {
+                  emitEvent(EVENT_NAMES.PRODUCT_REMOVED, {
+                    id: String(currentProduct.id),
+                    reason: 'consumed',
+                    locationId: currentProduct?.locationId != null ? String(currentProduct.locationId) : null,
+                  });
+                } catch (e) {}
                 // 약간의 지연 후 성공 모달 표시 (애니메이션 충돌 방지)
                 setTimeout(() => {
                   // 성공 모달 설정 및 표시
@@ -376,13 +384,6 @@ const ProductDetailScreen = () => {
                     onConfirm: () => {
                       // 모달 닫기 후 이전 화면으로 이동
                       setSuccessModalVisible(false);
-                      try {
-                        if (currentProduct?.locationId) {
-                          dispatch(fetchProductsByLocation(currentProduct.locationId));
-                        }
-                      } catch (e) {}
-                      // 템플릿 최신화
-                      try { dispatch(loadUserProductSlotTemplateInstances()); } catch (e) {}
                       navigation.goBack();
                     }
                   });
@@ -390,7 +391,10 @@ const ProductDetailScreen = () => {
                 }, 300);
               })
               .catch((err) => {
-                showErrorAlert(`소진 처리 중 오류가 발생했습니다: ${err.message}`);
+                const msg = typeof err === 'string'
+                  ? err
+                  : (err?.message || err?.error || '알 수 없는 오류');
+                showErrorAlert(`소진 처리 중 오류가 발생했습니다: ${msg}`);
               });
           }
         }
@@ -1126,10 +1130,21 @@ const ProductDetailScreen = () => {
             dispatch(deleteProductAsync(currentProduct.id))
               .unwrap()
               .then(() => {
+                // ✅ Event-driven refresh: 목록 refetch 없이 즉시 제거
+                try {
+                  emitEvent(EVENT_NAMES.PRODUCT_REMOVED, {
+                    id: String(currentProduct.id),
+                    reason: 'deleted',
+                    locationId: currentProduct?.locationId != null ? String(currentProduct.locationId) : null,
+                  });
+                } catch (e) {}
                 navigation.goBack();
               })
               .catch((err) => {
-                showErrorAlert(`삭제 중 오류가 발생했습니다: ${err.message}`);
+                const msg = typeof err === 'string'
+                  ? err
+                  : (err?.message || err?.error || '알 수 없는 오류');
+                showErrorAlert(`삭제 중 오류가 발생했습니다: ${msg}`);
               });
           }
         }

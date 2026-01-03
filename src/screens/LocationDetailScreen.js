@@ -171,9 +171,20 @@ const LocationDetailScreen = () => {
       });
     });
 
+    // ✅ 소진/삭제 등으로 활성 목록에서 제거되는 이벤트
+    const unsubRemoved = onEvent(EVENT_NAMES.PRODUCT_REMOVED, (payload) => {
+      const id = String(payload?.id ?? '');
+      if (!id) return;
+      setLocationProducts((prev) => {
+        if (!Array.isArray(prev) || prev.length === 0) return prev;
+        return prev.filter((p) => String(p?.id) !== id);
+      });
+    });
+
     return () => {
       try { unsubUpdated(); } catch (e) {}
       try { unsubCreated(); } catch (e) {}
+      try { unsubRemoved(); } catch (e) {}
     };
   }, [isAllProductsView, locationId]);
 
