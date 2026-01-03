@@ -37,6 +37,16 @@ import {
   formatDate
 } from '../utils/dateUtils';
 
+// 조건부 DateTimePicker 임포트 (웹 제외)
+let DateTimePicker;
+if (Platform.OS !== 'web') {
+  try {
+    DateTimePicker = require('@react-native-community/datetimepicker').default;
+  } catch (error) {
+    // ignore
+  }
+}
+
 // HP 바 컴포넌트
 const HPBar = ({ percentage, type }) => {
   // percentage가 NaN이면 0으로 처리
@@ -717,6 +727,13 @@ const ProductDetailScreen = () => {
   const [purchaseDateText, setPurchaseDateText] = useState('');
   const [expiryDateText, setExpiryDateText] = useState('');
   const [estimatedEndDateText, setEstimatedEndDateText] = useState('');
+  // 앱에서 날짜 선택 UI를 사용하기 위한 Date 상태
+  const [purchaseDate, setPurchaseDate] = useState(new Date());
+  const [expiryDate, setExpiryDate] = useState(null);
+  const [estimatedEndDate, setEstimatedEndDate] = useState(null);
+  const [showPurchaseDatePicker, setShowPurchaseDatePicker] = useState(false);
+  const [showExpiryDatePicker, setShowExpiryDatePicker] = useState(false);
+  const [showEstimatedEndDatePicker, setShowEstimatedEndDatePicker] = useState(false);
 
   // 이미지 업로드 상태 (선택 즉시 presigned + S3 업로드)
   const [imagePreviewUri, setImagePreviewUri] = useState(null);
@@ -1026,9 +1043,15 @@ const ProductDetailScreen = () => {
     setBrand(currentProduct.brand || '');
     setPurchasePlace(currentProduct.purchasePlace || '');
     setPrice(currentProduct.price != null ? String(currentProduct.price) : '');
-    setPurchaseDateText(currentProduct.purchaseDate ? formatYMD(new Date(currentProduct.purchaseDate)) : formatYMD(new Date()));
-    setExpiryDateText(currentProduct.expiryDate ? formatYMD(new Date(currentProduct.expiryDate)) : '');
-    setEstimatedEndDateText(currentProduct.estimatedEndDate ? formatYMD(new Date(currentProduct.estimatedEndDate)) : '');
+    const pd = currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate) : new Date();
+    const ed = currentProduct.expiryDate ? new Date(currentProduct.expiryDate) : null;
+    const eed = currentProduct.estimatedEndDate ? new Date(currentProduct.estimatedEndDate) : null;
+    setPurchaseDate(pd);
+    setExpiryDate(ed);
+    setEstimatedEndDate(eed);
+    setPurchaseDateText(formatYMD(pd));
+    setExpiryDateText(ed ? formatYMD(ed) : '');
+    setEstimatedEndDateText(eed ? formatYMD(eed) : '');
     setImagePreviewUri(currentProduct.iconUrl || null);
     setPickedImageMeta(null);
     setUploadedIconUrl(null);
@@ -1042,7 +1065,11 @@ const ProductDetailScreen = () => {
       setBrand('');
       setPurchasePlace('');
       setPrice('');
-      setPurchaseDateText(formatYMD(new Date()));
+      const today = new Date();
+      setPurchaseDate(today);
+      setExpiryDate(null);
+      setEstimatedEndDate(null);
+      setPurchaseDateText(formatYMD(today));
       setExpiryDateText('');
       setEstimatedEndDateText('');
       setImagePreviewUri(null);
@@ -1270,14 +1297,110 @@ const ProductDetailScreen = () => {
           <Text style={styles.formLabel}>제품명 *</Text>
           <TextInput style={styles.formInput} value={productName} onChangeText={setProductName} placeholder="제품명을 입력하세요" />
 
-          <Text style={styles.formLabel}>구매일 (YYYY-MM-DD)</Text>
-          <TextInput style={styles.formInput} value={purchaseDateText} onChangeText={setPurchaseDateText} placeholder="2026-01-03" />
+          {/* 날짜 입력: 웹은 텍스트, 앱(iOS/Android)은 DateTimePicker UI */}
+          {Platform.OS === 'web' ? (
+            <>
+              <Text style={styles.formLabel}>구매일 (YYYY-MM-DD)</Text>
+              <TextInput style={styles.formInput} value={purchaseDateText} onChangeText={setPurchaseDateText} placeholder="2026-01-03" />
 
-          <Text style={styles.formLabel}>유통기한 (YYYY-MM-DD)</Text>
-          <TextInput style={styles.formInput} value={expiryDateText} onChangeText={setExpiryDateText} placeholder="선택" />
+              <Text style={styles.formLabel}>유통기한 (YYYY-MM-DD)</Text>
+              <TextInput style={styles.formInput} value={expiryDateText} onChangeText={setExpiryDateText} placeholder="선택" />
 
-          <Text style={styles.formLabel}>소진 예상일 (YYYY-MM-DD)</Text>
-          <TextInput style={styles.formInput} value={estimatedEndDateText} onChangeText={setEstimatedEndDateText} placeholder="선택" />
+              <Text style={styles.formLabel}>소진 예상일 (YYYY-MM-DD)</Text>
+              <TextInput style={styles.formInput} value={estimatedEndDateText} onChangeText={setEstimatedEndDateText} placeholder="선택" />
+            </>
+          ) : (
+            <>
+              <Text style={styles.formLabel}>구매일</Text>
+              <TouchableOpacity
+                style={styles.datePickButton}
+                onPress={() => setShowPurchaseDatePicker(true)}
+              >
+                <Text style={styles.datePickButtonText}>{formatDate(purchaseDate)}</Text>
+                <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+              </TouchableOpacity>
+              {showPurchaseDatePicker && DateTimePicker ? (
+                <DateTimePicker
+                  value={purchaseDate || new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, date) => {
+                    if (Platform.OS !== 'ios') setShowPurchaseDatePicker(false);
+                    if (!date) return;
+                    setPurchaseDate(date);
+                    setPurchaseDateText(formatYMD(date));
+                  }}
+                />
+              ) : null}
+
+              <Text style={styles.formLabel}>유통기한</Text>
+              <TouchableOpacity
+                style={styles.datePickButton}
+                onPress={() => setShowExpiryDatePicker(true)}
+              >
+                <Text style={styles.datePickButtonText}>{expiryDate ? formatDate(expiryDate) : '날짜 선택'}</Text>
+                <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+              </TouchableOpacity>
+              {showExpiryDatePicker && DateTimePicker ? (
+                <DateTimePicker
+                  value={expiryDate || new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, date) => {
+                    if (Platform.OS !== 'ios') setShowExpiryDatePicker(false);
+                    if (date === undefined) return;
+                    // 취소 시 date가 undefined로 올 수 있음
+                    if (!date) return;
+                    setExpiryDate(date);
+                    setExpiryDateText(formatYMD(date));
+                  }}
+                />
+              ) : null}
+
+              <Text style={styles.formLabel}>소진 예상일</Text>
+              <TouchableOpacity
+                style={styles.datePickButton}
+                onPress={() => setShowEstimatedEndDatePicker(true)}
+              >
+                <Text style={styles.datePickButtonText}>{estimatedEndDate ? formatDate(estimatedEndDate) : '날짜 선택'}</Text>
+                <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+              </TouchableOpacity>
+              {showEstimatedEndDatePicker && DateTimePicker ? (
+                <DateTimePicker
+                  value={estimatedEndDate || new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, date) => {
+                    if (Platform.OS !== 'ios') setShowEstimatedEndDatePicker(false);
+                    if (date === undefined) return;
+                    if (!date) return;
+                    setEstimatedEndDate(date);
+                    setEstimatedEndDateText(formatYMD(date));
+                  }}
+                />
+              ) : null}
+
+              {Platform.OS === 'ios' ? (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                  {showPurchaseDatePicker || showExpiryDatePicker || showEstimatedEndDatePicker ? (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.datePickerIosDone, { backgroundColor: '#E0E0E0' }]}
+                        onPress={() => {
+                          setShowPurchaseDatePicker(false);
+                          setShowExpiryDatePicker(false);
+                          setShowEstimatedEndDatePicker(false);
+                        }}
+                      >
+                        <Text style={{ color: '#333', fontWeight: '700' }}>닫기</Text>
+                      </TouchableOpacity>
+                      <View />
+                    </>
+                  ) : null}
+                </View>
+              ) : null}
+            </>
+          )}
 
           <Text style={styles.formLabel}>브랜드</Text>
           <TextInput style={styles.formInput} value={brand} onChangeText={setBrand} placeholder="선택" />
@@ -1816,6 +1939,27 @@ const styles = StyleSheet.create({
     color: '#333',
     fontSize: 14,
     fontWeight: '700',
+  },
+  datePickButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  datePickButtonText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+  },
+  datePickerIosDone: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
   loadingContainer: {
     flex: 1,
