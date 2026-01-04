@@ -659,7 +659,6 @@ const ProfileScreen = () => {
               </ScrollView>
             </View>
           </KeyboardAvoidingView>
-          </View>
         </View>
       </Modal>
       <AlertModal
