@@ -769,6 +769,10 @@ const ProductDetailScreen = () => {
   const [purchaseDate, setPurchaseDate] = useState(new Date());
   const [expiryDate, setExpiryDate] = useState(null);
   const [estimatedEndDate, setEstimatedEndDate] = useState(null);
+  // iOS DateTimePicker는 열자마자 onChange가 발생할 수 있어 "확정 전 자동 설정"을 막기 위해 임시값을 둡니다.
+  const [tempPurchaseDate, setTempPurchaseDate] = useState(null);
+  const [tempExpiryDate, setTempExpiryDate] = useState(null);
+  const [tempEstimatedEndDate, setTempEstimatedEndDate] = useState(null);
   const [showPurchaseDatePicker, setShowPurchaseDatePicker] = useState(false);
   const [showExpiryDatePicker, setShowExpiryDatePicker] = useState(false);
   const [showEstimatedEndDatePicker, setShowEstimatedEndDatePicker] = useState(false);
@@ -1431,19 +1435,29 @@ const ProductDetailScreen = () => {
               </Text>
               <TouchableOpacity
               style={styles.datePickButton}
-              onPress={() => setShowPurchaseDatePicker(true)}>
+              onPress={() => {
+                if (Platform.OS === 'ios') {
+                  setTempPurchaseDate(purchaseDate || new Date());
+                }
+                setShowPurchaseDatePicker(true);
+              }}>
 
                 <Text style={styles.datePickButtonText}>{formatDate(purchaseDate)}</Text>
                 <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
               </TouchableOpacity>
               {showPurchaseDatePicker && DateTimePicker ?
             <DateTimePicker
-              value={purchaseDate || new Date()}
+              value={Platform.OS === 'ios' ? (tempPurchaseDate || purchaseDate || new Date()) : (purchaseDate || new Date())}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               onChange={(event, date) => {
                 if (Platform.OS !== 'ios') setShowPurchaseDatePicker(false);
+                if (date === undefined) return;
                 if (!date) return;
+                if (Platform.OS === 'ios') {
+                  setTempPurchaseDate(date);
+                  return;
+                }
                 setPurchaseDate(date);
                 setPurchaseDateText(formatYMD(date));
               }} /> :
@@ -1454,7 +1468,12 @@ const ProductDetailScreen = () => {
               <View style={styles.datePickRow}>
                 <TouchableOpacity
                 style={[styles.datePickButton, { flex: 1 }]}
-                onPress={() => setShowExpiryDatePicker(true)}>
+                onPress={() => {
+                  if (Platform.OS === 'ios') {
+                    setTempExpiryDate(expiryDate || new Date());
+                  }
+                  setShowExpiryDatePicker(true);
+                }}>
 
                   <Text style={styles.datePickButtonText}>{expiryDate ? formatDate(expiryDate) : '날짜 선택'}</Text>
                   <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
@@ -1474,7 +1493,7 @@ const ProductDetailScreen = () => {
               </View>
               {showExpiryDatePicker && DateTimePicker ?
             <DateTimePicker
-              value={expiryDate || new Date()}
+              value={Platform.OS === 'ios' ? (tempExpiryDate || expiryDate || new Date()) : (expiryDate || new Date())}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               onChange={(event, date) => {
@@ -1482,6 +1501,10 @@ const ProductDetailScreen = () => {
                 if (date === undefined) return;
                 // 취소 시 date가 undefined로 올 수 있음
                 if (!date) return;
+                if (Platform.OS === 'ios') {
+                  setTempExpiryDate(date);
+                  return;
+                }
                 setExpiryDate(date);
                 setExpiryDateText(formatYMD(date));
               }} /> :
@@ -1492,7 +1515,12 @@ const ProductDetailScreen = () => {
               <View style={styles.datePickRow}>
                 <TouchableOpacity
                 style={[styles.datePickButton, { flex: 1 }]}
-                onPress={() => setShowEstimatedEndDatePicker(true)}>
+                onPress={() => {
+                  if (Platform.OS === 'ios') {
+                    setTempEstimatedEndDate(estimatedEndDate || new Date());
+                  }
+                  setShowEstimatedEndDatePicker(true);
+                }}>
 
                   <Text style={styles.datePickButtonText}>{estimatedEndDate ? formatDate(estimatedEndDate) : '날짜 선택'}</Text>
                   <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
@@ -1512,13 +1540,17 @@ const ProductDetailScreen = () => {
               </View>
               {showEstimatedEndDatePicker && DateTimePicker ?
             <DateTimePicker
-              value={estimatedEndDate || new Date()}
+              value={Platform.OS === 'ios' ? (tempEstimatedEndDate || estimatedEndDate || new Date()) : (estimatedEndDate || new Date())}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               onChange={(event, date) => {
                 if (Platform.OS !== 'ios') setShowEstimatedEndDatePicker(false);
                 if (date === undefined) return;
                 if (!date) return;
+                if (Platform.OS === 'ios') {
+                  setTempEstimatedEndDate(date);
+                  return;
+                }
                 setEstimatedEndDate(date);
                 setEstimatedEndDateText(formatYMD(date));
               }} /> :
@@ -1535,11 +1567,40 @@ const ProductDetailScreen = () => {
                     setShowPurchaseDatePicker(false);
                     setShowExpiryDatePicker(false);
                     setShowEstimatedEndDatePicker(false);
+                    setTempPurchaseDate(null);
+                    setTempExpiryDate(null);
+                    setTempEstimatedEndDate(null);
                   }}>
 
-                        <Text style={{ color: '#333', fontWeight: '700' }}>닫기</Text>
+                        <Text style={{ color: '#333', fontWeight: '700' }}>취소</Text>
                       </TouchableOpacity>
-                      <View />
+                      <TouchableOpacity
+                        style={[styles.datePickerIosDone, { backgroundColor: '#4CAF50' }]}
+                        onPress={() => {
+                          // iOS에서는 "적용"을 눌렀을 때만 실제 상태에 반영
+                          try {
+                            if (showPurchaseDatePicker && tempPurchaseDate) {
+                              setPurchaseDate(tempPurchaseDate);
+                              setPurchaseDateText(formatYMD(tempPurchaseDate));
+                            }
+                            if (showExpiryDatePicker && tempExpiryDate) {
+                              setExpiryDate(tempExpiryDate);
+                              setExpiryDateText(formatYMD(tempExpiryDate));
+                            }
+                            if (showEstimatedEndDatePicker && tempEstimatedEndDate) {
+                              setEstimatedEndDate(tempEstimatedEndDate);
+                              setEstimatedEndDateText(formatYMD(tempEstimatedEndDate));
+                            }
+                          } catch (e) {}
+                          setShowPurchaseDatePicker(false);
+                          setShowExpiryDatePicker(false);
+                          setShowEstimatedEndDatePicker(false);
+                          setTempPurchaseDate(null);
+                          setTempExpiryDate(null);
+                          setTempEstimatedEndDate(null);
+                        }}>
+                        <Text style={{ color: '#fff', fontWeight: '800' }}>적용</Text>
+                      </TouchableOpacity>
                     </> :
               null}
                 </View> :
@@ -1863,7 +1924,7 @@ const ProductDetailScreen = () => {
           {currentProduct.memo &&
           <View style={styles.memoContainer}>
               <Text style={styles.memoLabel}>메모</Text>
-              <Text style={styles.memoText}>{currentProduct.memo}</Text>
+              <Text style={styles.memoText} selectable>{currentProduct.memo}</Text>
             </View>
           }
         </View>
