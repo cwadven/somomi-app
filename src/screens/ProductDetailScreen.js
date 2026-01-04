@@ -700,97 +700,57 @@ const ProductDetailScreen = () => {
   // 유통기한 남은 수명 계산 (%)
   const calculateExpiryPercentage = () => {
     if (!currentProduct.expiryDate) return null;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // 오늘 날짜의 시작(자정)으로 설정
-
-    const expiryDate = new Date(currentProduct.expiryDate);
-    expiryDate.setHours(23, 59, 59, 999); // 만료일의 끝(23:59:59.999)으로 설정
-
-    // purchaseDate가 없는 경우 오늘 날짜를 기준으로 계산
-    const purchaseDate = currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate) : new Date();
-    purchaseDate.setHours(0, 0, 0, 0); // 구매일의 시작(자정)으로 설정
-
-    // 날짜가 유효한지 확인
-    if (isNaN(expiryDate.getTime()) || isNaN(purchaseDate.getTime())) {
-      return 100;
-    }
-
-    const totalDays = (expiryDate - purchaseDate) / (1000 * 60 * 60 * 24);
-
-    // totalDays가 0이거나 음수인 경우 처리
-    if (totalDays <= 0) {
-      return 0;
-    }
-
-    const remainingDays = (expiryDate - today) / (1000 * 60 * 60 * 24);
-
-    // 유통기한이 가까워질수록 HP바가 줄어들도록 계산
-    // 남은 일수의 비율을 직접 사용 (구매일부터 유통기한까지의 총 기간 중 남은 비율)
-    const percentage = Math.max(0, Math.min(100, remainingDays / totalDays * 100));
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const nowMs = Date.now();
+    const endMs = new Date(currentProduct.expiryDate).getTime();
+    const startMsRaw = currentProduct.purchaseDate ?
+    new Date(currentProduct.purchaseDate).getTime() :
+    (currentProduct.createdAt ? new Date(currentProduct.createdAt).getTime() : null);
+    const startMs = Number.isFinite(startMsRaw) && startMsRaw < endMs ? startMsRaw : (endMs - 30 * DAY_MS);
+    if (!Number.isFinite(endMs) || !Number.isFinite(startMs)) return 100;
+    const totalMs = endMs - startMs;
+    if (totalMs <= 0) return 0;
+    const remainingMs = endMs - nowMs;
+    const percentage = Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
     return Math.round(percentage);
   };
 
   // 소진 예상일 남은 수명 계산 (%)
   const calculateConsumptionPercentage = () => {
     if (!currentProduct.estimatedEndDate) return null;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // 오늘 날짜의 시작(자정)으로 설정
-
-    const endDate = new Date(currentProduct.estimatedEndDate);
-    endDate.setHours(23, 59, 59, 999); // 소진 예상일의 끝(23:59:59.999)으로 설정
-
-    // purchaseDate가 없는 경우 오늘 날짜를 기준으로 계산
-    const purchaseDate = currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate) : new Date();
-    purchaseDate.setHours(0, 0, 0, 0); // 구매일의 시작(자정)으로 설정
-
-    // 날짜가 유효한지 확인
-    if (isNaN(endDate.getTime()) || isNaN(purchaseDate.getTime())) {
-      return 100;
-    }
-
-    const totalDays = (endDate - purchaseDate) / (1000 * 60 * 60 * 24);
-
-    // totalDays가 0이거나 음수인 경우 처리
-    if (totalDays <= 0) {
-      return 0;
-    }
-
-    const remainingDays = (endDate - today) / (1000 * 60 * 60 * 24);
-
-    // 소진예상일이 가까워질수록 HP바가 줄어들도록 계산
-    // 남은 일수의 비율을 직접 사용 (구매일부터 소진예상일까지의 총 기간 중 남은 비율)
-    const percentage = Math.max(0, Math.min(100, remainingDays / totalDays * 100));
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const nowMs = Date.now();
+    const endMs = new Date(currentProduct.estimatedEndDate).getTime();
+    const startMsRaw = currentProduct.purchaseDate ?
+    new Date(currentProduct.purchaseDate).getTime() :
+    (currentProduct.createdAt ? new Date(currentProduct.createdAt).getTime() : null);
+    const startMs = Number.isFinite(startMsRaw) && startMsRaw < endMs ? startMsRaw : (endMs - 30 * DAY_MS);
+    if (!Number.isFinite(endMs) || !Number.isFinite(startMs)) return 100;
+    const totalMs = endMs - startMs;
+    if (totalMs <= 0) return 0;
+    const remainingMs = endMs - nowMs;
+    const percentage = Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
     return Math.round(percentage);
   };
 
   // 유통기한 남은 일수 계산
   const calculateExpiryDays = () => {
     if (!currentProduct.expiryDate) return null;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // 오늘 날짜의 시작(자정)으로 설정
-
-    const expiryDate = new Date(currentProduct.expiryDate);
-    expiryDate.setHours(23, 59, 59, 999); // 만료일의 끝(23:59:59.999)으로 설정
-
-    const remainingDays = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
-    return remainingDays;
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const nowMs = Date.now();
+    const endMs = new Date(currentProduct.expiryDate).getTime();
+    if (!Number.isFinite(endMs)) return null;
+    return Math.ceil((endMs - nowMs) / DAY_MS);
   };
 
   // 소진 예상일 남은 일수 계산
   const calculateConsumptionDays = () => {
     if (!currentProduct.estimatedEndDate) return null;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // 오늘 날짜의 시작(자정)으로 설정
-
-    const endDate = new Date(currentProduct.estimatedEndDate);
-    endDate.setHours(23, 59, 59, 999); // 소진 예상일의 끝(23:59:59.999)으로 설정
-
-    const remainingDays = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
-    return remainingDays;
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const nowMs = Date.now();
+    const endMs = new Date(currentProduct.estimatedEndDate).getTime();
+    if (!Number.isFinite(endMs)) return null;
+    return Math.ceil((endMs - nowMs) / DAY_MS);
   };
 
   // 카테고리 제거: 고정 아이콘 사용

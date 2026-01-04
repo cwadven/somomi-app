@@ -1,15 +1,20 @@
 // 제품 관련 공용 유틸리티
 
-// 내부: 날짜 정규화 헬퍼
-const normalizeStartOfDay = (d) => {
-  const date = new Date(d);
-  date.setHours(0, 0, 0, 0);
-  return date;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const toMs = (v) => {
+  if (!v) return null;
+  const ms = new Date(v).getTime();
+  return Number.isFinite(ms) ? ms : null;
 };
-const normalizeEndOfDay = (d) => {
-  const date = new Date(d);
-  date.setHours(23, 59, 59, 999);
-  return date;
+const getStartMs = (product, endMs) => {
+  const fromPurchase = toMs(product?.purchaseDate);
+  const fromCreated = toMs(product?.createdAt);
+  let start = fromPurchase ?? fromCreated ?? null;
+  // 시작이 없거나 비정상(시작>=끝)이면, 보수적으로 "끝 - 30일"을 가정
+  if (!Number.isFinite(start) || (Number.isFinite(endMs) && start >= endMs)) {
+    start = Number.isFinite(endMs) ? (endMs - 30 * DAY_MS) : null;
+  }
+  return start;
 };
 
 // 내부: 안전 숫자 결과 포맷
@@ -22,19 +27,17 @@ const result = (percentage, remainingDays) => ({
 export const calculateExpiryPercentage = (product) => {
   if (!product?.expiryDate) return null;
 
-  const today = normalizeStartOfDay(new Date());
-  const expiryDate = normalizeEndOfDay(product.expiryDate);
-  const purchaseDate = normalizeStartOfDay(product.purchaseDate || new Date());
+  const nowMs = Date.now();
+  const endMs = toMs(product.expiryDate);
+  const startMs = getStartMs(product, endMs);
+  if (!Number.isFinite(endMs) || !Number.isFinite(startMs)) return result(100, 0);
 
-  if (isNaN(expiryDate.getTime()) || isNaN(purchaseDate.getTime())) {
-    return result(100, 0);
-  }
+  const totalMs = endMs - startMs;
+  if (totalMs <= 0) return result(0, 0);
 
-  const totalDays = (expiryDate - purchaseDate) / (1000 * 60 * 60 * 24);
-  if (totalDays <= 0) return result(0, 0);
-
-  const remainingDays = (expiryDate - today) / (1000 * 60 * 60 * 24);
-  const percentage = (remainingDays / totalDays) * 100;
+  const remainingMs = endMs - nowMs;
+  const remainingDays = remainingMs / DAY_MS;
+  const percentage = (remainingMs / totalMs) * 100;
   return result(percentage, remainingDays);
 };
 
@@ -42,19 +45,17 @@ export const calculateExpiryPercentage = (product) => {
 export const calculateConsumptionPercentage = (product) => {
   if (!product?.estimatedEndDate) return null;
 
-  const today = normalizeStartOfDay(new Date());
-  const endDate = normalizeEndOfDay(product.estimatedEndDate);
-  const purchaseDate = normalizeStartOfDay(product.purchaseDate || new Date());
+  const nowMs = Date.now();
+  const endMs = toMs(product.estimatedEndDate);
+  const startMs = getStartMs(product, endMs);
+  if (!Number.isFinite(endMs) || !Number.isFinite(startMs)) return result(100, 0);
 
-  if (isNaN(endDate.getTime()) || isNaN(purchaseDate.getTime())) {
-    return result(100, 0);
-  }
+  const totalMs = endMs - startMs;
+  if (totalMs <= 0) return result(0, 0);
 
-  const totalDays = (endDate - purchaseDate) / (1000 * 60 * 60 * 24);
-  if (totalDays <= 0) return result(0, 0);
-
-  const remainingDays = (endDate - today) / (1000 * 60 * 60 * 24);
-  const percentage = (remainingDays / totalDays) * 100;
+  const remainingMs = endMs - nowMs;
+  const remainingDays = remainingMs / DAY_MS;
+  const percentage = (remainingMs / totalMs) * 100;
   return result(percentage, remainingDays);
 };
 
