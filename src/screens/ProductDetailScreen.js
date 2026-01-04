@@ -1452,6 +1452,8 @@ const ProductDetailScreen = () => {
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               onChange={(event, date) => {
                 if (Platform.OS !== 'ios') setShowPurchaseDatePicker(false);
+                // Android: 취소(dismissed) 시에는 date가 기본값으로 넘어올 수 있어 무시
+                if (Platform.OS === 'android' && event?.type && event.type !== 'set') return;
                 if (date === undefined) return;
                 if (!date) return;
                 if (Platform.OS === 'ios') {
@@ -1498,6 +1500,8 @@ const ProductDetailScreen = () => {
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               onChange={(event, date) => {
                 if (Platform.OS !== 'ios') setShowExpiryDatePicker(false);
+                // Android: 취소(dismissed) 시에는 date가 기본값으로 넘어올 수 있어 무시
+                if (Platform.OS === 'android' && event?.type && event.type !== 'set') return;
                 if (date === undefined) return;
                 // 취소 시 date가 undefined로 올 수 있음
                 if (!date) return;
@@ -1545,6 +1549,8 @@ const ProductDetailScreen = () => {
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               onChange={(event, date) => {
                 if (Platform.OS !== 'ios') setShowEstimatedEndDatePicker(false);
+                // Android: 취소(dismissed) 시에는 date가 기본값으로 넘어올 수 있어 무시
+                if (Platform.OS === 'android' && event?.type && event.type !== 'set') return;
                 if (date === undefined) return;
                 if (!date) return;
                 if (Platform.OS === 'ios') {

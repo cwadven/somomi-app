@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  KeyboardAvoidingView,
   Linking } from
 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -263,7 +264,8 @@ const ProfileScreen = () => {
   };
 
   const ALLOWED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
-  const NICKNAME_ALLOWED_REGEX = /^[0-9A-Za-z가-힣]+$/;
+  // iOS/Android 한글 IME 조합 중에는 'ㄱ/ㅏ' 같은 자모가 입력되므로 자모까지 허용해야 입력이 끊기지 않음
+  const NICKNAME_ALLOWED_REGEX = /^[0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ]+$/;
   const getFileExtension = (nameOrUri) => {
     if (!nameOrUri || typeof nameOrUri !== 'string') return null;
     const clean = nameOrUri.split('?')[0].split('#')[0];
@@ -582,15 +584,23 @@ const ProfileScreen = () => {
         onRequestClose={() => setShowEditProfileModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>프로필 수정</Text>
-              <TouchableOpacity onPress={() => setShowEditProfileModal(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.modalBody}>
-              <Text style={styles.modalDescription}>닉네임과 프로필 이미지를 수정할 수 있어요.</Text>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ width: '100%' }}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>프로필 수정</Text>
+                <TouchableOpacity onPress={() => setShowEditProfileModal(false)}>
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                style={styles.modalBody}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingBottom: 24 }}
+              >
+                <Text style={styles.modalDescription}>닉네임과 프로필 이미지를 수정할 수 있어요.</Text>
 
               <View style={{ alignItems: 'center', marginTop: 12, marginBottom: 12 }}>
                 {editProfileImagePreview ?
@@ -630,8 +640,8 @@ const ProfileScreen = () => {
               <TextInput
                 value={editNickname}
                 onChangeText={(t) => {
-                  // ✅ 닉네임은 한글/영문/숫자만 허용
-                  const sanitized = String(t || '').replace(/[^0-9A-Za-z가-힣]/g, '');
+                  // ✅ 닉네임은 한글/영문/숫자만 허용 (한글 IME 조합용 자모 포함)
+                  const sanitized = String(t || '').replace(/[^0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ]/g, '');
                   setEditNickname(sanitized);
                 }}
                 placeholder="닉네임"
@@ -646,7 +656,9 @@ const ProfileScreen = () => {
               >
                 <Text style={styles.authCtaText}>{profileImageUploading ? '업로드 중...' : '저장'}</Text>
               </TouchableOpacity>
+              </ScrollView>
             </View>
+          </KeyboardAvoidingView>
           </View>
         </View>
       </Modal>
