@@ -9,13 +9,18 @@ import {
   ScrollView,
   Platform,
   Modal,
+  TextInput,
+  ActivityIndicator,
   Linking } from
 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { logout } from '../redux/slices/authSlice';
-import { fetchMemberProfile } from '../api/memberApi';
+import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { logout, updateUserInfo } from '../redux/slices/authSlice';
+import { fetchMemberProfile, updateMemberProfile } from '../api/memberApi';
+import { givePresignedUrl } from '../api/commonApi';
 import NotificationSettings from '../components/NotificationSettings';
 
 
@@ -110,6 +115,14 @@ const ProfileScreen = () => {
   }, [isLoggedIn]);
 
   const [profileOverride, setProfileOverride] = useState(null);
+  const activeProfile = profileOverride || user || null;
+
+  // 프로필 수정 모달 상태
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [editNickname, setEditNickname] = useState('');
+  const [editProfileImagePreview, setEditProfileImagePreview] = useState(null);
+  const [profileImageUploading, setProfileImageUploading] = useState(false);
+  const [uploadedProfileImageUrl, setUploadedProfileImageUrl] = useState(null);
 
   useEffect(() => {
     let interval;
@@ -194,6 +207,14 @@ const ProfileScreen = () => {
     setModalButtons(null);
   };
 
+  const showErrorAlert = (message) => {
+    setModalTitle('오류');
+    setModalMessage(message);
+    setModalAction(null);
+    setModalButtons([{ text: '확인', onPress: () => setModalVisible(false) }]);
+    setModalVisible(true);
+  };
+
   // 앱 정보 표시
   const showAppInfo = () => {
     setModalTitle('앱 정보');
@@ -231,6 +252,185 @@ const ProfileScreen = () => {
       </View>
     </TouchableOpacity>;
 
+  const openEditProfile = () => {
+    if (!isLoggedIn) return;
+    const currentNick = activeProfile?.username || activeProfile?.name || user?.username || user?.name || '';
+    setEditNickname(String(currentNick || ''));
+    const currentImg = activeProfile?.profileImage || user?.profileImage || null;
+    setEditProfileImagePreview(currentImg);
+    setUploadedProfileImageUrl(currentImg);
+    setShowEditProfileModal(true);
+  };
+
+  const ALLOWED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
+  const NICKNAME_ALLOWED_REGEX = /^[0-9A-Za-z가-힣]+$/;
+  const getFileExtension = (nameOrUri) => {
+    if (!nameOrUri || typeof nameOrUri !== 'string') return null;
+    const clean = nameOrUri.split('?')[0].split('#')[0];
+    const last = clean.split('/').pop() || clean;
+    const idx = last.lastIndexOf('.');
+    if (idx === -1) return null;
+    return last.slice(idx + 1).toLowerCase();
+  };
+  const guessMimeTypeFromExtension = (ext) => {
+    switch ((ext || '').toLowerCase()) {
+      case 'png':return 'image/png';
+      case 'jpg':
+      case 'jpeg':return 'image/jpeg';
+      case 'gif':return 'image/gif';
+      case 'webp':return 'image/webp';
+      default:return 'application/octet-stream';
+    }
+  };
+  const guessExtensionFromMimeType = (mimeType) => {
+    switch ((mimeType || '').toLowerCase()) {
+      case 'image/png':return 'png';
+      case 'image/jpeg':return 'jpg';
+      case 'image/gif':return 'gif';
+      case 'image/webp':return 'webp';
+      default:return null;
+    }
+  };
+  const buildSafeFileName = (ext) => `member_image_${Date.now()}.${String(ext || '').toLowerCase()}`;
+  const joinReadHostAndKey = (readHost, key) => {
+    if (!readHost || !key) return null;
+    const host = String(readHost);
+    const k = String(key);
+    if (host.endsWith('/') && k.startsWith('/')) return host + k.slice(1);
+    if (!host.endsWith('/') && !k.startsWith('/')) return `${host}/${k}`;
+    return host + k;
+  };
+  const optimizeImageIfNeeded = async ({ uri, ext }) => {
+    if (ext === 'gif') return { uri, ext };
+    const MAX_DIM = 1280;
+    let format = SaveFormat.JPEG;
+    let outExt = 'jpg';
+    let compress = 0.78;
+    if (ext === 'png' || ext === 'webp') {
+      format = SaveFormat.WEBP;
+      outExt = 'webp';
+      compress = 0.8;
+    }
+    const result = await manipulateAsync(uri, [{ resize: { width: MAX_DIM } }], { compress, format });
+    return { uri: result?.uri || uri, ext: outExt };
+  };
+  const getMemberImageTransactionPk = () => {
+    const raw = user?.id;
+    const s = raw == null ? '' : String(raw);
+    if (/^\\d+$/.test(s)) return s;
+    return '0';
+  };
+  const uploadProfileImage = async ({ uri, fileName, mimeType, ext }) => {
+    setProfileImageUploading(true);
+    try {
+      const pk = getMemberImageTransactionPk();
+      const presigned = await givePresignedUrl('member-image', pk, fileName);
+      const url = presigned?.url;
+      const fields = presigned?.data;
+      const key = fields?.key;
+      const readHost = presigned?.read_host;
+      if (!url || !fields || !key) throw new Error('invalid-presigned-response');
+
+      const form = new FormData();
+      Object.entries(fields).forEach(([k, v]) => {
+        if (v == null) return;
+        form.append(k, String(v));
+      });
+      const finalExt = ext || getFileExtension(fileName) || 'jpg';
+      const mime = mimeType || guessMimeTypeFromExtension(finalExt);
+      if (Platform.OS === 'web') {
+        const blob = await fetch(uri).then((r) => r.blob());
+        if (typeof File !== 'undefined') {
+          const file = new File([blob], fileName, { type: mime });
+          form.append('file', file);
+        } else {
+          form.append('file', blob, fileName);
+        }
+      } else {
+        form.append('file', { uri, name: fileName, type: mime });
+      }
+
+      const uploadRes = await fetch(url, { method: 'POST', body: form });
+      if (!uploadRes.ok) {
+        const t = await uploadRes.text().catch(() => '');
+        throw new Error(`s3-upload-failed:${uploadRes.status}:${t}`);
+      }
+      const full = joinReadHostAndKey(readHost, key);
+      const iconUrl = full || key;
+      setUploadedProfileImageUrl(iconUrl);
+      return iconUrl;
+    } finally {
+      setProfileImageUploading(false);
+    }
+  };
+  const pickProfileImage = async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm?.granted) {
+          showErrorAlert('갤러리 접근 권한이 필요합니다.');
+          return;
+        }
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.85
+      });
+      if (res.canceled) return;
+      const asset = Array.isArray(res.assets) ? res.assets[0] : null;
+      if (!asset?.uri) return;
+
+      const extFromNameOrUri = getFileExtension(asset.fileName || asset.uri);
+      const extFromMime = guessExtensionFromMimeType(asset.mimeType);
+      const ext = (extFromNameOrUri || extFromMime || '').toLowerCase();
+      if (!ext || !ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
+        showErrorAlert('png, jpg, jpeg, gif, webp 파일만 업로드할 수 있어요.');
+        return;
+      }
+      const optimized = await optimizeImageIfNeeded({ uri: asset.uri, ext }).catch(() => ({ uri: asset.uri, ext }));
+      const finalExt = optimized.ext || ext;
+      const meta = {
+        uri: optimized.uri,
+        ext: finalExt,
+        fileName: buildSafeFileName(finalExt),
+        mimeType: guessMimeTypeFromExtension(finalExt)
+      };
+      setEditProfileImagePreview(meta.uri);
+      setUploadedProfileImageUrl(null);
+      await uploadProfileImage(meta);
+    } catch (e) {
+      showErrorAlert(`이미지 선택 중 오류가 발생했습니다: ${e?.message || String(e)}`);
+    }
+  };
+  const saveProfile = async () => {
+    const nickname = (editNickname || '').trim();
+    if (!nickname) {
+      showErrorAlert('닉네임을 입력해 주세요.');
+      return;
+    }
+    if (!NICKNAME_ALLOWED_REGEX.test(nickname)) {
+      showErrorAlert('닉네임은 한글/영문/숫자만 입력할 수 있어요.');
+      return;
+    }
+    if (profileImageUploading) return;
+    try {
+      const profile_image_url = uploadedProfileImageUrl || null;
+      await updateMemberProfile({ nickname, profile_image_url });
+      const next = {
+        ...(activeProfile || user || {}),
+        username: nickname,
+        name: nickname,
+        profileImage: profile_image_url,
+      };
+      setProfileOverride(next);
+      try { dispatch(updateUserInfo({ username: nickname, name: nickname, profileImage: profile_image_url })); } catch (e) {}
+      setShowEditProfileModal(false);
+    } catch (e) {
+      showErrorAlert(`프로필 저장 중 오류가 발생했습니다: ${e?.message || String(e)}`);
+    }
+  };
+
 
   // 프로필 화면
   const renderProfileScreen = () =>
@@ -249,9 +449,15 @@ const ProfileScreen = () => {
             <View style={styles.profileInfo}>
               <Text style={styles.userName}>{profileOverride?.username || profileOverride?.name || user?.username || user?.name || '사용자'}</Text>
             </View>
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <Text style={styles.logoutText}>로그아웃</Text>
-            </TouchableOpacity>
+            <View style={styles.profileActionsRow}>
+              <TouchableOpacity style={styles.editProfileButton} onPress={openEditProfile}>
+                <Ionicons name="create-outline" size={16} color="#4CAF50" />
+                <Text style={styles.editProfileButtonText}>프로필 수정</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                <Text style={styles.logoutText}>로그아웃</Text>
+              </TouchableOpacity>
+            </View>
           </> :
 
       <View style={styles.loginContainer}>
@@ -339,38 +545,111 @@ const ProfileScreen = () => {
     </ScrollView>;
 
 
-  // 알림 설정 모달
-  const NotificationSettingsModal = () =>
-  <Modal
-    visible={showNotificationModal}
-    transparent={true}
-    animationType="slide"
-    onRequestClose={() => setShowNotificationModal(false)}>
-
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>알림 설정</Text>
-            <TouchableOpacity onPress={() => setShowNotificationModal(false)}>
-              <Ionicons name="close" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.modalBody}>
-            <Text style={styles.modalDescription}>
-              앱 전체 알림 설정을 관리합니다. 이 설정을 비활성화하면 모든 알림이 중지됩니다.
-            </Text>
-            <NotificationSettings />
-          </View>
-        </View>
-      </View>
-    </Modal>;
-
-
   return (
     <>
       {renderProfileScreen()}
-      <NotificationSettingsModal />
+      {/* 알림 설정 모달 */}
+      <Modal
+        visible={showNotificationModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowNotificationModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>알림 설정</Text>
+              <TouchableOpacity onPress={() => setShowNotificationModal(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={styles.modalDescription}>
+                앱 전체 알림 설정을 관리합니다. 이 설정을 비활성화하면 모든 알림이 중지됩니다.
+              </Text>
+              <NotificationSettings />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 프로필 수정 모달 (입력 시 리렌더되어도 모달이 리마운트되지 않도록 inline 렌더) */}
+      <Modal
+        visible={showEditProfileModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowEditProfileModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>프로필 수정</Text>
+              <TouchableOpacity onPress={() => setShowEditProfileModal(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              <Text style={styles.modalDescription}>닉네임과 프로필 이미지를 수정할 수 있어요.</Text>
+
+              <View style={{ alignItems: 'center', marginTop: 12, marginBottom: 12 }}>
+                {editProfileImagePreview ?
+                <Image source={{ uri: editProfileImagePreview }} style={styles.profileImage} /> :
+                <View style={[styles.profileImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#e0e0e0' }]}>
+                    <Ionicons name="person-circle" size={64} color="#9E9E9E" />
+                  </View>
+                }
+                <View style={{ flexDirection: 'row', marginTop: 10 }}>
+                  <TouchableOpacity
+                    style={[styles.editProfileButton, { marginRight: 8 }]}
+                    disabled={profileImageUploading}
+                    onPress={pickProfileImage}
+                  >
+                    {profileImageUploading ?
+                    <ActivityIndicator size="small" color="#4CAF50" style={{ marginRight: 6 }} /> :
+                    <Ionicons name="image-outline" size={16} color="#4CAF50" />
+                    }
+                    <Text style={styles.editProfileButtonText}>{profileImageUploading ? '업로드 중...' : '이미지 선택'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.logoutButton, { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E0E0E0' }]}
+                    disabled={profileImageUploading}
+                    onPress={() => {
+                      setEditProfileImagePreview(null);
+                      setUploadedProfileImageUrl(null);
+                    }}
+                  >
+                    <Text style={[styles.logoutText, { color: '#666' }]}>이미지 삭제</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <Text style={styles.requiredLabel}>
+                닉네임 <Text style={styles.requiredAsterisk}>*</Text>
+              </Text>
+              <TextInput
+                value={editNickname}
+                onChangeText={(t) => {
+                  // ✅ 닉네임은 한글/영문/숫자만 허용
+                  const sanitized = String(t || '').replace(/[^0-9A-Za-z가-힣]/g, '');
+                  setEditNickname(sanitized);
+                }}
+                placeholder="닉네임"
+                style={styles.profileEditInput}
+                editable={!profileImageUploading}
+              />
+
+              <TouchableOpacity
+                style={[styles.authCtaButton, (profileImageUploading || (editNickname || '').trim().length === 0) && { opacity: 0.5 }]}
+                disabled={profileImageUploading || (editNickname || '').trim().length === 0}
+                onPress={saveProfile}
+              >
+                <Text style={styles.authCtaText}>{profileImageUploading ? '업로드 중...' : '저장'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <AlertModal
         visible={modalVisible}
         title={modalTitle}
@@ -424,6 +703,27 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#f5f5f5'
   },
+  profileActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  editProfileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginRight: 10,
+  },
+  editProfileButtonText: {
+    marginLeft: 6,
+    color: '#4CAF50',
+    fontWeight: '700',
+  },
   logoutText: {
     color: '#F44336',
     fontWeight: '500'
@@ -463,6 +763,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 14
+  },
+  profileEditInput: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    marginBottom: 12,
+  },
+  requiredLabel: {
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  requiredAsterisk: {
+    color: '#F44336',
+    fontWeight: '900',
   },
   previewContainer: {
     width: '100%',

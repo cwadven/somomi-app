@@ -46,12 +46,23 @@ export const fetchMemberProfile = async () => {
   });
 };
 
+// PUT /v1/member/profile
+// ProfileUpdateRequest: { nickname: string, profile_image_url?: string|null }
+export const updateMemberProfile = async ({ nickname, profile_image_url = null }) => {
+  return request('/v1/member/profile', {
+    method: 'PUT',
+    body: { nickname, profile_image_url },
+  });
+};
+
 export default {
   loginMember,
   refreshAccessToken,
   sendVerificationToken,
   verifyVerificationToken,
   emailSignUp,
+  fetchMemberProfile,
+  updateMemberProfile,
 };
 
 
