@@ -85,6 +85,8 @@ const AppContent = () => {
   const prevAppStateRef = useRef(AppState.currentState);
   const [dataInitialized, setDataInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [startupMessage, setStartupMessage] = useState('초기화 중...');
+  const [startupProgressText, setStartupProgressText] = useState('');
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   
   // 디버깅 모달 상태
@@ -259,59 +261,86 @@ const AppContent = () => {
   
   // 앱 초기화 함수
   const initializeApp = async () => {
+    const startedAt = Date.now();
+    const TOTAL_STEPS = 9;
+    let stepIdx = 0;
+    const setStep = (msg) => {
+      stepIdx += 1;
+      setStartupMessage(msg);
+      setStartupProgressText(`${Math.min(stepIdx, TOTAL_STEPS)}/${TOTAL_STEPS}`);
+      addLog(`[startup] ${msg}`, 'info');
+    };
+    const withTimeout = async (promise, timeoutMs, label) => {
+      if (!timeoutMs) return promise;
+      let timeoutId;
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          const err = new Error(`timeout:${label || 'step'}:${timeoutMs}ms`);
+          err._timeout = true;
+          reject(err);
+        }, timeoutMs);
+      });
+      try {
+        return await Promise.race([promise, timeoutPromise]);
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
+    };
+    const runStep = async (msg, fn, { timeoutMs } = {}) => {
+      const t0 = Date.now();
+      setStep(msg);
+      try {
+        await withTimeout(Promise.resolve().then(fn), timeoutMs, msg);
+        addLog(`[startup] done: ${msg} (${Date.now() - t0}ms)`, 'success');
+      } catch (e) {
+        const detail = e?._timeout ? ' (timeout)' : '';
+        addLog(`[startup] skip: ${msg}${detail} - ${e?.message || String(e)}`, 'warning');
+      }
+    };
     try {
       setIsLoading(true);
-      // 프로덕션: 앱 시작 시 업데이트 사전 다운로드 시도 (다음 1회 재시작에 적용)
-      try { await prefetchUpdateIfAvailable(); } catch (e) {}
-      // 7단계: 1회 마이그레이션 수행 (id/localId/메타 보강)
-      await migrateLocalIdsAndMeta();
+      setStartupMessage('초기화 중...');
+      setStartupProgressText(`0/${TOTAL_STEPS}`);
+
+      // ✅ UX: 앱 진입을 막지 않도록 업데이트 사전 다운로드는 "백그라운드"로 수행
+      try { prefetchUpdateIfAvailable(); } catch (e) {}
+
+      await runStep('데이터 마이그레이션', () => migrateLocalIdsAndMeta(), { timeoutMs: 4000 });
       
-      // 토큰 검증
-      await dispatch(verifyToken()).unwrap();
+      await runStep('로그인 상태 확인', () => dispatch(verifyToken()).unwrap(), { timeoutMs: 5000 });
       
-      // 사용자 영역 템플릿 인스턴스 로드
-      await dispatch(loadUserLocationTemplateInstances()).unwrap();
-      // 위치 데이터 로드 후 템플릿 사용 상태 동기화
-      await dispatch(reconcileLocationTemplates());
-      // 사용자 제품 슬롯 템플릿 인스턴스 로드
-      await dispatch(loadUserProductSlotTemplateInstances()).unwrap();
+      await runStep('영역 템플릿 불러오기', () => dispatch(loadUserLocationTemplateInstances()).unwrap(), { timeoutMs: 5000 });
+      await runStep('템플릿 사용 상태 동기화', () => dispatch(reconcileLocationTemplates()), { timeoutMs: 2000 });
+      await runStep('제품 슬롯 템플릿 불러오기', () => dispatch(loadUserProductSlotTemplateInstances()).unwrap(), { timeoutMs: 1500 });
       
-      // 영역 데이터 로드
-      await dispatch(fetchLocations()).unwrap();
-      // 위치 로드 후 한 번 더 동기화 (순서상 보강)
-      await dispatch(reconcileLocationTemplates());
-      // 템플릿 미연동을 disabled=true로 반영
-      await dispatch(reconcileLocationsDisabled()).unwrap();
-      // 연동 상태가 바뀌었을 수 있으니 한 번 더 저장된 locations 로드
-      await dispatch(fetchLocations()).unwrap();
+      await runStep('영역 불러오기', () => dispatch(fetchLocations()).unwrap(), { timeoutMs: 7000 });
+      await runStep('영역 disabled 동기화', () => dispatch(reconcileLocationsDisabled()).unwrap(), { timeoutMs: 2000 });
       
-      // 제품 데이터 로드
-      await dispatch(fetchProducts()).unwrap();
+      await runStep('제품 불러오기', () => dispatch(fetchProducts()).unwrap(), { timeoutMs: 2500 });
       
-      // 소진된 제품 데이터 로드
-      await dispatch(fetchConsumedProducts()).unwrap();
+      await runStep('소진 제품 불러오기', () => dispatch(fetchConsumedProducts()).unwrap(), { timeoutMs: 6000 });
       
-      // 카테고리 로드
-      await dispatch(loadCategories()).unwrap();
+      await runStep('카테고리/알림 초기화', async () => {
+        await Promise.all([
+          dispatch(loadCategories()).unwrap().catch(() => {}),
+          dispatch(initializeNotificationsData()).unwrap().catch(() => {}),
+        ]);
+      }, { timeoutMs: 5000 });
       
-      // 알림 데이터 초기화
-      await dispatch(initializeNotificationsData()).unwrap();
-      
-      // 푸시 알림 초기화
-      if (Platform.OS !== 'web' && messaging) {
-        const token = await pushNotificationService.initialize();
-        if (token) {
-          setPushToken(token);
+      await runStep('푸시 초기화', async () => {
+        if (Platform.OS !== 'web' && messaging) {
+          const token = await pushNotificationService.initialize();
+          if (token) setPushToken(token);
+          try { await scheduleDailyReminderIfNeeded(); } catch (e) { }
+          try { await scheduleDailyUpdateReminderIfNeeded(); } catch (e) { }
         }
-        // 일일 리마인더/작성 리마인더 스케줄링 시도
-        try { await scheduleDailyReminderIfNeeded(); } catch (e) { }
-        try { await scheduleDailyUpdateReminderIfNeeded(); } catch (e) { }
-      }
+      }, { timeoutMs: 5000 });
       
       setDataInitialized(true);
     } catch (error) {
       console.error('앱 초기화 오류:', error);
     } finally {
+      addLog(`[startup] total ${(Date.now() - startedAt)}ms`, 'info');
       setIsLoading(false);
     }
   };
@@ -349,6 +378,7 @@ const AppContent = () => {
 
   // 주기적으로 동기화 큐 처리 (모드 제거)
   useEffect(() => {
+    if (isLoading) return;
     let interval;
     (async () => {
       // 최초 진입 시 한 번 처리
@@ -361,7 +391,7 @@ const AppContent = () => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [dispatch]);
+  }, [dispatch, isLoading]);
   
   // 업데이트 디버깅 모달
   const UpdateDebugModal = () => (
@@ -739,7 +769,10 @@ const AppContent = () => {
   // 데이터 초기화 중이면 로딩 화면 표시
   if (isLoading) {
     return (
-      <CodePushUpdateLoading />
+      <CodePushUpdateLoading
+        message={startupMessage}
+        progressText={startupProgressText}
+      />
     );
   }
   
