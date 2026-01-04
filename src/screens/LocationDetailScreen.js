@@ -40,8 +40,10 @@ const LocationDetailScreen = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [locationProducts, setLocationProducts] = useState([]);
   const [activeTab, setActiveTab] = useState('products'); // 'products' 또는 'notifications'
-  const [sortKey, setSortKey] = useState('created'); // null | 'estimated' | 'expiry' | 'created' | 'name' | 'estimatedRate' | 'expiryRate'
-  const [sortDesc, setSortDesc] = useState(true); // 등록순 기본: 내림차순(가장 최근이 위)
+  // ✅ 앱에서 로컬 정렬/기본 sort 강제하지 않음: 백엔드 응답 순서 그대로 사용
+  // (정렬을 쓰고 싶다면 서버 sort 파라미터로만 동작)
+  const [sortKey, setSortKey] = useState(null); // null | 'estimated' | 'expiry' | 'created' | 'name' | 'estimatedRate' | 'expiryRate'
+  const [sortDesc, setSortDesc] = useState(true);
   const [productsTimedOut, setProductsTimedOut] = useState(false);
   const PRODUCTS_TIMEOUT_MS = 8000;
   const [productsTimerId, setProductsTimerId] = useState(null);
@@ -165,8 +167,9 @@ const LocationDetailScreen = () => {
       setLocationProducts((prev) => {
         if (!Array.isArray(prev)) return prev;
         if (prev.some((p) => String(p?.id) === id)) return prev;
-        // 정렬/페이지네이션을 깨지 않기 위해 "prepend"만 수행 (스크롤 리셋 없음)
-        return [product, ...prev];
+        // ✅ 백엔드 정렬을 신뢰: 로컬에서 "prepend"로 순서를 바꾸지 않음
+        // - 신규 생성품은 리스트 끝에만 추가(스크롤/순서 교란 최소화)
+        return [...prev, product];
       });
     });
 
@@ -212,6 +215,17 @@ const LocationDetailScreen = () => {
     const keyChanged = prevKey !== key;
     if (keyChanged) listKeyRef.current = key;
 
+    const isSameOrderById = (a, b) => {
+      if (!Array.isArray(a) || !Array.isArray(b)) return false;
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i += 1) {
+        const aid = String(a[i]?.id ?? a[i]?.localId ?? '');
+        const bid = String(b[i]?.id ?? b[i]?.localId ?? '');
+        if (aid !== bid) return false;
+      }
+      return true;
+    };
+
     // ✅ 스크롤 점프 방지:
     // - 화면 key가 바뀐 경우(다른 영역/모든 제품으로 이동)만 캐시/필터 결과를 주입
     // - 같은 화면 key에서 Redux 캐시가 갱신되더라도(예: 수정 patch), 여기서 리스트를 통째로 set 하지 않음
@@ -221,6 +235,16 @@ const LocationDetailScreen = () => {
       if (locationProducts.length === 0) {
         const cached = locationProductsCache?.[key];
         if (Array.isArray(cached) && cached.length > 0) {
+          setLocationProducts(cached);
+        }
+      }
+      // ✅ 백엔드/Redux 캐시의 "순서"가 바뀐 경우는 반영해야 함
+      // (예: 서버가 정렬/커서 기준으로 새 순서를 내려줬는데, 로컬 state가 이전 순서로 남아있는 경우)
+      const cached = locationProductsCache?.[key];
+      if (Array.isArray(cached) && cached.length > 0 && Array.isArray(locationProducts) && locationProducts.length > 0) {
+        if (!isSameOrderById(locationProducts, cached)) {
+          // 현재 스크롤 위치는 유지하도록 복원 플래그 세팅
+          shouldRestoreScrollRef.current = true;
           setLocationProducts(cached);
         }
       }

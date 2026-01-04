@@ -506,11 +506,11 @@ export const productsSlice = createSlice({
         if (Array.isArray(state.locationProducts[prevLocId])) {
           state.locationProducts[prevLocId] = state.locationProducts[prevLocId].filter(p => String(p?.id) !== id);
         }
-        // 새 location 캐시가 이미 존재하면(해당 화면에서 보고 있는 경우) prepend로 추가
+        // 새 location 캐시가 이미 존재하면(해당 화면에서 보고 있는 경우) 로컬에서 순서 변경 최소화: append
         if (Array.isArray(state.locationProducts[nextLocId])) {
           const updated = idx !== -1 ? state.products[idx] : (state.currentProduct && String(state.currentProduct.id) === id ? state.currentProduct : null);
           if (updated && !state.locationProducts[nextLocId].some(p => String(p?.id) === id)) {
-            state.locationProducts[nextLocId] = [{ ...updated }, ...state.locationProducts[nextLocId]];
+            state.locationProducts[nextLocId] = [...state.locationProducts[nextLocId], { ...updated }];
           }
         }
         // 'all' 캐시는 유지(이미 patch로 locationId만 갱신됨)
@@ -529,7 +529,7 @@ export const productsSlice = createSlice({
       // products(전체/내 제품) upsert
       const pIdx = state.products.findIndex(p => String(p?.id) === id);
       if (pIdx !== -1) state.products[pIdx] = { ...state.products[pIdx], ...product, isConsumed: false };
-      else state.products.unshift({ ...product, isConsumed: false });
+      else state.products.push({ ...product, isConsumed: false });
 
       // locationProducts 캐시 upsert (해당 locId, 그리고 'all' 캐시가 있다면 거기도)
       if (locId) {
@@ -537,14 +537,14 @@ export const productsSlice = createSlice({
         if (Array.isArray(list)) {
           const i = list.findIndex(p => String(p?.id) === id);
           if (i !== -1) state.locationProducts[locId][i] = { ...state.locationProducts[locId][i], ...product, isConsumed: false };
-          else state.locationProducts[locId].unshift({ ...product, isConsumed: false });
+          else state.locationProducts[locId].push({ ...product, isConsumed: false });
         }
       }
       if (Array.isArray(state.locationProducts['all'])) {
         const all = state.locationProducts['all'];
         const i = all.findIndex(p => String(p?.id) === id);
         if (i !== -1) all[i] = { ...all[i], ...product, isConsumed: false };
-        else all.unshift({ ...product, isConsumed: false });
+        else all.push({ ...product, isConsumed: false });
       }
 
       // currentProduct도 해당 id면 갱신
