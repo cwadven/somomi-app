@@ -846,7 +846,6 @@ const ProductDetailScreen = () => {
   const [imageUploading, setImageUploading] = useState(false);
   const [uploadedIconUrl, setUploadedIconUrl] = useState(null); // read_host + key
   const [pickedImageMeta, setPickedImageMeta] = useState(null); // { uri, fileName, mimeType, ext }
-  const pendingSubmitRef = useRef(false);
 
   const ALLOWED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
   const getFileExtension = (nameOrUri) => {
@@ -1090,16 +1089,7 @@ const ProductDetailScreen = () => {
     setScreenMode('view');
   };
 
-  // 업로드 중 "등록/저장"을 눌렀다면 업로드 완료 후 자동으로 제출
-  useEffect(() => {
-    if (!imageUploading && pendingSubmitRef.current) {
-      pendingSubmitRef.current = false;
-      // 업로드가 끝난 시점에 자동 저장
-      submitCreateOrEdit().catch((e) => {
-        showErrorAlert(`저장 중 오류가 발생했습니다: ${e?.message || String(e)}`);
-      });
-    }
-  }, [imageUploading, submitCreateOrEdit]);
+  // 업로드 중에는 저장/수정 버튼을 비활성화하여 제출 자체를 막습니다. (요청사항)
 
   const pickImageForForm = async () => {
     try {
@@ -1253,8 +1243,8 @@ const ProductDetailScreen = () => {
 
   const renderCreateEditForm = () => {
     const isCreate = screenMode === 'create';
-    // 업로드 중이어도 "등록/저장" 버튼은 항상 보이고 누를 수 있게 유지
-    const canSave = (productName || '').trim().length > 0;
+    // ✅ 업로드 중에는 저장/수정 불가: 버튼 비활성화
+    const canSave = (productName || '').trim().length > 0 && !imageUploading;
 
     const onCancel = () => {
       if (isCreate) navigation.goBack();else
@@ -1264,13 +1254,14 @@ const ProductDetailScreen = () => {
     const onSave = async () => {
       try {
         if (!canSave) {
-          showErrorAlert('제품명을 입력해 주세요.');
-          return;
-        }
-        // 업로드 중이라면 일단 "누를 수는 있게" 하고, 완료 후 자동 저장되도록 큐잉
-        if (imageUploading) {
-          pendingSubmitRef.current = true;
-          showErrorAlert('이미지 업로드 중입니다. 업로드가 완료되면 자동으로 등록/저장됩니다.');
+          if ((productName || '').trim().length === 0) {
+            showErrorAlert('제품명을 입력해 주세요.');
+            return;
+          }
+          if (imageUploading) {
+            showErrorAlert('이미지 업로드 중입니다. 업로드가 완료된 후 등록/저장해 주세요.');
+            return;
+          }
           return;
         }
         const purchaseDateObj = parseYMD(purchaseDateText) || new Date();
@@ -1609,7 +1600,9 @@ const ProductDetailScreen = () => {
           <TextInput style={[styles.formInput, styles.formTextArea]} value={memo} onChangeText={setMemo} placeholder="선택" multiline />
 
           <TouchableOpacity style={[styles.formSaveButton, !canSave && { opacity: 0.5 }]} disabled={!canSave} onPress={onSave}>
-            <Text style={styles.formSaveButtonText}>{isCreate ? '등록' : '저장'}</Text>
+            <Text style={styles.formSaveButtonText}>
+              {imageUploading ? '업로드중...' : (isCreate ? '등록' : '저장')}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.formCancelButton} onPress={onCancel}>
             <Text style={styles.formCancelButtonText}>취소</Text>

@@ -426,6 +426,10 @@ const LocationDetailScreen = () => {
 
     // 서버 정렬 적용: 정렬 해제가 아닌 경우만 호출
     if (nextKey) {
+      // ✅ 정렬을 눌렀을 때는 스크롤을 항상 맨 위로 이동
+      shouldRestoreScrollRef.current = false;
+      lastScrollOffsetRef.current = 0;
+      try { productsListRef.current?.scrollToOffset?.({ offset: 0, animated: true }); } catch (e) {}
       setProductsTimedOut(false);
       try { if (productsTimerId) clearTimeout(productsTimerId); } catch (e) {}
       setLocationProducts([]);
