@@ -1011,6 +1011,7 @@ const ProductDetailScreen = () => {
       };
       const createRes = await createInventoryItemInSection(locIdAfter, body);
       const newId = createRes?.guest_inventory_item_id ? String(createRes.guest_inventory_item_id) : undefined;
+      const createdAt = createRes?.created_at || createRes?.createdAt || new Date().toISOString();
       const created = {
         id: newId,
         locationId: String(locIdAfter),
@@ -1023,6 +1024,7 @@ const ProductDetailScreen = () => {
         expiryDate: body.expire_at,
         estimatedEndDate: body.expected_expire_at,
         iconUrl: body.icon_url || null,
+        createdAt,
         isConsumed: false
       };
       try {dispatch(upsertActiveProduct({ product: created }));} catch (e) {}
@@ -1313,6 +1315,7 @@ const ProductDetailScreen = () => {
           };
           const createRes = await createInventoryItemInSection(locIdAfter, body);
           const newId = createRes?.guest_inventory_item_id ? String(createRes.guest_inventory_item_id) : undefined;
+          const createdAt = createRes?.created_at || createRes?.createdAt || new Date().toISOString();
           const created = {
             id: newId,
             locationId: String(locIdAfter),
@@ -1325,6 +1328,7 @@ const ProductDetailScreen = () => {
             expiryDate: body.expire_at,
             estimatedEndDate: body.expected_expire_at,
             iconUrl: body.icon_url || null,
+            createdAt,
             isConsumed: false
           };
           try {dispatch(upsertActiveProduct({ product: created }));} catch (e) {}
@@ -1496,13 +1500,27 @@ const ProductDetailScreen = () => {
             null}
 
               <Text style={styles.formLabel}>유통기한</Text>
-              <TouchableOpacity
-              style={styles.datePickButton}
-              onPress={() => setShowExpiryDatePicker(true)}>
+              <View style={styles.datePickRow}>
+                <TouchableOpacity
+                style={[styles.datePickButton, { flex: 1 }]}
+                onPress={() => setShowExpiryDatePicker(true)}>
 
-                <Text style={styles.datePickButtonText}>{expiryDate ? formatDate(expiryDate) : '날짜 선택'}</Text>
-                <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
-              </TouchableOpacity>
+                  <Text style={styles.datePickButtonText}>{expiryDate ? formatDate(expiryDate) : '날짜 선택'}</Text>
+                  <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+                </TouchableOpacity>
+                {expiryDate ?
+                <TouchableOpacity
+                  style={styles.dateClearButton}
+                  onPress={() => {
+                    setShowExpiryDatePicker(false);
+                    setExpiryDate(null);
+                    setExpiryDateText('');
+                  }}>
+                  <Ionicons name="close-circle" size={18} color="#9E9E9E" />
+                  <Text style={styles.dateClearButtonText}>지우기</Text>
+                </TouchableOpacity> :
+                null}
+              </View>
               {showExpiryDatePicker && DateTimePicker ?
             <DateTimePicker
               value={expiryDate || new Date()}
@@ -1520,13 +1538,27 @@ const ProductDetailScreen = () => {
             null}
 
               <Text style={styles.formLabel}>소진 예상일</Text>
-              <TouchableOpacity
-              style={styles.datePickButton}
-              onPress={() => setShowEstimatedEndDatePicker(true)}>
+              <View style={styles.datePickRow}>
+                <TouchableOpacity
+                style={[styles.datePickButton, { flex: 1 }]}
+                onPress={() => setShowEstimatedEndDatePicker(true)}>
 
-                <Text style={styles.datePickButtonText}>{estimatedEndDate ? formatDate(estimatedEndDate) : '날짜 선택'}</Text>
-                <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
-              </TouchableOpacity>
+                  <Text style={styles.datePickButtonText}>{estimatedEndDate ? formatDate(estimatedEndDate) : '날짜 선택'}</Text>
+                  <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+                </TouchableOpacity>
+                {estimatedEndDate ?
+                <TouchableOpacity
+                  style={styles.dateClearButton}
+                  onPress={() => {
+                    setShowEstimatedEndDatePicker(false);
+                    setEstimatedEndDate(null);
+                    setEstimatedEndDateText('');
+                  }}>
+                  <Ionicons name="close-circle" size={18} color="#9E9E9E" />
+                  <Text style={styles.dateClearButtonText}>지우기</Text>
+                </TouchableOpacity> :
+                null}
+              </View>
               {showEstimatedEndDatePicker && DateTimePicker ?
             <DateTimePicker
               value={estimatedEndDate || new Date()}
@@ -2128,6 +2160,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     fontWeight: '600'
+  },
+  datePickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10
+  },
+  dateClearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    backgroundColor: '#FAFAFA'
+  },
+  dateClearButtonText: {
+    marginLeft: 4,
+    color: '#666',
+    fontSize: 12,
+    fontWeight: '700'
   },
   datePickerIosDone: {
     paddingHorizontal: 14,

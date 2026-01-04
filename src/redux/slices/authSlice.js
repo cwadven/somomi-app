@@ -2,7 +2,6 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, loadDeviceId, saveLocations, saveProducts, saveConsumedProducts, saveRefreshToken, removeRefreshToken, removeData, STORAGE_KEYS } from '../../utils/storageUtils';
 import { loginMember } from '../../api/memberApi';
 import { fetchGuestSectionTemplates } from '../../api/sectionApi';
-import { fetchGuestInventoryItemTemplates } from '../../api/inventoryApi';
 import { generateId } from '../../utils/idUtils';
 
 // 디바이스 기반 기본 템플릿 ID 생성기
@@ -247,28 +246,9 @@ export const loadUserProductSlotTemplateInstances = createAsyncThunk(
     try {
       const state = getState();
       const isLoggedIn = !!state?.auth?.isLoggedIn;
-      if (isLoggedIn) {
-        try {
-          const res = await fetchGuestInventoryItemTemplates();
-          const items = Array.isArray(res?.guest_inventory_item_templates) ? res.guest_inventory_item_templates : [];
-          if (items.length > 0) {
-            const mapped = items.map((it) => ({
-              id: String(it.id),
-              name: it.name,
-              description: it.description || '',
-              used: !!it.used,
-              assignedLocationId: it.assigned_in_section_id ? String(it.assigned_in_section_id) : null,
-              usedByProductId: it.used_in_inventory_item_id ? String(it.used_in_inventory_item_id) : null,
-              createdAt: it.created_at || new Date().toISOString(),
-              updatedAt: it.updated_at || new Date().toISOString()
-            }));
-            await saveUserProductSlotTemplates(mapped);
-            return mapped;
-          }
-        } catch (apiErr) {
-          console.warn('게스트 인벤토리 템플릿 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
-        }
-      } else {
+      // ✅ /v1/inventory/guest-templates 호출 제거 (요청사항)
+      // - 로그인/비로그인 모두 로컬 저장소(또는 locations.feature.connectedProductSlotTemplates) 기반으로만 동작
+      if (!isLoggedIn) {
         // 비로그인: 저장 금지 및 초기화
         try {await saveUserProductSlotTemplates([]);} catch (e) {}
         return [];

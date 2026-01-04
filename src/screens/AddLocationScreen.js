@@ -13,7 +13,7 @@ import {
 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { createLocation, updateLocation, fetchLocations } from '../redux/slices/locationsSlice';
 
 
@@ -36,7 +36,6 @@ import { fetchProductsByLocation } from '../redux/slices/productsSlice';
 import IconSelector from '../components/IconSelector';
 import AlertModal from '../components/AlertModal';
 import { isTemplateActive } from '../utils/validityUtils';
-import { fetchGuestInventoryItemTemplates } from '../api/inventoryApi';
 
 const AddLocationScreen = () => {
   const navigation = useNavigation();
@@ -85,46 +84,9 @@ const AddLocationScreen = () => {
   const currentLocationProducts = isEditMode && locationToEdit ? locationProducts?.[locationToEdit.id] || [] : [];
   const currentProductCount = currentLocationProducts.length;
   const currentProductIdSet = new Set(currentLocationProducts.map((p) => p.id));
-  const [remoteProductSlotTemplates, setRemoteProductSlotTemplates] = useState(null);
-
-  // 포커스 시 추가 제품 슬롯 템플릿을 API로 최신화
-  useFocusEffect(
-    React.useCallback(() => {
-      let alive = true;
-      (async () => {
-        try {
-          if (!isLoggedIn) {setRemoteProductSlotTemplates(null);return;}
-          const res = await fetchGuestInventoryItemTemplates();
-          const list = Array.isArray(res) ? res : Array.isArray(res?.guest_inventory_item_templates) ? res.guest_inventory_item_templates : res?.guest_inventory_item_template_products || [];
-          // 현재 편집 중 영역의 연결 템플릿에서 expiresAt 매핑 정보 준비
-          let expiresMap = new Map();
-          if (isEditMode && locationToEdit) {
-            const reduxLoc = (locationsList || []).find((l) => String(l.id) === String(locationToEdit.id));
-            const connected = reduxLoc?.feature?.connectedProductSlotTemplates || locationToEdit?.feature?.connectedProductSlotTemplates || [];
-            connected.forEach((ct) => {
-              expiresMap.set(String(ct.id), ct.expiresAt || null);
-            });
-          }
-
-          // 맵핑: assigned_in_section_id, used_in_inventory_item_id → 프론트 스키마 유사 + expiresAt 합류
-          const mapped = list.map((t) => ({
-            id: String(t.id || t.template_id || t.product_slot_template_id || t.product_id || Math.random()),
-            assignedLocationId: t.assigned_in_section_id ?? t.assigned_section_id ?? null,
-            usedByProductId: t.used_in_inventory_item_id ?? t.used_by_inventory_item_id ?? null,
-            feature: t.feature || t.template_feature || {},
-            used: !!t.used_in_inventory_item_id,
-            expiresAt: expiresMap.get(String(t.id)) || null
-          }));
-          if (alive) setRemoteProductSlotTemplates(mapped);
-        } catch (_) {
-          if (alive) setRemoteProductSlotTemplates(null);
-        }
-      })();
-      return () => {alive = false;};
-    }, [isLoggedIn])
-  );
-
-  const sourceProductSlotTemplates = Array.isArray(remoteProductSlotTemplates) ? remoteProductSlotTemplates : userProductSlotTemplateInstances || [];
+  // ✅ /v1/inventory/guest-templates 호출 제거 (요청사항)
+  // - 제품 슬롯 템플릿은 Redux(auth 저장소) 또는 섹션 API로 내려오는 connected 템플릿 기반으로만 사용
+  const sourceProductSlotTemplates = userProductSlotTemplateInstances || [];
   const usedProductSlotTemplatesInThisLocation = sourceProductSlotTemplates.filter((t) => t.used && currentProductIdSet.has(t.usedByProductId)).length;
   // 이 영역에 등록된 슬롯은 유효성 여부와 무관하게 표시 (만료/비활성도 포함)
   // 기준: 섹션 API의 connected_guest_inventory_item_templates (expires_at 포함)
