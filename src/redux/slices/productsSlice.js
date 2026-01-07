@@ -474,7 +474,27 @@ export const productsSlice = createSlice({
 
       // products(내 제품 목록) 업데이트
       const idx = state.products.findIndex(p => String(p.id) === id);
-      const prevLocId = idx !== -1 && state.products[idx]?.locationId != null ? String(state.products[idx].locationId) : null;
+      // prevLocId는 products 배열이 비어있는 경우가 있어(특정 영역만 fetch하는 화면) 캐시/현재상품에서도 추론해야 함
+      const prevLocIdFromPayload = action.payload?.prevLocationId != null ? String(action.payload.prevLocationId) : null;
+      const prevLocIdFromProducts = idx !== -1 && state.products[idx]?.locationId != null ? String(state.products[idx].locationId) : null;
+      const prevLocIdFromCurrent =
+        state.currentProduct && String(state.currentProduct.id) === id && state.currentProduct.locationId != null
+          ? String(state.currentProduct.locationId)
+          : null;
+      const prevLocIdFromCaches = (() => {
+        try {
+          const keys = Object.keys(state.locationProducts || {});
+          for (let i = 0; i < keys.length; i += 1) {
+            const locKey = keys[i];
+            if (locKey === 'all') continue;
+            const list = state.locationProducts[locKey];
+            if (!Array.isArray(list)) continue;
+            if (list.some(p => String(p?.id) === id)) return String(locKey);
+          }
+        } catch (e) {}
+        return null;
+      })();
+      const prevLocId = prevLocIdFromPayload || prevLocIdFromProducts || prevLocIdFromCurrent || prevLocIdFromCaches;
       if (idx !== -1) {
         state.products[idx] = { ...state.products[idx], ...patch };
       }
@@ -501,13 +521,13 @@ export const productsSlice = createSlice({
       });
 
       // ✅ locationId가 변경된 경우: 캐시 리스트 간 이동 처리
-      if (nextLocId && prevLocId && nextLocId !== prevLocId) {
+      if (prevLocId && nextLocId !== prevLocId) {
         // 이전 location 캐시에서 제거
         if (Array.isArray(state.locationProducts[prevLocId])) {
           state.locationProducts[prevLocId] = state.locationProducts[prevLocId].filter(p => String(p?.id) !== id);
         }
         // 새 location 캐시가 이미 존재하면(해당 화면에서 보고 있는 경우) 로컬에서 순서 변경 최소화: append
-        if (Array.isArray(state.locationProducts[nextLocId])) {
+        if (nextLocId && Array.isArray(state.locationProducts[nextLocId])) {
           const updated = idx !== -1 ? state.products[idx] : (state.currentProduct && String(state.currentProduct.id) === id ? state.currentProduct : null);
           if (updated && !state.locationProducts[nextLocId].some(p => String(p?.id) === id)) {
             state.locationProducts[nextLocId] = [...state.locationProducts[nextLocId], { ...updated }];

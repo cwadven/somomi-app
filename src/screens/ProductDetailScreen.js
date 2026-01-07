@@ -1001,6 +1001,7 @@ const ProductDetailScreen = () => {
 
     // edit (영역 변경 포함)
     if (!currentProduct?.id) return;
+    const prevLocId = currentProduct.locationId != null ? String(currentProduct.locationId) : null;
     const locIdAfter = selectedLocation?.id || currentProduct.locationId || null;
     const body = {
       guest_section_id: locIdAfter ? Number(locIdAfter) : null,
@@ -1018,6 +1019,7 @@ const ProductDetailScreen = () => {
     try {
       dispatch(patchProductById({
         id: String(currentProduct.id),
+        prevLocationId: prevLocId,
         patch: {
           iconUrl: body.icon_url,
           name: body.name,

@@ -216,17 +216,6 @@ const ProfileScreen = () => {
     setModalVisible(true);
   };
 
-  // 앱 정보 표시
-  const showAppInfo = () => {
-    setModalTitle('앱 정보');
-    setModalMessage('소모미 (SoMoMi) v1.0.0\n생활용품 리마인드 알림 앱');
-    setModalAction(null);
-    setModalButtons([
-    { text: '확인', onPress: () => setModalVisible(false) }]
-    );
-    setModalVisible(true);
-  };
-
   // 도움말 표시
   const showHelp = () => {
     navigation.navigate('RootHelp');
@@ -514,25 +503,26 @@ const ProfileScreen = () => {
           onPress={() => navigation.navigate('ConsumedProducts')} />
 
             
+            {/* NOTE: 아직 완전 배포 전이라 노출하지 않음 */}
+            {/*
             <SettingItem
-          icon="notifications-outline"
-          title="알림 목록"
-          onPress={() => navigation.navigate('Notifications')} />
+              icon="notifications-outline"
+              title="알림 목록"
+              onPress={() => navigation.navigate('Notifications')}
+            />
+            */}
 
-            
+            {/* NOTE: 아직 완전 배포 전이라 노출하지 않음 */}
+            {/*
             <SettingItem
-          icon="cart-outline"
-          title="상점"
-          onPress={() => navigation.navigate('Store')} />
+              icon="cart-outline"
+              title="상점"
+              onPress={() => navigation.navigate('Store')}
+            />
+            */}
 
           </>
       }
-        
-        <SettingItem
-        icon="information-circle-outline"
-        title="앱 정보"
-        onPress={showAppInfo} />
-
         
         <SettingItem
         icon="help-circle-outline"
@@ -543,7 +533,6 @@ const ProfileScreen = () => {
         {/* 문의하기(미구현): 추후 기능 추가 예정 */}
       </View>
 
-      {/* 앱 버전 표시는 앱 정보 화면에서 제공 */}
     </ScrollView>;
 
 
