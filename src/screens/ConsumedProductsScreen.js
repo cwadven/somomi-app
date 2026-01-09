@@ -30,27 +30,52 @@ import { fetchConsumedProducts } from '../redux/slices/productsSlice';
 const ConsumedProductsScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
-  // 정렬 상태: 서버 정렬만 사용 ('-consumed' | 'consumed')
-  const [sortDesc, setSortDesc] = useState(true);
+  // 정렬 상태: 서버 정렬만 사용
+  // - 기준1: 소진 등록(moved_to_consumed_section_at)
+  // - 기준2: 소진일(consumed_at)  ※ 기존 키 'consumed'를 유지
+  // - 기본값: 최신 소진 등록순(-moved_to_consumed_section)
+  const [activeSortField, setActiveSortField] = useState('moved_to_consumed_section'); // 'moved_to_consumed_section' | 'consumed'
+  const [regDesc, setRegDesc] = useState(true);
+  const [consumedDesc, setConsumedDesc] = useState(true);
   
   const { consumedProducts, consumedStatus, consumedLoadingMore, consumedMeta, error } = useSelector(state => state.products);
+
+  const currentSort = (() => {
+    const field = activeSortField === 'consumed' ? 'consumed' : 'moved_to_consumed_section';
+    const desc = field === 'consumed' ? consumedDesc : regDesc;
+    return `${desc ? '-' : ''}${field}`;
+  })();
 
   // 첫 진입 1회만 초기 로드
   const didInitialFetchRef = useRef(false);
   useEffect(() => {
     if (didInitialFetchRef.current) return;
     didInitialFetchRef.current = true;
-    const sort = sortDesc ? '-consumed' : 'consumed';
-    dispatch(fetchConsumedProducts({ size: 20, sort, append: false }));
+    dispatch(fetchConsumedProducts({ size: 20, sort: '-moved_to_consumed_section', append: false }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 정렬 칩 클릭 핸들러 (내림 ↔ 오름)
-  const handleSortPress = () => {
-    const nextDesc = !sortDesc;
-    setSortDesc(nextDesc);
-    const sort = nextDesc ? '-consumed' : 'consumed';
-    dispatch(fetchConsumedProducts({ size: 20, sort, append: false }));
+  // 정렬 칩 클릭 핸들러 (각 칩은 활성화 또는 오름/내림 토글)
+  const handleSortPress = (field) => {
+    const normalized = field === 'consumed' ? 'consumed' : 'moved_to_consumed_section';
+    const isActive = activeSortField === normalized;
+    if (!isActive) {
+      setActiveSortField(normalized);
+      const nextSort = normalized === 'consumed'
+        ? `${consumedDesc ? '-' : ''}consumed`
+        : `${regDesc ? '-' : ''}moved_to_consumed_section`;
+      dispatch(fetchConsumedProducts({ size: 20, sort: nextSort, append: false }));
+      return;
+    }
+    if (normalized === 'consumed') {
+      const nextDesc = !consumedDesc;
+      setConsumedDesc(nextDesc);
+      dispatch(fetchConsumedProducts({ size: 20, sort: `${nextDesc ? '-' : ''}consumed`, append: false }));
+    } else {
+      const nextDesc = !regDesc;
+      setRegDesc(nextDesc);
+      dispatch(fetchConsumedProducts({ size: 20, sort: `${nextDesc ? '-' : ''}moved_to_consumed_section`, append: false }));
+    }
   };
 
   // 화면 포커스 시 자동 재호출 방지: useFocusEffect 제거
@@ -58,9 +83,8 @@ const ConsumedProductsScreen = () => {
   const loadMore = useCallback(() => {
     if (consumedLoadingMore) return;
     if (!consumedMeta?.hasMore) return;
-    const sort = sortDesc ? '-consumed' : 'consumed';
-    dispatch(fetchConsumedProducts({ nextCursor: consumedMeta.nextCursor, size: 20, sort, append: true }));
-  }, [dispatch, consumedMeta, sortDesc, consumedLoadingMore]);
+    dispatch(fetchConsumedProducts({ nextCursor: consumedMeta.nextCursor, size: 20, sort: currentSort, append: true }));
+  }, [dispatch, consumedMeta, currentSort, consumedLoadingMore]);
   
   // 소진 처리된 날짜 포맷팅
   const formatConsumedDate = (dateString) => {
@@ -150,12 +174,33 @@ const ConsumedProductsScreen = () => {
       </View>
       
       <View style={styles.container}>
-        {/* 정렬 바 - LocationDetailScreen 스타일 준용, 기준은 소진 처리순만 */}
+        {/* 정렬 바: 서버 정렬만 사용 */}
         <View style={styles.sortBar}>
           <View style={styles.sortBarContent}>
-            <TouchableOpacity style={[styles.sortChip, styles.sortChipActive]} onPress={handleSortPress}>
-              <Text style={[styles.sortChipText, styles.sortChipTextActive]}>소진순</Text>
-              <Ionicons name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color="#4CAF50" style={styles.sortChipArrow} />
+            {/* ✅ 버튼 순서: "소진 등록"이 앞에 */}
+            <TouchableOpacity
+              style={[styles.sortChip, activeSortField === 'moved_to_consumed_section' ? styles.sortChipActive : null]}
+              onPress={() => handleSortPress('moved_to_consumed_section')}
+            >
+              <Text style={[styles.sortChipText, activeSortField === 'moved_to_consumed_section' ? styles.sortChipTextActive : null]}>소진 등록순</Text>
+              <Ionicons
+                name={regDesc ? 'arrow-down' : 'arrow-up'}
+                size={14}
+                color={activeSortField === 'moved_to_consumed_section' ? '#4CAF50' : '#9E9E9E'}
+                style={styles.sortChipArrow}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sortChip, activeSortField === 'consumed' ? styles.sortChipActive : null]}
+              onPress={() => handleSortPress('consumed')}
+            >
+              <Text style={[styles.sortChipText, activeSortField === 'consumed' ? styles.sortChipTextActive : null]}>소진순</Text>
+              <Ionicons
+                name={consumedDesc ? 'arrow-down' : 'arrow-up'}
+                size={14}
+                color={activeSortField === 'consumed' ? '#4CAF50' : '#9E9E9E'}
+                style={styles.sortChipArrow}
+              />
             </TouchableOpacity>
           </View>
         </View>

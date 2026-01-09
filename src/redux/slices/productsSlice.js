@@ -332,11 +332,8 @@ export const markProductAsConsumedAsync = createAsyncThunk(
       // 제품이 소진된 후 전체 제품 목록과 소진된 제품 목록을 AsyncStorage에 저장
       const { products, consumedProducts } = getState().products;
       const updatedProducts = products.filter(p => p.id !== id);
-      const updatedConsumedProducts = [...consumedProducts, response].sort((a, b) => {
-        const ta = a.processedAt ? new Date(a.processedAt).getTime() : (a.consumedAt ? new Date(a.consumedAt).getTime() : 0);
-        const tb = b.processedAt ? new Date(b.processedAt).getTime() : (b.consumedAt ? new Date(b.consumedAt).getTime() : 0);
-        return tb - ta;
-      });
+      // ✅ 백엔드 정렬을 신뢰: 로컬에서 소진 목록 순서를 재정렬하지 않음
+      const updatedConsumedProducts = [...consumedProducts, response];
       
       await saveProducts(updatedProducts);
       await saveConsumedProducts(updatedConsumedProducts);
@@ -362,7 +359,7 @@ export const fetchConsumedProducts = createAsyncThunk(
       const isObj = typeof arg === 'object' && arg !== null;
       const nextCursorParam = isObj ? (arg.nextCursor || null) : null;
       const sizeParam = isObj && arg.size != null ? arg.size : null;
-      const sortParam = isObj ? (arg.sort || null) : (state.products?.consumedMeta?.sort || '-consumed');
+      const sortParam = isObj ? (arg.sort || null) : (state.products?.consumedMeta?.sort || '-moved_to_consumed_section');
       const append = isObj ? !!arg.append : false;
       if (isLoggedIn) {
         try {
@@ -452,7 +449,9 @@ const initialState = {
   currentProduct: null,
   locationProducts: {}, // 영역별 제품 목록 캐시 (array)
   locationProductsMeta: {}, // { [locationId]: { nextCursor, hasMore } }
-  consumedMeta: { nextCursor: null, hasMore: false, sort: '-consumed' }, // 소진 목록 메타
+  // 소진 목록 정렬: moved_to_consumed_section(소진 등록 시각) 기준
+  // - 기본값은 최신 소진 등록순: -moved_to_consumed_section
+  consumedMeta: { nextCursor: null, hasMore: false, sort: '-moved_to_consumed_section' }, // 소진 목록 메타
 };
 
 export const productsSlice = createSlice({
@@ -718,11 +717,6 @@ export const productsSlice = createSlice({
         // 소진 처리된 제품 목록에 추가 (이미 있는 경우 중복 방지)
         if (!state.consumedProducts.some(p => p.id === action.payload.id)) {
           state.consumedProducts.push(action.payload);
-          state.consumedProducts.sort((a, b) => {
-            const ta = a.processedAt ? new Date(a.processedAt).getTime() : (a.consumedAt ? new Date(a.consumedAt).getTime() : 0);
-            const tb = b.processedAt ? new Date(b.processedAt).getTime() : (b.consumedAt ? new Date(b.consumedAt).getTime() : 0);
-            return tb - ta;
-          });
         }
         // 현재 제품 상태 유지 (null로 설정하지 않음)
         
@@ -751,7 +745,7 @@ export const productsSlice = createSlice({
       })
       .addCase(fetchConsumedProducts.fulfilled, (state, action) => {
         const payload = action.payload || {};
-        const { items = [], nextCursor = null, hasMore = false, append = false, sort = '-consumed' } = payload;
+        const { items = [], nextCursor = null, hasMore = false, append = false, sort = '-moved_to_consumed_section' } = payload;
         if (append) {
           state.consumedLoadingMore = false;
           state.consumedProducts = [...state.consumedProducts, ...items];
