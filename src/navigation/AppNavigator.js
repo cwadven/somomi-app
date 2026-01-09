@@ -244,7 +244,8 @@ const AppNavigator = ({ linking }) => {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
-      <SafeAreaView style={{ flex: 1 }}>
+      {/* 탭바가 바닥에서 떠 보이는 현상 방지: 전체 SafeArea를 bottom까지 적용하지 않음 */}
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <NavigationContainer
           ref={navigationRef}
           linking={linking}
