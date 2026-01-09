@@ -699,3 +699,14 @@ Local 실행
 ```
 npx expo start --reset-cache
 ```
+
+
+빌드 할 때, PermissionsService.kt 에서 
+
+```kotlin
+context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)?.run {
+      return requestedPermissions?.contains(permission) == true
+    }
+```
+
+이부분 null safe 처리
