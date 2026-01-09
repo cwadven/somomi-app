@@ -1,49 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
-
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  ScrollView,
-  Platform,
-  Modal,
-  TextInput,
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
-  Linking } from
-'react-native';
-import { useSelector, useDispatch } from 'react-redux';
-import { useNavigation, useRoute } from '@react-navigation/native';
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { logout, updateUserInfo } from '../redux/slices/authSlice';
-import { fetchMemberProfile, updateMemberProfile } from '../api/memberApi';
+import { useDispatch, useSelector } from 'react-redux';
+
 import { givePresignedUrl } from '../api/commonApi';
+import { fetchMemberProfile, updateMemberProfile } from '../api/memberApi';
 import NotificationSettings from '../components/NotificationSettings';
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-import { loadSyncQueue } from '../utils/storageUtils';
+import { navigate as rootNavigate } from '../navigation/RootNavigation';
+import { logout, updateUserInfo } from '../redux/slices/authSlice';
 import AlertModal from '../components/AlertModal';
+import { loadSyncQueue } from '../utils/storageUtils';
 
 const ProfileScreen = () => {
   const dispatch = useDispatch();
@@ -528,6 +510,12 @@ const ProfileScreen = () => {
         icon="help-circle-outline"
         title="도움말"
         onPress={showHelp} />
+
+        <SettingItem
+          icon="document-text-outline"
+          title="개인정보처리방침"
+          onPress={() => rootNavigate('PrivacyPolicyWebView', { title: '개인정보처리방침' })}
+        />
 
         
         {/* 문의하기(미구현): 추후 기능 추가 예정 */}

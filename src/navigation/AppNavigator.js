@@ -27,6 +27,7 @@ import HelpScreen from '../screens/HelpScreen';
 // 결제 결과 딥링크 스크린 제거
 import PaymentWebViewScreen from '../screens/PaymentWebViewScreen';
 import ContentWebViewScreen from '../screens/ContentWebViewScreen';
+import PrivacyPolicyWebViewScreen from '../screens/PrivacyPolicyWebViewScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -258,6 +259,7 @@ const AppNavigator = ({ linking }) => {
             <RootStack.Screen name="RootHelp" component={HelpScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
             <RootStack.Screen name="PaymentWebView" component={PaymentWebViewScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
             <RootStack.Screen name="ContentWebView" component={ContentWebViewScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
+            <RootStack.Screen name="PrivacyPolicyWebView" component={PrivacyPolicyWebViewScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
             <RootStack.Screen name="Store" component={StoreScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
           </RootStack.Navigator>
         </NavigationContainer>

@@ -710,3 +710,7 @@ context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PE
 ```
 
 이부분 null safe 처리
+
+# 안드로이드 배포 방법
+
+앱 올릴 때 마다 build.gradle 에 있는 versionCode 올려야함.
