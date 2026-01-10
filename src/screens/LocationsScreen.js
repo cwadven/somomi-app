@@ -66,7 +66,7 @@ const LocationsScreen = () => {
   const route = useRoute();
   
   const { locations, status, error } = useSelector(state => state.locations);
-  const { isAnonymous, isLoggedIn, userLocationTemplateInstances, subscription } = useSelector(state => state.auth);
+  const { isAnonymous, isLoggedIn, userLocationTemplateInstances, subscription, locationTemplatesStatus } = useSelector(state => state.auth);
 
   // 자동 연동 모달 제거 (요청사항)
  
@@ -242,6 +242,19 @@ const LocationsScreen = () => {
   };
 
   const handleLocationPress = (location) => {
+    // 템플릿 정보가 아직 로드되지 않은 상태(앱 재실행 직후 캐시만 있는 상태)에서는
+    // "템플릿 미연동" 같은 오판단을 막기 위해 잠시 대기 안내만 보여줌
+    if (isLoggedIn && locationTemplatesStatus !== 'succeeded') {
+      setAlertModalConfig({
+        title: '불러오는 중',
+        message: '템플릿 정보를 불러오는 중입니다.\n잠시만 기다려주세요.',
+        icon: 'time-outline',
+        iconColor: '#4CAF50',
+        buttons: [{ text: '확인', style: 'plain', onPress: () => setAlertModalVisible(false) }],
+      });
+      setAlertModalVisible(true);
+      return;
+    }
     // 만료된 경우에도 상세 진입은 허용하되, 내부에서 수정으로 변경 유도
     // 로그인 상태에서 템플릿에 연동되지 않은 영역은 접근 차단
     const linked = userLocationTemplateInstances.some(t => t.usedInLocationId === location.id);
@@ -469,7 +482,7 @@ const LocationsScreen = () => {
                             {item.description}
                           </Text>
                         ) : null}
-                        {isLoggedIn && !userLocationTemplateInstances.some(t => t.usedInLocationId === item.id) && (
+                        {isLoggedIn && locationTemplatesStatus === 'succeeded' && !userLocationTemplateInstances.some(t => t.usedInLocationId === item.id) && (
                           <Text style={{ color: '#F44336', marginTop: 4, fontSize: 12 }}>
                             템플릿 미연동(비활성화)
                           </Text>

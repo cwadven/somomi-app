@@ -294,6 +294,8 @@ const initialState = {
   deviceId: null,
   loading: false,
   error: null,
+  // 템플릿 로드 상태(내 영역 목록에서 "미연동" 판단을 너무 일찍 하지 않도록 분리)
+  locationTemplatesStatus: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
   subscription: {
     isSubscribed: false,
     plan: null, // 'basic', 'premium', 'pro' 등
@@ -426,6 +428,7 @@ export const authSlice = createSlice({
       state.points = initialState.points;
       state.purchaseHistory = [];
       state.pointHistory = [];
+      state.locationTemplatesStatus = 'idle';
       // 템플릿 인스턴스를 비회원 상태로 초기화
       console.log('로그아웃: 템플릿 인스턴스 초기화');
       const defaults = createAnonymousDefaultTemplates(state.deviceId || 'unknown', []);
@@ -847,14 +850,17 @@ export const authSlice = createSlice({
     // 사용자 영역 템플릿 인스턴스 로드 처리
     .addCase(loadUserLocationTemplateInstances.pending, (state) => {
       state.loading = true;
+      state.locationTemplatesStatus = 'loading';
     }).
     addCase(loadUserLocationTemplateInstances.fulfilled, (state, action) => {
       state.loading = false;
+      state.locationTemplatesStatus = 'succeeded';
       state.userLocationTemplateInstances = action.payload;
       console.log('사용자 영역 템플릿 인스턴스 로드 완료:', action.payload);
     }).
     addCase(loadUserLocationTemplateInstances.rejected, (state, action) => {
       state.loading = false;
+      state.locationTemplatesStatus = 'failed';
       state.error = action.payload;
       console.error('사용자 영역 템플릿 인스턴스 로드 실패:', action.payload);
     })
