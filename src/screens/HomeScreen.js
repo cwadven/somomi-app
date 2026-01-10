@@ -21,7 +21,7 @@ const ToastAndroid = Platform.OS === 'android' ? require('react-native').ToastAn
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { navigate as rootNavigate } from '../navigation/RootNavigation';
-import { fetchManageTipsApi } from '../api/promotionApi';
+import { fetchManageTipsApi, fetchPromotionBannersApi } from '../api/promotionApi';
 
 const { width } = Dimensions.get('window');
 
@@ -31,7 +31,11 @@ const HomeScreen = ({ navigation }) => {
   const flatListRef = useRef(null);
 
   // 배너 데이터
-  const banners = [];
+  const [banners, setBanners] = useState([]);
+  const [bannersLoading, setBannersLoading] = useState(false);
+  const [bannersError, setBannersError] = useState('');
+  const bannerAutoTimerRef = useRef(null);
+  const bannerUserInteractingRef = useRef(false);
 
   // 관리 팁 데이터
   const [tips, setTips] = useState([]);
@@ -57,6 +61,70 @@ const HomeScreen = ({ navigation }) => {
       }
     })();
     return () => { mounted = false; };
+  }, []);
+
+  // 홈 상단 배너 로드
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setBannersLoading(true);
+        setBannersError('');
+        const res = await fetchPromotionBannersApi({ target_layer: 'HOME_TOP', page: 1, size: 10 });
+        const list = Array.isArray(res?.banners) ? res.banners : [];
+        if (!mounted) return;
+        setBanners(list);
+        setCurrentBannerIndex(0);
+      } catch (e) {
+        if (!mounted) return;
+        setBanners([]);
+        setBannersError('배너를 불러오지 못했습니다.');
+      } finally {
+        if (mounted) setBannersLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // 배너 3초 자동 슬라이드
+  useEffect(() => {
+    if (!banners || banners.length <= 1) return () => {};
+    if (bannerUserInteractingRef.current) return () => {};
+    if (bannerAutoTimerRef.current) clearInterval(bannerAutoTimerRef.current);
+    bannerAutoTimerRef.current = setInterval(() => {
+      try {
+        if (bannerUserInteractingRef.current) return;
+        const next = (currentBannerIndex + 1) % banners.length;
+        flatListRef.current?.scrollToOffset?.({ offset: next * width, animated: true });
+      } catch (e) {}
+    }, 3000);
+    return () => {
+      if (bannerAutoTimerRef.current) clearInterval(bannerAutoTimerRef.current);
+      bannerAutoTimerRef.current = null;
+    };
+  }, [banners, currentBannerIndex]);
+
+  const pickBannerImage = useCallback((banner) => {
+    const w = width;
+    const big = banner?.big_image;
+    const mid = banner?.middle_image;
+    const small = banner?.small_image;
+    const ordered = w >= 720 ? [big, mid, small] : (w >= 390 ? [mid, big, small] : [small, mid, big]);
+    const uri = ordered.find((x) => typeof x === 'string' && x.trim() !== '') || null;
+    return uri;
+  }, []);
+
+  const handleBannerPress = useCallback((banner) => {
+    const external = banner?.external_target_url;
+    const targetPk = banner?.target_pk;
+    const title = banner?.title || '콘텐츠';
+    if (external && typeof external === 'string' && external.trim() !== '') {
+      rootNavigate('ExternalWebView', { url: external, title });
+      return;
+    }
+    if (targetPk != null && String(targetPk).trim() !== '') {
+      rootNavigate('ContentWebView', { contentId: String(targetPk), title });
+    }
   }, []);
 
   // 뒤로가기 버튼 처리
@@ -99,20 +167,55 @@ const HomeScreen = ({ navigation }) => {
   );
 
   // 배너 렌더링
-  const renderBanner = ({ item }) => (
-    <TouchableOpacity style={styles.bannerItem}>
-      <View style={styles.bannerContent}>
-        <Text style={styles.bannerTitle}>{item.title}</Text>
-        <Text style={styles.bannerDescription}>{item.description}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderBanner = ({ item }) => {
+    const bg = typeof item?.background_color === 'string' && item.background_color.trim() !== '' ? item.background_color : '#4CAF50';
+    const titleColor = typeof item?.title_font_color === 'string' && item.title_font_color.trim() !== '' ? item.title_font_color : '#ffffff';
+    const descColor = typeof item?.description_font_color === 'string' && item.description_font_color.trim() !== '' ? item.description_font_color : 'rgba(255,255,255,0.92)';
+    const uri = pickBannerImage(item);
+    const clickable = !!(item?.external_target_url || item?.target_pk);
+    const { Image } = require('react-native');
+    return (
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={[styles.bannerItem, { backgroundColor: bg }]}
+        onPress={() => (clickable ? handleBannerPress(item) : null)}
+        disabled={!clickable}
+      >
+        <View style={styles.bannerInner}>
+          {uri ? (
+            <Image source={{ uri }} style={styles.bannerImage} resizeMode="cover" />
+          ) : null}
+          <View style={styles.bannerOverlay}>
+            {!!item?.title && (
+              <Text style={[styles.bannerTitle, { color: titleColor }]} numberOfLines={1}>
+                {item.title}
+              </Text>
+            )}
+            {!!item?.description && (
+              <Text style={[styles.bannerDescription, { color: descColor }]} numberOfLines={2}>
+                {item.description}
+              </Text>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   // 배너 스크롤 이벤트 핸들러
-  const handleBannerScroll = (event) => {
+  const handleBannerScrollEnd = (event) => {
     const scrollPosition = event.nativeEvent.contentOffset.x;
     const index = Math.round(scrollPosition / width);
     setCurrentBannerIndex(index);
+    bannerUserInteractingRef.current = false;
+  };
+
+  const handleBannerScrollBeginDrag = () => {
+    bannerUserInteractingRef.current = true;
+    if (bannerAutoTimerRef.current) {
+      clearInterval(bannerAutoTimerRef.current);
+      bannerAutoTimerRef.current = null;
+    }
   };
 
   const handleTipPress = useCallback((tip) => {
@@ -152,8 +255,12 @@ const HomeScreen = ({ navigation }) => {
       </View>
       
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* 배너 섹션 (데이터가 있을 때만 표시) */}
-        {banners.length > 0 && (
+        {/* 배너 섹션 (관리팁 위) */}
+        {bannersLoading ? (
+          <View style={styles.bannerSection}>
+            <View style={[styles.bannerItem, { backgroundColor: '#e8f5e9' }]} />
+          </View>
+        ) : banners.length > 0 ? (
           <View style={styles.bannerSection}>
             <FlatList
               ref={flatListRef}
@@ -161,10 +268,13 @@ const HomeScreen = ({ navigation }) => {
               showsHorizontalScrollIndicator={false}
               data={banners}
               renderItem={renderBanner}
-              keyExtractor={item => String(item.id)}
+              keyExtractor={item => String(item.banner_id)}
               pagingEnabled
-              snapToAlignment="center"
-              onScroll={handleBannerScroll}
+              snapToAlignment="start"
+              disableIntervalMomentum
+              scrollEventThrottle={16}
+              onScrollBeginDrag={handleBannerScrollBeginDrag}
+              onMomentumScrollEnd={handleBannerScrollEnd}
               decelerationRate="fast"
               snapToInterval={width}
             />
@@ -174,7 +284,11 @@ const HomeScreen = ({ navigation }) => {
               </Text>
             </View>
           </View>
-        )}
+        ) : bannersError ? (
+          <View style={styles.bannerSection}>
+            <Text style={{ paddingHorizontal: 16, color: '#d32f2f' }}>{bannersError}</Text>
+          </View>
+        ) : null}
         
         {/* 팁 섹션 */}
         <View style={styles.section}>
@@ -250,10 +364,25 @@ const styles = StyleSheet.create({
   },
   bannerItem: {
     width: width,
-    height: 150,
+    height: Math.max(140, Math.min(200, Math.round(width * 0.42))),
     backgroundColor: '#4CAF50',
     justifyContent: 'center',
-    padding: 16,
+    overflow: 'hidden',
+  },
+  bannerInner: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  bannerOverlay: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 14,
   },
   bannerContent: {
     flex: 1,

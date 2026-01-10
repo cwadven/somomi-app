@@ -260,22 +260,22 @@ const LocationDetailScreen = () => {
 
     // 캐시가 없으면 로컬 필터 폴백
     if (isAllProductsView) {
-      const activeLocIds = new Set(
-        (locations || [])
-          .filter(loc => loc && loc.disabled !== true && !isLocExpired(loc))
-          .map(loc => loc.id)
-      );
-      const fallback = (products || []).filter(p => {
+        const activeLocIds = new Set(
+          (locations || [])
+            .filter(loc => loc && loc.disabled !== true && !isLocExpired(loc))
+            .map(loc => loc.id)
+        );
+        const fallback = (products || []).filter(p => {
         const k = p.locationLocalId || p.locationId;
         return !!k && activeLocIds.has(k) && p.syncStatus !== 'deleted' && !p.isConsumed;
-      });
-      setLocationProducts(fallback);
-    } else {
-      const filteredProducts = (products || []).filter(product =>
+        });
+        setLocationProducts(fallback);
+      } else {
+        const filteredProducts = (products || []).filter(product => 
         String(product.locationId) === String(locationId) && product.syncStatus !== 'deleted' && !product.isConsumed
-      );
-      setLocationProducts(filteredProducts);
-    }
+        );
+        setLocationProducts(filteredProducts);
+      }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, locationProductsCache, locationId, isAllProductsView, locations, isLocExpired, locationProducts.length]);
 

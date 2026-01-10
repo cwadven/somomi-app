@@ -1,11 +1,11 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import {
+import { 
 
-fetchProductByIdApi,
-addProductApi,
-updateProductApi,
+  fetchProductByIdApi, 
+  addProductApi, 
+  updateProductApi, 
 
-markProductAsConsumedApi,
+  markProductAsConsumedApi,
 
 restoreConsumedProductApi } from
 '../../api/productsApi';

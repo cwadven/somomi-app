@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
+import { 
 
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
+  View, 
+  Text, 
+  StyleSheet, 
+  TextInput, 
+  TouchableOpacity, 
   ScrollView,
 
   ActivityIndicator,
@@ -41,17 +41,17 @@ const AddLocationScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const dispatch = useDispatch();
-
+  
   // 수정 모드 여부 확인
   const isEditMode = route.params?.isEditMode || false;
   const locationToEdit = route.params?.location;
-
+  
   // 템플릿 인스턴스 및 구독 상태
   const { userLocationTemplateInstances, slots, userProductSlotTemplateInstances, subscription, isLoggedIn } = useSelector((state) => state.auth);
   const additionalProductSlots = slots?.productSlots?.additionalSlots || 0;
   const { locationProducts } = useSelector((state) => state.products);
   const { locations: locationsList } = useSelector((state) => state.locations);
-
+  
   // 만료 템플릿 판단: 정책 기반(validWhile) 또는 expiresAt
   const isTemplateExpired = (t) => {
     if (!t) return false;
@@ -73,10 +73,10 @@ const AddLocationScreen = () => {
   userLocationTemplateInstances.find((t) => t.id === locationToEdit.templateInstanceId) ||
   userLocationTemplateInstances.find((t) => t.usedInLocationId === locationToEdit.id) || (
   locationToEdit.feature ? {
-    id: 'derived_current_template',
-    name: locationToEdit.title || '현재 템플릿',
-    description: locationToEdit.description || '',
-    icon: locationToEdit.icon || 'cube-outline',
+          id: 'derived_current_template',
+          name: locationToEdit.title || '현재 템플릿',
+          description: locationToEdit.description || '',
+          icon: locationToEdit.icon || 'cube-outline',
     feature: locationToEdit.feature
   } : null) :
 
@@ -112,9 +112,9 @@ const AddLocationScreen = () => {
   const assignedActiveTemplatesForThisLocation = assignedProductSlotTemplatesForThisLocation.filter((t) => !isAssignedExpired(t));
   const assignedActiveCountForThisLocation = assignedActiveTemplatesForThisLocation.length;
   const availableProductSlotTemplates = sourceProductSlotTemplates.filter((t) => !t.used && !t.assignedLocationId && isTemplateActive(t, subscription));
-
+ 
   // 스테이징 계산은 아래 선언 이후에 수행됩니다.
-
+  
   // 사용자의 템플릿 인스턴스 목록 콘솔 출력 및 템플릿 부족 확인
   useEffect(() => {
     // 컴포넌트 마운트 시 한 번만 실행되는 로직
@@ -122,16 +122,16 @@ const AddLocationScreen = () => {
       console.log('사용자의 현재 템플릿 인스턴스 목록:', userLocationTemplateInstances);
       console.log('사용 가능한 템플릿 인스턴스 목록:', availableTemplates);
       console.log('사용 중인 템플릿 인스턴스 목록:', userLocationTemplateInstances.filter((template) => template.used));
-
+      
       // 수정 모드가 아니고 사용 가능한 템플릿이 없는 경우 뒤로 가기
       if (!isEditMode && availableTemplates.length === 0) {
         setAlertModalConfig({
           title: '템플릿 부족',
           message: '사용 가능한 영역 템플릿이 없습니다. 영역 목록으로 돌아갑니다.',
           buttons: [
-          {
-            text: '확인',
-            onPress: () => navigation.goBack()
+            { 
+              text: '확인',
+              onPress: () => navigation.goBack()
           }],
 
           icon: 'alert-circle',
@@ -140,10 +140,10 @@ const AddLocationScreen = () => {
         setAlertModalVisible(true);
       }
     };
-
+    
     // 초기 실행
     checkTemplates();
-
+    
     // 이 useEffect는 컴포넌트 마운트 시 한 번만 실행
   }, []);
 
@@ -176,7 +176,7 @@ const AddLocationScreen = () => {
     groups[productId].push(template);
     return groups;
   }, {});
-
+  
   // 상태 관리
   const [selectedTemplateInstance, setSelectedTemplateInstance] = useState(null);
   const [selectedEditTemplateInstance, setSelectedEditTemplateInstance] = useState(null);
@@ -206,7 +206,7 @@ const AddLocationScreen = () => {
   const draftSelectedTemplateIdRef = useRef(null);
   const pendingNavActionRef = useRef(null);
   const isNavigatingAwayRef = useRef(false);
-
+  
   // 스테이징 미리보기 계산 (선언 이후)
   const stagedAssignCount = stagedAssignTemplateIds.length;
   const stagedUnassignCount = stagedUnassignTemplateIds.length;
@@ -308,7 +308,7 @@ const AddLocationScreen = () => {
 
 
 
-
+  
   // 선택된 템플릿이 있으면 기본 정보 설정 (생성 모드에서만)
   useEffect(() => {
     if (selectedTemplateInstance && !isEditMode) {
@@ -327,7 +327,7 @@ const AddLocationScreen = () => {
       setSelectedTemplateInstance(availableTemplates[0]);
     }
   }, [availableTemplates, selectedTemplateInstance, isEditMode]);
-
+  
   // 초안 로드 (생성 모드에서만) - 최초 1회만 로드
   useEffect(() => {
 
@@ -381,8 +381,8 @@ const AddLocationScreen = () => {
         templateInstanceId: selectedEditTemplateInstance?.id || original.templateInstanceId
       };
       const basicChanged =
-      original.title !== current.title ||
-      original.description !== current.description ||
+        original.title !== current.title ||
+        original.description !== current.description ||
       original.icon !== current.icon;
 
       const templateChanged = original.templateInstanceId !== current.templateInstanceId;
@@ -404,7 +404,7 @@ const AddLocationScreen = () => {
       icon: 'help-circle',
       iconColor: '#FF9800',
       buttons: [
-      { text: '취소', style: 'cancel' },
+        { text: '취소', style: 'cancel' },
       { text: '나가기', onPress: onConfirm }]
 
     });
@@ -429,7 +429,7 @@ const AddLocationScreen = () => {
     });
     return unsubscribe;
   }, [navigation, isEditMode, locationData.title, locationData.description, locationData.icon, selectedEditTemplateInstance, stagedAssignTemplateIds, stagedUnassignTemplateIds]);
-
+  
   // 입력값 변경 핸들러
   const handleInputChange = (key, value) => {
     setLocationData({
@@ -437,7 +437,7 @@ const AddLocationScreen = () => {
       [key]: value
     });
   };
-
+  
   // 아이콘 선택 핸들러
   const handleIconSelect = (icon) => {
     setLocationData({
@@ -446,7 +446,7 @@ const AddLocationScreen = () => {
     });
     setIsIconSelectorVisible(false);
   };
-
+  
   // 템플릿 인스턴스 선택 핸들러 (생성)
   const handleTemplateSelect = (template) => {
     setSelectedTemplateInstance(template);
@@ -455,7 +455,7 @@ const AddLocationScreen = () => {
   const handleEditTemplateSelect = (template) => {
     setSelectedEditTemplateInstance(template);
   };
-
+  
   // 영역 생성/수정 버튼 클릭 핸들러
   const handleCreateLocation = async () => {
     if (hasSubmittedRef.current) return;
@@ -473,10 +473,10 @@ const AddLocationScreen = () => {
       setAlertModalVisible(true);
       return;
     }
-
+    
     // 수정 모드가 아니고 템플릿이 선택되지 않은 경우에만 검증
     if (!selectedTemplateInstance && !isEditMode) {
-      setAlertModalConfig({
+    setAlertModalConfig({
         title: '선택 오류',
         message: '템플릿을 선택해주세요.',
         buttons: [
@@ -484,14 +484,14 @@ const AddLocationScreen = () => {
 
         icon: 'alert-circle',
         iconColor: '#F44336'
-      });
-      setAlertModalVisible(true);
+    });
+    setAlertModalVisible(true);
       return;
     }
-
+    
     hasSubmittedRef.current = true;
     setIsLoading(true);
-
+    
     try {
       if (isEditMode) {
         // 영역 수정 로직
@@ -500,12 +500,12 @@ const AddLocationScreen = () => {
           locationId: locationToEdit.id,
           selectedEditTemplateInstance
         });
-
+        
         let newTemplateInstanceId = locationToEdit.templateInstanceId;
         let newProductId = locationToEdit.productId;
         let newFeature = locationToEdit.feature;
         const changingTemplate = selectedEditTemplateInstance && selectedEditTemplateInstance.id !== locationToEdit.templateInstanceId;
-
+        
         if (changingTemplate) {
           // 이전 템플릿을 해제하여 만료된 상태 표기가 남지 않도록 정리
           try {
@@ -528,13 +528,13 @@ const AddLocationScreen = () => {
               iconColor: '#F44336'
             });
             setAlertModalVisible(true);
-            return;
+      return;
           }
           newTemplateInstanceId = selectedEditTemplateInstance.id;
           newProductId = selectedEditTemplateInstance.productId;
           newFeature = selectedEditTemplateInstance.feature;
         }
-
+        
         // 영역 수정 API 호출 (실패 시 모달 표시 후 중단)
         let updatedLocation = null;
         try {
@@ -587,21 +587,21 @@ const AddLocationScreen = () => {
             iconColor: '#F44336'
           });
           setAlertModalVisible(true);
-          return;
-        }
-
+      return;
+    }
+    
         // 스테이징 초기화
         setStagedAssignTemplateIds([]);
         setStagedUnassignTemplateIds([]);
-
+        
         setIsLoading(false);
-
+        
         // 성공 후 스택을 재구성: [영역 목록, 영역 상세]로 리셋하여 뒤로가기 한 번에 목록으로 복귀
         try {dispatch(fetchProductsByLocation(String(locationToEdit.id)));} catch (e) {}
         navigation.reset({
           index: 1,
           routes: [
-          { name: 'LocationsScreen' },
+            { name: 'LocationsScreen' },
           { name: 'LocationDetail', params: { locationId: String(locationToEdit.id) } }]
 
         });
@@ -611,39 +611,39 @@ const AddLocationScreen = () => {
           locationData,
           selectedTemplateInstance
         });
-
+        
         // 영역 생성 API 호출
         const result = await dispatch(createLocation({
-          ...locationData,
+        ...locationData,
           templateInstanceId: selectedTemplateInstance.id,
           productId: selectedTemplateInstance.productId,
           feature: selectedTemplateInstance.feature
         })).unwrap();
-
+        
         console.log('영역 생성 성공:', result);
-
+        
         // 생성된 영역 ID로 템플릿 인스턴스를 사용됨으로 표시
         dispatch(markTemplateInstanceAsUsed({
           templateId: selectedTemplateInstance.id,
           locationId: result.id
         }));
-
+        
         setIsLoading(false);
-
+        
         // 영역 목록 화면으로 돌아가기
         console.log('영역 생성 완료, 영역 목록 화면으로 이동');
-
+        
         // 성공 메시지 표시 후 내 영역 탭으로 이동
         setAlertModalConfig({
           title: '성공',
           message: '영역이 성공적으로 생성되었습니다.',
           buttons: [
-          {
-            text: '확인',
-            onPress: () => {
-              // 스택의 최상위 화면(영역 목록)으로 이동
-              navigation.popToTop();
-            }
+            {
+              text: '확인',
+              onPress: () => {
+                // 스택의 최상위 화면(영역 목록)으로 이동
+                navigation.popToTop();
+              }
           }],
 
           icon: 'checkmark-circle',
@@ -704,7 +704,7 @@ const AddLocationScreen = () => {
 
 
 
-
+  
   // baseSlots 값을 표시하는 함수
   const renderSlotCount = (baseSlots) => {
     if (baseSlots === -1) {
@@ -712,7 +712,7 @@ const AddLocationScreen = () => {
     }
     return `${baseSlots}개`;
   };
-
+  
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* 헤더 */}
@@ -727,7 +727,7 @@ const AddLocationScreen = () => {
       <ScrollView style={styles.container}>
         {/* 템플릿 선택 섹션 (생성 모드에서만 표시) */}
         {!isEditMode &&
-        <View style={styles.section}>
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>템플릿 선택</Text>
             <Text style={styles.sectionDescription}>
               영역을 생성할 템플릿을 선택하세요. 템플릿에 따라 제공되는 기능이 다릅니다.
@@ -735,14 +735,14 @@ const AddLocationScreen = () => {
             
             {/* 단일 스크롤 리스트로 통합 */}
             {availableTemplates.length > 0 ?
-          <View style={styles.templateOptionsContainer}>
+              <View style={styles.templateOptionsContainer}>
                 <ScrollView style={styles.templateOptionsScroll} nestedScrollEnabled>
                   <View style={styles.templateOptions}>
                     {availableTemplates.map((template) =>
-                <TouchableOpacity
-                  key={template.id}
-                  style={[
-                  styles.templateOption,
+          <TouchableOpacity 
+                        key={template.id}
+                        style={[
+                          styles.templateOption,
                   selectedTemplateInstance?.id === template.id && styles.selectedTemplateOption]
                   }
                   onPress={() => handleTemplateSelect(template)}>
@@ -759,7 +759,7 @@ const AddLocationScreen = () => {
                           </View>
                         </View>
                         {selectedTemplateInstance?.id === template.id &&
-                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                          <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
                   }
           </TouchableOpacity>
                 )}
@@ -767,7 +767,7 @@ const AddLocationScreen = () => {
                 </ScrollView>
       </View> :
 
-          <View style={styles.emptyTemplates}>
+              <View style={styles.emptyTemplates}>
                 <Text style={styles.emptyTemplatesText}>사용 가능한 템플릿이 없습니다. 상점에서 구매 후 다시 시도하세요.</Text>
               </View>
           }
@@ -775,10 +775,10 @@ const AddLocationScreen = () => {
         }
         {/* 템플릿 변경 섹션 (수정 모드에서만 표시) */}
         {isEditMode &&
-        <View style={styles.section}>
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>템플릿 변경</Text>
             {currentTemplate ?
-          <View style={[styles.templateGroupHeader, { marginBottom: 8 }]}>
+              <View style={[styles.templateGroupHeader, { marginBottom: 8 }]}>
                 <View style={styles.templateIconContainer}>
                   <Ionicons name={currentTemplate.icon || 'cube-outline'} size={24} color="#4CAF50" />
                 </View>
@@ -788,25 +788,25 @@ const AddLocationScreen = () => {
                 </View>
               </View> :
 
-          <Text style={styles.sectionDescription}>현재 템플릿 정보를 불러올 수 없습니다.</Text>
+              <Text style={styles.sectionDescription}>현재 템플릿 정보를 불러올 수 없습니다.</Text>
           }
             {availableTemplates.length > 0 ?
-          <View style={styles.templateOptionsContainer}>
+              <View style={styles.templateOptionsContainer}>
                 <ScrollView style={styles.templateOptionsScroll} nestedScrollEnabled>
                   <View style={styles.templateOptions}>
                     {availableTemplates.map((template) => {
-                  const baseSlots = template.feature?.baseSlots;
+                      const baseSlots = template.feature?.baseSlots;
                   const allowedSlots = baseSlots === -1 ? Number.POSITIVE_INFINITY : baseSlots + additionalProductSlots;
-                  const isDisabled = currentProductCount > allowedSlots;
-                  return (
-                    <TouchableOpacity
-                      key={template.id}
-                      style={[
-                      styles.templateOption,
-                      selectedEditTemplateInstance?.id === template.id && styles.selectedTemplateOption,
+                      const isDisabled = currentProductCount > allowedSlots;
+  return (
+          <TouchableOpacity 
+                          key={template.id}
+                          style={[
+                            styles.templateOption,
+                            selectedEditTemplateInstance?.id === template.id && styles.selectedTemplateOption,
                       isDisabled && styles.disabledTemplateOption]
                       }
-                      disabled={isDisabled}
+                          disabled={isDisabled}
                       onPress={() => !isDisabled && handleEditTemplateSelect(template)}>
 
                           <View style={{ flex: 1 }}>
@@ -814,22 +814,22 @@ const AddLocationScreen = () => {
                               {template.name} · 기본 슬롯: {renderSlotCount(baseSlots)}
                             </Text>
                             {isDisabled &&
-                        <Text style={styles.templateOptionSubtitle}>
+                              <Text style={styles.templateOptionSubtitle}>
                                 현재 {currentProductCount}개 / 허용 {allowedSlots === Number.POSITIVE_INFINITY ? '무제한' : `${allowedSlots}개`}
                               </Text>
                         }
           </View>
                           {selectedEditTemplateInstance?.id === template.id &&
-                      <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
                       }
           </TouchableOpacity>);
 
-                })}
+                    })}
         </View>
                 </ScrollView>
       </View> :
 
-          <Text style={styles.sectionDescription}>사용 가능한 템플릿이 없습니다. (만료된 템플릿은 목록에 표시되지 않습니다)</Text>
+              <Text style={styles.sectionDescription}>사용 가능한 템플릿이 없습니다. (만료된 템플릿은 목록에 표시되지 않습니다)</Text>
           }
           </View>
         }
@@ -838,7 +838,7 @@ const AddLocationScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>영역 정보</Text>
           {isEditMode && isEditLockedByExpiry &&
-          <View style={{ backgroundColor: '#fff8e1', borderWidth: 1, borderColor: '#ffe082', borderRadius: 8, padding: 10, marginBottom: 10 }}>
+            <View style={{ backgroundColor: '#fff8e1', borderWidth: 1, borderColor: '#ffe082', borderRadius: 8, padding: 10, marginBottom: 10 }}>
               <Text style={{ color: '#ff6f00', fontSize: 12 }}>이 영역은 만료된 영역 템플릿에 연결되어 있어 영역 정보는 수정할 수 없습니다. 상단의 템플릿 변경을 이용해주세요.</Text>
           </View>
           }
@@ -863,7 +863,7 @@ const AddLocationScreen = () => {
               onChangeText={(text) => handleInputChange('description', text)}
               placeholder={"영역 설명 입력..."}
               placeholderTextColor="#999"
-              multiline
+            multiline
               editable={!(isEditMode && isEditLockedByExpiry)} />
 
         </View>
@@ -887,7 +887,7 @@ const AddLocationScreen = () => {
         {/* (제거) 제품 슬롯 / 보유한 추가 제품 슬롯 섹션 (요청사항) */}
 
         {/* 저장 버튼 (영역 생성/수정은 기능적으로 수행하되 문구는 '저장'으로 통일) */}
-        <TouchableOpacity
+                      <TouchableOpacity
           style={styles.createButton}
           onPress={handleCreateLocation}
           disabled={isLoading}>
@@ -909,12 +909,12 @@ const AddLocationScreen = () => {
         
         {/* 알림 모달 */}
       <AlertModal
-          visible={alertModalVisible}
-          title={alertModalConfig.title}
-          message={alertModalConfig.message}
-          buttons={alertModalConfig.buttons}
-          onClose={() => setAlertModalVisible(false)}
-          icon={alertModalConfig.icon}
+        visible={alertModalVisible}
+        title={alertModalConfig.title}
+        message={alertModalConfig.message}
+        buttons={alertModalConfig.buttons}
+        onClose={() => setAlertModalVisible(false)}
+        icon={alertModalConfig.icon}
           iconColor={alertModalConfig.iconColor} />
 
       
@@ -1264,4 +1264,4 @@ const styles = StyleSheet.create({
   }
 });
 
-export default AddLocationScreen;
+export default AddLocationScreen; 

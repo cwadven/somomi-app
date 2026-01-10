@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import {
+import { 
 
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Image,
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  Image, 
   TouchableOpacity,
   TextInput,
 
@@ -100,11 +100,11 @@ import { fetchLocations } from '../redux/slices/locationsSlice';
 
 
 
-import {
-  getDaysInMonth,
+import { 
+  getDaysInMonth, 
 
-  generateMonthOptions,
-  generateDayOptions,
+  generateMonthOptions, 
+  generateDayOptions, 
   generateYearOptions,
   formatDate } from
 '../utils/dateUtils';
@@ -125,15 +125,15 @@ if (Platform.OS !== 'web') {
 const HPBar = ({ percentage, type }) => {
   // percentage가 NaN이면 0으로 처리
   const safePercentage = isNaN(percentage) ? 0 : percentage;
-
+  
   // HP 바 색상은 퍼센트에 따라 변하지 않도록 고정 (요청사항)
   const barColor = type === 'expiry' ? '#2196F3' : '#4CAF50';
 
   return (
     <View style={styles.hpBarContainer}>
-      <View
+      <View 
         style={[
-        styles.hpBar,
+          styles.hpBar, 
         { width: `${safePercentage}%`, backgroundColor: barColor }]
         } />
 
@@ -145,7 +145,7 @@ const ProductDetailScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const dispatch = useDispatch();
-
+  
   const { productId, product: passedProduct, mode: routeMode, locationId: createLocationId } = route.params || {};
   const [screenMode, setScreenMode] = useState(routeMode === 'create' ? 'create' : routeMode === 'edit' ? 'edit' : 'view'); // view | edit | create
   const { currentProduct: selectedProduct, status, error, locationProducts, products } = useSelector((state) => state.products);
@@ -177,14 +177,14 @@ const ProductDetailScreen = () => {
   useEffect(() => {
     setImageViewerVisible(false);
   }, [iconUri]);
-
+  
   // 최신 상태를 참조하기 위한 ref
   const consumptionDateRef = useRef({
     year: new Date().getFullYear(),
     month: new Date().getMonth(),
     day: new Date().getDate()
   });
-
+  
   // 소진 처리 성공 모달 상태
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successModalConfig, setSuccessModalConfig] = useState({
@@ -192,7 +192,7 @@ const ProductDetailScreen = () => {
     message: '',
     onConfirm: () => {}
   });
-
+  
   // 커스텀 알림 모달 상태
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [alertModalConfig, setAlertModalConfig] = useState({
@@ -202,21 +202,21 @@ const ProductDetailScreen = () => {
     icon: '',
     iconColor: ''
   });
-
+  
   // 소진 날짜 선택 모달 상태
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-
+  
   // 날짜 선택을 위한 상태
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
-
+  
   // 날짜 선택 모달의 임시 상태 - 모달 내에서만 사용
   const [tempYear, setTempYear] = useState(selectedYear);
   const [tempMonth, setTempMonth] = useState(selectedMonth);
   const [tempDay, setTempDay] = useState(selectedDay);
-
+  
   // 날짜 선택 스크롤 중앙 정렬을 위한 참조 및 상수
   const yearScrollRef = useRef(null);
   const monthScrollRef = useRef(null);
@@ -257,7 +257,7 @@ const ProductDetailScreen = () => {
     month: new Date().getMonth(),
     day: new Date().getDate()
   });
-
+  
   // 활성화된 탭 상태
   const [activeTab, setActiveTab] = useState('details'); // 'details' 또는 'notifications'
   // 소진된 항목이면 탭을 강제로 'details'로 유지
@@ -266,26 +266,26 @@ const ProductDetailScreen = () => {
       setActiveTab('details');
     }
   }, [isConsumed, activeTab]);
-
+  
   // 달력 표시 상태
   const [showCalendar, setShowCalendar] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-
+  
   useEffect(() => {
     // 리스트/캐시/파라미터에 데이터가 없을 때만 개별 상세 로드
     if (!currentProduct && productId) {
-      dispatch(fetchProductById(productId));
+    dispatch(fetchProductById(productId));
     }
   }, [dispatch, productId, currentProduct]);
-
+  
   // 목록 자동 재호출 제거 (요청사항): 제품 상세 진입/복귀 시 영역 목록 API 호출 금지
-
+  
   // 소진 처리 날짜 상태 변화 감지 및 로깅
   useEffect(() => {
     // consumptionDate 상태가 변경될 때마다 ref 업데이트
     consumptionDateRef.current = consumptionDate;
   }, [consumptionDate]);
-
+  
   // 날짜 선택 모달이 열릴 때 현재 선택된 날짜로 임시 상태 초기화
   useEffect(() => {
     if (datePickerVisible) {
@@ -294,31 +294,31 @@ const ProductDetailScreen = () => {
       setTempDay(selectedDay);
     }
   }, [datePickerVisible, selectedYear, selectedMonth, selectedDay]);
-
+  
   // 소진 처리 모달이 열려있을 때 선택된 날짜가 변경되면 모달 내용 업데이트
   useEffect(() => {
     if (alertModalVisible && alertModalConfig.title === '소진 처리') {
       // 현재 선택된 날짜 텍스트
       const dateText = `${selectedYear}년 ${selectedMonth + 1}월 ${selectedDay}일`;
-
+      
       // 소진 처리용 상태도 함께 업데이트
       setConsumptionDate({
         year: selectedYear,
         month: selectedMonth,
         day: selectedDay
       });
-
+      
       // 소진 처리 모달의 내용 업데이트
       setAlertModalConfig((prevConfig) => ({
         ...prevConfig,
         content:
-        <View style={styles.consumptionDateContainer}>
+          <View style={styles.consumptionDateContainer}>
             <Text style={styles.consumptionDateLabel}>소진 날짜</Text>
-            <TouchableOpacity
-            style={styles.datePickerButton}
-            onPress={() => {
-              // 알림 모달을 닫지 않고 날짜 선택 모달만 표시
-              setDatePickerVisible(true);
+            <TouchableOpacity 
+              style={styles.datePickerButton}
+              onPress={() => {
+                // 알림 모달을 닫지 않고 날짜 선택 모달만 표시
+                setDatePickerVisible(true);
             }}>
 
               <Text style={styles.datePickerButtonText}>{dateText}</Text>
@@ -329,37 +329,37 @@ const ProductDetailScreen = () => {
       }));
     }
   }, [selectedYear, selectedMonth, selectedDay, alertModalVisible]);
-
+  
   // 날짜 선택 모달 확인 버튼 처리
   const handleDatePickerConfirm = () => {
     // 선택된 날짜를 상태에 저장
     setSelectedYear(tempYear);
     setSelectedMonth(tempMonth);
     setSelectedDay(tempDay);
-
+    
     // 소진 처리용 상태에도 저장
     setConsumptionDate({
       year: tempYear,
       month: tempMonth,
       day: tempDay
     });
-
+    
     // 소진 처리 모달의 내용 업데이트 - 약간의 지연 후 실행하여 상태 업데이트가 반영되도록 함
     setTimeout(() => {
       setAlertModalConfig((prevConfig) => {
         // 현재 선택된 날짜 텍스트 - 임시 변수에서 직접 가져옴
         const dateText = `${tempYear}년 ${tempMonth + 1}월 ${tempDay}일`;
-
+        
         return {
           ...prevConfig,
           content:
-          <View style={styles.consumptionDateContainer}>
+            <View style={styles.consumptionDateContainer}>
               <Text style={styles.consumptionDateLabel}>소진 날짜</Text>
-              <TouchableOpacity
-              style={styles.datePickerButton}
-              onPress={() => {
-                // 알림 모달을 닫지 않고 날짜 선택 모달만 표시
-                setDatePickerVisible(true);
+              <TouchableOpacity 
+                style={styles.datePickerButton}
+                onPress={() => {
+                  // 알림 모달을 닫지 않고 날짜 선택 모달만 표시
+                  setDatePickerVisible(true);
               }}>
 
                 <Text style={styles.datePickerButtonText}>{dateText}</Text>
@@ -370,45 +370,45 @@ const ProductDetailScreen = () => {
         };
       });
     }, 100);
-
+    
     // 날짜 선택 모달 닫기
     setDatePickerVisible(false);
   };
-
+  
   // 날짜 선택 모달 취소 버튼 처리
   const handleDatePickerCancel = () => {
     setDatePickerVisible(false);
   };
-
+  
   // 소진 처리 함수
   const handleMarkAsConsumed = () => {
     // 임시 날짜 변수도 함께 초기화
     setTempYear(selectedYear);
     setTempMonth(selectedMonth);
     setTempDay(selectedDay);
-
+    
     // 소진 처리용 상태 초기화 (현재 선택된 날짜로)
     setConsumptionDate({
       year: selectedYear,
       month: selectedMonth,
       day: selectedDay
     });
-
+    
     // 현재 선택된 날짜 텍스트
     const dateText = `${selectedYear}년 ${selectedMonth + 1}월 ${selectedDay}일`;
-
+    
     // 소진 처리 모달 표시 - 함수형 업데이트 사용
     setAlertModalConfig({
       title: '소진 처리',
       message: '이 제품을 소진 처리하시겠습니까?\n소진 처리된 제품은 소진 처리 목록으로 이동합니다.',
       content:
-      <View style={styles.consumptionDateContainer}>
+        <View style={styles.consumptionDateContainer}>
           <Text style={styles.consumptionDateLabel}>소진 날짜</Text>
-          <TouchableOpacity
-          style={styles.datePickerButton}
-          onPress={() => {
-            // 알림 모달을 닫지 않고 날짜 선택 모달만 표시
-            setDatePickerVisible(true);
+          <TouchableOpacity 
+            style={styles.datePickerButton}
+            onPress={() => {
+              // 알림 모달을 닫지 않고 날짜 선택 모달만 표시
+              setDatePickerVisible(true);
           }}>
 
             <Text style={styles.datePickerButtonText}>{dateText}</Text>
@@ -417,25 +417,25 @@ const ProductDetailScreen = () => {
         </View>,
 
       buttons: [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '소진 처리',
-        style: 'default',
-        // 소진 처리 버튼 클릭 시 최신 상태를 참조하는 함수
+        { text: '취소', style: 'cancel' },
+        { 
+          text: '소진 처리', 
+          style: 'default',
+          // 소진 처리 버튼 클릭 시 최신 상태를 참조하는 함수
         onPress: function () {
-          // 소진 처리 전에 필요한 정보 저장
-          const productName = currentProduct.name;
-
-          // consumptionDateRef에서 최신 날짜 정보 가져오기
-          const { year, month, day } = consumptionDateRef.current;
-
-          // 선택한 날짜로 소진 처리
-          const date = new Date(year, month, day);
-          const formattedDate = formatDate(date);
-
-          // 알림 모달 닫기
-          setAlertModalVisible(false);
-
+            // 소진 처리 전에 필요한 정보 저장
+            const productName = currentProduct.name;
+            
+            // consumptionDateRef에서 최신 날짜 정보 가져오기
+            const { year, month, day } = consumptionDateRef.current;
+            
+            // 선택한 날짜로 소진 처리
+            const date = new Date(year, month, day);
+            const formattedDate = formatDate(date);
+            
+            // 알림 모달 닫기
+            setAlertModalVisible(false);
+            
           // ✅ Event-driven refresh: refetch 없이 소진 처리 thunk로 처리 + 이벤트로 목록에서 제거
           dispatch(markProductAsConsumedAsync({ id: currentProduct.id, consumptionDate: date.toISOString() })).
           unwrap().
@@ -447,28 +447,28 @@ const ProductDetailScreen = () => {
                 locationId: currentProduct?.locationId != null ? String(currentProduct.locationId) : null
               });
             } catch (e) {}
-            // 약간의 지연 후 성공 모달 표시 (애니메이션 충돌 방지)
-            setTimeout(() => {
-              // 성공 모달 설정 및 표시
-              setSuccessModalConfig({
-                title: '소진 처리 완료',
-                message: `${productName} 제품이 ${formattedDate}에 소진 처리되었습니다.`,
-                onConfirm: () => {
-                  // 모달 닫기 후 이전 화면으로 이동
-                  setSuccessModalVisible(false);
-                  navigation.goBack();
-                }
-              });
-              setSuccessModalVisible(true);
-            }, 300);
+                // 약간의 지연 후 성공 모달 표시 (애니메이션 충돌 방지)
+                setTimeout(() => {
+                  // 성공 모달 설정 및 표시
+                  setSuccessModalConfig({
+                    title: '소진 처리 완료',
+                    message: `${productName} 제품이 ${formattedDate}에 소진 처리되었습니다.`,
+                    onConfirm: () => {
+                      // 모달 닫기 후 이전 화면으로 이동
+                      setSuccessModalVisible(false);
+                      navigation.goBack();
+                    }
+                  });
+                  setSuccessModalVisible(true);
+                }, 300);
           }).
           catch((err) => {
             const msg = typeof err === 'string' ?
             err :
             err?.message || err?.error || '알 수 없는 오류';
             showErrorAlert(`소진 처리 중 오류가 발생했습니다: ${msg}`);
-          });
-        }
+              });
+          }
       }],
 
       icon: 'checkmark-circle',
@@ -476,15 +476,15 @@ const ProductDetailScreen = () => {
     });
     setAlertModalVisible(true);
   };
-
+  
   // 날짜 선택 모달 렌더링
   const renderDatePicker = () => {
     if (!datePickerVisible) return null;
-
+    
     const years = generateYearOptions();
     const months = generateMonthOptions();
     const days = generateDayOptions(tempYear, tempMonth);
-
+    
     return (
       <Modal
         visible={datePickerVisible}
@@ -509,23 +509,23 @@ const ProductDetailScreen = () => {
               <View style={styles.datePickerColumn}>
                 <Text style={styles.datePickerLabel}>년도</Text>
                 <View style={styles.datePickerScrollWrapper}>
-                  <ScrollView
+                  <ScrollView 
                     ref={yearScrollRef}
                     style={styles.datePickerScroll}
                     showsVerticalScrollIndicator={false}>
 
                     {years.map((year) =>
-                    <TouchableOpacity
-                      key={`year-${year}`}
-                      style={[
-                      styles.datePickerOption,
+                      <TouchableOpacity
+                        key={`year-${year}`}
+                        style={[
+                          styles.datePickerOption,
                       tempYear === year && styles.datePickerOptionSelected]
                       }
                       onPress={() => setTempYear(year)}>
 
                         <Text
-                        style={[
-                        styles.datePickerOptionText,
+                          style={[
+                            styles.datePickerOptionText,
                         tempYear === year && styles.datePickerOptionTextSelected]
                         }>
 
@@ -542,30 +542,30 @@ const ProductDetailScreen = () => {
               <View style={styles.datePickerColumn}>
                 <Text style={styles.datePickerLabel}>월</Text>
                 <View style={styles.datePickerScrollWrapper}>
-                  <ScrollView
+                  <ScrollView 
                     ref={monthScrollRef}
                     style={styles.datePickerScroll}
                     showsVerticalScrollIndicator={false}>
 
                     {months.map((monthName, index) =>
-                    <TouchableOpacity
-                      key={`month-${index}`}
-                      style={[
-                      styles.datePickerOption,
+                      <TouchableOpacity
+                        key={`month-${index}`}
+                        style={[
+                          styles.datePickerOption,
                       tempMonth === index && styles.datePickerOptionSelected]
                       }
-                      onPress={() => {
-                        setTempMonth(index);
-                        // 일수가 변경될 수 있으므로 선택한 일이 유효한지 확인
-                        const daysInNewMonth = getDaysInMonth(tempYear, index);
-                        if (tempDay > daysInNewMonth) {
-                          setTempDay(daysInNewMonth);
-                        }
+                        onPress={() => {
+                          setTempMonth(index);
+                          // 일수가 변경될 수 있으므로 선택한 일이 유효한지 확인
+                          const daysInNewMonth = getDaysInMonth(tempYear, index);
+                          if (tempDay > daysInNewMonth) {
+                            setTempDay(daysInNewMonth);
+                          }
                       }}>
 
                         <Text
-                        style={[
-                        styles.datePickerOptionText,
+                          style={[
+                            styles.datePickerOptionText,
                         tempMonth === index && styles.datePickerOptionTextSelected]
                         }>
 
@@ -582,23 +582,23 @@ const ProductDetailScreen = () => {
               <View style={styles.datePickerColumn}>
                 <Text style={styles.datePickerLabel}>일</Text>
                 <View style={styles.datePickerScrollWrapper}>
-                  <ScrollView
+                  <ScrollView 
                     ref={dayScrollRef}
                     style={styles.datePickerScroll}
                     showsVerticalScrollIndicator={false}>
 
                     {generateDayOptions(tempYear, tempMonth).map((day) =>
-                    <TouchableOpacity
-                      key={`day-${day}`}
-                      style={[
-                      styles.datePickerOption,
+                      <TouchableOpacity
+                        key={`day-${day}`}
+                        style={[
+                          styles.datePickerOption,
                       tempDay === day && styles.datePickerOptionSelected]
                       }
                       onPress={() => setTempDay(day)}>
 
                         <Text
-                        style={[
-                        styles.datePickerOptionText,
+                          style={[
+                            styles.datePickerOptionText,
                         tempDay === day && styles.datePickerOptionTextSelected]
                         }>
 
@@ -618,13 +618,13 @@ const ProductDetailScreen = () => {
             </Text>
             
             <View style={styles.datePickerButtons}>
-              <TouchableOpacity
+              <TouchableOpacity 
                 style={[styles.datePickerButton, styles.datePickerCancelButton]}
                 onPress={handleDatePickerCancel}>
 
                 <Text style={styles.datePickerCancelButtonText}>취소</Text>
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity 
                 style={[styles.datePickerButton, styles.datePickerConfirmButton]}
                 onPress={handleDatePickerConfirm}>
 
@@ -636,7 +636,7 @@ const ProductDetailScreen = () => {
       </Modal>);
 
   };
-
+  
   // 제품 데이터가 로딩 중일 경우 로딩 화면 표시 (create 모드 제외)
   if (screenMode !== 'create' && !currentProduct && status === 'loading') {
     return (
@@ -654,7 +654,7 @@ const ProductDetailScreen = () => {
       </View>);
 
   }
-
+  
   // 에러가 발생한 경우 에러 메시지 표시 (create 모드 제외)
   if (screenMode !== 'create' && !currentProduct && status === 'failed') {
     return (
@@ -668,8 +668,8 @@ const ProductDetailScreen = () => {
         </View>
       <View style={styles.loadingContainer}>
         <Text style={styles.errorText}>오류: {error}</Text>
-        <TouchableOpacity
-            style={styles.retryButton}
+        <TouchableOpacity 
+          style={styles.retryButton}
             onPress={() => dispatch(fetchProductById(productId))}>
 
           <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -678,7 +678,7 @@ const ProductDetailScreen = () => {
       </View>);
 
   }
-
+  
   // 제품 데이터가 없을 경우 메시지 표시 (create 모드 제외)
   if (screenMode !== 'create' && !currentProduct) {
     return (
@@ -696,7 +696,7 @@ const ProductDetailScreen = () => {
       </View>);
 
   }
-
+  
   // 유통기한 남은 수명 계산 (%)
   const calculateExpiryPercentage = () => {
     if (!currentProduct.expiryDate) return null;
@@ -732,7 +732,7 @@ const ProductDetailScreen = () => {
     const percentage = Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
     return Math.round(percentage);
   };
-
+  
   // 유통기한 남은 일수 계산
   const calculateExpiryDays = () => {
     if (!currentProduct.expiryDate) return null;
@@ -1147,18 +1147,18 @@ const ProductDetailScreen = () => {
       setUploadedIconUrl(null);
     }
   }, [screenMode]);
-
+  
   // 제품 삭제 처리
   const handleDelete = () => {
     setAlertModalConfig({
       title: '제품 삭제',
       message: '정말 이 제품을 삭제하시겠습니까?',
       buttons: [
-      { text: '취소', style: 'plain' },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: () => {
+        { text: '취소', style: 'plain' },
+        { 
+          text: '삭제', 
+          style: 'destructive',
+          onPress: () => {
           dispatch(deleteProductAsync(currentProduct.id)).
           unwrap().
           then(() => {
@@ -1170,15 +1170,15 @@ const ProductDetailScreen = () => {
                 locationId: currentProduct?.locationId != null ? String(currentProduct.locationId) : null
               });
             } catch (e) {}
-            navigation.goBack();
+                navigation.goBack();
           }).
           catch((err) => {
             const msg = typeof err === 'string' ?
             err :
             err?.message || err?.error || '알 수 없는 오류';
             showErrorAlert(`삭제 중 오류가 발생했습니다: ${msg}`);
-          });
-        }
+              });
+          }
       }],
 
       icon: 'trash-outline',
@@ -1186,17 +1186,17 @@ const ProductDetailScreen = () => {
     });
     setAlertModalVisible(true);
   };
-
+  
   // 제품 수정: 별도 화면 이동 없이 현재 화면에서 edit 모드로 전환
   const handleEdit = () => {
     enterEditMode();
   };
-
+  
   // 알림 설정 탭으로 전환
 
 
 
-
+  
   // 오류 알림 표시 함수
   const showErrorAlert = (message) => {
     setAlertModalConfig({
@@ -1649,17 +1649,17 @@ const ProductDetailScreen = () => {
   const consumptionPercentage = screenMode === 'view' ? calculateConsumptionPercentage() : null;
   const expiryDays = screenMode === 'view' ? calculateExpiryDays() : null;
   const consumptionDays = screenMode === 'view' ? calculateConsumptionDays() : null;
-
+  
   // 소진 처리가 필요한지 확인 (남은 일수가 0일 이하인 경우)
 
 
 
-
+  
   // 정보 항목 컴포넌트
   const InfoItem = ({ label, value, icon }) => {
     // value가 없어도 항목을 표시하고 '정보 없음'으로 표시
     const displayValue = value || '정보 없음';
-
+    
     return (
       <View style={styles.infoItem}>
         <View style={styles.infoItemLeft}>
@@ -1670,7 +1670,7 @@ const ProductDetailScreen = () => {
       </View>);
 
   };
-
+  
   // 소진 처리 모달은 더 이상 필요하지 않으므로 제거
   // 소진 처리 모달 닫기 및 화면 이동
 
@@ -1679,11 +1679,11 @@ const ProductDetailScreen = () => {
 
 
 
-
+  
   // 달력에 표시할 날짜 생성
   const getMarkedDates = () => {
     const markedDates = [];
-
+    
     // 유통기한 추가
     if (currentProduct.expiryDate) {
       markedDates.push({
@@ -1692,7 +1692,7 @@ const ProductDetailScreen = () => {
         label: '유통기한'
       });
     }
-
+    
     // 소진 예상일 추가
     if (currentProduct.estimatedEndDate) {
       markedDates.push({
@@ -1701,18 +1701,18 @@ const ProductDetailScreen = () => {
         label: '소진 예상일'
       });
     }
-
+    
     return markedDates;
   };
-
+  
   // 달력에 표시할 날짜 범위 생성
   const getDateRanges = () => {
     const dateRanges = [];
-
+    
     // 구매일이 있는 경우에만 범위 추가
     if (currentProduct.purchaseDate) {
       const purchaseDate = new Date(currentProduct.purchaseDate);
-
+      
       // 구매일 ~ 유통기한 범위 추가
       if (currentProduct.expiryDate) {
         dateRanges.push({
@@ -1722,7 +1722,7 @@ const ProductDetailScreen = () => {
           label: '구매일~유통기한'
         });
       }
-
+      
       // 구매일 ~ 소진 예상일 범위 추가
       if (currentProduct.estimatedEndDate) {
         dateRanges.push({
@@ -1733,17 +1733,17 @@ const ProductDetailScreen = () => {
         });
       }
     }
-
+    
     return dateRanges;
   };
-
+  
   // 유통기한 및 소진 예상일 정보 섹션에 달력 보기 버튼 추가
   const renderInfoSection = () => {
     return (
       <View style={styles.infoSection}>
         {/* 유통기한 정보 */}
         {currentProduct.expiryDate &&
-        <View style={styles.hpSection}>
+          <View style={styles.hpSection}>
             <View style={styles.hpHeader}>
               <Ionicons name="calendar-outline" size={20} color="#2196F3" />
               <Text style={styles.hpTitle}>유통기한</Text>
@@ -1752,8 +1752,8 @@ const ProductDetailScreen = () => {
               </Text>
             </View>
             
-            <HPBar
-            percentage={calculateExpiryPercentage() || 0}
+            <HPBar 
+              percentage={calculateExpiryPercentage() || 0} 
             type="expiry" />
 
             
@@ -1761,14 +1761,14 @@ const ProductDetailScreen = () => {
               {expiryDays >= 0 ?
             `유통기한까지 ${expiryDays}일 남았습니다.` :
             '유통기한이 지났습니다!'
-            }
+              }
             </Text>
           </View>
         }
         
         {/* 소진 예상일 정보 */}
         {currentProduct.estimatedEndDate &&
-        <View style={styles.hpSection}>
+          <View style={styles.hpSection}>
             <View style={styles.hpHeader}>
               <Ionicons name="hourglass-outline" size={20} color="#4CAF50" />
               <Text style={styles.hpTitle}>소진 예상</Text>
@@ -1777,8 +1777,8 @@ const ProductDetailScreen = () => {
               </Text>
             </View>
             
-            <HPBar
-            percentage={calculateConsumptionPercentage() || 0}
+            <HPBar 
+              percentage={calculateConsumptionPercentage() || 0} 
             type="consumption" />
 
             
@@ -1786,28 +1786,28 @@ const ProductDetailScreen = () => {
               {consumptionDays >= 0 ?
             `소진 예상일까지 ${consumptionDays}일 남았습니다.` :
             '소진 예상일이 지났습니다!'
-            }
+              }
             </Text>
           </View>
         }
         
         {/* 달력으로 보기 버튼 */}
         {(currentProduct.expiryDate || currentProduct.estimatedEndDate) &&
-        <TouchableOpacity
-          style={styles.calendarButton}
+          <TouchableOpacity 
+            style={styles.calendarButton}
           onPress={() => setShowCalendar(!showCalendar)}>
 
-            <Ionicons
-            name={showCalendar ? "calendar" : "calendar-outline"}
-            size={20}
+            <Ionicons 
+              name={showCalendar ? "calendar" : "calendar-outline"} 
+              size={20} 
             color="#4CAF50" />
 
             <Text style={styles.calendarButtonText}>
               {showCalendar ? "달력 닫기" : "달력으로 보기"}
             </Text>
-            <Ionicons
-            name={showCalendar ? "chevron-up" : "chevron-down"}
-            size={20}
+            <Ionicons 
+              name={showCalendar ? "chevron-up" : "chevron-down"} 
+              size={20} 
             color="#4CAF50" />
 
           </TouchableOpacity>
@@ -1815,17 +1815,17 @@ const ProductDetailScreen = () => {
         
         {/* 달력 렌더링 */}
         {showCalendar &&
-        <CalendarView
-          currentMonth={currentMonth}
-          onMonthChange={(newMonth) => setCurrentMonth(newMonth)}
-          markedDates={getMarkedDates()}
+          <CalendarView 
+            currentMonth={currentMonth}
+            onMonthChange={(newMonth) => setCurrentMonth(newMonth)}
+            markedDates={getMarkedDates()}
           dateRanges={getDateRanges()} />
 
         }
       </View>);
 
   };
-
+  
   // 제품 상세 정보 렌더링
   const renderProductDetails = () => {
     return (
@@ -1838,18 +1838,18 @@ const ProductDetailScreen = () => {
               activeOpacity={0.85}
               onPress={() => setImageViewerVisible(true)}>
 
-              <Image
+              <Image 
                 source={{ uri: iconUri }}
-                style={styles.productImage}
+                style={styles.productImage} 
                 resizeMode="cover"
                 onError={() => setIconLoadFailed(true)} />
 
               </TouchableOpacity> :
 
-            <View style={styles.noImageContainer}>
-                <Ionicons
-                name={getCategoryIcon()}
-                size={60}
+              <View style={styles.noImageContainer}>
+                <Ionicons 
+                  name={getCategoryIcon()} 
+                  size={60} 
                 color="#4CAF50" />
 
                 <Text style={styles.noImageText}>이미지 없음</Text>
@@ -1861,7 +1861,7 @@ const ProductDetailScreen = () => {
             <Text style={styles.productName}>{currentProduct.name}</Text>
             
             {currentProduct.location &&
-            <View style={styles.locationBadge}>
+              <View style={styles.locationBadge}>
                 <Ionicons name="location-outline" size={12} color="#4CAF50" />
                 <Text style={styles.locationText}>
                   {/* location이 객체인 경우 title 속성 사용 */}
@@ -1901,38 +1901,38 @@ const ProductDetailScreen = () => {
         <View style={styles.detailsSection}>
           <Text style={styles.sectionTitle}>제품 정보</Text>
           
-          <InfoItem
-            label="등록일"
-            value={currentProduct.createdAt ? new Date(currentProduct.createdAt).toLocaleDateString() : null}
+          <InfoItem 
+            label="등록일" 
+            value={currentProduct.createdAt ? new Date(currentProduct.createdAt).toLocaleDateString() : null} 
             icon="time-outline" />
 
           
-          <InfoItem
-            label="구매일"
-            value={currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate).toLocaleDateString() : null}
+          <InfoItem 
+            label="구매일" 
+            value={currentProduct.purchaseDate ? new Date(currentProduct.purchaseDate).toLocaleDateString() : null} 
             icon="calendar-outline" />
 
           
-          <InfoItem
-            label="브랜드"
-            value={currentProduct.brand || '정보 없음'}
+          <InfoItem 
+            label="브랜드" 
+            value={currentProduct.brand || '정보 없음'} 
             icon="pricetag-outline" />
 
           
-          <InfoItem
-            label="구매처"
-            value={currentProduct.purchasePlace || '정보 없음'}
+          <InfoItem 
+            label="구매처" 
+            value={currentProduct.purchasePlace || '정보 없음'} 
             icon="cart-outline" />
 
           
-          <InfoItem
-            label="가격"
-            value={currentProduct.price ? `${currentProduct.price.toLocaleString()}원` : '정보 없음'}
+          <InfoItem 
+            label="가격" 
+            value={currentProduct.price ? `${currentProduct.price.toLocaleString()}원` : '정보 없음'} 
             icon="cash-outline" />
-
+          
           
           {currentProduct.memo &&
-          <View style={styles.memoContainer}>
+            <View style={styles.memoContainer}>
               <Text style={styles.memoLabel}>메모</Text>
               <Text style={styles.memoText} selectable>{currentProduct.memo}</Text>
             </View>
@@ -1941,7 +1941,7 @@ const ProductDetailScreen = () => {
       </ScrollView>);
 
   };
-
+  
   // 알림 설정 탭은 아직 미구현(요청사항: 사용자에게 노출하지 않음)
 
   // 제품 상세 화면 렌더링
@@ -1961,13 +1961,13 @@ const ProductDetailScreen = () => {
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[
-          styles.tabButton,
+            styles.tabButton,
           activeTab === 'details' && styles.activeTabButton]
           }
           onPress={() => setActiveTab('details')}>
 
           <Text style={[
-          styles.tabButtonText,
+            styles.tabButtonText,
           activeTab === 'details' && styles.activeTabButtonText]
           }>
             제품 상세
@@ -1997,15 +1997,15 @@ const ProductDetailScreen = () => {
           };
           return (
             <>
-        <TouchableOpacity
-                style={styles.bottomActionButton}
+        <TouchableOpacity 
+          style={styles.bottomActionButton}
                 onPress={handleEdit}>
 
           <Ionicons name="create-outline" size={24} color="#4CAF50" />
           <Text style={styles.bottomActionText}>수정</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity
+        <TouchableOpacity 
                 style={[styles.bottomActionButton, isLocationExpired ? { opacity: 0.5 } : null]}
                 onPress={() => isLocationExpired ? onBlocked('만료된 영역에서는 소진 처리를 할 수 없습니다.') : handleMarkAsConsumed()}>
 
@@ -2013,7 +2013,7 @@ const ProductDetailScreen = () => {
           <Text style={styles.bottomActionText}>소진 처리</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity
+        <TouchableOpacity 
                 style={[styles.bottomActionButton, isLocationExpired ? { opacity: 0.5 } : null]}
                 onPress={() => isLocationExpired ? onBlocked('만료된 영역에서는 제품을 삭제할 수 없습니다.') : handleDelete()}>
 
@@ -2820,4 +2820,4 @@ const styles = StyleSheet.create({
   }
 });
 
-export default ProductDetailScreen;
+export default ProductDetailScreen; 
