@@ -405,7 +405,6 @@ const AppContent = () => {
                   text: '확인',
                   style: 'destructive',
                   onPress: async () => {
-                    try { await openStoreForUpdate(); } catch (e) {}
                     setServiceGateVisible(false);
                     resolve('maintenance');
                     exitAppNow();
