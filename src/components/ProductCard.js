@@ -34,14 +34,15 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
   const consumptionPercentage = consumptionResult?.percentage;
   const consumptionDaysLeft = consumptionResult?.remainingDays;
   
-  // 남은 일수가 0일 이하인지 확인
+  // 남은 일수가 0 미만인지 확인
+  // - D-0(당일)은 회색 처리하지 않고, 다음날부터(음수) 회색 처리
   const isZeroHP = 
-    (expiryDaysLeft !== undefined && expiryDaysLeft <= 0) || 
-    (consumptionDaysLeft !== undefined && consumptionDaysLeft <= 0);
+    (expiryDaysLeft !== undefined && expiryDaysLeft < 0) || 
+    (consumptionDaysLeft !== undefined && consumptionDaysLeft < 0);
   
-  // 유통기한 또는 소진 예상일이 3일 이하로 남았는지 확인
-  const showExpiryBadge = expiryDaysLeft !== undefined && expiryDaysLeft <= 3 && expiryDaysLeft > 0;
-  const showConsumptionBadge = consumptionDaysLeft !== undefined && consumptionDaysLeft <= 3 && consumptionDaysLeft > 0;
+  // 유통기한 또는 소진 예상일이 3일 이하(당일 포함)로 남았는지 확인
+  const showExpiryBadge = expiryDaysLeft !== undefined && expiryDaysLeft <= 3 && expiryDaysLeft >= 0;
+  const showConsumptionBadge = consumptionDaysLeft !== undefined && consumptionDaysLeft <= 3 && consumptionDaysLeft >= 0;
   
   // 뱃지 텍스트 생성
   const getBadgeText = () => {
@@ -57,6 +58,7 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
   // 뱃지 색상 결정
   const getBadgeColor = () => {
     const daysLeft = showExpiryBadge ? expiryDaysLeft : consumptionDaysLeft;
+    if (daysLeft === 0) return '#F44336'; // 빨간색 (D-0)
     if (daysLeft === 1) return '#F44336'; // 빨간색 (D-1)
     if (daysLeft === 2) return '#FF9800'; // 주황색 (D-2)
     return '#FFC107'; // 노란색 (D-3)

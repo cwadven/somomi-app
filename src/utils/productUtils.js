@@ -6,6 +6,13 @@ const toMs = (v) => {
   const ms = new Date(v).getTime();
   return Number.isFinite(ms) ? ms : null;
 };
+const toEndOfLocalDayMs = (v) => {
+  if (!v) return null;
+  const d = new Date(v);
+  const t = d.getTime();
+  if (!Number.isFinite(t)) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
+};
 const getStartMs = (product, endMs) => {
   const fromPurchase = toMs(product?.purchaseDate);
   const fromCreated = toMs(product?.createdAt);
@@ -20,7 +27,8 @@ const getStartMs = (product, endMs) => {
 // 내부: 안전 숫자 결과 포맷
 const result = (percentage, remainingDays) => ({
   percentage: Math.max(0, Math.min(100, Math.round(Number.isFinite(percentage) ? percentage : 0))),
-  remainingDays: Number.isFinite(remainingDays) ? Math.ceil(remainingDays) : 0,
+  // D-day는 "당일 = D-0"을 원하므로 올림이 아닌 내림(경과 후 음수)
+  remainingDays: Number.isFinite(remainingDays) ? Math.floor(remainingDays) : 0,
 });
 
 // 유통기한 남은 수명 계산 (% / 일)
@@ -28,7 +36,7 @@ export const calculateExpiryPercentage = (product) => {
   if (!product?.expiryDate) return null;
 
   const nowMs = Date.now();
-  const endMs = toMs(product.expiryDate);
+  const endMs = toEndOfLocalDayMs(product.expiryDate);
   const startMs = getStartMs(product, endMs);
   if (!Number.isFinite(endMs) || !Number.isFinite(startMs)) return result(100, 0);
 
@@ -46,7 +54,7 @@ export const calculateConsumptionPercentage = (product) => {
   if (!product?.estimatedEndDate) return null;
 
   const nowMs = Date.now();
-  const endMs = toMs(product.estimatedEndDate);
+  const endMs = toEndOfLocalDayMs(product.estimatedEndDate);
   const startMs = getStartMs(product, endMs);
   if (!Number.isFinite(endMs) || !Number.isFinite(startMs)) return result(100, 0);
 

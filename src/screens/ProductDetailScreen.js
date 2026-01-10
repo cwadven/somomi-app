@@ -738,9 +738,10 @@ const ProductDetailScreen = () => {
     if (!currentProduct.expiryDate) return null;
     const DAY_MS = 24 * 60 * 60 * 1000;
     const nowMs = Date.now();
-    const endMs = new Date(currentProduct.expiryDate).getTime();
+    const d = new Date(currentProduct.expiryDate);
+    const endMs = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
     if (!Number.isFinite(endMs)) return null;
-    return Math.ceil((endMs - nowMs) / DAY_MS);
+    return Math.floor((endMs - nowMs) / DAY_MS);
   };
 
   // 소진 예상일 남은 일수 계산
@@ -748,9 +749,10 @@ const ProductDetailScreen = () => {
     if (!currentProduct.estimatedEndDate) return null;
     const DAY_MS = 24 * 60 * 60 * 1000;
     const nowMs = Date.now();
-    const endMs = new Date(currentProduct.estimatedEndDate).getTime();
+    const d = new Date(currentProduct.estimatedEndDate);
+    const endMs = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
     if (!Number.isFinite(endMs)) return null;
-    return Math.ceil((endMs - nowMs) / DAY_MS);
+    return Math.floor((endMs - nowMs) / DAY_MS);
   };
 
   // 카테고리 제거: 고정 아이콘 사용
@@ -1756,7 +1758,7 @@ const ProductDetailScreen = () => {
 
             
             <Text style={styles.hpText}>
-              {expiryDays > 0 ?
+              {expiryDays >= 0 ?
             `유통기한까지 ${expiryDays}일 남았습니다.` :
             '유통기한이 지났습니다!'
             }
@@ -1781,7 +1783,7 @@ const ProductDetailScreen = () => {
 
             
             <Text style={styles.hpText}>
-              {consumptionDays > 0 ?
+              {consumptionDays >= 0 ?
             `소진 예상일까지 ${consumptionDays}일 남았습니다.` :
             '소진 예상일이 지났습니다!'
             }
