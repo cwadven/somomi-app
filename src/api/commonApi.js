@@ -13,6 +13,12 @@ export const givePresignedUrl = async (constance_type, transaction_pk, file_name
   });
 };
 
-export default { givePresignedUrl };
+// GET /v1/common/service-meta
+// 최소 지원 버전/점검 여부 등 서비스 메타 조회
+export const fetchServiceMeta = async () => {
+  return request('/v1/common/service-meta', { method: 'GET', skipAuth: true });
+};
+
+export default { givePresignedUrl, fetchServiceMeta };
 
 

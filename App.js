@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Provider, useDispatch, useSelector } from 'react-redux';
-import { Platform, StyleSheet, Linking, AppState, View, ActivityIndicator, Text, Modal, TouchableOpacity, ScrollView } from 'react-native';
+import { Platform, StyleSheet, Linking, AppState, View, ActivityIndicator, Text, Modal, TouchableOpacity, ScrollView, BackHandler } from 'react-native';
 import store from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { verifyToken, logout, loadUserLocationTemplateInstances, loadUserProductSlotTemplateInstances, updateSubscription } from './src/redux/slices/authSlice';
@@ -24,6 +24,7 @@ import { fetchProducts, fetchConsumedProducts } from './src/redux/slices/product
 import { processSyncQueueIfOnline } from './src/utils/syncManager';
 import { loadData, saveData, STORAGE_KEYS } from './src/utils/storageUtils';
 import { scheduleDailyReminderIfNeeded, scheduleDailyUpdateReminderIfNeeded } from './src/utils/notificationUtils';
+import { fetchServiceMeta } from './src/api/commonApi';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
@@ -78,6 +79,78 @@ if (typeof localStorage === 'undefined') {
 const AppContent = () => {
   const dispatch = useDispatch();
   const { isLoggedIn, user, subscription, slots } = useSelector(state => state.auth);
+
+  // ====== 서비스 메타(점검/업데이트) 게이트 ======
+  const [serviceGateVisible, setServiceGateVisible] = useState(false);
+  const [serviceGateConfig, setServiceGateConfig] = useState({
+    title: '알림',
+    message: '',
+    buttons: null,
+    icon: 'information-circle-outline',
+    iconColor: '#4CAF50',
+  });
+  const serviceGateResolveRef = useRef(null); // (action?: string) => void
+  const closeServiceGate = useCallback(() => {
+    setServiceGateVisible(false);
+    try { serviceGateResolveRef.current?.('close'); } catch (e) {}
+    serviceGateResolveRef.current = null;
+  }, []);
+
+  const getAppVersionString = useCallback(() => {
+    const v =
+      Constants?.expoConfig?.version ||
+      Constants?.manifest?.version ||
+      Constants?.nativeAppVersion ||
+      '0.0.0';
+    return String(v || '0.0.0');
+  }, []);
+
+  const compareSemver = useCallback((a, b) => {
+    const parse = (s) =>
+      String(s || '')
+        .trim()
+        .split(/[.+-]/g)[0] // "1.2.3-beta" → "1"
+        ? String(s || '').trim().split('-')[0].split('+')[0].split('.').map((x) => parseInt(x, 10) || 0)
+        : [0, 0, 0];
+    const av = parse(a);
+    const bv = parse(b);
+    const len = Math.max(av.length, bv.length, 3);
+    for (let i = 0; i < len; i += 1) {
+      const ai = av[i] ?? 0;
+      const bi = bv[i] ?? 0;
+      if (ai > bi) return 1;
+      if (ai < bi) return -1;
+    }
+    return 0;
+  }, []);
+
+  const openStoreForUpdate = useCallback(async () => {
+    if (Platform.OS !== 'android') return false;
+    const pkg =
+      Constants?.expoConfig?.android?.package ||
+      Constants?.manifest2?.extra?.expoClient?.android?.package ||
+      'com.nextstory.somomi';
+    const marketUrl = `market://details?id=${pkg}`;
+    const webUrl = `https://play.google.com/store/apps/details?id=${pkg}`;
+    try {
+      const ok = await Linking.canOpenURL(marketUrl);
+      if (ok) {
+        await Linking.openURL(marketUrl);
+        return true;
+      }
+    } catch (e) {}
+    try {
+      await Linking.openURL(webUrl);
+      return true;
+    } catch (e) {}
+    return false;
+  }, []);
+
+  const exitAppNow = useCallback(() => {
+    if (Platform.OS === 'android') {
+      try { BackHandler.exitApp(); } catch (e) {}
+    }
+  }, []);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
   const [pushToken, setPushToken] = useState('');
@@ -301,6 +374,97 @@ const AppContent = () => {
       setIsLoading(true);
       setStartupMessage('초기화 중...');
       setStartupProgressText(`0/${TOTAL_STEPS}`);
+
+      // ✅ 서비스 메타 확인: 점검/최소지원버전/권장버전
+      await runStep('서비스 상태 확인', async () => {
+        if (Platform.OS === 'web') return;
+        let meta = null;
+        try {
+          meta = await withTimeout(fetchServiceMeta(), 4000, 'service-meta');
+        } catch (e) {
+          // 네트워크/서버 오류는 앱 진입을 막지 않음
+          return;
+        }
+        if (!meta) return;
+
+        const currentVersion = getAppVersionString();
+        const minRequired = Platform.OS === 'ios' ? meta?.min_ios_version : meta?.min_android_version;
+        const suggested = Platform.OS === 'ios' ? meta?.suggested_ios_version : meta?.suggested_android_version;
+
+        // 1) 점검 모드: 확인 누르면 앱 종료
+        if (meta?.is_maintenance === true) {
+          await new Promise((resolve) => {
+            serviceGateResolveRef.current = resolve;
+            setServiceGateConfig({
+              title: '점검 중',
+              message: meta?.maintenance_message || '점검 중입니다.',
+              icon: 'construct-outline',
+              iconColor: '#F44336',
+              buttons: [
+                {
+                  text: '확인',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try { await openStoreForUpdate(); } catch (e) {}
+                    setServiceGateVisible(false);
+                    resolve('maintenance');
+                    exitAppNow();
+                  },
+                },
+              ],
+            });
+            setServiceGateVisible(true);
+          });
+          // 점검이면 이후 초기화 진행하지 않음(안드로이드는 exit)
+          return;
+        }
+
+        // 2) 최소 지원 버전 미만: 강제 업데이트(확인 누르면 앱 종료)
+        if (minRequired && compareSemver(currentVersion, minRequired) < 0) {
+          await new Promise((resolve) => {
+            serviceGateResolveRef.current = resolve;
+            setServiceGateConfig({
+              title: '업데이트 필요',
+              message: `현재 버전(${currentVersion})은 지원되지 않습니다.\n최소 지원 버전: ${minRequired}\n업데이트 후 다시 이용해 주세요.`,
+              icon: 'alert-circle-outline',
+              iconColor: '#F44336',
+              buttons: [
+                {
+                  text: '확인',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try { await openStoreForUpdate(); } catch (e) {}
+                    setServiceGateVisible(false);
+                    resolve('force-update');
+                    exitAppNow();
+                  },
+                },
+              ],
+            });
+            setServiceGateVisible(true);
+          });
+          // 강제 업데이트면 이후 초기화 진행하지 않음(안드로이드는 exit)
+          return;
+        }
+
+        // 3) 권장 버전 미만: 선택 업데이트(취소/그냥 사용 가능)
+        if (suggested && compareSemver(currentVersion, suggested) < 0) {
+          await new Promise((resolve) => {
+            serviceGateResolveRef.current = resolve;
+            setServiceGateConfig({
+              title: '업데이트 안내',
+              message: `더 안정적인 사용을 위해 업데이트를 권장합니다.\n현재 버전: ${currentVersion}\n권장 버전: ${suggested}`,
+              icon: 'arrow-up-circle-outline',
+              iconColor: '#4CAF50',
+              buttons: [
+                { text: '나중에', style: 'plain', onPress: () => { setServiceGateVisible(false); resolve('later'); } },
+                { text: '업데이트', style: 'success', onPress: async () => { try { await openStoreForUpdate(); } catch (e) {} setServiceGateVisible(false); resolve('update'); } },
+              ],
+            });
+            setServiceGateVisible(true);
+          });
+        }
+      }, { timeoutMs: 4500 });
 
       // ✅ UX: 앱 진입을 막지 않도록 업데이트 사전 다운로드는 "백그라운드"로 수행
       try { prefetchUpdateIfAvailable(); } catch (e) {}
@@ -753,6 +917,15 @@ const AppContent = () => {
     return (
       <>
         <CodePushUpdateLoading error={updateError} />
+        <AlertModal
+          visible={serviceGateVisible}
+          title={serviceGateConfig.title}
+          message={serviceGateConfig.message}
+          buttons={serviceGateConfig.buttons}
+          icon={serviceGateConfig.icon}
+          iconColor={serviceGateConfig.iconColor}
+          onClose={closeServiceGate}
+        />
         {Platform.OS === 'web' && (
           <TouchableOpacity 
             style={styles.debugButton}
@@ -769,16 +942,36 @@ const AppContent = () => {
   // 데이터 초기화 중이면 로딩 화면 표시
   if (isLoading) {
     return (
-      <CodePushUpdateLoading
-        message={startupMessage}
-        progressText={startupProgressText}
-      />
+      <>
+        <CodePushUpdateLoading
+          message={startupMessage}
+          progressText={startupProgressText}
+        />
+        <AlertModal
+          visible={serviceGateVisible}
+          title={serviceGateConfig.title}
+          message={serviceGateConfig.message}
+          buttons={serviceGateConfig.buttons}
+          icon={serviceGateConfig.icon}
+          iconColor={serviceGateConfig.iconColor}
+          onClose={closeServiceGate}
+        />
+      </>
     );
   }
   
   return (
     <>
       <AppNavigator linking={linking} />
+      <AlertModal
+        visible={serviceGateVisible}
+        title={serviceGateConfig.title}
+        message={serviceGateConfig.message}
+        buttons={serviceGateConfig.buttons}
+        icon={serviceGateConfig.icon}
+        iconColor={serviceGateConfig.iconColor}
+        onClose={closeServiceGate}
+      />
       {Platform.OS === 'web' && (
         <View style={styles.debugButtonsContainer}>
           <TouchableOpacity 
