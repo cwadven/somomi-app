@@ -117,12 +117,20 @@ const HomeScreen = ({ navigation }) => {
   const handleBannerPress = useCallback((banner) => {
     const external = banner?.external_target_url;
     const targetPk = banner?.target_pk;
+    const targetType = banner?.target_type;
     const title = banner?.title || '콘텐츠';
-    if (external && typeof external === 'string' && external.trim() !== '') {
-      rootNavigate('ExternalWebView', { url: external, title });
+    const normalizedType = targetType == null ? null : String(targetType).toUpperCase();
+    const isContentTarget = normalizedType == null || normalizedType === 'CONTENT';
+    const isExternalTarget = normalizedType === 'EXTERNAL_URL';
+
+    if (isExternalTarget) {
+      if (external && typeof external === 'string' && external.trim() !== '') {
+        rootNavigate('ExternalWebView', { url: external, title });
+      }
       return;
     }
-    if (targetPk != null && String(targetPk).trim() !== '') {
+
+    if (isContentTarget && targetPk != null && String(targetPk).trim() !== '') {
       rootNavigate('ContentWebView', { contentId: String(targetPk), title });
     }
   }, []);
@@ -172,7 +180,13 @@ const HomeScreen = ({ navigation }) => {
     const titleColor = typeof item?.title_font_color === 'string' && item.title_font_color.trim() !== '' ? item.title_font_color : '#ffffff';
     const descColor = typeof item?.description_font_color === 'string' && item.description_font_color.trim() !== '' ? item.description_font_color : 'rgba(255,255,255,0.92)';
     const uri = pickBannerImage(item);
-    const clickable = !!(item?.external_target_url || item?.target_pk);
+    const normalizedType = item?.target_type == null ? null : String(item?.target_type).toUpperCase();
+    const isContentTarget = normalizedType == null || normalizedType === 'CONTENT';
+    const isExternalTarget = normalizedType === 'EXTERNAL_URL';
+    const clickable = !!(
+      (isExternalTarget && item?.external_target_url && String(item?.external_target_url).trim() !== '') ||
+      (isContentTarget && item?.target_pk != null && String(item?.target_pk).trim() !== '')
+    );
     const { Image } = require('react-native');
     return (
       <TouchableOpacity
