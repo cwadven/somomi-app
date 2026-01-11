@@ -337,6 +337,8 @@ const ProfileScreen = () => {
     }
   };
   const pickProfileImage = async () => {
+    const prevPreview = editProfileImagePreview || null;
+    const prevUploaded = uploadedProfileImageUrl || null;
     try {
       if (Platform.OS !== 'web') {
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -373,6 +375,9 @@ const ProfileScreen = () => {
       setUploadedProfileImageUrl(null);
       await uploadProfileImage(meta);
     } catch (e) {
+      // presigned 발급/업로드 실패 시: 프리뷰/업로드 URL을 이전 값으로 복구
+      setEditProfileImagePreview(prevPreview);
+      setUploadedProfileImageUrl(prevUploaded);
       showErrorAlert(`이미지 선택 중 오류가 발생했습니다: ${e?.message || String(e)}`);
     }
   };
@@ -560,12 +565,12 @@ const ProfileScreen = () => {
         animationType="slide"
         onRequestClose={() => setShowEditProfileModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, styles.modalOverlayTight]}>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ width: '100%' }}
           >
-            <View style={styles.modalContainer}>
+            <View style={[styles.modalContainer, styles.modalContainerLarge]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>프로필 수정</Text>
                 <TouchableOpacity onPress={() => setShowEditProfileModal(false)}>
@@ -919,13 +924,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20
   },
+  modalOverlayTight: {
+    padding: 8
+  },
   modalContainer: {
     backgroundColor: '#fff',
     borderRadius: 12,
     width: '100%',
     maxWidth: 500,
-    maxHeight: '80%',
+    // 프로필 수정 모달이 너무 작게 보이는 이슈 개선: 세로 비율 확장
+    maxHeight: '92%',
     overflow: 'hidden'
+  },
+  modalContainerLarge: {
+    // 프로필 수정은 가능한 크게(거의 풀스크린) 표시하여 스크롤 필요성을 최소화
+    maxHeight: '98%',
+    minHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',

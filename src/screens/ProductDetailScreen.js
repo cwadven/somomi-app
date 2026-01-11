@@ -1027,6 +1027,9 @@ const ProductDetailScreen = () => {
   // 업로드 중에는 저장/수정 버튼을 비활성화하여 제출 자체를 막습니다. (요청사항)
 
   const pickImageForForm = async () => {
+    const prevPreviewUri = imagePreviewUri;
+    const prevPickedMeta = pickedImageMeta;
+    const prevUploadedUrl = uploadedIconUrl;
     try {
       if (Platform.OS !== 'web') {
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -1069,6 +1072,10 @@ const ProductDetailScreen = () => {
         meta
       });
     } catch (e) {
+      // presigned 발급/업로드 실패 시: "성공한 것처럼" 로컬 프리뷰가 남지 않도록 롤백
+      setPickedImageMeta(prevPickedMeta || null);
+      setUploadedIconUrl(prevUploadedUrl || null);
+      setImagePreviewUri(prevPreviewUri || null);
       showErrorAlert(`이미지 선택 중 오류가 발생했습니다: ${e?.message || String(e)}`);
     }
   };
