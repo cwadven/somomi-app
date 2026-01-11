@@ -25,6 +25,7 @@ import NotificationSettings from '../components/NotificationSettings';
 import { navigate as rootNavigate } from '../navigation/RootNavigation';
 import { logout, updateUserInfo } from '../redux/slices/authSlice';
 import AlertModal from '../components/AlertModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadSyncQueue } from '../utils/storageUtils';
 
 const ProfileScreen = () => {
@@ -152,7 +153,15 @@ const ProfileScreen = () => {
     setModalMessage('정말 로그아웃 하시겠습니까?');
     setModalAction(null);
     setModalButtons([
-    { text: '확인', onPress: () => {setModalVisible(false);dispatch(logout());} },
+    { text: '확인', onPress: async () => {
+      setModalVisible(false);
+      try { await AsyncStorage.removeItem('navigation-state'); } catch (e) {}
+      try { dispatch(logout()); } catch (e) {}
+      // 로그아웃 후 "내 영역" 탭을 첫 화면으로 리셋
+      try {
+        rootNavigate('Locations', { screen: 'LocationsScreen' });
+      } catch (e) {}
+    } },
     { text: '취소', style: 'cancel', onPress: () => setModalVisible(false) }]
     );
     setModalVisible(true);
