@@ -53,6 +53,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
   const [estimatedEnabled, setEstimatedEnabled] = useState(true);
   const [estimatedDays, setEstimatedDays] = useState('7');
   const [aiEnabled, setAiEnabled] = useState(false);
+  const AI_NOTIFICATION_COMING_SOON = true;
   const [isExpiryRepeating, setIsExpiryRepeating] = useState(false); // 유통기한 연속 알림
   const [isEstimatedRepeating, setIsEstimatedRepeating] = useState(false); // 소진예상 연속 알림
   const [apiLoading, setApiLoading] = useState(false);
@@ -184,29 +185,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
       };
       await updateGuestSectionAlarm(locationId, body);
       
-      // AI 알림 설정 저장(백엔드 스펙 외 항목은 기존 로컬 로직 유지)
-      const aiNotification = currentNotifications.find(n => n.notifyType === 'ai');
-      if (aiNotification) {
-        // 기존 설정 업데이트
-        await dispatch(updateNotification({
-          id: aiNotification.id,
-          data: {
-            isActive: aiEnabled
-          }
-        })).unwrap();
-      } else {
-        // 새 설정 추가
-        await dispatch(addNotification({
-          type: 'location',
-          targetId: locationId,
-          title: `${locationTitle} AI 알림`,
-          message: `${locationTitle} 영역의 AI 추천 알림 설정입니다.`,
-          notifyType: 'ai',
-          daysBeforeTarget: 7, // 기본값
-          isActive: aiEnabled,
-          isRepeating: false
-        })).unwrap();
-      }
+      // AI 알림은 아직 미사용(런칭 예정): 저장/동기화 하지 않음
       
       // 성공 모달 표시
       showSuccessModal();
@@ -303,22 +282,43 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
       )}
       
       {/* AI 알림 설정 */}
-      <View style={styles.settingSection}>
+      <View style={[styles.settingSection, AI_NOTIFICATION_COMING_SOON && styles.comingSoonSection]}>
         <View style={styles.settingHeader}>
-          <Ionicons name="analytics-outline" size={20} color="#4CAF50" style={styles.settingIcon} />
-          <Text style={styles.settingTitle}>AI 알림</Text>
+          <Ionicons
+            name="analytics-outline"
+            size={20}
+            color={AI_NOTIFICATION_COMING_SOON ? '#9E9E9E' : '#4CAF50'}
+            style={styles.settingIcon}
+          />
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={[styles.settingTitle, AI_NOTIFICATION_COMING_SOON && styles.comingSoonTitle]}>
+                AI 알림
+              </Text>
+              {AI_NOTIFICATION_COMING_SOON && (
+                <View style={styles.comingSoonBadge}>
+                  <Text style={styles.comingSoonBadgeText}>추후 런칭 예정</Text>
+                </View>
+              )}
+            </View>
+            {AI_NOTIFICATION_COMING_SOON && (
+              <Text style={styles.comingSoonSubtitle}>
+                준비 중인 기능입니다. 업데이트로 제공될 예정이에요.
+              </Text>
+            )}
+          </View>
         </View>
         <View style={styles.settingItem}>
-          <Text style={styles.settingText}>AI 추천 알림 활성화</Text>
+          <Text style={[styles.settingText, AI_NOTIFICATION_COMING_SOON && styles.comingSoonText]}>AI 추천 알림 활성화</Text>
           <Switch
-            value={aiEnabled}
-            onValueChange={(v) => { if (!isLocationExpired) setAiEnabled(v); }}
+            value={false}
+            onValueChange={() => {}}
             trackColor={{ false: '#767577', true: '#81b0ff' }}
-            thumbColor={aiEnabled ? '#4630EB' : '#f4f3f4'}
-            disabled={isLocationExpired}
+            thumbColor="#f4f3f4"
+            disabled
           />
         </View>
-        <Text style={styles.settingDescription}>
+        <Text style={[styles.settingDescription, AI_NOTIFICATION_COMING_SOON && styles.comingSoonText]}>
           AI가 제품 사용 패턴을 분석하여 구매 시점을 추천해 드립니다.
         </Text>
       </View>
@@ -582,6 +582,32 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  comingSoonSection: {
+    backgroundColor: '#FAFAFA',
+  },
+  comingSoonTitle: {
+    color: '#9E9E9E',
+  },
+  comingSoonText: {
+    color: '#9E9E9E',
+  },
+  comingSoonBadge: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#EEEEEE',
+  },
+  comingSoonBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#757575',
+  },
+  comingSoonSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#9E9E9E',
   },
   blockBanner: {
     flexDirection: 'row',
