@@ -68,6 +68,7 @@ import CalendarView from '../components/CalendarView';
 import { emitEvent, EVENT_NAMES } from '../utils/eventBus';
 import LocationSelector from '../components/LocationSelector';
 import { fetchLocations } from '../redux/slices/locationsSlice';
+import { calculateConsumptionPercentage as calculateConsumptionResult, calculateExpiryPercentage as calculateExpiryResult } from '../utils/productUtils';
 
 
 
@@ -697,62 +698,28 @@ const ProductDetailScreen = () => {
 
   }
   
-  // 유통기한 남은 수명 계산 (%)
+  // 유통기한 남은 수명 계산 (%) - 목록(ProductCard)과 동일한 공용 로직 사용
   const calculateExpiryPercentage = () => {
-    if (!currentProduct.expiryDate) return null;
-    const DAY_MS = 24 * 60 * 60 * 1000;
-    const nowMs = Date.now();
-    const endMs = new Date(currentProduct.expiryDate).getTime();
-    const startMsRaw = currentProduct.purchaseDate ?
-    new Date(currentProduct.purchaseDate).getTime() :
-    (currentProduct.createdAt ? new Date(currentProduct.createdAt).getTime() : null);
-    const startMs = Number.isFinite(startMsRaw) && startMsRaw < endMs ? startMsRaw : (endMs - 30 * DAY_MS);
-    if (!Number.isFinite(endMs) || !Number.isFinite(startMs)) return 100;
-    const totalMs = endMs - startMs;
-    if (totalMs <= 0) return 0;
-    const remainingMs = endMs - nowMs;
-    const percentage = Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
-    return Math.round(percentage);
+    const r = calculateExpiryResult(currentProduct);
+    return r?.percentage ?? null;
   };
 
-  // 소진 예상일 남은 수명 계산 (%)
+  // 소진 예상일 남은 수명 계산 (%) - 목록(ProductCard)과 동일한 공용 로직 사용
   const calculateConsumptionPercentage = () => {
-    if (!currentProduct.estimatedEndDate) return null;
-    const DAY_MS = 24 * 60 * 60 * 1000;
-    const nowMs = Date.now();
-    const endMs = new Date(currentProduct.estimatedEndDate).getTime();
-    const startMsRaw = currentProduct.purchaseDate ?
-    new Date(currentProduct.purchaseDate).getTime() :
-    (currentProduct.createdAt ? new Date(currentProduct.createdAt).getTime() : null);
-    const startMs = Number.isFinite(startMsRaw) && startMsRaw < endMs ? startMsRaw : (endMs - 30 * DAY_MS);
-    if (!Number.isFinite(endMs) || !Number.isFinite(startMs)) return 100;
-    const totalMs = endMs - startMs;
-    if (totalMs <= 0) return 0;
-    const remainingMs = endMs - nowMs;
-    const percentage = Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
-    return Math.round(percentage);
+    const r = calculateConsumptionResult(currentProduct);
+    return r?.percentage ?? null;
   };
   
-  // 유통기한 남은 일수 계산
+  // 유통기한 남은 일수 계산 - 목록(ProductCard)과 동일한 공용 로직 사용
   const calculateExpiryDays = () => {
-    if (!currentProduct.expiryDate) return null;
-    const DAY_MS = 24 * 60 * 60 * 1000;
-    const nowMs = Date.now();
-    const d = new Date(currentProduct.expiryDate);
-    const endMs = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
-    if (!Number.isFinite(endMs)) return null;
-    return Math.floor((endMs - nowMs) / DAY_MS);
+    const r = calculateExpiryResult(currentProduct);
+    return r ? r.remainingDays : null;
   };
 
-  // 소진 예상일 남은 일수 계산
+  // 소진 예상일 남은 일수 계산 - 목록(ProductCard)과 동일한 공용 로직 사용
   const calculateConsumptionDays = () => {
-    if (!currentProduct.estimatedEndDate) return null;
-    const DAY_MS = 24 * 60 * 60 * 1000;
-    const nowMs = Date.now();
-    const d = new Date(currentProduct.estimatedEndDate);
-    const endMs = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
-    if (!Number.isFinite(endMs)) return null;
-    return Math.floor((endMs - nowMs) / DAY_MS);
+    const r = calculateConsumptionResult(currentProduct);
+    return r ? r.remainingDays : null;
   };
 
   // 카테고리 제거: 고정 아이콘 사용
