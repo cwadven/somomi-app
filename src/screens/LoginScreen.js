@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { verifyToken } from '../redux/slices/authSlice';
@@ -9,6 +9,7 @@ import BasicLoginForm from '../components/BasicLoginForm';
 const LoginScreen = ({ navigation }) => {
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
   const dispatch = useDispatch();
+  const mountedRef = useRef(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -18,6 +19,12 @@ const LoginScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const [otpRequested, setOtpRequested] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const handleSignup = async () => {
     try {
@@ -50,49 +57,66 @@ const LoginScreen = ({ navigation }) => {
         try { await dispatch(verifyToken()).unwrap(); } catch (e) {}
       } else {
         setError('토큰 발급에 실패했습니다. 잠시 후 다시 시도해 주세요.');
-        setLoading(false);
         return;
       }
-      navigation.goBack();
+      // 화면 닫기 전에 로딩 해제(언마운트 후 setState 방지)
+      if (mountedRef.current) setLoading(false);
+      try {
+        if (navigation?.canGoBack?.()) navigation.goBack();
+        else navigation.navigate('Profile');
+      } catch (e) {}
     } catch (e) {
       setError(e?.message || '회원가입 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
-  const handleRequestOtp = () => {
-    setError('');
-    setOtpError('');
-    if (!email || !email.includes('@')) {
-      setError('유효한 이메일을 입력한 후 인증을 요청하세요.');
-      return;
+  const handleRequestOtp = async () => {
+    if (otpLoading || loading) return;
+    try {
+      setError('');
+      setOtpError('');
+      if (!email || !email.includes('@')) {
+        setError('유효한 이메일을 입력한 후 인증을 요청하세요.');
+        return;
+      }
+      setOtpVerified(false);
+      setOtpCode('');
+      setOtpLoading(true);
+      await sendVerificationToken(email);
+      if (mountedRef.current) setOtpRequested(true);
+    } catch (e) {
+      if (!mountedRef.current) return;
+      setError(e?.response?.data?.message || e?.message || '인증 메일 전송 중 오류가 발생했습니다.');
+      setOtpRequested(false);
+    } finally {
+      if (mountedRef.current) setOtpLoading(false);
     }
-    setOtpVerified(false);
-    setOtpCode('');
-    // 서버에 인증 메일 발송 요청 (성공 시에만 입력 UI 노출)
-    sendVerificationToken(email)
-      .then(() => {
-        setOtpRequested(true);
-      })
-      .catch((e) => {
-        setError(e?.response?.data?.message || e?.message || '인증 메일 전송 중 오류가 발생했습니다.');
-        setOtpRequested(false);
-      });
   };
 
-  const handleVerifyOtp = () => {
-    setError('');
-    if (!/^\d{6}$/.test(otpCode)) {
-      setOtpError('6자리 숫자 인증 코드를 입력하세요.');
-      return;
+  const handleVerifyOtp = async () => {
+    if (otpLoading || loading) return;
+    try {
+      setError('');
+      const onlyDigits = String(otpCode || '').replace(/\D/g, '');
+      if (!/^\d{6}$/.test(onlyDigits)) {
+        setOtpError('6자리 숫자 인증 코드를 입력하세요.');
+        return;
+      }
+      setOtpLoading(true);
+      await verifyVerificationToken(email, onlyDigits);
+      if (!mountedRef.current) return;
+      setOtpVerified(true);
+      setOtpError('');
+      setOtpCode(onlyDigits);
+    } catch (e) {
+      if (!mountedRef.current) return;
+      setOtpVerified(false);
+      setOtpError(e?.response?.data?.message || e?.message || '인증 코드 검증에 실패했습니다.');
+    } finally {
+      if (mountedRef.current) setOtpLoading(false);
     }
-    verifyVerificationToken(email, otpCode)
-      .then(() => { setOtpVerified(true); setOtpError(''); })
-      .catch((e) => {
-        setOtpVerified(false);
-        setOtpError(e?.response?.data?.message || e?.message || '인증 코드 검증에 실패했습니다.');
-      });
   };
 
   return (
@@ -123,8 +147,10 @@ const LoginScreen = ({ navigation }) => {
               autoCapitalize="none"
               keyboardType="email-address"
             />
-            <TouchableOpacity style={styles.smallBtn} onPress={handleRequestOtp} disabled={loading}>
-              <Text style={styles.smallBtnText}>{otpRequested ? '재요청' : '인증 받기'}</Text>
+            <TouchableOpacity style={styles.smallBtn} onPress={handleRequestOtp} disabled={loading || otpLoading}>
+              {otpLoading
+                ? <ActivityIndicator size="small" color="#2E7D32" />
+                : <Text style={styles.smallBtnText}>{otpRequested ? '재요청' : '인증 받기'}</Text>}
             </TouchableOpacity>
           </View>
           {/* 인증코드 입력: 이메일 아래로 이동 */}
@@ -133,12 +159,17 @@ const LoginScreen = ({ navigation }) => {
               <TextInput
                 style={[styles.input, { flex: 1 }]}
                 value={otpCode}
-                onChangeText={(t) => { setOtpCode(t.replace(/[^0-9]/g, '').slice(0, 6)); setOtpError(''); }}
+                onChangeText={(t) => { setOtpCode(t); setOtpError(''); }}
                 placeholder="인증 코드(6자리)"
                 keyboardType="number-pad"
+                maxLength={6}
+                autoCorrect={false}
+                autoCapitalize="none"
               />
-              <TouchableOpacity style={styles.smallBtn} onPress={handleVerifyOtp} disabled={loading}>
-                <Text style={styles.smallBtnText}>확인하기</Text>
+              <TouchableOpacity style={styles.smallBtn} onPress={handleVerifyOtp} disabled={loading || otpLoading}>
+                {otpLoading
+                  ? <ActivityIndicator size="small" color="#2E7D32" />
+                  : <Text style={styles.smallBtnText}>확인하기</Text>}
               </TouchableOpacity>
             </View>
           )}
@@ -163,7 +194,7 @@ const LoginScreen = ({ navigation }) => {
             secureTextEntry={true}
           />
           {!!error && <Text style={styles.errorText}>{error}</Text>}
-          <TouchableOpacity style={styles.primaryBtn} onPress={handleSignup} disabled={loading}>
+          <TouchableOpacity style={styles.primaryBtn} onPress={handleSignup} disabled={loading || otpLoading}>
             {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>회원가입</Text>}
           </TouchableOpacity>
         </View>
