@@ -37,6 +37,9 @@ import IconSelector from '../components/IconSelector';
 import AlertModal from '../components/AlertModal';
 import { isTemplateActive } from '../utils/validityUtils';
 
+const MAX_LOCATION_TITLE_LEN = 50;
+const MAX_LOCATION_DESC_LEN = 100;
+
 const AddLocationScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -432,9 +435,12 @@ const AddLocationScreen = () => {
   
   // 입력값 변경 핸들러
   const handleInputChange = (key, value) => {
+    let next = value;
+    if (key === 'title') next = String(value || '').slice(0, MAX_LOCATION_TITLE_LEN);
+    if (key === 'description') next = String(value || '').slice(0, MAX_LOCATION_DESC_LEN);
     setLocationData({
       ...locationData,
-      [key]: value
+      [key]: next
     });
   };
   
@@ -460,7 +466,10 @@ const AddLocationScreen = () => {
   const handleCreateLocation = async () => {
     if (hasSubmittedRef.current) return;
     // 필수 입력값 검증
-    if (!locationData.title.trim()) {
+    const sanitizedTitle = String(locationData.title || '').trim();
+    const sanitizedDesc = String(locationData.description || '').trim();
+
+    if (!sanitizedTitle) {
       setAlertModalConfig({
         title: '입력 오류',
         message: '영역 이름을 입력해주세요.',
@@ -469,6 +478,30 @@ const AddLocationScreen = () => {
 
         icon: 'alert-circle',
         iconColor: '#F44336'
+      });
+      setAlertModalVisible(true);
+      return;
+    }
+
+    if (sanitizedTitle.length > MAX_LOCATION_TITLE_LEN) {
+      setAlertModalConfig({
+        title: '입력 오류',
+        message: `영역 이름은 최대 ${MAX_LOCATION_TITLE_LEN}자까지 입력할 수 있어요.`,
+        buttons: [{ text: '확인' }],
+        icon: 'alert-circle',
+        iconColor: '#F44336',
+      });
+      setAlertModalVisible(true);
+      return;
+    }
+
+    if (sanitizedDesc.length > MAX_LOCATION_DESC_LEN) {
+      setAlertModalConfig({
+        title: '입력 오류',
+        message: `영역 설명은 최대 ${MAX_LOCATION_DESC_LEN}자까지 입력할 수 있어요.`,
+        buttons: [{ text: '확인' }],
+        icon: 'alert-circle',
+        iconColor: '#F44336',
       });
       setAlertModalVisible(true);
       return;
@@ -540,8 +573,8 @@ const AddLocationScreen = () => {
         try {
           updatedLocation = await dispatch(updateLocation({
             id: locationToEdit.id,
-            title: locationData.title,
-            description: locationData.description,
+            title: sanitizedTitle,
+            description: sanitizedDesc || null,
             icon: locationData.icon,
             templateInstanceId: newTemplateInstanceId,
             productId: newProductId,
@@ -615,6 +648,8 @@ const AddLocationScreen = () => {
         // 영역 생성 API 호출
         const result = await dispatch(createLocation({
         ...locationData,
+          title: sanitizedTitle,
+          description: sanitizedDesc || null,
           templateInstanceId: selectedTemplateInstance.id,
           productId: selectedTemplateInstance.productId,
           feature: selectedTemplateInstance.feature
@@ -829,7 +864,7 @@ const AddLocationScreen = () => {
                 </ScrollView>
       </View> :
 
-              <Text style={styles.sectionDescription}>사용 가능한 템플릿이 없습니다. (만료된 템플릿은 목록에 표시되지 않습니다)</Text>
+              <Text style={styles.sectionDescription}>사용 가능한 템플릿이 없습니다.</Text>
           }
           </View>
         }
@@ -851,7 +886,9 @@ const AddLocationScreen = () => {
               onChangeText={(text) => handleInputChange('title', text)}
               placeholder="영역 이름 입력..."
               placeholderTextColor="#999"
+              maxLength={MAX_LOCATION_TITLE_LEN}
               editable={!(isEditMode && isEditLockedByExpiry)} />
+          <Text style={styles.inputHint}>최대 {MAX_LOCATION_TITLE_LEN}자</Text>
 
         </View>
         
@@ -863,8 +900,10 @@ const AddLocationScreen = () => {
               onChangeText={(text) => handleInputChange('description', text)}
               placeholder={"영역 설명 입력..."}
               placeholderTextColor="#999"
+            maxLength={MAX_LOCATION_DESC_LEN}
             multiline
               editable={!(isEditMode && isEditLockedByExpiry)} />
+          <Text style={styles.inputHint}>최대 {MAX_LOCATION_DESC_LEN}자</Text>
 
         </View>
         
@@ -1000,6 +1039,11 @@ const styles = StyleSheet.create({
   textArea: {
     height: 100,
     textAlignVertical: 'top'
+  },
+  inputHint: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#9E9E9E'
   },
   iconSelector: {
     flexDirection: 'row',
