@@ -260,14 +260,15 @@ const LocationDetailScreen = () => {
 
     // 캐시가 없으면 로컬 필터 폴백
     if (isAllProductsView) {
+        // locationId 타입(number/string)이 섞여도 필터에서 누락되지 않도록 String으로 통일
         const activeLocIds = new Set(
           (locations || [])
             .filter(loc => loc && loc.disabled !== true && !isLocExpired(loc))
-            .map(loc => loc.id)
+            .map(loc => String(loc.id))
         );
         const fallback = (products || []).filter(p => {
         const k = p.locationLocalId || p.locationId;
-        return !!k && activeLocIds.has(k) && p.syncStatus !== 'deleted' && !p.isConsumed;
+        return !!k && activeLocIds.has(String(k)) && p.syncStatus !== 'deleted' && !p.isConsumed;
         });
         setLocationProducts(fallback);
       } else {

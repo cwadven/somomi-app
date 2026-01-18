@@ -5,6 +5,7 @@ import {
   Text, 
   StyleSheet, 
   ScrollView, 
+  KeyboardAvoidingView,
   Image, 
   TouchableOpacity,
   TextInput,
@@ -148,6 +149,12 @@ const ProductDetailScreen = () => {
   const dispatch = useDispatch();
   
   const { productId, product: passedProduct, mode: routeMode, locationId: createLocationId } = route.params || {};
+  // 일부 진입 경로에서는 productId가 없고(product 객체만 전달), 수정 후에도 상세가 route param(passedProduct)만 바라보면 최신화가 안 됩니다.
+  // 가능한 id 후보를 모아 "해당 화면에서 바라봐야 하는 제품 id"를 항상 확보합니다.
+  const resolvedProductId =
+    productId != null ? String(productId) :
+    passedProduct?.id != null ? String(passedProduct.id) :
+    null;
   const [screenMode, setScreenMode] = useState(routeMode === 'create' ? 'create' : routeMode === 'edit' ? 'edit' : 'view'); // view | edit | create
   const { currentProduct: selectedProduct, status, error, locationProducts, products } = useSelector((state) => state.products);
   // 섹션 인벤토리 API로 채워진 캐시에서 우선 탐색
@@ -155,7 +162,7 @@ const ProductDetailScreen = () => {
     try {
       const lists = Object.values(locationProducts || {});
       for (const list of lists) {
-        const found = Array.isArray(list) ? list.find((p) => String(p.id) === String(productId)) : null;
+        const found = Array.isArray(list) && resolvedProductId ? list.find((p) => String(p.id) === String(resolvedProductId)) : null;
         if (found) return found;
       }
       return null;
@@ -163,7 +170,10 @@ const ProductDetailScreen = () => {
       return null;
     }
   })();
-  const currentProduct = cachedFromSections || selectedProduct || passedProduct;
+  // 일부 진입 경로에서는 route params(passedProduct)만 있고, Redux(products/locationProducts/currentProduct)에 제품이 없을 수 있어
+  // 저장 후에도 화면이 최신화되지 않을 수 있습니다. store의 products에서도 찾아서 우선 사용합니다.
+  const fromProducts = Array.isArray(products) && resolvedProductId ? products.find((p) => String(p?.id) === String(resolvedProductId)) : null;
+  const currentProduct = cachedFromSections || selectedProduct || fromProducts || passedProduct;
   const { userLocationTemplateInstances, userProductSlotTemplateInstances, subscription, slots } = useSelector((state) => state.auth);
   const { locations, status: locationsStatus, error: locationsError } = useSelector((state) => state.locations);
   const isConsumed = currentProduct?.isConsumed === true || currentProduct?.is_consumed === true;
@@ -274,10 +284,10 @@ const ProductDetailScreen = () => {
   
   useEffect(() => {
     // 리스트/캐시/파라미터에 데이터가 없을 때만 개별 상세 로드
-    if (!currentProduct && productId) {
-    dispatch(fetchProductById(productId));
+    if (!currentProduct && resolvedProductId) {
+    dispatch(fetchProductById(resolvedProductId));
     }
-  }, [dispatch, productId, currentProduct]);
+  }, [dispatch, resolvedProductId, currentProduct]);
   
   // 목록 자동 재호출 제거 (요청사항): 제품 상세 진입/복귀 시 영역 목록 API 호출 금지
   
@@ -747,6 +757,15 @@ const ProductDetailScreen = () => {
   const [showEstimatedEndDatePicker, setShowEstimatedEndDatePicker] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null); // create 모드에서 locationId 없을 때 사용
   const didInitEditLocationRef = useRef(false);
+  const formScrollRef = useRef(null);
+  const memoInputRef = useRef(null);
+
+  const scrollFormToMemo = () => {
+    // 키보드가 올라오는 타이밍 이후에 스크롤을 맞추기 위해 약간 지연
+    setTimeout(() => {
+      try { formScrollRef.current?.scrollToEnd({ animated: true }); } catch (e) {}
+    }, 150);
+  };
 
   useEffect(() => {
     // create 모드인데 locationId가 없으면, 영역 선택을 위해 locations를 보장
@@ -1275,6 +1294,7 @@ const ProductDetailScreen = () => {
 
         // edit (영역 변경 포함)
         if (!currentProduct?.id) return;
+        const prevLocId = currentProduct.locationId != null ? String(currentProduct.locationId) : null;
         const locIdAfter = selectedLocation?.id || currentProduct.locationId || null;
         const body = {
           guest_section_id: locIdAfter ? Number(locIdAfter) : null,
@@ -1289,38 +1309,45 @@ const ProductDetailScreen = () => {
           expire_at: expiryDateObj ? expiryDateObj.toISOString() : null
         };
         await updateInventoryItem(String(currentProduct.id), body);
+        const patch = {
+          iconUrl: body.icon_url,
+          name: body.name,
+          memo: body.memo,
+          brand: body.brand,
+          purchasePlace: body.point_of_purchase,
+          price: body.purchase_price,
+          purchaseDate: body.purchase_at,
+          expiryDate: body.expire_at,
+          estimatedEndDate: body.expected_expire_at,
+          locationId: locIdAfter ? String(locIdAfter) : null
+        };
         try {
           dispatch(patchProductById({
             id: String(currentProduct.id),
+            prevLocationId: prevLocId,
             patch: {
-              iconUrl: body.icon_url,
-              name: body.name,
-              memo: body.memo,
-              brand: body.brand,
-              purchasePlace: body.point_of_purchase,
-              price: body.purchase_price,
-              purchaseDate: body.purchase_at,
-              expiryDate: body.expire_at,
-              estimatedEndDate: body.expected_expire_at
+              ...patch
             }
           }));
+        } catch (e) {}
+        // ✅ 상세 화면이 route params(passedProduct)만으로 그려지는 경우에도 즉시 최신 값이 보이도록 upsert
+        try {
+          const updated = {
+            ...(currentProduct || {}),
+            id: String(currentProduct.id),
+            isConsumed: false,
+            ...patch
+          };
+          dispatch(upsertActiveProduct({ product: updated }));
         } catch (e) {}
         // ✅ Event-driven refresh: 목록 refetch 없이 현재 아이템만 부분 업데이트
         try {
           emitEvent(EVENT_NAMES.PRODUCT_UPDATED, {
             id: String(currentProduct.id),
             patch: {
-              iconUrl: body.icon_url,
-              name: body.name,
-              memo: body.memo,
-              brand: body.brand,
-              purchasePlace: body.point_of_purchase,
-              price: body.purchase_price,
-              purchaseDate: body.purchase_at,
-              expiryDate: body.expire_at,
-              estimatedEndDate: body.expected_expire_at
+              ...patch
             },
-            locationId: currentProduct.locationId != null ? String(currentProduct.locationId) : null
+            locationId: locIdAfter ? String(locIdAfter) : (currentProduct.locationId != null ? String(currentProduct.locationId) : null)
           });
         } catch (e) {}
         setScreenMode('view');
@@ -1330,7 +1357,19 @@ const ProductDetailScreen = () => {
     };
 
     return (
-      <ScrollView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // iOS에서 헤더/상단바가 있을 때 입력창이 덜 가려지도록 약간 오프셋
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+      >
+      <ScrollView
+        ref={formScrollRef}
+        style={{ flex: 1 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
         <View style={styles.productHeader}>
           <View style={styles.imageContainer}>
             {imagePreviewUri ?
@@ -1602,7 +1641,15 @@ const ProductDetailScreen = () => {
           <TextInput style={styles.formInput} value={price} onChangeText={(t) => setPrice(t.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="숫자만 입력" />
 
           <Text style={styles.formLabel}>메모</Text>
-          <TextInput style={[styles.formInput, styles.formTextArea]} value={memo} onChangeText={setMemo} placeholder="선택" multiline />
+          <TextInput
+            ref={memoInputRef}
+            style={[styles.formInput, styles.formTextArea]}
+            value={memo}
+            onChangeText={setMemo}
+            placeholder="선택"
+            multiline
+            onFocus={scrollFormToMemo}
+          />
 
           <TouchableOpacity style={[styles.formSaveButton, !canSave && { opacity: 0.5 }]} disabled={!canSave} onPress={onSave}>
             <Text style={styles.formSaveButtonText}>
@@ -1613,7 +1660,8 @@ const ProductDetailScreen = () => {
             <Text style={styles.formCancelButtonText}>취소</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>);
+      </ScrollView>
+      </KeyboardAvoidingView>);
 
   };
 
