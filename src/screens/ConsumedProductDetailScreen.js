@@ -134,12 +134,12 @@ const ConsumedProductDetailScreen = () => {
           let reason = msg;
           if (!reason) {
             const map = {
-              'guest-section-not-exists': '선택된 영역을 찾을 수 없습니다. 다른 영역을 선택해주세요.',
-              'guest-section-exceed-base-slot': '해당 영역의 유효 슬롯을 초과했습니다. 다른 영역을 선택해주세요.',
-              'guest-inventory-item-template-invalid': '연결 가능한 제품 템플릿이 유효하지 않습니다. 다른 영역을 선택하거나 템플릿을 확인해주세요.',
-              'guest-inventory-item-template-already-item-registered': '이미 연결된 제품이 있는 템플릿입니다. 다른 영역을 선택해주세요.',
+              'guest-section-not-exists': '선택된 카테고리를 찾을 수 없습니다. 다른 카테고리를 선택해주세요.',
+              'guest-section-exceed-base-slot': '해당 카테고리의 유효 슬롯을 초과했습니다. 다른 카테고리를 선택해주세요.',
+              'guest-inventory-item-template-invalid': '연결 가능한 제품 템플릿이 유효하지 않습니다. 다른 카테고리를 선택하거나 템플릿을 확인해주세요.',
+              'guest-inventory-item-template-already-item-registered': '이미 연결된 제품이 있는 템플릿입니다. 다른 카테고리를 선택해주세요.',
             };
-            reason = map[code] || '해당 영역으로 복원할 수 없습니다. 다른 영역을 선택해주세요.';
+            reason = map[code] || '해당 카테고리로 복원할 수 없습니다. 다른 카테고리를 선택해주세요.';
           }
           setReasonForSelection(reason);
           setLocationSelectionVisible(true);
@@ -190,7 +190,7 @@ const ConsumedProductDetailScreen = () => {
       });
     } catch (e) {
       setIsRestoring(false);
-      showErrorModal('영역 정보를 확인하는 중 오류가 발생했습니다. 다시 시도해주세요.');
+      showErrorModal('카테고리 정보를 확인하는 중 오류가 발생했습니다. 다시 시도해주세요.');
     }
   };
   
@@ -387,7 +387,7 @@ const ConsumedProductDetailScreen = () => {
           />
 
           <InfoItem 
-            label="소진 당시 영역"
+            label="소진 당시 카테고리"
             value={consumedFromLocation ? consumedFromLocation.title : null}
             icon="location-outline"
           />

@@ -268,7 +268,7 @@ export const applyLocationNotifications = createAsyncThunk(
       );
       
       if (locationNotifications.length === 0) {
-        return rejectWithValue('영역의 기본 알림 설정이 없습니다.');
+        return rejectWithValue('카테고리의 기본 알림 설정이 없습니다.');
       }
       
       // 해당 영역에 속한 제품 목록 가져오기

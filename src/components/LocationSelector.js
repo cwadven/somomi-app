@@ -11,12 +11,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 /**
- * 영역 선택 컴포넌트
- * @param {Array} locations - 영역 목록 배열
- * @param {Object} selectedLocation - 현재 선택된 영역
- * @param {Function} onSelectLocation - 영역 선택 시 호출되는 함수
- * @param {Function} onAddLocation - 영역 추가 버튼 클릭 시 호출되는 함수
- * @param {Boolean} isLoading - 영역 로딩 중 여부
+ * 카테고리 선택 컴포넌트
+ * @param {Array} locations - 카테고리 목록 배열
+ * @param {Object} selectedLocation - 현재 선택된 카테고리
+ * @param {Function} onSelectLocation - 카테고리 선택 시 호출되는 함수
+ * @param {Function} onAddLocation - 카테고리 추가 버튼 클릭 시 호출되는 함수
+ * @param {Boolean} isLoading - 카테고리 로딩 중 여부
  * @param {Function} onRetry - 로드 재시도 함수
  * @param {String} error - 에러 메시지
  */
@@ -35,7 +35,7 @@ const LocationSelector = forwardRef(({
       {isLoading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="small" color="#4CAF50" style={styles.loader} />
-          <Text style={styles.loaderText}>영역 정보를 불러오는 중...</Text>
+          <Text style={styles.loaderText}>카테고리 정보를 불러오는 중...</Text>
       </View>
       ) : locations.length > 0 ? (
         <>
@@ -78,7 +78,7 @@ const LocationSelector = forwardRef(({
                 onPress={onAddLocation}
               >
                 <Ionicons name="add" size={18} color="#4CAF50" style={styles.addLocationIcon} />
-                <Text style={styles.addLocationText}>영역 추가</Text>
+                <Text style={styles.addLocationText}>카테고리 추가</Text>
               </TouchableOpacity>
             )}
           />
@@ -88,14 +88,14 @@ const LocationSelector = forwardRef(({
         </>
       ) : (
         <View style={styles.emptyLocations}>
-          <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
+          <Text style={styles.emptyText}>등록된 카테고리가 없습니다.</Text>
           <View style={styles.emptyButtonsContainer}>
           {!hideAddButton && (
             <TouchableOpacity
               style={styles.addLocationButton}
               onPress={onAddLocation}
             >
-              <Text style={styles.addLocationButtonText}>영역 추가하기</Text>
+              <Text style={styles.addLocationButtonText}>카테고리 추가하기</Text>
             </TouchableOpacity>
           )}
             

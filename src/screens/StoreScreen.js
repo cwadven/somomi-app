@@ -46,16 +46,16 @@ const StoreScreen = () => {
   const { locations, status: locationsStatus } = useSelector((state) => state.locations);
 
   const [showPointHistory, setShowPointHistory] = useState(false);
-  // 영역 슬롯 내부에서만 카운트다운 렌더를 트리거하기 위해 전역 타이머는 두지 않습니다.
+  // 카테고리 슬롯 내부에서만 카운트다운 렌더를 트리거하기 위해 전역 타이머는 두지 않습니다.
 
-  // 영역 데이터 로드
+  // 카테고리 데이터 로드
   useEffect(() => {
     if (isLoggedIn) {
       dispatch(fetchLocations());
     }
   }, [dispatch, isLoggedIn]);
 
-  // 영역 슬롯 항목용 카운트다운 전용 컴포넌트(해당 영역만 재렌더)
+  // 카테고리 슬롯 항목용 카운트다운 전용 컴포넌트(해당 카테고리만 재렌더)
   const SaleEndCountdown = ({ endAt }) => {
     const [label, setLabel] = useState(null);
     useEffect(() => {
@@ -232,11 +232,11 @@ const StoreScreen = () => {
           dispatch(updateSlots({ locationSlots: { additionalSlots: slots.locationSlots.additionalSlots + count } }));
           for (const t of templates) {
             const baseSlots = t && typeof t.feature?.baseSlots === 'number' ? t.feature.baseSlots : 3;
-            const displayName = t?.locationTemplateName || '기본 영역';
+            const displayName = t?.locationTemplateName || '기본 카테고리';
             dispatch(addTemplateInstance({
               productId: t?.locationTemplateId || 'basic_location',
               name: displayName,
-              description: '기본적인 제품 관리 기능을 제공하는 영역',
+              description: '기본적인 제품 관리 기능을 제공하는 카테고리',
               icon: 'cube-outline',
               feature: { baseSlots },
               used: false,
@@ -260,11 +260,11 @@ const StoreScreen = () => {
           const days = specialTemplate?.feature?.validWhile && specialTemplate.feature.validWhile.expiresAt ? null : specialTemplate?.durationDays || 30;
           const baseSlots = specialTemplate && typeof specialTemplate.feature?.baseSlots === 'number' ? specialTemplate.feature.baseSlots : -1;
           const expiresAt = specialTemplate?.feature?.validWhile && specialTemplate.feature.validWhile.expiresAt || new Date(Date.now() + (days || 0) * 24 * 60 * 60 * 1000).toISOString();
-          // slots counter 업데이트(스페셜 영역도 하나의 추가 영역으로 카운트)
+          // slots counter 업데이트(스페셜 카테고리도 하나의 추가 카테고리로 카운트)
           dispatch(updateSlots({ locationSlots: { additionalSlots: slots.locationSlots.additionalSlots + 1 } }));
           dispatch(addTemplateInstance({
             productId: specialTemplate?.locationTemplateId || 'special_location',
-            name: specialTemplate?.locationTemplateName || '스페셜 영역',
+            name: specialTemplate?.locationTemplateName || '스페셜 카테고리',
             description: days ? `${days}일 유효` : '기간 제한 없음',
             icon: 'star',
             feature: { baseSlots, validWhile: { type: 'fixed', expiresAt } },
@@ -490,7 +490,7 @@ const StoreScreen = () => {
 
   // (제거) 슬롯 기본 카탈로그 렌더링은 더 이상 사용하지 않음
 
-  // 영역 슬롯만 렌더링
+  // 카테고리 슬롯만 렌더링
   const renderLocationSlotItems = () => {
     const apiItems = Array.isArray(remoteLocationTemplateProducts) ? remoteLocationTemplateProducts : null;
     const items = apiItems ? apiItems.map((p) => {
@@ -514,7 +514,7 @@ const StoreScreen = () => {
     return (
       <View style={styles.slotsGrid}>
         {items.length === 0 ?
-        <Text style={styles.emptyText}>판매 중인 영역 슬롯 상품이 없습니다.</Text> :
+        <Text style={styles.emptyText}>판매 중인 카테고리 슬롯 상품이 없습니다.</Text> :
         items.map((item) =>
         <View key={item.id} style={styles.slotTile}>
             {/* 좌측 아이콘 */}
@@ -733,7 +733,7 @@ const StoreScreen = () => {
             <Ionicons name="lock-closed" size={40} color="#999" />
             <Text style={styles.loginPromptTitle}>로그인이 필요합니다</Text>
             <Text style={styles.loginPromptText}>
-              영역 슬롯 구매 및 G 충전을 위해 로그인이 필요합니다.
+              카테고리 슬롯 구매 및 G 충전을 위해 로그인이 필요합니다.
             </Text>
             <TouchableOpacity
             style={styles.loginButton}
@@ -769,7 +769,7 @@ const StoreScreen = () => {
               style={[styles.shopTabItem, activeShopTab === 'locationSlot' && styles.shopTabItemActive]}
               onPress={() => handleTabChange('locationSlot')}>
 
-              <Text style={[styles.shopTabText, activeShopTab === 'locationSlot' && styles.shopTabTextActive]}>영역 슬롯</Text>
+              <Text style={[styles.shopTabText, activeShopTab === 'locationSlot' && styles.shopTabTextActive]}>카테고리 슬롯</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.shopTabItem, activeShopTab === 'points' && styles.shopTabItemActive]}
@@ -783,7 +783,7 @@ const StoreScreen = () => {
         {/* 탭 내용 */}
         {activeShopTab === 'locationSlot' &&
         <View style={styles.section}>
-            <Text style={styles.sectionTitle}>영역 슬롯</Text>
+            <Text style={styles.sectionTitle}>카테고리 슬롯</Text>
             {renderLocationSlotItems()}
           </View>
         }

@@ -1,6 +1,6 @@
 // 공통 배지 라벨 유틸
 
-// 영역 슬롯: feature.baseSlots 배열을 받아 "N 슬롯 영역 x M" 그룹 라벨 목록 생성
+// 카테고리 슬롯: feature.baseSlots 배열을 받아 "N 슬롯 카테고리 x M" 그룹 라벨 목록 생성
 export const getLocationSlotChipLabels = (baseSlotsArray = []) => {
   const values = (Array.isArray(baseSlotsArray) ? baseSlotsArray : [])
     .filter(v => typeof v === 'number');
@@ -10,7 +10,7 @@ export const getLocationSlotChipLabels = (baseSlotsArray = []) => {
   }, {});
   return Object.entries(countsMap).map(([vStr, count]) => {
     const v = Number(vStr);
-    const label = (v === -1) ? '무제한 슬롯 영역' : `${v} 슬롯 영역`;
+    const label = (v === -1) ? '무제한 슬롯 카테고리' : `${v} 슬롯 카테고리`;
     return count > 1 ? `${label} x ${count}` : label;
   });
 };

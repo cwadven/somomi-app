@@ -148,7 +148,7 @@ export const fetchProductsByLocation = createAsyncThunk(
             append 
           };
         } catch (apiErr) {
-          console.warn('영역별 인벤토리 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
+          console.warn('카테고리별 인벤토리 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
         }
       }
 

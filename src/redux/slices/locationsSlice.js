@@ -60,8 +60,8 @@ export const fetchLocations = createAsyncThunk(
       const storedLocations = await loadLocations();
       return storedLocations || [];
     } catch (error) {
-      console.error('영역 목록 가져오기 오류:', error);
-      return rejectWithValue(error.message || '영역 목록을 불러오는 중 오류가 발생했습니다.');
+      console.error('카테고리 목록 가져오기 오류:', error);
+      return rejectWithValue(error.message || '카테고리 목록을 불러오는 중 오류가 발생했습니다.');
     }
   }
 );
@@ -77,7 +77,7 @@ export const fetchLocationById = createAsyncThunk(
       const location = locations.find(loc => loc.id === locationId);
       
       if (!location) {
-        throw new Error('영역을 찾을 수 없습니다.');
+        throw new Error('카테고리를 찾을 수 없습니다.');
       }
       
       return location;
@@ -103,7 +103,7 @@ export const createLocation = createAsyncThunk(
       };
       const res = await createGuestSection(payload);
       const createdId = res?.guest_section_id;
-      if (!createdId) throw new Error('영역 생성에 실패했습니다.');
+      if (!createdId) throw new Error('카테고리 생성에 실패했습니다.');
 
       // 생성 후 목록 재동기화(GET)
       try {
@@ -138,8 +138,8 @@ export const createLocation = createAsyncThunk(
         return (stored || []).find(x => x.id === String(createdId)) || null;
       }
     } catch (error) {
-      console.error('영역 생성 오류:', error);
-      return rejectWithValue(error.message || '영역 생성 중 오류가 발생했습니다.');
+      console.error('카테고리 생성 오류:', error);
+      return rejectWithValue(error.message || '카테고리 생성 중 오류가 발생했습니다.');
     }
   }
 );

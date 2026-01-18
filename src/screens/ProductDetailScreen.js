@@ -291,7 +291,7 @@ const ProductDetailScreen = () => {
     }
   }, [dispatch, resolvedProductId, currentProduct]);
   
-  // 목록 자동 재호출 제거 (요청사항): 제품 상세 진입/복귀 시 영역 목록 API 호출 금지
+  // 목록 자동 재호출 제거 (요청사항): 제품 상세 진입/복귀 시 카테고리 목록 API 호출 금지
   
   // 소진 처리 날짜 상태 변화 감지 및 로깅
   useEffect(() => {
@@ -861,7 +861,7 @@ const ProductDetailScreen = () => {
   };
 
   useEffect(() => {
-    // create 모드인데 locationId가 없으면, 영역 선택을 위해 locations를 보장
+    // create 모드인데 locationId가 없으면, 카테고리 선택을 위해 locations를 보장
     if (screenMode === 'create' && !createLocationId) {
       if (!Array.isArray(locations) || locations.length === 0) {
         try {dispatch(fetchLocations());} catch (e) {}
@@ -870,7 +870,7 @@ const ProductDetailScreen = () => {
   }, [screenMode, createLocationId, locations, dispatch]);
 
   useEffect(() => {
-    // edit 모드에서도 영역 변경이 가능해야 하므로 locations 로드 보장
+    // edit 모드에서도 카테고리 변경이 가능해야 하므로 locations 로드 보장
     if (screenMode === 'edit') {
       if (!Array.isArray(locations) || locations.length === 0) {
         try {dispatch(fetchLocations());} catch (e) {}
@@ -1022,7 +1022,7 @@ const ProductDetailScreen = () => {
     if (isCreate) {
       const resolvedLocationId = createLocationId || selectedLocation?.id || null;
       if (!resolvedLocationId) {
-        showErrorAlert('영역 정보가 없습니다. 다시 시도해 주세요.');
+        showErrorAlert('카테고리 정보가 없습니다. 다시 시도해 주세요.');
         return;
       }
 
@@ -1080,7 +1080,7 @@ const ProductDetailScreen = () => {
       return;
     }
 
-    // edit (영역 변경 포함)
+    // edit (카테고리 변경 포함)
     if (!currentProduct?.id) return;
     const prevLocId = currentProduct.locationId != null ? String(currentProduct.locationId) : null;
     const locIdAfter = selectedLocation?.id || currentProduct.locationId || null;
@@ -1328,7 +1328,7 @@ const ProductDetailScreen = () => {
 
         if (isCreate) {
           if (!createLocationId) {
-            showErrorAlert('영역 정보가 없습니다. 다시 시도해 주세요.');
+            showErrorAlert('카테고리 정보가 없습니다. 다시 시도해 주세요.');
             return;
           }
           const locIdAfter = String(createLocationId);
@@ -1385,7 +1385,7 @@ const ProductDetailScreen = () => {
           return;
         }
 
-        // edit (영역 변경 포함)
+        // edit (카테고리 변경 포함)
         if (!currentProduct?.id) return;
         const prevLocId = currentProduct.locationId != null ? String(currentProduct.locationId) : null;
         const locIdAfter = selectedLocation?.id || currentProduct.locationId || null;
@@ -1485,10 +1485,10 @@ const ProductDetailScreen = () => {
         </View>
 
         <View style={styles.detailsSection}>
-          {/* edit 모드에서는 영역 변경 가능하도록 노출 */}
+          {/* edit 모드에서는 카테고리 변경 가능하도록 노출 */}
           {screenMode === 'edit' ?
           <>
-              <Text style={styles.formLabel}>영역</Text>
+              <Text style={styles.formLabel}>카테고리</Text>
               <LocationSelector
               locations={Array.isArray(locations) ? locations : []}
               selectedLocation={selectedLocation}
@@ -1502,10 +1502,10 @@ const ProductDetailScreen = () => {
             </> :
           null}
 
-          {/* create 모드에서 locationId가 없으면 여기서 영역 선택 */}
+          {/* create 모드에서 locationId가 없으면 여기서 카테고리 선택 */}
           {isCreate && !createLocationId ?
           <>
-              <Text style={styles.formLabel}>영역 선택 *</Text>
+              <Text style={styles.formLabel}>카테고리 선택 *</Text>
               <LocationSelector
               locations={Array.isArray(locations) ? locations : []}
               selectedLocation={selectedLocation}
@@ -2122,7 +2122,7 @@ const ProductDetailScreen = () => {
           const onBlocked = (msg) => {
             setAlertModalConfig({
               title: '불가',
-              message: msg || '이 영역 템플릿이 만료되어 이 작업을 수행할 수 없습니다. 제품 수정에서 영역 위치를 변경하세요.',
+              message: msg || '이 카테고리 템플릿이 만료되어 이 작업을 수행할 수 없습니다. 제품 수정에서 카테고리 위치를 변경하세요.',
               buttons: [{ text: '확인' }],
               icon: 'alert-circle',
               iconColor: '#F44336'
@@ -2141,7 +2141,7 @@ const ProductDetailScreen = () => {
         
         <TouchableOpacity 
                 style={[styles.bottomActionButton, isLocationExpired ? { opacity: 0.5 } : null]}
-                onPress={() => isLocationExpired ? onBlocked('만료된 영역에서는 소진 처리를 할 수 없습니다.') : handleMarkAsConsumed()}>
+                onPress={() => isLocationExpired ? onBlocked('만료된 카테고리에서는 소진 처리를 할 수 없습니다.') : handleMarkAsConsumed()}>
 
           <Ionicons name="checkmark-circle-outline" size={24} color="#FF9800" />
           <Text style={styles.bottomActionText}>소진 처리</Text>
@@ -2149,7 +2149,7 @@ const ProductDetailScreen = () => {
         
         <TouchableOpacity 
                 style={[styles.bottomActionButton, isLocationExpired ? { opacity: 0.5 } : null]}
-                onPress={() => isLocationExpired ? onBlocked('만료된 영역에서는 제품을 삭제할 수 없습니다.') : handleDelete()}>
+                onPress={() => isLocationExpired ? onBlocked('만료된 카테고리에서는 제품을 삭제할 수 없습니다.') : handleDelete()}>
 
           <Ionicons name="trash-outline" size={24} color="#F44336" />
           <Text style={styles.bottomActionText}>삭제</Text>

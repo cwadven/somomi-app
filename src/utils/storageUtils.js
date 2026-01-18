@@ -103,10 +103,10 @@ export const clearAllData = async () => {
 export const saveLocations = async (locations) => {
   try {
     await saveData(STORAGE_KEYS.LOCATIONS, locations);
-    console.log('영역 데이터가 저장되었습니다. 개수:', locations.length);
+    console.log('카테고리 데이터가 저장되었습니다. 개수:', locations.length);
     return true;
   } catch (error) {
-    console.error('영역 데이터 저장 중 오류:', error);
+    console.error('카테고리 데이터 저장 중 오류:', error);
     return false;
   }
 };
@@ -115,10 +115,10 @@ export const saveLocations = async (locations) => {
 export const loadLocations = async () => {
   try {
     const locations = await loadData(STORAGE_KEYS.LOCATIONS);
-    console.log('영역 데이터 로드. 개수:', locations ? locations.length : 0);
+    console.log('카테고리 데이터 로드. 개수:', locations ? locations.length : 0);
     return locations || [];
   } catch (error) {
-    console.error('영역 데이터 로드 중 오류:', error);
+    console.error('카테고리 데이터 로드 중 오류:', error);
     return [];
   }
 };
@@ -175,10 +175,10 @@ export const loadConsumedProducts = async () => {
 export const saveUserLocationTemplates = async (templates) => {
   try {
     await saveData(STORAGE_KEYS.USER_LOCATION_TEMPLATES, templates);
-    console.log('사용자 영역 템플릿 인스턴스가 저장되었습니다. 개수:', templates.length);
+    console.log('사용자 카테고리 템플릿 인스턴스가 저장되었습니다. 개수:', templates.length);
     return true;
   } catch (error) {
-    console.error('사용자 영역 템플릿 인스턴스 저장 중 오류:', error);
+    console.error('사용자 카테고리 템플릿 인스턴스 저장 중 오류:', error);
     return false;
   }
 };
@@ -187,10 +187,10 @@ export const saveUserLocationTemplates = async (templates) => {
 export const loadUserLocationTemplates = async () => {
   try {
     const templates = await loadData(STORAGE_KEYS.USER_LOCATION_TEMPLATES);
-    console.log('사용자 영역 템플릿 인스턴스 로드. 개수:', templates ? templates.length : 0);
+    console.log('사용자 카테고리 템플릿 인스턴스 로드. 개수:', templates ? templates.length : 0);
     return templates;
   } catch (error) {
-    console.error('사용자 영역 템플릿 인스턴스 로드 중 오류:', error);
+    console.error('사용자 카테고리 템플릿 인스턴스 로드 중 오류:', error);
     return null;
   }
 };

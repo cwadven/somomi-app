@@ -157,7 +157,7 @@ const ProfileScreen = () => {
       setModalVisible(false);
       try { await AsyncStorage.removeItem('navigation-state'); } catch (e) {}
       try { dispatch(logout()); } catch (e) {}
-      // 로그아웃 후 "내 영역" 탭을 첫 화면으로 리셋
+      // 로그아웃 후 "내 카테고리" 탭을 첫 화면으로 리셋
       try {
         rootNavigate('Locations', { screen: 'LocationsScreen' });
       } catch (e) {}

@@ -214,7 +214,7 @@ const MainTabs = ({ linking }) => {
       })}
     >
       <Tab.Screen name="Home" component={HomeStack} options={{ title: '홈' }} />
-      <Tab.Screen name="Locations" component={LocationsStack} options={{ title: '내 영역' }} />
+      <Tab.Screen name="Locations" component={LocationsStack} options={{ title: '내 카테고리' }} />
       <Tab.Screen name="Profile" component={ProfileStack} options={{ title: '프로필' }} />
     </Tab.Navigator>
   );

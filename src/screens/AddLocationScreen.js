@@ -130,7 +130,7 @@ const AddLocationScreen = () => {
       if (!isEditMode && availableTemplates.length === 0) {
         setAlertModalConfig({
           title: '템플릿 부족',
-          message: '사용 가능한 영역 템플릿이 없습니다. 영역 목록으로 돌아갑니다.',
+          message: '사용 가능한 카테고리 템플릿이 없습니다. 카테고리 목록으로 돌아갑니다.',
           buttons: [
             { 
               text: '확인',
@@ -472,7 +472,7 @@ const AddLocationScreen = () => {
     if (!sanitizedTitle) {
       setAlertModalConfig({
         title: '입력 오류',
-        message: '영역 이름을 입력해주세요.',
+        message: '카테고리 이름을 입력해주세요.',
         buttons: [
         { text: '확인' }],
 
@@ -528,7 +528,7 @@ const AddLocationScreen = () => {
     try {
       if (isEditMode) {
         // 영역 수정 로직
-        console.log('영역 수정 시작:', {
+        console.log('카테고리 수정 시작:', {
           locationData,
           locationId: locationToEdit.id,
           selectedEditTemplateInstance
@@ -580,12 +580,12 @@ const AddLocationScreen = () => {
             productId: newProductId,
             feature: newFeature
           })).unwrap();
-          console.log('영역 수정 성공:', updatedLocation);
+          console.log('카테고리 수정 성공:', updatedLocation);
         } catch (e) {
           setIsLoading(false);
           setAlertModalConfig({
             title: '수정 실패',
-            message: e?.response?.data?.message || '영역 수정 중 오류가 발생했습니다.',
+            message: e?.response?.data?.message || '카테고리 수정 중 오류가 발생했습니다.',
             buttons: [{ text: '확인' }],
             icon: 'alert-circle',
             iconColor: '#F44336'
@@ -640,7 +640,7 @@ const AddLocationScreen = () => {
         });
       } else {
         // 영역 생성 로직
-        console.log('영역 생성 시작:', {
+        console.log('카테고리 생성 시작:', {
           locationData,
           selectedTemplateInstance
         });
@@ -655,7 +655,7 @@ const AddLocationScreen = () => {
           feature: selectedTemplateInstance.feature
         })).unwrap();
         
-        console.log('영역 생성 성공:', result);
+        console.log('카테고리 생성 성공:', result);
         
         // 생성된 영역 ID로 템플릿 인스턴스를 사용됨으로 표시
         dispatch(markTemplateInstanceAsUsed({
@@ -666,12 +666,12 @@ const AddLocationScreen = () => {
         setIsLoading(false);
         
         // 영역 목록 화면으로 돌아가기
-        console.log('영역 생성 완료, 영역 목록 화면으로 이동');
+        console.log('카테고리 생성 완료, 카테고리 목록 화면으로 이동');
         
         // 성공 메시지 표시 후 내 영역 탭으로 이동
         setAlertModalConfig({
           title: '성공',
-          message: '영역이 성공적으로 생성되었습니다.',
+          message: '카테고리가 성공적으로 생성되었습니다.',
           buttons: [
             {
               text: '확인',
@@ -690,10 +690,10 @@ const AddLocationScreen = () => {
     } catch (error) {
       setIsLoading(false);
       hasSubmittedRef.current = false;
-      console.error('영역 처리 실패:', error);
+      console.error('카테고리 처리 실패:', error);
       setAlertModalConfig({
         title: '오류',
-        message: isEditMode ? '영역 수정 중 오류가 발생했습니다.' : '영역 생성 중 오류가 발생했습니다.',
+        message: isEditMode ? '카테고리 수정 중 오류가 발생했습니다.' : '카테고리 생성 중 오류가 발생했습니다.',
         buttons: [
         { text: '확인' }],
 
@@ -884,7 +884,7 @@ const AddLocationScreen = () => {
               style={styles.input}
               value={locationData.title}
               onChangeText={(text) => handleInputChange('title', text)}
-              placeholder="영역 이름 입력..."
+              placeholder="카테고리 이름 입력..."
               placeholderTextColor="#999"
               maxLength={MAX_LOCATION_TITLE_LEN}
               editable={!(isEditMode && isEditLockedByExpiry)} />
@@ -898,7 +898,7 @@ const AddLocationScreen = () => {
               style={[styles.input, styles.textArea, styles.placeholderLight]}
               value={locationData.description}
               onChangeText={(text) => handleInputChange('description', text)}
-              placeholder={"영역 설명 입력..."}
+              placeholder={"카테고리 설명 입력..."}
               placeholderTextColor="#999"
             maxLength={MAX_LOCATION_DESC_LEN}
             multiline

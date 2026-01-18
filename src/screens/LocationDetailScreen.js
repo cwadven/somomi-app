@@ -70,7 +70,7 @@ const LocationDetailScreen = () => {
 
   // 만료된 구독 템플릿이어도 상세 접근은 허용. 대신 UI 상에서 편집 유도로 처리.
   
-  // 영역 정보 로드
+  // 카테고리 정보 로드
   useEffect(() => {
     if (!isAllProductsView) {
       dispatch(fetchLocationById(locationId));
@@ -79,7 +79,7 @@ const LocationDetailScreen = () => {
   
   // 제품 목록 로드
   useEffect(() => {
-    // 초기 진입: 내 영역에서 들어온 경우에만 초기 로딩/초기화 수행
+    // 초기 진입: 내 카테고리에서 들어온 경우에만 초기 로딩/초기화 수행
     if (!didInitialFetchRef.current && from === 'Locations') {
       const metaKey = isAllProductsView ? 'all' : locationId;
       const cachedAlready = locationProductsCache?.[metaKey];
@@ -143,7 +143,7 @@ const LocationDetailScreen = () => {
         if (!Array.isArray(prev) || prev.length === 0) return prev;
         const idx = prev.findIndex((p) => String(p?.id) === id);
         if (idx === -1) return prev;
-        // 영역이 변경된 수정이라면, 현재 화면이 특정 영역 보기일 때 리스트에서 제거
+        // 카테고리가 변경된 수정이라면, 현재 화면이 특정 카테고리 보기일 때 리스트에서 제거
         const newLocId = payload?.patch?.locationId != null ? String(payload.patch.locationId) : (payload?.locationId != null ? String(payload.locationId) : null);
         if (!isAllProductsView && newLocId && String(locationId) !== String(newLocId)) {
           const next = prev.filter((p) => String(p?.id) !== id);
@@ -161,7 +161,7 @@ const LocationDetailScreen = () => {
       if (!id) return;
       const targetLocId = product?.locationId != null ? String(product.locationId) : null;
 
-      // 현재 화면이 특정 영역 보기라면 해당 영역일 때만 반영
+      // 현재 화면이 특정 카테고리 보기라면 해당 카테고리일 때만 반영
       if (!isAllProductsView && String(locationId) !== String(targetLocId)) return;
 
       setLocationProducts((prev) => {
@@ -197,7 +197,7 @@ const LocationDetailScreen = () => {
     }
   }, [productsStatus]);
   
-  // 활성화/만료 상태 헬퍼 (영역)
+  // 활성화/만료 상태 헬퍼 (카테고리)
   const isLocExpired = useCallback((loc) => {
     try {
       const locKey = loc?.id;
@@ -226,7 +226,7 @@ const LocationDetailScreen = () => {
     };
 
     // ✅ 스크롤 점프 방지:
-    // - 화면 key가 바뀐 경우(다른 영역/모든 제품으로 이동)만 캐시/필터 결과를 주입
+    // - 화면 key가 바뀐 경우(다른 카테고리/모든 제품으로 이동)만 캐시/필터 결과를 주입
     // - 같은 화면 key에서 Redux 캐시가 갱신되더라도(예: 수정 patch), 여기서 리스트를 통째로 set 하지 않음
     //   → 이벤트 기반 부분 업데이트로만 반영
     if (!keyChanged) {
@@ -457,18 +457,18 @@ const LocationDetailScreen = () => {
     navigation.goBack();
   };
   
-  // 영역 삭제 확인 모달 표시
+  // 카테고리 삭제 확인 모달 표시
   const handleDeletePress = () => {
     setShowDeleteConfirm(true);
   };
   
-  // 영역 삭제 실행
+  // 카테고리 삭제 실행
   const handleDeleteConfirm = async () => {
     setShowDeleteConfirm(false);
     setDeleteConfirmText('');
     
     try {
-      // 영역 삭제
+      // 카테고리 삭제
       await dispatch(deleteLocation(locationId)).unwrap();
       
       // 템플릿 인스턴스 해제 (다시 사용 가능하게)
@@ -478,11 +478,11 @@ const LocationDetailScreen = () => {
       
           navigation.goBack();
     } catch (error) {
-      Alert.alert('오류', '영역 삭제 중 문제가 발생했습니다.');
+      Alert.alert('오류', '카테고리 삭제 중 문제가 발생했습니다.');
     }
   };
   
-  // (제거) 영역 수정 화면으로 이동 UI (요청사항)
+  // (제거) 카테고리 수정 화면으로 이동 UI (요청사항)
   
   // 제품 추가 화면으로 이동
   const handleAddProduct = () => {
@@ -552,7 +552,7 @@ const LocationDetailScreen = () => {
       return { used: products.length, total: 999 }; // 모든 제품 보기에서는 슬롯 제한 없음
     }
     
-    // 영역의 기본 슬롯 + 해당 영역에 등록된 추가 제품 슬롯 수
+    // 카테고리의 기본 슬롯 + 해당 카테고리에 등록된 추가 제품 슬롯 수
     const baseSlots = currentLocation?.feature?.baseSlots ?? slots.productSlots.baseSlots;
     const assignedExtra = (userProductSlotTemplateInstances || [])
       .filter(t => t.assignedLocationId === locationId)
@@ -794,7 +794,7 @@ const LocationDetailScreen = () => {
             )}
           </View>
           
-        {/* 영역 수정/삭제 버튼 (모든 제품 보기가 아닐 때만 표시) */}
+        {/* 카테고리 수정/삭제 버튼 (모든 제품 보기가 아닐 때만 표시) */}
         {!isAllProductsView && (
             <View style={styles.headerActions}>
               <TouchableOpacity 
@@ -865,9 +865,9 @@ const LocationDetailScreen = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>영역 삭제</Text>
+            <Text style={styles.modalTitle}>카테고리 삭제</Text>
             <Text style={styles.modalMessage}>
-              이 영역을 삭제하시겠습니까? 영역 내의 모든 제품 정보도 함께 삭제됩니다.
+              이 카테고리를 삭제하시겠습니까? 카테고리 내의 모든 제품 정보도 함께 삭제됩니다.
             </Text>
             <Text style={styles.modalWarning}>안전한 삭제를 위해 아래에 "삭제하기"를 입력하세요.</Text>
             <TextInput

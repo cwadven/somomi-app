@@ -313,7 +313,7 @@ export const fetchLocationsApi = async () => {
     
     return [...sampleLocations]; // 배열 복사본 반환
   } catch (error) {
-    console.error('영역 조회 중 오류 발생:', error);
+    console.error('카테고리 조회 중 오류 발생:', error);
     throw new Error('Failed to fetch locations');
   }
 };
@@ -333,7 +333,7 @@ export const fetchLocationByIdApi = async (id) => {
       throw new Error('Location not found');
       }
   } catch (error) {
-    console.error('영역 상세 조회 중 오류 발생:', error);
+    console.error('카테고리 상세 조회 중 오류 발생:', error);
     throw error;
   }
 };
@@ -362,7 +362,7 @@ export const addLocationApi = async (location) => {
     
     return {...newLocation}; // 객체 복사본 반환
   } catch (error) {
-    console.error('영역 추가 중 오류 발생:', error);
+    console.error('카테고리 추가 중 오류 발생:', error);
     throw new Error('Failed to add location');
   }
 };
@@ -393,7 +393,7 @@ export const updateLocationApi = async (location) => {
       throw new Error('Location not found');
       }
   } catch (error) {
-    console.error('영역 업데이트 중 오류 발생:', error);
+    console.error('카테고리 업데이트 중 오류 발생:', error);
     throw error;
   }
 };
@@ -423,7 +423,7 @@ export const deleteLocationApi = async (id) => {
       throw new Error('Location not found');
       }
   } catch (error) {
-    console.error('영역 삭제 중 오류 발생:', error);
+    console.error('카테고리 삭제 중 오류 발생:', error);
     throw error;
   }
 };
@@ -443,7 +443,7 @@ export const fetchProductsByLocationApi = async (locationId) => {
     
     return [...locationProducts]; // 배열 복사본 반환
       } catch (error) {
-    console.error('영역별 제품 조회 중 오류 발생:', error);
+    console.error('카테고리별 제품 조회 중 오류 발생:', error);
     throw new Error(`Failed to fetch products for location ${locationId}`);
   }
 };

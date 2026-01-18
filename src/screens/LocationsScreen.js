@@ -57,7 +57,7 @@ import { loadUserLocationTemplateInstances, loadUserProductSlotTemplateInstances
 import SignupPromptModal from '../components/SignupPromptModal';
 import SlotStatusBar from '../components/SlotStatusBar';
 import AlertModal from '../components/AlertModal';
-// 로그인 폼/소셜 버튼은 내 영역에서 노출하지 않음
+// 로그인 폼/소셜 버튼은 내 카테고리에서 노출하지 않음
 
 const LocationsScreen = () => {
   const dispatch = useDispatch();
@@ -85,7 +85,7 @@ const LocationsScreen = () => {
   const [freeTemplates, setFreeTemplates] = useState([]);
   const [templatePickerSelectedTemplateId, setTemplatePickerSelectedTemplateId] = useState(null);
 
-  // 각 영역별로 연결된 템플릿이 구독 만료인지 계산하는 헬퍼
+  // 각 카테고리별로 연결된 템플릿이 구독 만료인지 계산하는 헬퍼
   const isLocationExpired = useCallback((loc) => {
     const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === loc.id) || null;
     if (!tpl) return false;
@@ -114,7 +114,7 @@ const LocationsScreen = () => {
           text: selected ? '확인' : '확인(선택 필요)',
           onPress: () => {
             if (!selected || !templatePickerLocation) return;
-            // 선택된 템플릿의 feature/baseSlots를 영역에 반영
+            // 선택된 템플릿의 feature/baseSlots를 카테고리에 반영
             const selectedTpl = freeTemplates.find(t => t.id === selected.id);
             if (selectedTpl) {
               dispatch(updateLocation({
@@ -166,20 +166,20 @@ const LocationsScreen = () => {
     }));
   }, [templatePickerVisible, templatePickerSelectedTemplateId, freeTemplates, templatePickerLocation, dispatch, navigation]);
 
-  // 화면이 포커스될 때마다 영역 데이터 로드
+  // 화면이 포커스될 때마다 카테고리 데이터 로드
   useEffect(() => {
     if (isFocused) {
-      console.log('LocationsScreen: 영역 목록 로드 시작');
+      console.log('LocationsScreen: 카테고리 목록 로드 시작');
       // 로그인 상태에서 진입 시 템플릿 최신화
       try { if (isLoggedIn) { dispatch(loadUserLocationTemplateInstances()); } } catch (e) {}
       try { if (isLoggedIn) { dispatch(loadUserProductSlotTemplateInstances()); } } catch (e) {}
       if (isLoggedIn) {
         dispatch(fetchLocations())
         .then(result => {
-          console.log('LocationsScreen: 영역 목록 로드 성공', result);
+          console.log('LocationsScreen: 카테고리 목록 로드 성공', result);
         })
         .catch(err => {
-          console.error('LocationsScreen: 영역 목록 로드 실패', err);
+          console.error('LocationsScreen: 카테고리 목록 로드 실패', err);
         });
       }
     }
@@ -190,17 +190,17 @@ const LocationsScreen = () => {
     // no-op
   }, [isLoggedIn, userLocationTemplateInstances, locations]);
 
-  // route.params.refresh가 변경될 때마다 영역 목록 새로고침
+  // route.params.refresh가 변경될 때마다 카테고리 목록 새로고침
   useEffect(() => {
     if (route.params?.refresh) {
-      console.log('LocationsScreen: refresh 파라미터 감지, 영역 목록 새로고침', route.params.refresh);
+      console.log('LocationsScreen: refresh 파라미터 감지, 카테고리 목록 새로고침', route.params.refresh);
       dispatch(fetchLocations());
     }
   }, [dispatch, route.params?.refresh]);
   
   // 디버깅용: locations 변경 감지
   useEffect(() => {
-    console.log('LocationsScreen: 현재 영역 목록', locations);
+    console.log('LocationsScreen: 현재 카테고리 목록', locations);
   }, [locations]);
   
   // 뒤로가기 버튼 처리
@@ -224,7 +224,7 @@ const LocationsScreen = () => {
     };
   }, [isFocused, navigation]);
 
-  // 영역 추가 화면으로 이동 (영역 생성/수정 UI는 최소화하고, 제품 슬롯 관련 UI는 제거됨)
+  // 카테고리 추가 화면으로 이동 (카테고리 생성/수정 UI는 최소화하고, 제품 슬롯 관련 UI는 제거됨)
   const handleAddLocation = () => {
     navigation.navigate('AddLocation');
   };
@@ -234,7 +234,7 @@ const LocationsScreen = () => {
     // 템플릿이 부족한 경우 (사용 가능한 템플릿이 없는 경우)
     const availableTemplates = userLocationTemplateInstances.filter(template => !template.used);
     if (availableTemplates.length === 0) {
-      return '비회원은 최대 1개의 영역 템플릿만 사용할 수 있습니다. 회원가입하여 더 많은 영역을 생성하세요!';
+      return '비회원은 최대 1개의 카테고리 템플릿만 사용할 수 있습니다. 회원가입하여 더 많은 카테고리를 생성하세요!';
     }
     
     // 기본 메시지
@@ -256,7 +256,7 @@ const LocationsScreen = () => {
       return;
     }
     // 만료된 경우에도 상세 진입은 허용하되, 내부에서 수정으로 변경 유도
-    // 로그인 상태에서 템플릿에 연동되지 않은 영역은 접근 차단
+    // 로그인 상태에서 템플릿에 연동되지 않은 카테고리는 접근 차단
     const linked = userLocationTemplateInstances.some(t => t.usedInLocationId === location.id);
     const hasFreeTemplate = userLocationTemplateInstances.some(t => !t.used && !isTemplateExpired(t));
     if (isLoggedIn && !linked) {
@@ -300,7 +300,7 @@ const LocationsScreen = () => {
       } else {
         setAlertModalConfig({
           title: '템플릿 부족',
-          message: '이 영역은 템플릿이 없어 접근할 수 없습니다.\n템플릿을 구매하고 연동해주세요.',
+          message: '이 카테고리는 템플릿이 없어 접근할 수 없습니다.\n템플릿을 구매하고 연동해주세요.',
           icon: 'alert-circle',
           iconColor: '#F44336',
           buttons: [
@@ -361,7 +361,7 @@ const LocationsScreen = () => {
       <View style={[styles.centered, { paddingHorizontal: 24 }]}>
         <Ionicons name="lock-closed" size={48} color="#4CAF50" style={{ marginBottom: 12 }} />
         <Text style={styles.loginTitle}>로그인이 필요합니다</Text>
-        <Text style={styles.loginSubtitle}>내 영역 기능을 이용하려면 로그인해주세요.</Text>
+        <Text style={styles.loginSubtitle}>내 카테고리 기능을 이용하려면 로그인해주세요.</Text>
         <View style={{ width: '100%', marginTop: 16 }}>
           <TouchableOpacity
             style={styles.primaryBtn}
@@ -424,7 +424,7 @@ const LocationsScreen = () => {
       ) : (
         <>
           {/* 구독 만료 배너 */}
-          {/* 전역 만료 배너 제거. 영역별로 안내 */}
+          {/* 전역 만료 배너 제거. 카테고리별로 안내 */}
           {/* 슬롯 상태 표시 바 - 템플릿 인스턴스 기준 */}
           <SlotStatusBar 
             used={rawUsedTemplates} 
@@ -450,16 +450,16 @@ const LocationsScreen = () => {
             <Ionicons name="chevron-forward" size={24} color="#999" />
           </TouchableOpacity>
           
-          {/* 영역 목록 */}
-          <Text style={styles.sectionTitle}>내 영역 목록</Text>
+          {/* 카테고리 목록 */}
+          <Text style={styles.sectionTitle}>내 카테고리 목록</Text>
           
-          {/* 영역 슬롯 리스트 */}
+          {/* 카테고리 슬롯 리스트 */}
           <View style={styles.locationsContainer}>
             {locations.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>등록된 영역이 없습니다.</Text>
+                <Text style={styles.emptyText}>등록된 카테고리가 없습니다.</Text>
                 <Text style={styles.emptySubText}>
-                  오른쪽 하단의 + 버튼을 눌러 영역을 추가하세요.
+                  오른쪽 하단의 + 버튼을 눌러 카테고리를 추가하세요.
                 </Text>
               </View>
             ) : (
@@ -500,7 +500,7 @@ const LocationsScreen = () => {
               />
             )}
             
-            {/* 영역 추가 버튼 (우측 하단에 고정) */}
+            {/* 카테고리 추가 버튼 (우측 하단에 고정) */}
             <TouchableOpacity style={styles.addButton} onPress={handleAddLocation}>
               <Ionicons name="add" size={30} color="white" />
             </TouchableOpacity>

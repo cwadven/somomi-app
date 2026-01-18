@@ -233,7 +233,7 @@ export const loadUserLocationTemplateInstances = createAsyncThunk(
       if (templates && templates.length > 0) return templates;
       return [];
     } catch (error) {
-      console.error('사용자 영역 템플릿 인스턴스 로드 오류:', error);
+      console.error('사용자 카테고리 템플릿 인스턴스 로드 오류:', error);
       return rejectWithValue(error.message);
     }
   }
@@ -267,8 +267,8 @@ const createBasicLocationTemplate = (idOverride, baseSlotsOverride, extraMeta = 
   const obj = {
     id: idOverride || generateId('locationTemplate'),
     productId: 'basic_location',
-    name: '기본 영역',
-    description: '기본적인 제품 관리 기능을 제공하는 영역',
+    name: '기본 카테고리',
+    description: '기본적인 제품 관리 기능을 제공하는 카테고리',
     icon: 'cube-outline',
     feature: {
       baseSlots: typeof baseSlotsOverride === 'number' ? baseSlotsOverride : 3
@@ -593,8 +593,8 @@ export const authSlice = createSlice({
         if (mutatedLocTemplates) {
           const plainTemplates = JSON.parse(JSON.stringify(state.userLocationTemplateInstances));
           saveUserLocationTemplates(plainTemplates).
-          then(() => console.log('구독 적용(신 스키마): 영역 템플릿 추가 저장 성공')).
-          catch((err) => console.error('구독 적용(신 스키마): 영역 템플릿 추가 저장 실패:', err));
+          then(() => console.log('구독 적용(신 스키마): 카테고리 템플릿 추가 저장 성공')).
+          catch((err) => console.error('구독 적용(신 스키마): 카테고리 템플릿 추가 저장 실패:', err));
         }
 
         if (Array.isArray(payload.productTemplate)) {
@@ -856,13 +856,13 @@ export const authSlice = createSlice({
       state.loading = false;
       state.locationTemplatesStatus = 'succeeded';
       state.userLocationTemplateInstances = action.payload;
-      console.log('사용자 영역 템플릿 인스턴스 로드 완료:', action.payload);
+      console.log('사용자 카테고리 템플릿 인스턴스 로드 완료:', action.payload);
     }).
     addCase(loadUserLocationTemplateInstances.rejected, (state, action) => {
       state.loading = false;
       state.locationTemplatesStatus = 'failed';
       state.error = action.payload;
-      console.error('사용자 영역 템플릿 인스턴스 로드 실패:', action.payload);
+      console.error('사용자 카테고리 템플릿 인스턴스 로드 실패:', action.payload);
     })
 
     // 사용자 제품 슬롯 템플릿 인스턴스 로드 처리

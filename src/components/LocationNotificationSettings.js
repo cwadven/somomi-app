@@ -21,9 +21,9 @@ import { isLocationExpired as isLocationExpiredUtil } from '../utils/locationUti
 import { fetchGuestSectionAlarm, updateGuestSectionAlarm } from '../api/alarmApi';
 
 /**
- * 영역별 알림 설정 컴포넌트
- * @param {string} locationId - 영역 ID
- * @param {object} location - 영역 정보
+ * 카테고리별 알림 설정 컴포넌트
+ * @param {string} locationId - 카테고리 ID
+ * @param {object} location - 카테고리 정보
  */
 const LocationNotificationSettings = ({ locationId, location = {} }) => {
   const dispatch = useDispatch();
@@ -31,21 +31,21 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
   const { isAnonymous, userLocationTemplateInstances } = useSelector(state => state.auth);
   const { locations } = useSelector(state => state.locations);
 
-  // 영역 정보 가져오기 (props로 전달된 location이 없으면 Redux에서 찾기)
+  // 카테고리 정보 가져오기 (props로 전달된 location이 없으면 Redux에서 찾기)
   const locationData = location && Object.keys(location).length > 0 
     ? location 
     : locations.find(loc => loc.id === locationId) || {};
 
-  // 영역 템플릿 만료 여부 (공용 유틸 사용)
+  // 카테고리 템플릿 만료 여부 (공용 유틸 사용)
   const isLocationExpired = isLocationExpiredUtil(locationId, { userLocationTemplateInstances, locations });
   
   // 디버그 로그
   useEffect(() => {
-    console.log('LocationNotificationSettings - 영역 정보:', locationData);
+    console.log('LocationNotificationSettings - 카테고리 정보:', locationData);
   }, [locationData]);
   
-  // 영역 이름 안전하게 가져오기
-  const locationTitle = locationData?.title || '영역';
+  // 카테고리 이름 안전하게 가져오기
+  const locationTitle = locationData?.title || '카테고리';
   
   // 알림 설정 상태
   const [expiryEnabled, setExpiryEnabled] = useState(true);
@@ -69,10 +69,10 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
     iconColor: ''
   });
   
-  // 컴포넌트 마운트 시 영역 알림 설정 로드
+  // 컴포넌트 마운트 시 카테고리 알림 설정 로드
   useEffect(() => {
     if (locationId) {
-      console.log('영역 알림 설정 로드(백엔드):', locationId);
+      console.log('카테고리 알림 설정 로드(백엔드):', locationId);
       // 백엔드 섹션 알림 설정 우선 로드
       const load = async () => {
         try {
@@ -147,7 +147,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
   const showSuccessModal = () => {
     setAlertModalConfig({
       title: '성공',
-      message: '영역 알림 설정이 저장되었습니다.',
+      message: '카테고리 알림 설정이 저장되었습니다.',
       buttons: [{ text: '확인', style: 'default' }],
       icon: 'checkmark-circle-outline',
       iconColor: '#4CAF50'
@@ -270,14 +270,14 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>영역별 알림 설정</Text>
+      <Text style={styles.title}>카테고리별 알림 설정</Text>
       <Text style={styles.description}>
-        이 영역에 있는 제품들에 대한 알림 설정을 관리합니다.
+        이 카테고리에 있는 제품들에 대한 알림 설정을 관리합니다.
       </Text>
       {isLocationExpired && (
         <View style={styles.blockBanner}>
           <Ionicons name="alert-circle" size={16} color="#F44336" style={{ marginRight: 6 }} />
-          <Text style={styles.blockBannerText}>이 영역의 템플릿이 만료되어 알림 설정을 변경할 수 없습니다. 설정되어 있어도 동작하지 않습니다.</Text>
+          <Text style={styles.blockBannerText}>이 카테고리의 템플릿이 만료되어 알림 설정을 변경할 수 없습니다. 설정되어 있어도 동작하지 않습니다.</Text>
         </View>
       )}
       
@@ -371,7 +371,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
         )}
         
         <Text style={styles.settingDescription}>
-          이 영역의 모든 제품에 대해 유통기한 알림을 설정합니다.
+          이 카테고리의 모든 제품에 대해 유통기한 알림을 설정합니다.
         </Text>
       </View>
       
@@ -423,7 +423,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
         )}
         
         <Text style={styles.settingDescription}>
-          이 영역의 모든 제품에 대해 소진예상 알림을 설정합니다.
+          이 카테고리의 모든 제품에 대해 소진예상 알림을 설정합니다.
         </Text>
       </View>
       
@@ -434,7 +434,7 @@ const LocationNotificationSettings = ({ locationId, location = {} }) => {
           if (isLocationExpired) {
             setAlertModalConfig({
               title: '저장 불가',
-              message: '이 영역의 템플릿이 만료되어 알림 설정을 저장할 수 없습니다.',
+              message: '이 카테고리의 템플릿이 만료되어 알림 설정을 저장할 수 없습니다.',
               buttons: [{ text: '확인' }],
               icon: 'alert-circle',
               iconColor: '#F44336'
