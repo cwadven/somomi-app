@@ -860,6 +860,15 @@ const ProductDetailScreen = () => {
     }, 80);
   };
 
+  const scrollFormToMemoBottom = () => {
+    // multiline에서 줄이 늘어날 때는 메모 상단이 아니라 "끝"을 따라가야 커서가 안 가려집니다.
+    setTimeout(() => {
+      try {
+        formScrollRef.current?.scrollToEnd?.({ animated: true });
+      } catch (e) {}
+    }, 0);
+  };
+
   useEffect(() => {
     // create 모드인데 locationId가 없으면, 카테고리 선택을 위해 locations를 보장
     if (screenMode === 'create' && !createLocationId) {
@@ -1758,7 +1767,7 @@ const ProductDetailScreen = () => {
               }}
               onContentSizeChange={() => {
                 // 멀티라인에서 줄이 늘어날 때 커서가 키보드 뒤로 숨지 않게 보정
-                if (memoFocusedRef.current) scrollFormToMemo();
+                if (memoFocusedRef.current) scrollFormToMemoBottom();
               }}
             />
           </View>
