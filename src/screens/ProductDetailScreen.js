@@ -6,6 +6,8 @@ import {
   StyleSheet, 
   ScrollView, 
   KeyboardAvoidingView,
+  Keyboard,
+  Linking,
   Image, 
   TouchableOpacity,
   TextInput,
@@ -759,12 +761,103 @@ const ProductDetailScreen = () => {
   const didInitEditLocationRef = useRef(false);
   const formScrollRef = useRef(null);
   const memoInputRef = useRef(null);
+  const memoYRef = useRef(0);
+  const memoFocusedRef = useRef(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const openExternalUrl = async (rawUrl) => {
+    try {
+      if (!rawUrl) return;
+      const url = rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : `https://${rawUrl}`;
+      const can = await Linking.canOpenURL(url);
+      if (!can) return;
+      await Linking.openURL(url);
+    } catch (e) {}
+  };
+
+  const renderTextWithLinks = (text, textStyle) => {
+    const s = (text ?? '').toString();
+    if (!s) return null;
+    // http(s)://... 또는 www.... 형태 링크를 인식
+    const urlRegex = /((https?:\/\/)[^\s]+|(www\.)[^\s]+)/gi;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = urlRegex.exec(s)) !== null) {
+      const start = match.index;
+      const full = match[0];
+      if (start > lastIndex) {
+        parts.push({ type: 'text', value: s.slice(lastIndex, start) });
+      }
+
+      // 끝에 붙은 문장부호는 링크에서 제외 (.,),],} 등)
+      const m = full.match(/^(.*?)([)\].,!?}]+)?$/);
+      const urlPart = (m && m[1]) ? m[1] : full;
+      const trailing = (m && m[2]) ? m[2] : '';
+
+      parts.push({ type: 'link', value: urlPart });
+      if (trailing) parts.push({ type: 'text', value: trailing });
+
+      lastIndex = start + full.length;
+    }
+    if (lastIndex < s.length) {
+      parts.push({ type: 'text', value: s.slice(lastIndex) });
+    }
+
+    return (
+      <Text style={textStyle} selectable>
+        {parts.map((p, idx) => {
+          if (p.type === 'link') {
+            return (
+              <Text
+                key={`link-${idx}`}
+                style={[textStyle, { color: '#2563eb', textDecorationLine: 'underline' }]}
+                suppressHighlighting
+                accessibilityRole="link"
+                onPress={() => openExternalUrl(p.value)}
+              >
+                {p.value}
+              </Text>
+            );
+          }
+          return (
+            <Text key={`text-${idx}`} style={textStyle}>
+              {p.value}
+            </Text>
+          );
+        })}
+      </Text>
+    );
+  };
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      const h = e?.endCoordinates?.height || 0;
+      setKeyboardHeight(h);
+      // 메모 입력 중이면 키보드 올라온 뒤 다시 한 번 위치 보정
+      if (memoFocusedRef.current) {
+        setTimeout(() => {
+          try {
+            formScrollRef.current?.scrollTo({ y: Math.max(0, (memoYRef.current || 0) - 16), animated: true });
+          } catch (err) {}
+        }, 50);
+      }
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      try { showSub?.remove?.(); } catch (e) {}
+      try { hideSub?.remove?.(); } catch (e) {}
+    };
+  }, []);
 
   const scrollFormToMemo = () => {
-    // 키보드가 올라오는 타이밍 이후에 스크롤을 맞추기 위해 약간 지연
+    // 키보드 애니메이션 이후에도 입력 중인 줄이 보이도록 위치 보정
     setTimeout(() => {
-      try { formScrollRef.current?.scrollToEnd({ animated: true }); } catch (e) {}
-    }, 150);
+      try {
+        formScrollRef.current?.scrollTo({ y: Math.max(0, (memoYRef.current || 0) - 16), animated: true });
+      } catch (e) {}
+    }, 80);
   };
 
   useEffect(() => {
@@ -1368,7 +1461,7 @@ const ProductDetailScreen = () => {
         style={{ flex: 1 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: 40 + (keyboardHeight || 0) }}
       >
         <View style={styles.productHeader}>
           <View style={styles.imageContainer}>
@@ -1641,15 +1734,34 @@ const ProductDetailScreen = () => {
           <TextInput style={styles.formInput} value={price} onChangeText={(t) => setPrice(t.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="숫자만 입력" />
 
           <Text style={styles.formLabel}>메모</Text>
-          <TextInput
-            ref={memoInputRef}
-            style={[styles.formInput, styles.formTextArea]}
-            value={memo}
-            onChangeText={setMemo}
-            placeholder="선택"
-            multiline
-            onFocus={scrollFormToMemo}
-          />
+          <View
+            onLayout={(e) => {
+              try {
+                memoYRef.current = e?.nativeEvent?.layout?.y ?? memoYRef.current;
+              } catch (err) {}
+            }}
+          >
+            <TextInput
+              ref={memoInputRef}
+              style={[styles.formInput, styles.formTextArea]}
+              value={memo}
+              onChangeText={setMemo}
+              placeholder="선택"
+              multiline
+              textAlignVertical="top"
+              onFocus={() => {
+                memoFocusedRef.current = true;
+                scrollFormToMemo();
+              }}
+              onBlur={() => {
+                memoFocusedRef.current = false;
+              }}
+              onContentSizeChange={() => {
+                // 멀티라인에서 줄이 늘어날 때 커서가 키보드 뒤로 숨지 않게 보정
+                if (memoFocusedRef.current) scrollFormToMemo();
+              }}
+            />
+          </View>
 
           <TouchableOpacity style={[styles.formSaveButton, !canSave && { opacity: 0.5 }]} disabled={!canSave} onPress={onSave}>
             <Text style={styles.formSaveButtonText}>
@@ -1956,7 +2068,7 @@ const ProductDetailScreen = () => {
           {currentProduct.memo &&
             <View style={styles.memoContainer}>
               <Text style={styles.memoLabel}>메모</Text>
-              <Text style={styles.memoText} selectable>{currentProduct.memo}</Text>
+              {renderTextWithLinks(currentProduct.memo, styles.memoText)}
             </View>
           }
         </View>
