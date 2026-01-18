@@ -26,7 +26,7 @@ const createAnonymousDefaultTemplates = (deviceId, existing = []) => {
   return [t1, t2];
 };
 
-// 영역과 템플릿 사용 상태 동기화
+// 카테고리와 템플릿 사용 상태 동기화
 export const reconcileLocationTemplates = createAsyncThunk(
   'auth/reconcileLocationTemplates',
   async (_, { getState }) => {
@@ -34,7 +34,7 @@ export const reconcileLocationTemplates = createAsyncThunk(
     const templates = (state.auth.userLocationTemplateInstances || []).map((t) => ({ ...t }));
     const locations = state.locations.locations || [];
     const linkedTemplateIds = new Set();
-    // 영역에 연결된 템플릿 적용
+    // 카테고리에 연결된 템플릿 적용
     for (const loc of locations) {
       const templateKey = loc?.templateInstanceLocalId || loc?.templateInstanceId;
       if (templateKey) {
@@ -189,7 +189,7 @@ export const verifyToken = createAsyncThunk(
   }
 );
 
-// 사용자 영역 템플릿 인스턴스 로드
+// 사용자 카테고리 템플릿 인스턴스 로드
 export const loadUserLocationTemplateInstances = createAsyncThunk(
   'auth/loadUserLocationTemplateInstances',
   async (_, { rejectWithValue, getState }) => {
@@ -294,7 +294,7 @@ const initialState = {
   deviceId: null,
   loading: false,
   error: null,
-  // 템플릿 로드 상태(내 영역 목록에서 "미연동" 판단을 너무 일찍 하지 않도록 분리)
+  // 템플릿 로드 상태(내 카테고리 목록에서 "미연동" 판단을 너무 일찍 하지 않도록 분리)
   locationTemplatesStatus: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
   subscription: {
     isSubscribed: false,
@@ -303,11 +303,11 @@ const initialState = {
   },
   slots: {
     locationSlots: {
-      baseSlots: 3, // 기본 영역 슬롯 수
-      additionalSlots: 0 // 추가 구매한 영역 슬롯 수
+      baseSlots: 3, // 기본 카테고리 슬롯 수
+      additionalSlots: 0 // 추가 구매한 카테고리 슬롯 수
     },
     productSlots: {
-      baseSlots: 3, // 각 영역당 기본 제품 슬롯 수
+      baseSlots: 3, // 각 카테고리당 기본 제품 슬롯 수
       additionalSlots: 0 // (deprecated) 템플릿 기반으로 대체 예정
     }
   },
@@ -318,7 +318,7 @@ const initialState = {
   },
   purchaseHistory: [], // 구매 내역
   pointHistory: [], // G 내역 (충전 및 사용)
-  // 사용자가 소유한 영역 템플릿 인스턴스 목록 - 비회원은 기본 템플릿 1개 제공
+  // 사용자가 소유한 카테고리 템플릿 인스턴스 목록 - 비회원은 기본 템플릿 1개 제공
   userLocationTemplateInstances: [],
   // 사용자가 소유한 제품 슬롯 템플릿 인스턴스 목록 (각 인스턴스는 제품 1개를 추가 허용)
   userProductSlotTemplateInstances: []
@@ -667,7 +667,7 @@ export const authSlice = createSlice({
       const plain = JSON.parse(JSON.stringify(state.userProductSlotTemplateInstances));
       saveUserProductSlotTemplates(plain).catch((err) => console.error('제품 슬롯 템플릿 저장 실패:', err));
     },
-    // 제품 슬롯 템플릿을 특정 영역에 등록(할당)
+    // 제품 슬롯 템플릿을 특정 카테고리에 등록(할당)
     assignProductSlotTemplatesToLocation: (state, action) => {
       const { locationId, count } = action.payload;
       if (!locationId || !count) return;
@@ -682,7 +682,7 @@ export const authSlice = createSlice({
       const plain = JSON.parse(JSON.stringify(state.userProductSlotTemplateInstances));
       saveUserProductSlotTemplates(plain).catch((err) => console.error('제품 슬롯 템플릿 할당 저장 실패:', err));
     },
-    // 특정 영역에서 제품 슬롯 템플릿 등록 해제 (count개)
+    // 특정 카테고리에서 제품 슬롯 템플릿 등록 해제 (count개)
     unassignProductSlotTemplatesFromLocation: (state, action) => {
       const { locationId, count } = action.payload;
       if (!locationId || !count) return;
@@ -719,7 +719,7 @@ export const authSlice = createSlice({
         saveUserProductSlotTemplates(plain).catch((err) => console.error('제품 슬롯 템플릿 해제 저장 실패:', err));
       }
     },
-    // 특정 템플릿을 특정 영역에 등록
+    // 특정 템플릿을 특정 카테고리에 등록
     assignProductSlotTemplateToLocation: (state, action) => {
       const { templateId, locationId } = action.payload;
       const t = state.userProductSlotTemplateInstances.find((x) => x.id === templateId);
@@ -847,7 +847,7 @@ export const authSlice = createSlice({
       state.error = action.payload;
     })
 
-    // 사용자 영역 템플릿 인스턴스 로드 처리
+    // 사용자 카테고리 템플릿 인스턴스 로드 처리
     .addCase(loadUserLocationTemplateInstances.pending, (state) => {
       state.loading = true;
       state.locationTemplatesStatus = 'loading';

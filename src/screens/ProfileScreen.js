@@ -80,7 +80,7 @@ const ProfileScreen = () => {
             ...user,
             username: res?.nickname || user?.username || '사용자',
             name: res?.nickname || user?.name || '사용자',
-            email: undefined, // 이메일 영역 제거
+            email: undefined, // 이메일 필드 제거
             profileImage: res?.profile_image_url || null
           };
           // 로컬에서만 최신화: authSlice에 user 업데이트 로직이 없다면 화면 레벨 상태로 반영

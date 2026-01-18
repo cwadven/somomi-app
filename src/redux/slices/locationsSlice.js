@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { saveLocations, loadLocations } from '../../utils/storageUtils';
 import { createGuestSection, updateGuestSection, deleteGuestSection, fetchGuestSections } from '../../api/sectionApi';
 
-// 영역 목록 가져오기
+// 카테고리 목록 가져오기
 export const fetchLocations = createAsyncThunk(
   'locations/fetchLocations',
   async (_, { rejectWithValue, getState }) => {
@@ -66,13 +66,13 @@ export const fetchLocations = createAsyncThunk(
   }
 );
 
-// 영역 상세 정보 가져오기
+// 카테고리 상세 정보 가져오기
 export const fetchLocationById = createAsyncThunk(
   'locations/fetchLocationById',
   async (locationId, { rejectWithValue, getState }) => {
     try {
       // 실제 구현에서는 API 호출
-      // 여기서는 상태에서 영역 찾기
+      // 여기서는 상태에서 카테고리 찾기
       const { locations } = getState().locations;
       const location = locations.find(loc => loc.id === locationId);
       
@@ -87,7 +87,7 @@ export const fetchLocationById = createAsyncThunk(
   }
 );
 
-// 영역 생성
+// 카테고리 생성
 export const createLocation = createAsyncThunk(
   'locations/createLocation',
   async (locationData, { rejectWithValue, getState, dispatch }) => {
@@ -144,7 +144,7 @@ export const createLocation = createAsyncThunk(
   }
 );
 
-// 영역 수정
+// 카테고리 수정
 export const updateLocation = createAsyncThunk(
   'locations/updateLocation',
   async (locationData, { rejectWithValue, getState, dispatch }) => {
@@ -196,7 +196,7 @@ export const updateLocation = createAsyncThunk(
   }
 );
 
-// 영역 삭제
+// 카테고리 삭제
 export const deleteLocation = createAsyncThunk(
   'locations/deleteLocation',
   async (locationId, { rejectWithValue, getState, dispatch }) => {
@@ -242,7 +242,7 @@ export const deleteLocation = createAsyncThunk(
   }
 );
 
-// 템플릿 미연동(usedInLocationId 없음)인 영역을 disabled=true로 동기화
+// 템플릿 미연동(usedInLocationId 없음)인 카테고리를 disabled=true로 동기화
 export const reconcileLocationsDisabled = createAsyncThunk(
   'locations/reconcileLocationsDisabled',
   async (_, { getState, rejectWithValue }) => {
@@ -285,12 +285,12 @@ const locationsSlice = createSlice({
       // 저장소도 비웁니다
       try { saveLocations([]); } catch (e) {}
     },
-    // 영역 생성 성공 (템플릿 인스턴스 ID 포함)
+    // 카테고리 생성 성공 (템플릿 인스턴스 ID 포함)
     createLocationSuccess: (state, action) => {
       state.locations.push(action.payload);
       state.status = 'succeeded';
     },
-    // 영역 수정 성공
+    // 카테고리 수정 성공
     updateLocationSuccess: (state, action) => {
       const index = state.locations.findIndex(loc => loc.id === action.payload.id);
       if (index !== -1) {
@@ -299,7 +299,7 @@ const locationsSlice = createSlice({
       state.currentLocation = action.payload;
       state.status = 'succeeded';
     },
-    // 영역 삭제 성공
+    // 카테고리 삭제 성공
     deleteLocationSuccess: (state, action) => {
       state.locations = state.locations.filter(location => location.id !== action.payload);
       state.currentLocation = null;
@@ -308,7 +308,7 @@ const locationsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // 영역 목록 가져오기
+      // 카테고리 목록 가져오기
       .addCase(fetchLocations.pending, (state) => {
         state.status = 'loading';
       })
@@ -322,7 +322,7 @@ const locationsSlice = createSlice({
         state.error = action.payload;
       })
       
-      // 영역 상세 정보 가져오기
+      // 카테고리 상세 정보 가져오기
       .addCase(fetchLocationById.pending, (state) => {
         state.status = 'loading';
       })
@@ -336,7 +336,7 @@ const locationsSlice = createSlice({
         state.error = action.payload;
       })
       
-      // 영역 생성
+      // 카테고리 생성
       .addCase(createLocation.pending, (state) => {
         state.status = 'loading';
       })
@@ -350,7 +350,7 @@ const locationsSlice = createSlice({
         state.error = action.payload;
       })
       
-      // 영역 수정
+      // 카테고리 수정
       .addCase(updateLocation.pending, (state) => {
         state.status = 'loading';
       })
@@ -368,7 +368,7 @@ const locationsSlice = createSlice({
         state.error = action.payload;
       })
       
-      // 영역 삭제
+      // 카테고리 삭제
       .addCase(deleteLocation.pending, (state) => {
         state.status = 'loading';
       })

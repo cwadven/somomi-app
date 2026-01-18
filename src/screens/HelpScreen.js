@@ -19,7 +19,7 @@ const HelpScreen = ({ navigation }) => {
         </Text>
 
         <Text style={styles.sectionTitle}>핵심 기능</Text>
-        <Text style={styles.bullet}>• 영역 관리: 냉장고/욕실/주방 등 영역을 만들어 제품을 분류하세요.</Text>
+        <Text style={styles.bullet}>• 카테고리 관리: 냉장고/욕실/주방 등 카테고리를 만들어 제품을 분류하세요.</Text>
         <Text style={styles.bullet}>• 제품 등록: 구매일/유통기한/소진예정일을 기록해 관리하세요.</Text>
         <Text style={styles.bullet}>• 알림: 유통/소진 시점 전에 리마인드를 받아 놓치지 않도록 합니다.</Text>
 
@@ -32,7 +32,7 @@ const HelpScreen = ({ navigation }) => {
         <Text style={styles.qaQ}>Q. 알림이 오지 않아요.</Text>
         <Text style={styles.qaA}>A. 프로필 → 앱 설정에서 알림을 활성화했는지 확인하고, 기기 설정의 앱 알림 권한도 허용해 주세요.</Text>
         <Text style={styles.qaQ}>Q. 제품을 어디서 수정하나요?</Text>
-        <Text style={styles.qaA}>A. 내 영역 목록 또는 제품 목록에서 제품을 눌러 상세 화면에서 수정할 수 있습니다.</Text>
+        <Text style={styles.qaA}>A. 내 카테고리 목록 또는 제품 목록에서 제품을 눌러 상세 화면에서 수정할 수 있습니다.</Text>
       </ScrollView>
     </View>
   );

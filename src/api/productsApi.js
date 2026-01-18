@@ -12,7 +12,7 @@ let consumedProducts = [];
 // 샘플 카테고리 데이터
 const initialSampleCategories = [];
 
-// 샘플 영역(Location) 데이터
+// 샘플 카테고리(Location) 데이터
 const initialSampleLocations = [];
 
 let sampleLocations = [...initialSampleLocations];
@@ -38,7 +38,7 @@ export const initializeData = async () => {
       await saveData(STORAGE_KEYS.CONSUMED_PRODUCTS, []);
     }
 
-    // 영역 데이터 로드
+    // 카테고리 데이터 로드
     const storedLocations = await loadData(STORAGE_KEYS.LOCATIONS);
     if (storedLocations) {
       sampleLocations = storedLocations;
@@ -436,7 +436,7 @@ export const fetchProductsByLocationApi = async (locationId) => {
       sampleProducts = storedProducts;
     }
     
-    // 해당 영역의 제품만 필터링 (localId 우선)
+    // 해당 카테고리의 제품만 필터링 (localId 우선)
     const locationProducts = sampleProducts.filter(
       product => (product.locationLocalId === locationId || product.locationId === locationId) && !product.isConsumed
           );
@@ -495,7 +495,7 @@ export const restoreConsumedProductApi = async (id, locationId = null) => {
       delete product.consumedAt;
       product.isConsumed = false;
       
-      // 영역 ID 설정 (새 영역이 지정된 경우)
+      // 카테고리 ID 설정 (새 카테고리가 지정된 경우)
       if (locationId) {
         product.locationId = locationId;
       }

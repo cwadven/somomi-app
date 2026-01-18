@@ -68,7 +68,7 @@ const HomeStack = () => {
   );
 };
 
-// 영역 관련 스택 네비게이터
+// 카테고리 관련 스택 네비게이터
 const LocationsStack = () => (
   <Stack.Navigator
     screenOptions={{

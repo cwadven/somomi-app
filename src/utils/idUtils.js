@@ -1,10 +1,10 @@
 /**
  * ID 생성 유틸리티 함수
  * 
- * 다양한 항목(영역, 제품, 카테고리 등)에 대한 고유 ID를 생성합니다.
+ * 다양한 항목(카테고리, 제품 등)에 대한 고유 ID를 생성합니다.
  * 
  * 사용 예시:
- * - 영역 ID 생성: generateId('location')
+ * - 카테고리 ID 생성: generateId('location')
  * - 제품 ID 생성: generateId('product')
  * - 카테고리 ID 생성: generateId('category')
  * - 알림 ID 생성: generateId('notification')

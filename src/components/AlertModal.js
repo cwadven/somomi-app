@@ -67,7 +67,7 @@ const AlertModal = ({ visible, title, message, content, onClose, buttons, icon, 
           <Text style={styles.modalTitle}>{title || '알림'}</Text>
           <Text style={styles.modalText}>{message}</Text>
           
-          {/* 커스텀 콘텐츠 영역 */}
+          {/* 커스텀 콘텐츠 섹션 */}
           {content && <View style={styles.contentContainer}>{content}</View>}
           
           <View style={styles.buttonContainer}>

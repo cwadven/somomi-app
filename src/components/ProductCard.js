@@ -140,7 +140,7 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
             {/* 카테고리 표시 제거 */}
           </View>
           
-          {/* 영역 정보 표시 (showLocation이 true일 때만) */}
+          {/* 카테고리 정보 표시 (showLocation이 true일 때만) */}
           {showLocation && locationName && (
             <View style={styles.locationContainer}>
               <Ionicons name="location-outline" size={14} color={isZeroHP ? "#888" : "#4CAF50"} />

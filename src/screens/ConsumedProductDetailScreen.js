@@ -95,19 +95,19 @@ const ConsumedProductDetailScreen = () => {
   // 카테고리 제거: 고정 아이콘 사용
   const getCategoryIcon = () => 'cube-outline';
 
-  // 소진 당시 영역 이름 결정 (현재 사용자의 영역 목록에서 id로 매칭)
+  // 소진 당시 카테고리 이름 결정 (현재 사용자의 카테고리 목록에서 id로 매칭)
   const consumedFromLocation = currentProduct && locations
     ? (locations.find(loc => loc.id === currentProduct.locationId) || null)
     : null;
   
-  // 소진 철회 처리 함수: 기본 철회 시도 후 특정 에러코드면 영역 선택 유도
+  // 소진 철회 처리 함수: 기본 철회 시도 후 특정 에러코드면 카테고리 선택 유도
   const [reasonForSelection, setReasonForSelection] = useState('');
 
   const handleRestoreProduct = () => {
     setIsRestoring(true);
     revokeConsumeInventoryItem(currentProduct.id)
       .then(() => {
-        // ✅ Optimistic update: 철회된 제품을 즉시 활성 목록/영역 캐시에 추가
+        // ✅ Optimistic update: 철회된 제품을 즉시 활성 목록/카테고리 캐시에 추가
         try {
           const restored = {
             ...currentProduct,
@@ -150,7 +150,7 @@ const ConsumedProductDetailScreen = () => {
       });
   };
   
-  // 영역 선택 후 소진 철회 처리 (지정 영역으로 재시도)
+  // 카테고리 선택 후 소진 철회 처리 (지정 카테고리로 재시도)
   const handleLocationSelect = (location) => {
     setIsRestoring(true);
     try {
@@ -169,7 +169,7 @@ const ConsumedProductDetailScreen = () => {
       }
       revokeConsumeInventoryItem(currentProduct.id, body)
       .then(() => {
-        // ✅ Optimistic update: 지정한 영역으로 즉시 복원 표시
+        // ✅ Optimistic update: 지정한 카테고리로 즉시 복원 표시
         try {
           const restoredLocId = location?.id != null ? String(location.id) : null;
           const restored = {
@@ -410,7 +410,7 @@ const ConsumedProductDetailScreen = () => {
         </TouchableOpacity>
       </ScrollView>
       
-      {/* 영역 선택 모달 */}
+      {/* 카테고리 선택 모달 */}
       <LocationSelectionModal
         visible={locationSelectionVisible}
         onClose={() => setLocationSelectionVisible(false)}

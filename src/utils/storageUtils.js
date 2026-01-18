@@ -8,7 +8,7 @@ export const STORAGE_KEYS = {
   NOTIFICATIONS: 'somomi_notifications',
   CONSUMED_PRODUCTS: 'somomi_consumed_products',
   PROCESSED_NOTIFICATIONS: 'somomi_processed_notifications',
-  USER_LOCATION_TEMPLATES: 'somomi_user_location_templates', // 사용자 영역 템플릿 인스턴스
+  USER_LOCATION_TEMPLATES: 'somomi_user_location_templates', // 사용자 카테고리 템플릿 인스턴스
   USER_PRODUCT_SLOT_TEMPLATES: 'somomi_user_product_slot_templates', // 사용자 제품 슬롯 템플릿 인스턴스
   JWT_TOKEN: 'somomi_jwt_token',
   REFRESH_TOKEN: 'somomi_refresh_token',
@@ -99,7 +99,7 @@ export const clearAllData = async () => {
 // 동기화 보조 스토리지 관련 항목 제거됨
 // =====================
 
-// 영역 데이터 저장 함수
+// 카테고리 데이터 저장 함수
 export const saveLocations = async (locations) => {
   try {
     await saveData(STORAGE_KEYS.LOCATIONS, locations);
@@ -111,7 +111,7 @@ export const saveLocations = async (locations) => {
   }
 };
 
-// 영역 데이터 로드 함수
+// 카테고리 데이터 로드 함수
 export const loadLocations = async () => {
   try {
     const locations = await loadData(STORAGE_KEYS.LOCATIONS);
@@ -171,7 +171,7 @@ export const loadConsumedProducts = async () => {
   }
 };
 
-// 사용자 영역 템플릿 인스턴스 저장 함수
+// 사용자 카테고리 템플릿 인스턴스 저장 함수
 export const saveUserLocationTemplates = async (templates) => {
   try {
     await saveData(STORAGE_KEYS.USER_LOCATION_TEMPLATES, templates);
@@ -183,7 +183,7 @@ export const saveUserLocationTemplates = async (templates) => {
   }
 };
 
-// 사용자 영역 템플릿 인스턴스 로드 함수
+// 사용자 카테고리 템플릿 인스턴스 로드 함수
 export const loadUserLocationTemplates = async () => {
   try {
     const templates = await loadData(STORAGE_KEYS.USER_LOCATION_TEMPLATES);

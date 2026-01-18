@@ -63,7 +63,7 @@ const AddLocationScreen = () => {
   // 사용 가능 + 미만료 템플릿만 필터링
   const availableTemplates = userLocationTemplateInstances.filter((template) => !template.used && !isTemplateExpired(template));
 
-  // 수정 모드에서 현재 영역에 연결된 템플릿이 만료되었는지 판단
+  // 수정 모드에서 현재 카테고리에 연결된 템플릿이 만료되었는지 판단
   const linkedTemplateInEdit = isEditMode && locationToEdit ?
 
   (userLocationTemplateInstances || []).find((t) => t.usedInLocationId === locationToEdit.id) ||
@@ -91,7 +91,7 @@ const AddLocationScreen = () => {
   // - 제품 슬롯 템플릿은 Redux(auth 저장소) 또는 섹션 API로 내려오는 connected 템플릿 기반으로만 사용
   const sourceProductSlotTemplates = userProductSlotTemplateInstances || [];
   const usedProductSlotTemplatesInThisLocation = sourceProductSlotTemplates.filter((t) => t.used && currentProductIdSet.has(t.usedByProductId)).length;
-  // 이 영역에 등록된 슬롯은 유효성 여부와 무관하게 표시 (만료/비활성도 포함)
+  // 이 카테고리에 등록된 슬롯은 유효성 여부와 무관하게 표시 (만료/비활성도 포함)
   // 기준: 섹션 API의 connected_guest_inventory_item_templates (expires_at 포함)
   const assignedProductSlotTemplatesForThisLocation = (() => {
     if (!(isEditMode && locationToEdit)) return [];
@@ -462,7 +462,7 @@ const AddLocationScreen = () => {
     setSelectedEditTemplateInstance(template);
   };
   
-  // 영역 생성/수정 버튼 클릭 핸들러
+  // 카테고리 생성/수정 버튼 클릭 핸들러
   const handleCreateLocation = async () => {
     if (hasSubmittedRef.current) return;
     // 필수 입력값 검증
@@ -486,7 +486,7 @@ const AddLocationScreen = () => {
     if (sanitizedTitle.length > MAX_LOCATION_TITLE_LEN) {
       setAlertModalConfig({
         title: '입력 오류',
-        message: `영역 이름은 최대 ${MAX_LOCATION_TITLE_LEN}자까지 입력할 수 있어요.`,
+        message: `카테고리 이름은 최대 ${MAX_LOCATION_TITLE_LEN}자까지 입력할 수 있어요.`,
         buttons: [{ text: '확인' }],
         icon: 'alert-circle',
         iconColor: '#F44336',
@@ -498,7 +498,7 @@ const AddLocationScreen = () => {
     if (sanitizedDesc.length > MAX_LOCATION_DESC_LEN) {
       setAlertModalConfig({
         title: '입력 오류',
-        message: `영역 설명은 최대 ${MAX_LOCATION_DESC_LEN}자까지 입력할 수 있어요.`,
+        message: `카테고리 설명은 최대 ${MAX_LOCATION_DESC_LEN}자까지 입력할 수 있어요.`,
         buttons: [{ text: '확인' }],
         icon: 'alert-circle',
         iconColor: '#F44336',
@@ -527,7 +527,7 @@ const AddLocationScreen = () => {
     
     try {
       if (isEditMode) {
-        // 영역 수정 로직
+        // 카테고리 수정 로직
         console.log('카테고리 수정 시작:', {
           locationData,
           locationId: locationToEdit.id,
@@ -568,7 +568,7 @@ const AddLocationScreen = () => {
           newFeature = selectedEditTemplateInstance.feature;
         }
         
-        // 영역 수정 API 호출 (실패 시 모달 표시 후 중단)
+        // 카테고리 수정 API 호출 (실패 시 모달 표시 후 중단)
         let updatedLocation = null;
         try {
           updatedLocation = await dispatch(updateLocation({
@@ -593,7 +593,7 @@ const AddLocationScreen = () => {
           setAlertModalVisible(true);
           return;
         }
-        // 새 템플릿을 해당 영역에 사용 처리 (UI 동기화)
+        // 새 템플릿을 해당 카테고리에 사용 처리 (UI 동기화)
         try {
           if (changingTemplate) {
             await dispatch(markTemplateInstanceAsUsed({ templateId: newTemplateInstanceId, locationId: locationToEdit.id }));
@@ -629,7 +629,7 @@ const AddLocationScreen = () => {
         
         setIsLoading(false);
         
-        // 성공 후 스택을 재구성: [영역 목록, 영역 상세]로 리셋하여 뒤로가기 한 번에 목록으로 복귀
+        // 성공 후 스택을 재구성: [카테고리 목록, 카테고리 상세]로 리셋하여 뒤로가기 한 번에 목록으로 복귀
         try {dispatch(fetchProductsByLocation(String(locationToEdit.id)));} catch (e) {}
         navigation.reset({
           index: 1,
@@ -639,13 +639,13 @@ const AddLocationScreen = () => {
 
         });
       } else {
-        // 영역 생성 로직
+        // 카테고리 생성 로직
         console.log('카테고리 생성 시작:', {
           locationData,
           selectedTemplateInstance
         });
         
-        // 영역 생성 API 호출
+        // 카테고리 생성 API 호출
         const result = await dispatch(createLocation({
         ...locationData,
           title: sanitizedTitle,
@@ -657,7 +657,7 @@ const AddLocationScreen = () => {
         
         console.log('카테고리 생성 성공:', result);
         
-        // 생성된 영역 ID로 템플릿 인스턴스를 사용됨으로 표시
+        // 생성된 카테고리 ID로 템플릿 인스턴스를 사용됨으로 표시
         dispatch(markTemplateInstanceAsUsed({
           templateId: selectedTemplateInstance.id,
           locationId: result.id
@@ -665,10 +665,10 @@ const AddLocationScreen = () => {
         
         setIsLoading(false);
         
-        // 영역 목록 화면으로 돌아가기
+        // 카테고리 목록 화면으로 돌아가기
         console.log('카테고리 생성 완료, 카테고리 목록 화면으로 이동');
         
-        // 성공 메시지 표시 후 내 영역 탭으로 이동
+        // 성공 메시지 표시 후 내 카테고리 탭으로 이동
         setAlertModalConfig({
           title: '성공',
           message: '카테고리가 성공적으로 생성되었습니다.',
@@ -676,7 +676,7 @@ const AddLocationScreen = () => {
             {
               text: '확인',
               onPress: () => {
-                // 스택의 최상위 화면(영역 목록)으로 이동
+                // 스택의 최상위 화면(카테고리 목록)으로 이동
                 navigation.popToTop();
               }
           }],
@@ -755,7 +755,7 @@ const AddLocationScreen = () => {
         <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
           <Ionicons name="chevron-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>영역</Text>
+        <Text style={styles.headerTitle}>카테고리</Text>
         <View style={styles.headerRight} />
           </View>
       
@@ -765,7 +765,7 @@ const AddLocationScreen = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>템플릿 선택</Text>
             <Text style={styles.sectionDescription}>
-              영역을 생성할 템플릿을 선택하세요. 템플릿에 따라 제공되는 기능이 다릅니다.
+              카테고리를 생성할 템플릿을 선택하세요. 템플릿에 따라 제공되는 기능이 다릅니다.
           </Text>
             
             {/* 단일 스크롤 리스트로 통합 */}
@@ -869,12 +869,12 @@ const AddLocationScreen = () => {
           </View>
         }
         
-        {/* 영역 정보 입력 섹션 */}
+        {/* 카테고리 정보 입력 섹션 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>영역 정보</Text>
+          <Text style={styles.sectionTitle}>카테고리 정보</Text>
           {isEditMode && isEditLockedByExpiry &&
             <View style={{ backgroundColor: '#fff8e1', borderWidth: 1, borderColor: '#ffe082', borderRadius: 8, padding: 10, marginBottom: 10 }}>
-              <Text style={{ color: '#ff6f00', fontSize: 12 }}>이 영역은 만료된 영역 템플릿에 연결되어 있어 영역 정보는 수정할 수 없습니다. 상단의 템플릿 변경을 이용해주세요.</Text>
+              <Text style={{ color: '#ff6f00', fontSize: 12 }}>이 카테고리는 만료된 카테고리 템플릿에 연결되어 있어 카테고리 정보는 수정할 수 없습니다. 상단의 템플릿 변경을 이용해주세요.</Text>
           </View>
           }
           
@@ -925,7 +925,7 @@ const AddLocationScreen = () => {
 
         {/* (제거) 제품 슬롯 / 보유한 추가 제품 슬롯 섹션 (요청사항) */}
 
-        {/* 저장 버튼 (영역 생성/수정은 기능적으로 수행하되 문구는 '저장'으로 통일) */}
+        {/* 저장 버튼 (카테고리 생성/수정은 기능적으로 수행하되 문구는 '저장'으로 통일) */}
                       <TouchableOpacity
           style={styles.createButton}
           onPress={handleCreateLocation}

@@ -19,10 +19,10 @@ if (Platform.OS !== 'web') {
 import { loadData, saveData, STORAGE_KEYS, loadAppPrefs, saveData as saveAny } from './storageUtils';
 
 /**
- * 영역 알림을 처리하는 함수
+ * 카테고리 알림을 처리하는 함수
  * @param {Array} notifications - 알림 설정 목록
  * @param {Array} products - 제품 목록
- * @param {Array} locations - 영역 목록
+ * @param {Array} locations - 카테고리 목록
  * @returns {Array} 처리된 알림 정보 배열
  */
 export const processLocationNotifications = (notifications, products, locations, templates = []) => {
@@ -35,7 +35,7 @@ export const processLocationNotifications = (notifications, products, locations,
     } catch (e) {}
   };
   
-  // 영역 알림 필터링
+  // 카테고리 알림 필터링
   const locationNotifications = notifications.filter(n => n.type === 'location');
   
   const isLocationTemplateExpired = (locId) => {
@@ -49,18 +49,18 @@ export const processLocationNotifications = (notifications, products, locations,
   for (const locationNotif of locationNotifications) {
     const location = locations.find(loc => (loc.localId === locationNotif.targetId) || (loc.id === locationNotif.targetId));
     if (!location) continue;
-    // 비활성화 또는 만료된 영역 제외
+    // 비활성화 또는 만료된 카테고리 제외
     if (location.disabled === true) {
-      addLog(`[SKIP] 영역 비활성화: ${location.title} (${location.id})`, 'warning');
+      addLog(`[SKIP] 카테고리 비활성화: ${location.title} (${location.id})`, 'warning');
       continue;
     }
     const locKey = location.localId || location.id;
     if (isLocationTemplateExpired(locKey)) {
-      addLog(`[SKIP] 영역 템플릿 만료: ${location.title} (${location.id})`, 'warning');
+      addLog(`[SKIP] 카테고리 템플릿 만료: ${location.title} (${location.id})`, 'warning');
       continue;
     }
     
-    // 해당 영역에 속한 제품들 찾기 (소진되지 않은 제품만)
+    // 해당 카테고리에 속한 제품들 찾기 (소진되지 않은 제품만)
     const locationProducts = products.filter(p => {
       const pLocKey = p.locationLocalId || p.locationId;
       return pLocKey === locKey && !p.isConsumed;
@@ -73,7 +73,7 @@ export const processLocationNotifications = (notifications, products, locations,
         n.targetId === product.id
       );
       
-      // 영역 알림 무시 설정이 true인 제품은 건너뜀
+      // 카테고리 알림 무시 설정이 true인 제품은 건너뜀
       if (productNotif && productNotif.ignoreLocationNotification === true) {
         continue;
       }
@@ -124,7 +124,7 @@ export const processLocationNotifications = (notifications, products, locations,
  * 제품 알림을 처리하는 함수
  * @param {Array} notifications - 알림 설정 목록
  * @param {Array} products - 제품 목록
- * @param {Array} locations - 영역 목록
+ * @param {Array} locations - 카테고리 목록
  * @returns {Array} 처리된 알림 정보 배열
  */
 export const processProductNotifications = (notifications, products, locations, templates = []) => {
@@ -155,15 +155,15 @@ export const processProductNotifications = (notifications, products, locations, 
     
     const locKey = product.locationLocalId || product.locationId;
     const location = locations.find(loc => (loc.localId === locKey) || (loc.id === locKey));
-    // 비활성화 또는 만료된 영역 소속 제품 제외
+    // 비활성화 또는 만료된 카테고리 소속 제품 제외
     if (!location) continue;
     if (location.disabled === true) {
-      addLog(`[SKIP] 영역 비활성화(제품 제외): ${product.name} (${product.id}) @ ${product.locationId}`, 'warning');
+      addLog(`[SKIP] 카테고리 비활성화(제품 제외): ${product.name} (${product.id}) @ ${product.locationId}`, 'warning');
       continue;
     }
     const lkey = location.localId || location.id;
     if (isLocationTemplateExpired(lkey)) {
-      addLog(`[SKIP] 영역 템플릿 만료(제품 제외): ${product.name} (${product.id}) @ ${location.title} (${lkey})`, 'warning');
+      addLog(`[SKIP] 카테고리 템플릿 만료(제품 제외): ${product.name} (${product.id}) @ ${location.title} (${lkey})`, 'warning');
       continue;
     }
     
@@ -211,7 +211,7 @@ export const processProductNotifications = (notifications, products, locations, 
 /**
  * 유통기한 알림 정보를 생성하는 함수
  * @param {Object} product - 제품 정보
- * @param {Object} location - 영역 정보 (nullable)
+ * @param {Object} location - 카테고리 정보 (nullable)
  * @param {number} daysBeforeTarget - 알림 발생 기준 일수
  * @param {string} notificationId - 알림 설정 ID
  * @returns {Object|null} 알림 정보 객체 또는 null
@@ -252,7 +252,7 @@ export const createExpiryNotification = (product, location, daysBeforeTarget, no
 /**
  * 소진예상 알림 정보를 생성하는 함수
  * @param {Object} product - 제품 정보
- * @param {Object} location - 영역 정보 (nullable)
+ * @param {Object} location - 카테고리 정보 (nullable)
  * @param {number} daysBeforeTarget - 알림 발생 기준 일수
  * @param {string} notificationId - 알림 설정 ID
  * @returns {Object|null} 알림 정보 객체 또는 null
@@ -311,7 +311,7 @@ export const processAllNotifications = async (skipSending = false) => {
     const locations = await loadData(STORAGE_KEYS.LOCATIONS) || [];
     const templates = await loadData(STORAGE_KEYS.USER_LOCATION_TEMPLATES) || [];
     
-    // 2. 영역 알림과 제품 알림 처리
+    // 2. 카테고리 알림과 제품 알림 처리
     const locationNotificationsToSend = processLocationNotifications(notifications, products, locations, templates);
     const productNotificationsToSend = processProductNotifications(notifications, products, locations, templates);
     

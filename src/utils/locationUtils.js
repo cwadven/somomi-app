@@ -1,4 +1,4 @@
-// 영역 관련 유틸리티
+// 카테고리 관련 유틸리티
 import { isTemplateActive } from './validityUtils';
 
 // 템플릿 만료 여부 판별

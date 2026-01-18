@@ -77,7 +77,7 @@ export const fetchProductById = createAsyncThunk(
   }
 );
 
-// 특정 영역의 제품 목록 가져오기
+// 특정 카테고리의 제품 목록 가져오기
 export const fetchProductsByLocation = createAsyncThunk(
   'products/fetchProductsByLocation',
   async (arg, { rejectWithValue, getState }) => {
@@ -89,7 +89,7 @@ export const fetchProductsByLocation = createAsyncThunk(
       const append = isObj ? !!arg.append : false;
       const sortParam = isObj ? (arg.sort || null) : null;
 
-      // 서버 호출: 전체/특정 영역 분기
+      // 서버 호출: 전체/특정 카테고리 분기
       if (locId === 'all') {
         try {
           const res = await fetchAllInventoryItems({ nextCursor: nextCursorParam, size: sizeParam, sort: sortParam });
@@ -447,7 +447,7 @@ const initialState = {
   consumedLoadingMore: false, // 소진 목록 추가 로딩 상태
   error: null,
   currentProduct: null,
-  locationProducts: {}, // 영역별 제품 목록 캐시 (array)
+  locationProducts: {}, // 카테고리별 제품 목록 캐시 (array)
   locationProductsMeta: {}, // { [locationId]: { nextCursor, hasMore } }
   // 소진 목록 정렬: moved_to_consumed_section(소진 등록 시각) 기준
   // - 기본값은 최신 소진 등록순: -moved_to_consumed_section
@@ -473,7 +473,7 @@ export const productsSlice = createSlice({
 
       // products(내 제품 목록) 업데이트
       const idx = state.products.findIndex(p => String(p.id) === id);
-      // prevLocId는 products 배열이 비어있는 경우가 있어(특정 영역만 fetch하는 화면) 캐시/현재상품에서도 추론해야 함
+      // prevLocId는 products 배열이 비어있는 경우가 있어(특정 카테고리만 fetch하는 화면) 캐시/현재상품에서도 추론해야 함
       const prevLocIdFromPayload = action.payload?.prevLocationId != null ? String(action.payload.prevLocationId) : null;
       const prevLocIdFromProducts = idx !== -1 && state.products[idx]?.locationId != null ? String(state.products[idx].locationId) : null;
       const prevLocIdFromCurrent =
@@ -626,7 +626,7 @@ export const productsSlice = createSlice({
           state.products = items;
         }
 
-        // 영역별 캐시 업데이트 (append 시에는 이어 붙임)
+        // 카테고리별 캐시 업데이트 (append 시에는 이어 붙임)
         const existing = state.locationProducts[locationId] || [];
         state.locationProducts[locationId] = append ? [...existing, ...items] : items;
         state.locationProductsMeta[locationId] = { nextCursor, hasMore };
@@ -644,7 +644,7 @@ export const productsSlice = createSlice({
         state.status = 'succeeded';
         state.products.unshift(action.payload);
         
-        // 영역별 제품 목록 캐시 업데이트
+        // 카테고리별 제품 목록 캐시 업데이트
         const locationId = action.payload.locationLocalId || action.payload.locationId;
         if (state.locationProducts[locationId]) {
           state.locationProducts[locationId].unshift(action.payload);
@@ -670,7 +670,7 @@ export const productsSlice = createSlice({
         }
         state.currentProduct = action.payload;
         
-        // 영역별 제품 목록 캐시 업데이트
+        // 카테고리별 제품 목록 캐시 업데이트
         Object.keys(state.locationProducts).forEach(locationId => {
           const productIndex = state.locationProducts[locationId].findIndex(
             product => product.id === action.payload.id
@@ -693,7 +693,7 @@ export const productsSlice = createSlice({
         state.status = 'succeeded';
         state.products = state.products.filter(product => product.id !== action.payload);
         
-        // 영역별 제품 목록 캐시 업데이트
+        // 카테고리별 제품 목록 캐시 업데이트
         Object.keys(state.locationProducts).forEach(locationId => {
           state.locationProducts[locationId] = state.locationProducts[locationId].filter(
             product => product.id !== action.payload
@@ -720,7 +720,7 @@ export const productsSlice = createSlice({
         }
         // 현재 제품 상태 유지 (null로 설정하지 않음)
         
-        // 영역별 제품 목록 캐시 업데이트
+        // 카테고리별 제품 목록 캐시 업데이트
         Object.keys(state.locationProducts).forEach(locationId => {
           state.locationProducts[locationId] = state.locationProducts[locationId].filter(
             product => product.id !== action.payload.id
@@ -780,7 +780,7 @@ export const productsSlice = createSlice({
         }
         // 현재 제품 상태 유지 (null로 설정하지 않음)
         
-        // 영역별 제품 목록 캐시 업데이트
+        // 카테고리별 제품 목록 캐시 업데이트
         const locationId = action.payload.locationId;
         if (locationId && state.locationProducts[locationId]) {
           state.locationProducts[locationId].push(action.payload);
@@ -794,23 +794,23 @@ export const productsSlice = createSlice({
         state.error = action.payload;
       })
       
-      // 영역 삭제 시 해당 영역의 제품들도 함께 삭제
+      // 카테고리 삭제 시 해당 카테고리의 제품들도 함께 삭제
       .addCase(deleteLocation.fulfilled, (state, action) => {
         const deletedLocationId = action.payload;
-        // 일반 제품 목록에서 해당 영역의 제품 제거
+        // 일반 제품 목록에서 해당 카테고리의 제품 제거
         state.products = state.products.filter(product => 
           product.locationId !== deletedLocationId && product.locationLocalId !== deletedLocationId
         );
-        // 소진 처리된 제품 목록에서도 해당 영역의 제품 제거
+        // 소진 처리된 제품 목록에서도 해당 카테고리의 제품 제거
         state.consumedProducts = state.consumedProducts.filter(product => 
           product.locationId !== deletedLocationId && product.locationLocalId !== deletedLocationId
         );
-        // 현재 제품이 해당 영역의 제품이면 초기화
+        // 현재 제품이 해당 카테고리의 제품이면 초기화
         if (state.currentProduct && (state.currentProduct.locationId === deletedLocationId || state.currentProduct.locationLocalId === deletedLocationId)) {
           state.currentProduct = null;
         }
         
-        // 영역별 제품 목록 캐시에서 해당 영역 제거
+        // 카테고리별 제품 목록 캐시에서 해당 카테고리 제거
         if (state.locationProducts[deletedLocationId]) {
           delete state.locationProducts[deletedLocationId];
         }

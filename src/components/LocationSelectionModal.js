@@ -23,7 +23,7 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMess
   const [loading, setLoading] = useState(true);
   const [selectedLocationId, setSelectedLocationId] = useState(null);
 
-  // 모달이 표시될 때 영역 데이터 로드
+  // 모달이 표시될 때 카테고리 데이터 로드
   useEffect(() => {
     if (visible) {
       setLoading(true);
@@ -32,7 +32,7 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMess
         .then(async (fetchedLocations) => {
           try {
             const list = Array.isArray(fetchedLocations) ? fetchedLocations : (locations || []);
-            // 각 영역별 제품 목록 최신화 (용량 계산 정확도 향상)
+            // 각 카테고리별 제품 목록 최신화 (용량 계산 정확도 향상)
             await Promise.all(
               list.map((loc) => {
                 if (!loc?.id) return Promise.resolve();
@@ -53,7 +53,7 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMess
     setSelectedLocationId(location.id);
   };
 
-  // 복원 가능(만료 아님 && 가득 참 아님)한 영역만 필터링
+  // 복원 가능(만료 아님 && 가득 참 아님)한 카테고리만 필터링
   const eligibleLocations = useMemo(() => {
     try {
       return (locations || []).filter((loc) => {
@@ -130,7 +130,7 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMess
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>영역 선택</Text>
+            <Text style={styles.modalTitle}>카테고리 선택</Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
@@ -144,7 +144,7 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMess
               </View>
             ) : null}
             <Text style={styles.modalDescription}>
-              복원할 제품을 넣을 영역을 선택하세요.
+              복원할 제품을 넣을 카테고리를 선택하세요.
             </Text>
 
             {loading || status === 'loading' ? (
@@ -161,8 +161,8 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMess
             ) : (
               <View style={styles.emptyContainer}>
                 <Ionicons name="alert-circle-outline" size={48} color="#ccc" />
-                <Text style={styles.emptyText}>복원 가능한 영역이 없습니다.</Text>
-                <Text style={styles.emptySubText}>만료되었거나 슬롯이 가득 찬 영역은 표시되지 않습니다.</Text>
+                <Text style={styles.emptyText}>복원 가능한 카테고리가 없습니다.</Text>
+                <Text style={styles.emptySubText}>만료되었거나 슬롯이 가득 찬 카테고리는 표시되지 않습니다.</Text>
               </View>
             )}
           </View>

@@ -71,7 +71,7 @@ export const fetchProductNotifications = createAsyncThunk(
   }
 );
 
-// 영역별 알림 조회 API
+// 카테고리별 알림 조회 API
 export const fetchLocationNotifications = createAsyncThunk(
   'notifications/fetchLocationNotifications',
   async (locationId, { rejectWithValue }) => {
@@ -82,7 +82,7 @@ export const fetchLocationNotifications = createAsyncThunk(
         sampleNotifications = storedNotifications;
       }
       
-      // 해당 영역의 알림만 필터링
+      // 해당 카테고리의 알림만 필터링
       const locationNotifications = sampleNotifications.filter(
         notification => notification.type === 'location' && notification.targetId === locationId
       );
@@ -251,7 +251,7 @@ export const deleteNotification = createAsyncThunk(
   }
 );
 
-// 영역의 기본 알림 설정 적용
+// 카테고리의 기본 알림 설정 적용
 export const applyLocationNotifications = createAsyncThunk(
   'notifications/applyLocationNotifications',
   async ({ locationId, applyToExisting }, { rejectWithValue, getState }) => {
@@ -262,7 +262,7 @@ export const applyLocationNotifications = createAsyncThunk(
         sampleNotifications = storedNotifications;
       }
       
-      // 영역의 기본 알림 설정 가져오기
+      // 카테고리의 기본 알림 설정 가져오기
       const locationNotifications = sampleNotifications.filter(
         n => n.type === 'location' && n.targetId === locationId
       );
@@ -271,7 +271,7 @@ export const applyLocationNotifications = createAsyncThunk(
         return rejectWithValue('카테고리의 기본 알림 설정이 없습니다.');
       }
       
-      // 해당 영역에 속한 제품 목록 가져오기
+      // 해당 카테고리에 속한 제품 목록 가져오기
       const { products } = getState().products;
       const locationProducts = products.filter(p => p.locationId === locationId);
       
@@ -279,7 +279,7 @@ export const applyLocationNotifications = createAsyncThunk(
         return [];
       }
       
-      // 각 제품에 영역 알림 설정 적용
+      // 각 제품에 카테고리 알림 설정 적용
       const newNotifications = [];
       
       for (const product of locationProducts) {
@@ -292,7 +292,7 @@ export const applyLocationNotifications = createAsyncThunk(
           // 기존 알림 취소
           for (const notification of existingProductNotifications) {
             try {
-              // 영역 알림 무시 설정이 활성화된 제품은 건너뜀
+              // 카테고리 알림 무시 설정이 활성화된 제품은 건너뜀
               if (notification.ignoreLocationNotification) {
                 continue;
               }
@@ -314,7 +314,7 @@ export const applyLocationNotifications = createAsyncThunk(
             n => n.type === 'product' && n.targetId === product.id
           );
           
-          // 영역 알림 무시 설정이 활성화된 제품은 건너뜀
+          // 카테고리 알림 무시 설정이 활성화된 제품은 건너뜀
           const hasIgnoreLocationSetting = existingProductNotifications.some(
             n => n.ignoreLocationNotification
           );
@@ -324,7 +324,7 @@ export const applyLocationNotifications = createAsyncThunk(
           }
         }
         
-        // 영역 알림 설정을 제품에 적용
+        // 카테고리 알림 설정을 제품에 적용
         for (const locationNotification of locationNotifications) {
           // AI 알림은 제품별로 적용하지 않음
           if (locationNotification.notifyType === 'ai') {
@@ -455,7 +455,7 @@ export const applyLocationNotifications = createAsyncThunk(
 
 const initialState = {
   notifications: [],
-  currentNotifications: [], // 현재 선택된 제품/영역의 알림 목록
+  currentNotifications: [], // 현재 선택된 제품/카테고리의 알림 목록
   status: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
   error: null,
 };
