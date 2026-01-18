@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { calculateExpiryPercentage, calculateConsumptionPercentage } from '../utils/productUtils';
@@ -25,6 +25,8 @@ const HPBar = ({ percentage, type }) => {
 
 const ProductCard = ({ product, onPress, locationName, showLocation = false }) => {
   const [iconLoadFailed, setIconLoadFailed] = useState(false);
+  // NEW 뱃지(등록 후 5분) 갱신용: 만료 시점에 한 번만 리렌더
+  const [nowTs, setNowTs] = useState(Date.now());
   const expiryResult = calculateExpiryPercentage(product);
   const consumptionResult = calculateConsumptionPercentage(product);
   
@@ -66,6 +68,21 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
 
   const iconUri = typeof product?.iconUrl === 'string' && product.iconUrl.trim() !== '' ? product.iconUrl : null;
 
+  const createdAtIso = product?.createdAt || product?.created_at || null;
+  const createdMs = createdAtIso ? new Date(createdAtIso).getTime() : NaN;
+  const NEW_WINDOW_MS = 5 * 60 * 1000;
+  const isNew = isFinite(createdMs) && (nowTs - createdMs) >= 0 && (nowTs - createdMs) <= NEW_WINDOW_MS;
+
+  useEffect(() => {
+    if (!isFinite(createdMs)) return;
+    const elapsed = nowTs - createdMs;
+    const remaining = NEW_WINDOW_MS - elapsed;
+    if (remaining <= 0) return;
+    const t = setTimeout(() => setNowTs(Date.now()), Math.min(remaining + 80, NEW_WINDOW_MS + 80));
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createdMs]);
+
   return (
     <TouchableOpacity style={styles.container} onPress={onPress}>
       <View style={[
@@ -95,6 +112,13 @@ const ProductCard = ({ product, onPress, locationName, showLocation = false }) =
           {(showExpiryBadge || showConsumptionBadge) && (
             <View style={[styles.dDayBadge, { backgroundColor: getBadgeColor() }]}>
               <Text style={styles.dDayText}>{getBadgeText()}</Text>
+            </View>
+          )}
+
+          {/* NEW 뱃지: 등록 후 5분 이내 */}
+          {isNew && !isZeroHP && (
+            <View style={styles.newBadge}>
+              <Text style={styles.newBadgeText}>NEW</Text>
             </View>
           )}
         </View>
@@ -367,6 +391,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dDayText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  newBadge: {
+    position: 'absolute',
+    top: -5,
+    left: -5,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+  },
+  newBadgeText: {
     color: '#fff',
     fontSize: 10,
     fontWeight: 'bold',

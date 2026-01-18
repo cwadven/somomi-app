@@ -548,7 +548,7 @@ export const productsSlice = createSlice({
       // products(전체/내 제품) upsert
       const pIdx = state.products.findIndex(p => String(p?.id) === id);
       if (pIdx !== -1) state.products[pIdx] = { ...state.products[pIdx], ...product, isConsumed: false };
-      else state.products.push({ ...product, isConsumed: false });
+      else state.products.unshift({ ...product, isConsumed: false });
 
       // locationProducts 캐시 upsert (해당 locId, 그리고 'all' 캐시가 있다면 거기도)
       if (locId) {
@@ -556,14 +556,14 @@ export const productsSlice = createSlice({
         if (Array.isArray(list)) {
           const i = list.findIndex(p => String(p?.id) === id);
           if (i !== -1) state.locationProducts[locId][i] = { ...state.locationProducts[locId][i], ...product, isConsumed: false };
-          else state.locationProducts[locId].push({ ...product, isConsumed: false });
+          else state.locationProducts[locId].unshift({ ...product, isConsumed: false });
         }
       }
       if (Array.isArray(state.locationProducts['all'])) {
         const all = state.locationProducts['all'];
         const i = all.findIndex(p => String(p?.id) === id);
         if (i !== -1) all[i] = { ...all[i], ...product, isConsumed: false };
-        else all.push({ ...product, isConsumed: false });
+        else all.unshift({ ...product, isConsumed: false });
       }
 
       // currentProduct도 해당 id면 갱신
@@ -642,15 +642,15 @@ export const productsSlice = createSlice({
       })
       .addCase(addProductAsync.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        state.products.push(action.payload);
+        state.products.unshift(action.payload);
         
         // 영역별 제품 목록 캐시 업데이트
         const locationId = action.payload.locationLocalId || action.payload.locationId;
         if (state.locationProducts[locationId]) {
-          state.locationProducts[locationId].push(action.payload);
+          state.locationProducts[locationId].unshift(action.payload);
         }
         if (state.locationProducts['all']) {
-          state.locationProducts['all'].push(action.payload);
+          state.locationProducts['all'].unshift(action.payload);
         }
       })
       .addCase(addProductAsync.rejected, (state, action) => {

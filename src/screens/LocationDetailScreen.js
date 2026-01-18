@@ -167,9 +167,8 @@ const LocationDetailScreen = () => {
       setLocationProducts((prev) => {
         if (!Array.isArray(prev)) return prev;
         if (prev.some((p) => String(p?.id) === id)) return prev;
-        // ✅ 백엔드 정렬을 신뢰: 로컬에서 "prepend"로 순서를 바꾸지 않음
-        // - 신규 생성품은 리스트 끝에만 추가(스크롤/순서 교란 최소화)
-        return [...prev, product];
+        // 신규 생성품은 목록 맨 위에 노출
+        return [product, ...prev];
       });
     });
 
