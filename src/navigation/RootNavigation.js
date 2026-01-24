@@ -12,6 +12,16 @@ export function navigate(name, params) {
   }
 }
 
+export function resetRoot(state) {
+  try {
+    if (navigationRef.isReady()) {
+      navigationRef.resetRoot(state);
+    }
+  } catch (e) {
+    // ignore navigation errors
+  }
+}
+
 export default { navigationRef, navigate };
 
 

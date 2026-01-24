@@ -426,7 +426,7 @@ class PushNotificationService {
       this.notificationResponseListener = messaging().onNotificationOpenedApp((remoteMessage) => {
         addDebugLog(`백그라운드에서 알림 클릭: ${JSON.stringify(remoteMessage.notification)}`, 'info');
         if (remoteMessage.data) {
-          this.handleNotificationAction(remoteMessage.data);
+          this.handleNotificationAction(remoteMessage.data, { source: 'opened' });
         }
       });
 
@@ -437,7 +437,7 @@ class PushNotificationService {
           if (remoteMessage) {
             addDebugLog(`종료 상태에서 알림으로 앱 시작: ${JSON.stringify(remoteMessage.notification)}`, 'info');
             if (remoteMessage.data) {
-              this.handleNotificationAction(remoteMessage.data);
+              this.handleNotificationAction(remoteMessage.data, { source: 'initial' });
             }
           }
         });
@@ -535,7 +535,7 @@ class PushNotificationService {
   }
 
   // 알림 액션 처리 함수
-  handleNotificationAction(data) {
+  handleNotificationAction(data, { source = 'unknown' } = {}) {
     if (!data) {
       addDebugLog('알림 데이터가 없습니다.', 'warning');
       return;
@@ -569,9 +569,22 @@ class PushNotificationService {
           // 앱이 완전히 로드된 후 처리
           setTimeout(() => {
             try {
-              const { navigate } = require('../navigation/RootNavigation');
-              // ✅ 현재 화면 위에 덮어씌우기(탭 전환 없이 루트 모달로 오픈)
-              navigate('RootMyNotificationDetail', { notificationId: idStr });
+              const { navigate, resetRoot } = require('../navigation/RootNavigation');
+              // ✅ 종료 상태에서 푸시 클릭으로 들어온 경우:
+              // 스택이 비어있거나(MainTabs가 없는 상태)라면 뒤로가기 시 앱이 종료될 수 있어,
+              // MainTabs를 깔고 그 위에 알림 상세를 올리도록 reset 합니다.
+              if (source === 'initial') {
+                resetRoot({
+                  index: 1,
+                  routes: [
+                    { name: 'MainTabs' },
+                    { name: 'RootMyNotificationDetail', params: { notificationId: idStr } },
+                  ],
+                });
+              } else {
+                // 백그라운드/실행 중 클릭은 현재 화면 위에 덮어씌우기
+                navigate('RootMyNotificationDetail', { notificationId: idStr });
+              }
               addDebugLog('게스트 알림 상세 이동 성공', 'success');
             } catch (e) {
               addDebugLog(`게스트 알림 상세 이동 실패: ${e?.message || String(e)}`, 'error');

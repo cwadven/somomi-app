@@ -1,6 +1,6 @@
 {
   "name": "somomi",
-  "version": "1.0.0",
+  "version": "1.0.12",
   "main": "index.js",
   "scripts": {
     "start": "expo start",
@@ -41,7 +41,7 @@
     "react-native-gesture-handler": "~2.14.0",
     "react-native-reanimated": "~3.6.0",
     "react-native-safe-area-context": "4.8.2",
-    "react-native-screens": "~3.29.0",
+    "react-native-screens": "~3.33.0",
     "react-native-web": "~0.19.6",
     "react-redux": "^9.0.4",
     "react-native-webview": "13.6.4",
