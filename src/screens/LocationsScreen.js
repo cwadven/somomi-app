@@ -34,6 +34,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useIsFocused, useRoute } from '@react-navigation/native';
 import { fetchLocations } from '../redux/slices/locationsSlice';
 import { updateLocation } from '../redux/slices/locationsSlice';
+import { fetchGuestSectionsExpiredCount } from '../api/sectionApi';
 
 
 
@@ -84,6 +85,8 @@ const LocationsScreen = () => {
   const [templatePickerLocation, setTemplatePickerLocation] = useState(null);
   const [freeTemplates, setFreeTemplates] = useState([]);
   const [templatePickerSelectedTemplateId, setTemplatePickerSelectedTemplateId] = useState(null);
+  const [expiredCountsByLocationId, setExpiredCountsByLocationId] = useState({});
+  const [expiredTotalCount, setExpiredTotalCount] = useState(0);
 
   // 각 카테고리별로 연결된 템플릿이 구독 만료인지 계산하는 헬퍼
   const isLocationExpired = useCallback((loc) => {
@@ -181,6 +184,28 @@ const LocationsScreen = () => {
         .catch(err => {
           console.error('LocationsScreen: 카테고리 목록 로드 실패', err);
         });
+        // 만료 카운트 조회(카테고리별 + 전체)
+        (async () => {
+          try {
+            const res = await fetchGuestSectionsExpiredCount();
+            const list = Array.isArray(res?.guest_sections) ? res.guest_sections : [];
+            const map = {};
+            for (const it of list) {
+              const id = it?.guest_section_id;
+              const count = it?.count;
+              if (id == null) continue;
+              const n = Number(count);
+              map[String(id)] = Number.isFinite(n) ? n : 0;
+            }
+            const total = Number(res?.total_count);
+            setExpiredCountsByLocationId(map);
+            setExpiredTotalCount(Number.isFinite(total) ? total : 0);
+          } catch (e) {
+            // 실패해도 화면은 유지 (뱃지만 미표시)
+            setExpiredCountsByLocationId({});
+            setExpiredTotalCount(0);
+          }
+        })();
       }
     }
   }, [dispatch, isFocused]);
@@ -447,6 +472,11 @@ const LocationsScreen = () => {
                 등록된 모든 제품을 확인합니다
               </Text>
             </View>
+            {expiredTotalCount > 0 ? (
+              <View style={styles.expiredBadge}>
+                <Text style={styles.expiredBadgeText}>{expiredTotalCount}</Text>
+              </View>
+            ) : null}
             <Ionicons name="chevron-forward" size={24} color="#999" />
           </TouchableOpacity>
           
@@ -471,6 +501,13 @@ const LocationsScreen = () => {
                     style={styles.locationListItem}
                     onPress={() => handleLocationPress(item)}
                   >
+                    {Number(expiredCountsByLocationId?.[String(item.id)] || 0) > 0 ? (
+                      <View pointerEvents="none" style={styles.expiredBadgeCorner}>
+                        <Text style={styles.expiredBadgeText}>
+                          {Number(expiredCountsByLocationId[String(item.id)] || 0)}
+                        </Text>
+                      </View>
+                    ) : null}
                     <View style={styles.locationListItemContent}>
                       <View style={styles.locationIconContainer}>
                         <Ionicons name={item.icon || 'cube-outline'} size={24} color="#4CAF50" />
@@ -805,6 +842,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    position: 'relative',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -831,6 +869,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
+  },
+  expiredBadge: {
+    minWidth: 28,
+    height: 22,
+    paddingHorizontal: 8,
+    borderRadius: 11,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  expiredBadgeCorner: {
+    position: 'absolute',
+    top: 10,
+    // 오른쪽 chevron(24) + 여백(16) 고려해서 겹침 방지
+    right: 52,
+    minWidth: 26,
+    height: 18,
+    paddingHorizontal: 6,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  expiredBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
   },
   locationListItemDescription: {
     fontSize: 14,

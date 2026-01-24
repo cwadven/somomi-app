@@ -10,6 +10,11 @@ export const fetchGuestSections = async () => {
   return request('/v1/section/guest-sections', { method: 'GET' });
 };
 
+export const fetchGuestSectionsExpiredCount = async () => {
+  // GET /v1/section/guest-sections/expired-count → { total_count, guest_sections: [{ guest_section_id, count }] }
+  return request('/v1/section/guest-sections/expired-count', { method: 'GET' });
+};
+
 export const createGuestSection = async ({ title, description = null, icon = null, guest_section_template_id }) => {
   // POST /v1/section/guest-sections → { guest_section_id }
   return request('/v1/section/guest-sections', {
@@ -36,6 +41,7 @@ export const deleteGuestSection = async (guest_section_id) => {
 export default {
   fetchGuestSectionTemplates,
   fetchGuestSections,
+  fetchGuestSectionsExpiredCount,
   createGuestSection,
   updateGuestSection,
   deleteGuestSection,
