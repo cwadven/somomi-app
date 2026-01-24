@@ -551,6 +551,37 @@ class PushNotificationService {
     
     try {
       addDebugLog(`알림 액션 처리 시작: ${JSON.stringify(data)}`, 'info');
+
+      // ✅ 게스트 알림(백엔드 알림함) 딥링크 처리:
+      // payload 예시: { type: "GUEST_NOTIFICATION", transaction_id: "1" }
+      try {
+        const rawType = data?.type ?? data?.TYPE ?? '';
+        const type = String(rawType || '').toUpperCase();
+        const tx =
+          data?.transaction_id ??
+          data?.transactionId ??
+          data?.guest_notification_id ??
+          data?.guestNotificationId ??
+          null;
+        const idStr = tx != null ? String(tx).trim() : '';
+        if (type === 'GUEST_NOTIFICATION' && idStr) {
+          addDebugLog(`게스트 알림 상세로 이동: id=${idStr}`, 'info');
+          // 앱이 완전히 로드된 후 처리
+          setTimeout(() => {
+            try {
+              const { navigate } = require('../navigation/RootNavigation');
+              // Home 탭으로 이동 후, MyNotificationDetail 화면 push
+              navigate('Home', { screen: 'MyNotificationDetail', params: { notificationId: idStr } });
+              addDebugLog('게스트 알림 상세 이동 성공', 'success');
+            } catch (e) {
+              addDebugLog(`게스트 알림 상세 이동 실패: ${e?.message || String(e)}`, 'error');
+            } finally {
+              isHandlingNotification = false;
+            }
+          }, 800);
+          return;
+        }
+      } catch (e) {}
       
       // 딥링크 생성 및 처리
       const deepLink = this.buildDeepLinkFromNotificationData(data);
