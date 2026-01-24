@@ -276,6 +276,11 @@ const AppNavigator = ({ linking }) => {
             <RootStack.Screen name="ExternalWebView" component={ExternalWebViewScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
             <RootStack.Screen name="PrivacyPolicyWebView" component={PrivacyPolicyWebViewScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
             <RootStack.Screen name="Store" component={StoreScreen} options={{ presentation: 'modal', animation: 'slide_from_right' }} />
+            <RootStack.Screen
+              name="RootMyNotificationDetail"
+              component={MyNotificationDetailScreen}
+              options={{ presentation: 'modal', animation: 'slide_from_right' }}
+            />
           </RootStack.Navigator>
         </NavigationContainer>
       </SafeAreaView>

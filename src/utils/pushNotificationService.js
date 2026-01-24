@@ -570,8 +570,8 @@ class PushNotificationService {
           setTimeout(() => {
             try {
               const { navigate } = require('../navigation/RootNavigation');
-              // Home 탭으로 이동 후, MyNotificationDetail 화면 push
-              navigate('Home', { screen: 'MyNotificationDetail', params: { notificationId: idStr } });
+              // ✅ 현재 화면 위에 덮어씌우기(탭 전환 없이 루트 모달로 오픈)
+              navigate('RootMyNotificationDetail', { notificationId: idStr });
               addDebugLog('게스트 알림 상세 이동 성공', 'success');
             } catch (e) {
               addDebugLog(`게스트 알림 상세 이동 실패: ${e?.message || String(e)}`, 'error');
