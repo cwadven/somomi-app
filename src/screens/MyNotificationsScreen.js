@@ -31,18 +31,11 @@ const MyNotificationsScreen = () => {
   };
 
   const getItemTitle = (it) => {
-    return (
-      normalizeText(it?.title) ||
-      normalizeText(it?.message) ||
-      normalizeText(it?.body) ||
-      normalizeText(it?.notification_message) ||
-      normalizeText(it?.notificationType) ||
-      '알림'
-    );
+    return normalizeText(it?.title) || '알림';
   };
 
   const getItemSubtitle = (it) => {
-    const createdAt = it?.created_at || it?.createdAt || it?.sent_at || it?.sentAt || null;
+    const createdAt = it?.created_at || null;
     if (createdAt) {
       const t = new Date(createdAt).toLocaleString();
       return t;
@@ -51,7 +44,7 @@ const MyNotificationsScreen = () => {
   };
 
   const keyForItem = (it, idx) => {
-    const id = it?.id || it?.guest_notification_id || it?.notification_id || null;
+    const id = it?.id ?? null;
     if (id != null) return String(id);
     const createdAt = it?.created_at || it?.createdAt || '';
     return `${createdAt}-${idx}`;
@@ -115,14 +108,28 @@ const MyNotificationsScreen = () => {
     }
   };
 
-  const renderItem = ({ item }) => (
-    <View style={styles.row}>
+  const handlePressItem = (item) => {
+    const id = item?.id;
+    if (id == null) return;
+    // 상세 조회 시 읽음 처리되므로, 목록에서도 즉시 미읽음 표시 제거(UX)
+    setItems((prev) => prev.map((p) => (p?.id === id ? { ...p, is_read: true } : p)));
+    navigation.navigate('MyNotificationDetail', { notificationId: id });
+  };
+
+  const renderItem = ({ item }) => {
+    const isRead = item?.is_read === true;
+    return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      style={[styles.row, !isRead && styles.rowUnread]}
+      onPress={() => handlePressItem(item)}
+    >
       <View style={styles.rowLeft}>
         <View style={styles.iconBox}>
-          <Ionicons name="notifications-outline" size={18} color="#4CAF50" />
+          <Ionicons name={isRead ? 'notifications-outline' : 'notifications'} size={18} color={isRead ? '#4CAF50' : '#16A34A'} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.rowTitle} numberOfLines={2}>
+          <Text style={[styles.rowTitle, !isRead && styles.rowTitleUnread]} numberOfLines={2}>
             {getItemTitle(item)}
           </Text>
           {getItemSubtitle(item) ? (
@@ -131,9 +138,11 @@ const MyNotificationsScreen = () => {
             </Text>
           ) : null}
         </View>
+        {!isRead ? <View style={styles.unreadDot} /> : null}
       </View>
-    </View>
-  );
+    </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -219,6 +228,11 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
+  rowUnread: {
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    backgroundColor: '#F0FDF4',
+  },
   rowLeft: { flexDirection: 'row', alignItems: 'flex-start' },
   iconBox: {
     width: 34,
@@ -230,7 +244,16 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   rowTitle: { fontSize: 14, fontWeight: '700', color: '#333' },
+  rowTitleUnread: { color: '#14532D' },
   rowSubtitle: { marginTop: 4, fontSize: 12, color: '#888' },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+    marginLeft: 10,
+    marginTop: 6,
+  },
   errorBox: {
     margin: 16,
     padding: 14,

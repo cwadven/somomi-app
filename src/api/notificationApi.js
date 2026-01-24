@@ -10,5 +10,15 @@ export const fetchGuestNotifications = async ({ size = 20, nextCursor = null } =
   return request(`/v1/notification/guest-notifications${query}`, { method: 'GET' });
 };
 
-export default { fetchGuestNotifications };
+// GET /v1/notification/guest-notifications/{guest_notification_id}
+// → { id, title, message, is_read, created_at }
+// NOTE: 조회 시 읽음 처리
+export const fetchGuestNotificationDetail = async (guestNotificationId) => {
+  if (guestNotificationId == null || String(guestNotificationId).trim() === '') {
+    throw new Error('guestNotificationId is required');
+  }
+  return request(`/v1/notification/guest-notifications/${encodeURIComponent(String(guestNotificationId))}`, { method: 'GET' });
+};
+
+export default { fetchGuestNotifications, fetchGuestNotificationDetail };
 

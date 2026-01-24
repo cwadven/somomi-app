@@ -22,6 +22,7 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import NotificationDetailScreen from '../screens/NotificationDetailScreen';
 import NotificationDateScreen from '../screens/NotificationDateScreen';
 import MyNotificationsScreen from '../screens/MyNotificationsScreen';
+import MyNotificationDetailScreen from '../screens/MyNotificationDetailScreen';
 import StoreScreen from '../screens/StoreScreen';
 import LoginScreen from '../screens/LoginScreen';
 import HelpScreen from '../screens/HelpScreen';
@@ -69,6 +70,11 @@ const HomeStack = () => {
         name="MyNotifications"
         component={MyNotificationsScreen}
         options={{ title: '내 알림', headerShown: false }}
+      />
+      <Stack.Screen
+        name="MyNotificationDetail"
+        component={MyNotificationDetailScreen}
+        options={{ title: '알림 상세', headerShown: false }}
       />
     </Stack.Navigator>
   );
