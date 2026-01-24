@@ -189,7 +189,7 @@ const ProductDetailScreen = () => {
   }, [iconUri]);
   useEffect(() => {
     setImageViewerVisible(false);
-  }, [iconUri]);
+  }, [iconUri, imagePreviewUri]);
   
   // 최신 상태를 참조하기 위한 ref
   const consumptionDateRef = useRef({
@@ -1475,7 +1475,12 @@ const ProductDetailScreen = () => {
         <View style={styles.productHeader}>
           <View style={styles.imageContainer}>
             {imagePreviewUri ?
-            <Image source={{ uri: imagePreviewUri }} style={styles.productImage} resizeMode="cover" /> :
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setImageViewerVisible(true)}
+            >
+              <Image source={{ uri: imagePreviewUri }} style={styles.productImage} resizeMode="cover" />
+            </TouchableOpacity> :
 
             <View style={styles.noImageContainer}>
                 <Ionicons name={getCategoryIcon()} size={60} color="#4CAF50" />
@@ -1492,6 +1497,28 @@ const ProductDetailScreen = () => {
             <Text style={styles.formHint}>png, jpg, jpeg, gif, webp</Text>
           </View>
         </View>
+
+        {/* 이미지 전체보기 모달 (등록/수정 폼에서도 지원) */}
+        <Modal
+          visible={imageViewerVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setImageViewerVisible(false)}
+        >
+          <View style={styles.imageViewerOverlay}>
+            <TouchableOpacity
+              style={styles.imageViewerClose}
+              onPress={() => setImageViewerVisible(false)}
+            >
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.imageViewerBody}>
+              {(imagePreviewUri || iconUri) ? (
+                <Image source={{ uri: imagePreviewUri || iconUri }} style={styles.imageViewerImage} resizeMode="contain" />
+              ) : null}
+            </View>
+          </View>
+        </Modal>
 
         <View style={styles.detailsSection}>
           {/* edit 모드에서는 카테고리 변경 가능하도록 노출 */}
