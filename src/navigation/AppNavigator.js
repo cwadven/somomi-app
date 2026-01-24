@@ -21,6 +21,7 @@ import ConsumedProductDetailScreen from '../screens/ConsumedProductDetailScreen'
 import NotificationsScreen from '../screens/NotificationsScreen';
 import NotificationDetailScreen from '../screens/NotificationDetailScreen';
 import NotificationDateScreen from '../screens/NotificationDateScreen';
+import MyNotificationsScreen from '../screens/MyNotificationsScreen';
 import StoreScreen from '../screens/StoreScreen';
 import LoginScreen from '../screens/LoginScreen';
 import HelpScreen from '../screens/HelpScreen';
@@ -63,6 +64,11 @@ const HomeStack = () => {
         name="Category" 
         component={CategoryScreen} 
         options={{ title: '카테고리' }}
+      />
+      <Stack.Screen
+        name="MyNotifications"
+        component={MyNotificationsScreen}
+        options={{ title: '내 알림', headerShown: false }}
       />
     </Stack.Navigator>
   );

@@ -22,10 +22,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { navigate as rootNavigate } from '../navigation/RootNavigation';
 import { fetchManageTipsApi, fetchPromotionBannersApi } from '../api/promotionApi';
+import { useSelector } from 'react-redux';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
+  const { isLoggedIn } = useSelector((state) => state.auth);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [exitApp, setExitApp] = useState(false);
   const flatListRef = useRef(null);
@@ -265,7 +267,18 @@ const HomeScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>소모미</Text>
-        <View style={{ width: 24 }} />
+        {isLoggedIn ? (
+          <TouchableOpacity
+            style={styles.notificationButton}
+            onPress={() => navigation.navigate('MyNotifications')}
+            accessibilityRole="button"
+            accessibilityLabel="내 알림"
+          >
+            <Ionicons name="notifications-outline" size={22} color="#4CAF50" />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 24 }} />
+        )}
       </View>
       
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -355,7 +368,17 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
   },
   notificationButton: {
-    // removed
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
   },
   bannerSection: {
     position: 'relative',
