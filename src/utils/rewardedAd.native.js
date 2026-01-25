@@ -4,12 +4,11 @@ import { Alert, NativeModules, Platform } from 'react-native';
  * Show a rewarded ad (native only) via our custom native module.
  *
  * @param {object} opts
- * @param {string} [opts.unitId] - Rewarded Ad Unit ID ("/" form). If omitted, uses Google test id on Android.
- * @param {boolean} [opts.nonPersonalizedOnly] - Reserved (handled natively later if needed).
+ * @param {string} opts.unitId - Rewarded Ad Unit ID ("/" form). (필수)
  * @param {(reward: any) => void} [opts.onEarnedReward]
  * @param {(error: any) => void} [opts.onError]
  */
-export async function showRewardedAd({ unitId, nonPersonalizedOnly = true, onEarnedReward, onError } = {}) {
+export async function showRewardedAd({ unitId, onEarnedReward, onError } = {}) {
   if (Platform.OS === 'web') {
     throw new Error('웹에서는 불가능 합니다.');
   }
@@ -21,10 +20,13 @@ export async function showRewardedAd({ unitId, nonPersonalizedOnly = true, onEar
     throw new Error(msg);
   }
 
-  // NOTE: Rewarded "unit id" uses "/" form. App id uses "~" form.
-  const androidTestRewardedUnitId = 'ca-app-pub-5773129721731206/2419623977';
-  const finalUnitId = unitId || (Platform.OS === 'android' ? androidTestRewardedUnitId : '');
-  if (String(finalUnitId).includes('~')) {
+  const finalUnitId = String(unitId || '').trim();
+  if (!finalUnitId) {
+    const msg = 'Rewarded 광고 unitId가 필요합니다.';
+    try { Alert.alert('광고 설정 오류', msg); } catch (e) {}
+    throw new Error(msg);
+  }
+  if (finalUnitId.includes('~')) {
     const msg = `Rewarded 광고 유닛 ID가 아니라 App ID가 들어간 것 같아요.\n\nfinalUnitId=${finalUnitId}`;
     try { Alert.alert('광고 설정 오류', msg); } catch (e) {}
     throw new Error(msg);
