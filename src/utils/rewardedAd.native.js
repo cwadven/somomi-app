@@ -5,10 +5,11 @@ import { Alert, NativeModules, Platform } from 'react-native';
  *
  * @param {object} opts
  * @param {string} opts.unitId - Rewarded Ad Unit ID ("/" form). (필수)
+ * @param {string} [opts.customData] - SSV에 전달할 customData (예: guest_id)
  * @param {(reward: any) => void} [opts.onEarnedReward]
  * @param {(error: any) => void} [opts.onError]
  */
-export async function showRewardedAd({ unitId, onEarnedReward, onError } = {}) {
+export async function showRewardedAd({ unitId, customData, onEarnedReward, onError } = {}) {
   if (Platform.OS === 'web') {
     throw new Error('웹에서는 불가능 합니다.');
   }
@@ -34,7 +35,7 @@ export async function showRewardedAd({ unitId, onEarnedReward, onError } = {}) {
 
   try {
     // Native returns: { type, amount } when earned, or null when dismissed without reward.
-    const reward = await mod.show(finalUnitId);
+    const reward = await mod.show(finalUnitId, customData == null ? null : String(customData));
     if (reward) {
       try { onEarnedReward?.(reward); } catch (e) {}
     }

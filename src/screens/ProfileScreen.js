@@ -77,8 +77,17 @@ const ProfileScreen = () => {
         if (isLoggedIn) {
           const res = await fetchMemberProfile();
           // 응답 매핑: nickname, profile_image_url
+          const memberIdRaw = res?.member_id;
+          const guestIdRaw = res?.guest_id;
+          const memberId = memberIdRaw == null ? null : String(memberIdRaw);
+          const guestId = guestIdRaw == null ? null : String(guestIdRaw);
           const next = {
             ...user,
+            // 서버에서 내려주는 식별자 매핑
+            id: memberId || user?.id,
+            memberId: memberId || user?.memberId,
+            customerId: guestId || user?.customerId,
+            guestId: guestId || user?.guestId,
             username: res?.nickname || user?.username || '사용자',
             name: res?.nickname || user?.name || '사용자',
             email: undefined, // 이메일 필드 제거
@@ -91,6 +100,20 @@ const ProfileScreen = () => {
             // NOTE: Redux 상태 직접 변경 불가 → 화면에서 next를 우선 사용하도록 로컬 상태 보관
             setProfileOverride(next);
           }
+
+          // 전역 user에도 반영 (SSV customData 등에서 사용)
+          try {
+            dispatch(updateUserInfo({
+              id: next.id,
+              memberId: next.memberId,
+              customerId: next.customerId,
+              guestId: next.guestId,
+              username: next.username,
+              name: next.name,
+              profileImage: next.profileImage,
+              email: undefined,
+            }));
+          } catch (e) {}
         }
       } catch (e) {
 
@@ -226,6 +249,10 @@ const ProfileScreen = () => {
       await showRewardedAdNative({
         // TODO: 운영에서는 실제 리워드 광고 단위 ID로 교체
         unitId: 'ca-app-pub-5773129721731206/2419623977',
+        // SSV customData: guest_id 기준으로만 전달
+        customData: (activeProfile?.guestId ?? user?.guestId ?? activeProfile?.customerId ?? user?.customerId) != null
+          ? String(activeProfile?.guestId ?? user?.guestId ?? activeProfile?.customerId ?? user?.customerId)
+          : undefined,
         onEarnedReward: () => {
           showInfoAlert('보상 지급 완료', '광고 시청 보상이 지급되었습니다.');
         },
