@@ -21,6 +21,7 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { givePresignedUrl } from '../api/commonApi';
 import { fetchMemberProfile, updateMemberProfile } from '../api/memberApi';
+import { createAdMobRewardRequest } from '../api/rewardApi';
 import NotificationSettings from '../components/NotificationSettings';
 import { navigate as rootNavigate } from '../navigation/RootNavigation';
 import { logout, updateUserInfo } from '../redux/slices/authSlice';
@@ -246,13 +247,17 @@ const ProfileScreen = () => {
     try {
       setRewardAdLoading(true);
 
+      // 1) 백엔드에 SSV 요청 레코드 생성 → ssv_id 확보
+      const ssvRes = await createAdMobRewardRequest();
+      const ssvIdRaw = ssvRes?.ssv_id;
+      const ssvId = ssvIdRaw == null ? null : String(ssvIdRaw);
+      if (!ssvId) throw new Error('SSV 요청 생성에 실패했습니다. (ssv_id 없음)');
+
       await showRewardedAdNative({
         // TODO: 운영에서는 실제 리워드 광고 단위 ID로 교체
         unitId: 'ca-app-pub-5773129721731206/2419623977',
-        // SSV customData: guest_id 기준으로만 전달
-        customData: (activeProfile?.guestId ?? user?.guestId ?? activeProfile?.customerId ?? user?.customerId) != null
-          ? String(activeProfile?.guestId ?? user?.guestId ?? activeProfile?.customerId ?? user?.customerId)
-          : undefined,
+        // SSV customData: 백엔드에서 발급된 ssv_id를 전달하여 콜백과 매칭
+        customData: ssvId,
         onEarnedReward: () => {
           showInfoAlert('보상 지급 완료', '광고 시청 보상이 지급되었습니다.');
         },
