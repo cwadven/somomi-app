@@ -529,6 +529,12 @@ const ProfileScreen = () => {
           title="소진 처리한 상품 목록"
           onPress={() => navigation.navigate('ConsumedProducts')} />
 
+            <SettingItem
+              icon="gift-outline"
+              title={rewardAdLoading ? '광고 불러오는 중...' : '광고 보고 카테고리 받기'}
+              onPress={showRewardedAd}
+            />
+
             
             {/* NOTE: 아직 완전 배포 전이라 노출하지 않음 */}
             {/*
@@ -565,18 +571,6 @@ const ProfileScreen = () => {
         
         {/* 문의하기(미구현): 추후 기능 추가 예정 */}
       </View>
-
-      {/* 광고 섹션: 로그인 후에만 표시 */}
-      {isLoggedIn && user ? (
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>광고</Text>
-          <SettingItem
-            icon="gift-outline"
-            title={rewardAdLoading ? '광고 불러오는 중...' : '광고 보고 카테고리 받기'}
-            onPress={showRewardedAd}
-          />
-        </View>
-      ) : null}
 
     </ScrollView>;
 
