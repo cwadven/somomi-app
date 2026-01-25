@@ -577,6 +577,17 @@ const ProfileScreen = () => {
   return (
     <>
       {renderProfileScreen()}
+
+      {/* 보상형 광고 로딩 오버레이 */}
+      <Modal visible={rewardAdLoading} transparent animationType="fade">
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <Text style={styles.loadingText}>광고 불러오는 중...</Text>
+          </View>
+        </View>
+      </Modal>
+
       {/* 알림 설정 모달 */}
       <Modal
         visible={showNotificationModal}
@@ -949,6 +960,26 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#F44336',
     marginRight: 8
+  },
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  loadingBox: {
+    width: 220,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    alignItems: 'center'
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600'
   },
   footer: {
     padding: 16,
