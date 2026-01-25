@@ -27,6 +27,7 @@ import { logout, updateUserInfo } from '../redux/slices/authSlice';
 import AlertModal from '../components/AlertModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadSyncQueue } from '../utils/storageUtils';
+import { showRewardedAd as showRewardedAdNative } from '../utils/rewardedAd';
 
 const ProfileScreen = () => {
   const dispatch = useDispatch();
@@ -191,6 +192,7 @@ const ProfileScreen = () => {
   const [modalMessage, setModalMessage] = useState('');
   const [modalAction, setModalAction] = useState(null);
   const [modalButtons, setModalButtons] = useState(null);
+  const [rewardAdLoading, setRewardAdLoading] = useState(false);
 
   // 모달 닫기 핸들러
   const handleModalClose = () => {
@@ -205,6 +207,35 @@ const ProfileScreen = () => {
     setModalAction(null);
     setModalButtons([{ text: '확인', onPress: () => setModalVisible(false) }]);
     setModalVisible(true);
+  };
+
+  const showInfoAlert = (title, message) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalAction(null);
+    setModalButtons([{ text: '확인', onPress: () => setModalVisible(false) }]);
+    setModalVisible(true);
+  };
+
+  const showRewardedAd = async () => {
+    if (!isLoggedIn) return;
+    if (rewardAdLoading) return;
+    try {
+      setRewardAdLoading(true);
+
+      await showRewardedAdNative({
+        // TODO: 운영에서는 실제 리워드 광고 단위 ID로 교체
+        unitId: undefined,
+        nonPersonalizedOnly: true,
+        onEarnedReward: () => {
+          showInfoAlert('보상 지급 완료', '광고 시청 보상이 지급되었습니다.\\n카테고리 지급(서버 반영)은 다음 단계로 연결해드릴게요.');
+        },
+      });
+    } catch (e) {
+      showErrorAlert(e?.message || '광고를 불러오지 못했습니다.');
+    } finally {
+      setRewardAdLoading(false);
+    }
   };
 
   // 도움말 표시
@@ -534,6 +565,18 @@ const ProfileScreen = () => {
         
         {/* 문의하기(미구현): 추후 기능 추가 예정 */}
       </View>
+
+      {/* 광고 섹션: 로그인 후에만 표시 */}
+      {isLoggedIn && user ? (
+        <View style={styles.settingsSection}>
+          <Text style={styles.sectionTitle}>광고</Text>
+          <SettingItem
+            icon="gift-outline"
+            title={rewardAdLoading ? '광고 불러오는 중...' : '광고 보고 카테고리 받기'}
+            onPress={showRewardedAd}
+          />
+        </View>
+      ) : null}
 
     </ScrollView>;
 
