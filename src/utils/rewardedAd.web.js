@@ -4,6 +4,5 @@
  * to avoid Metro trying to bundle native-only dependencies.
  */
 export async function showRewardedAd() {
-  throw new Error('Rewarded ads are not supported on web');
+  throw new Error('웹에서는 불가능 합니다.');
 }
-

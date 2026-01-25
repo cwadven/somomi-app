@@ -19,7 +19,15 @@ export async function showRewardedAd({
   // if native config / initialization is not ready. We lazy-require it
   // only when the user actually tries to show an ad.
   // eslint-disable-next-line global-require
-  const { AdEventType, RewardedAd, RewardedAdEventType, TestIds } = require('react-native-google-mobile-ads');
+  const { AdEventType, RewardedAd, RewardedAdEventType, TestIds, MobileAds } = require('react-native-google-mobile-ads');
+
+  // Ensure the native SDK is initialized before trying to load/show an ad.
+  // If initialization fails, we surface the error instead of hard-crashing.
+  try {
+    await MobileAds().initialize();
+  } catch (e) {
+    throw e instanceof Error ? e : new Error(String(e));
+  }
 
   const finalUnitId = unitId || TestIds.REWARDED;
 
