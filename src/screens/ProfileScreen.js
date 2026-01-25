@@ -225,10 +225,10 @@ const ProfileScreen = () => {
 
       await showRewardedAdNative({
         // TODO: 운영에서는 실제 리워드 광고 단위 ID로 교체
-        unitId: undefined,
+        unitId: 'ca-app-pub-5773129721731206/2419623977',
         nonPersonalizedOnly: true,
         onEarnedReward: () => {
-          showInfoAlert('보상 지급 완료', '광고 시청 보상이 지급되었습니다.\\n카테고리 지급(서버 반영)은 다음 단계로 연결해드릴게요.');
+          showInfoAlert('보상 지급 완료', '광고 시청 보상이 지급되었습니다.');
         },
       });
     } catch (e) {
