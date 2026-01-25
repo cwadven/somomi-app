@@ -477,7 +477,7 @@ const LocationsScreen = () => {
                 <Text style={styles.expiredBadgeText}>{expiredTotalCount}</Text>
               </View>
             ) : null}
-            <Ionicons name="chevron-forward" size={24} color="#999" />
+            <Ionicons name="chevron-forward" size={24} color="#999" style={styles.chevronIcon} />
           </TouchableOpacity>
           
           {/* 카테고리 목록 */}
@@ -531,7 +531,7 @@ const LocationsScreen = () => {
                         )}
                       </View>
                     </View>
-                    <Ionicons name="chevron-forward" size={24} color="#999" />
+                    <Ionicons name="chevron-forward" size={24} color="#999" style={styles.chevronIcon} />
                   </TouchableOpacity>
                 )}
               />
@@ -885,10 +885,10 @@ const styles = StyleSheet.create({
     top: 10,
     // 오른쪽 chevron(24) + 여백(16) 고려해서 겹침 방지
     right: 52,
-    minWidth: 26,
-    height: 18,
-    paddingHorizontal: 6,
-    borderRadius: 9,
+    minWidth: 28,
+    height: 20,
+    paddingHorizontal: 8,
+    borderRadius: 10,
     backgroundColor: '#EF4444',
     justifyContent: 'center',
     alignItems: 'center',
@@ -897,6 +897,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '800',
+    lineHeight: 14,
+    includeFontPadding: false,
+    textAlign: 'center',
+  },
+  chevronIcon: {
+    marginRight: 4,
   },
   locationListItemDescription: {
     fontSize: 14,
