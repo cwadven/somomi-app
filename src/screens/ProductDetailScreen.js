@@ -948,6 +948,13 @@ const ProductDetailScreen = () => {
     if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
     return dt;
   };
+  const toEndOfDay = (date) => {
+    if (!(date instanceof Date) || isNaN(date.getTime())) return null;
+    const d = new Date(date.getTime());
+    // 선택한 날짜의 마지막 시각(23:59:59)으로 고정
+    d.setHours(23, 59, 59, 0);
+    return d;
+  };
   const formatYMD = (date) => {
     if (!(date instanceof Date) || isNaN(date.getTime())) return '';
     const y = date.getFullYear();
@@ -1025,8 +1032,8 @@ const ProductDetailScreen = () => {
     }
 
     const purchaseDateObj = parseYMD(purchaseDateText) || new Date();
-    const expiryDateObj = parseYMD(expiryDateText);
-    const estimatedEndDateObj = parseYMD(estimatedEndDateText);
+    const expiryDateObj = toEndOfDay(parseYMD(expiryDateText));
+    const estimatedEndDateObj = toEndOfDay(parseYMD(estimatedEndDateText));
 
     if (isCreate) {
       const resolvedLocationId = createLocationId || selectedLocation?.id || null;
@@ -1328,8 +1335,8 @@ const ProductDetailScreen = () => {
           return;
         }
         const purchaseDateObj = parseYMD(purchaseDateText) || new Date();
-        const expiryDateObj = parseYMD(expiryDateText);
-        const estimatedEndDateObj = parseYMD(estimatedEndDateText);
+        const expiryDateObj = toEndOfDay(parseYMD(expiryDateText));
+        const estimatedEndDateObj = toEndOfDay(parseYMD(estimatedEndDateText));
 
         const iconUrlForBody = imagePreviewUri ?
         uploadedIconUrl || currentProduct?.iconUrl || null :
