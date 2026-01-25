@@ -1,5 +1,3 @@
-import { AdEventType, RewardedAd, RewardedAdEventType, TestIds } from 'react-native-google-mobile-ads';
-
 /**
  * Show a rewarded ad (native only).
  *
@@ -15,6 +13,14 @@ export async function showRewardedAd({
   onEarnedReward,
   onError,
 } = {}) {
+  // IMPORTANT:
+  // Do NOT import react-native-google-mobile-ads at module top-level.
+  // In release builds, a top-level import can crash the app on startup
+  // if native config / initialization is not ready. We lazy-require it
+  // only when the user actually tries to show an ad.
+  // eslint-disable-next-line global-require
+  const { AdEventType, RewardedAd, RewardedAdEventType, TestIds } = require('react-native-google-mobile-ads');
+
   const finalUnitId = unitId || TestIds.REWARDED;
 
   return await new Promise((resolve, reject) => {
