@@ -1,69 +1,45 @@
+import { Alert, NativeModules, Platform } from 'react-native';
+
 /**
- * Show a rewarded ad (native only).
+ * Show a rewarded ad (native only) via our custom native module.
  *
  * @param {object} opts
- * @param {string} [opts.unitId] - Ad unit id. If omitted, uses Google test id.
- * @param {boolean} [opts.nonPersonalizedOnly] - NPA request.
+ * @param {string} [opts.unitId] - Rewarded Ad Unit ID ("/" form). If omitted, uses Google test id on Android.
+ * @param {boolean} [opts.nonPersonalizedOnly] - Reserved (handled natively later if needed).
  * @param {(reward: any) => void} [opts.onEarnedReward]
  * @param {(error: any) => void} [opts.onError]
  */
-export async function showRewardedAd({
-  unitId,
-  nonPersonalizedOnly = true,
-  onEarnedReward,
-  onError,
-} = {}) {
-  // IMPORTANT:
-  // Do NOT import react-native-google-mobile-ads at module top-level.
-  // In release builds, a top-level import can crash the app on startup
-  // if native config / initialization is not ready. We lazy-require it
-  // only when the user actually tries to show an ad.
-  // eslint-disable-next-line global-require
-  const { AdEventType, RewardedAd, RewardedAdEventType, TestIds, MobileAds } = require('react-native-google-mobile-ads');
-
-  // Ensure the native SDK is initialized before trying to load/show an ad.
-  // If initialization fails, we surface the error instead of hard-crashing.
-  try {
-    await MobileAds().initialize();
-  } catch (e) {
-    throw e instanceof Error ? e : new Error(String(e));
+export async function showRewardedAd({ unitId, nonPersonalizedOnly = true, onEarnedReward, onError } = {}) {
+  if (Platform.OS === 'web') {
+    throw new Error('웹에서는 불가능 합니다.');
   }
 
-  const finalUnitId = unitId || TestIds.REWARDED;
+  const mod = NativeModules?.SomomiRewardedAd;
+  if (!mod?.show) {
+    const msg = 'SomomiRewardedAd 네이티브 모듈을 찾을 수 없습니다. (Android 빌드에 포함되었는지 확인해주세요.)';
+    try { Alert.alert('광고 로드 오류', msg); } catch (e) {}
+    throw new Error(msg);
+  }
 
-  return await new Promise((resolve, reject) => {
-    try {
-      const rewarded = RewardedAd.createForAdRequest(finalUnitId, {
-        requestNonPersonalizedAdsOnly: !!nonPersonalizedOnly,
-      });
+  // NOTE: Rewarded "unit id" uses "/" form. App id uses "~" form.
+  const androidTestRewardedUnitId = 'ca-app-pub-5773129721731206/2419623977';
+  const finalUnitId = unitId || (Platform.OS === 'android' ? androidTestRewardedUnitId : '');
+  if (String(finalUnitId).includes('~')) {
+    const msg = `Rewarded 광고 유닛 ID가 아니라 App ID가 들어간 것 같아요.\n\nfinalUnitId=${finalUnitId}`;
+    try { Alert.alert('광고 설정 오류', msg); } catch (e) {}
+    throw new Error(msg);
+  }
 
-      const unsubscribe = rewarded.addAdEventListener((type, error, reward) => {
-        try {
-          if (type === AdEventType.LOADED) {
-            rewarded.show();
-          }
-
-          if (type === RewardedAdEventType.EARNED_REWARD) {
-            try { onEarnedReward?.(reward); } catch (e) {}
-          }
-
-          if (type === AdEventType.CLOSED) {
-            try { unsubscribe?.(); } catch (e) {}
-            resolve(true);
-          }
-
-          if (type === AdEventType.ERROR) {
-            try { onError?.(error); } catch (e) {}
-            try { unsubscribe?.(); } catch (e) {}
-            reject(error || new Error('ad-error'));
-          }
-        } catch (e) {}
-      });
-
-      rewarded.load();
-    } catch (e) {
-      reject(e);
+  try {
+    // Native returns: { type, amount } when earned, or null when dismissed without reward.
+    const reward = await mod.show(finalUnitId);
+    if (reward) {
+      try { onEarnedReward?.(reward); } catch (e) {}
     }
-  });
+    return reward;
+  } catch (e) {
+    try { onError?.(e); } catch (e2) {}
+    throw e;
+  }
 }
 
