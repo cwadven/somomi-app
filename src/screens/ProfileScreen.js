@@ -248,7 +248,19 @@ const ProfileScreen = () => {
       setRewardAdLoading(true);
 
       // 1) 백엔드에 SSV 요청 레코드 생성 → ssv_id 확보
-      const ssvRes = await createAdMobRewardRequest();
+      let ssvRes;
+      try {
+        ssvRes = await createAdMobRewardRequest();
+      } catch (reqErr) {
+        const status = reqErr?.response?.status;
+        const msg = reqErr?.message || 'SSV 요청 생성에 실패했습니다.';
+        // 400: 오늘 이미 리워드 받음 등 → 오류가 아니라 안내로 표시
+        if (status === 400) {
+          showInfoAlert('알림', msg);
+          return;
+        }
+        throw reqErr;
+      }
       const ssvIdRaw = ssvRes?.ssv_id;
       const ssvId = ssvIdRaw == null ? null : String(ssvIdRaw);
       if (!ssvId) throw new Error('SSV 요청 생성에 실패했습니다. (ssv_id 없음)');
