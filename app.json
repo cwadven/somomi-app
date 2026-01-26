@@ -2,7 +2,7 @@
   "expo": {
     "name": "소모미",
     "slug": "somomi",
-    "version": "1.0.17",
+    "version": "1.0.18",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -65,7 +65,7 @@
       "url": "https://u.expo.dev/25a0cbfb-df85-4335-8012-d06cc57c6fc6"
     },
     "runtimeVersion": {
-      "policy": "appVersion"
+      "policy": "sdkVersion"
     },
     "extra": {
       "eas": {
