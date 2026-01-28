@@ -21,7 +21,7 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { givePresignedUrl } from '../api/commonApi';
 import { fetchMemberProfile, updateMemberProfile } from '../api/memberApi';
-import { createAdMobRewardRequest } from '../api/rewardApi';
+import { createAdMobRewardRequest, fetchAdMobRewardRules } from '../api/rewardApi';
 import NotificationSettings from '../components/NotificationSettings';
 import { navigate as rootNavigate } from '../navigation/RootNavigation';
 import { logout, updateUserInfo } from '../redux/slices/authSlice';
@@ -217,6 +217,8 @@ const ProfileScreen = () => {
   const [modalAction, setModalAction] = useState(null);
   const [modalButtons, setModalButtons] = useState(null);
   const [rewardAdLoading, setRewardAdLoading] = useState(false);
+  const [rewardRules, setRewardRules] = useState([]);
+  const [rewardRulesLoading, setRewardRulesLoading] = useState(false);
 
   // 모달 닫기 핸들러
   const handleModalClose = () => {
@@ -241,7 +243,27 @@ const ProfileScreen = () => {
     setModalVisible(true);
   };
 
-  const showRewardedAd = async () => {
+  // AdMob 리워드 룰 목록 로드 (프로필 > 광고 섹션)
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      if (!isLoggedIn || !user) return;
+      try {
+        setRewardRulesLoading(true);
+        const res = await fetchAdMobRewardRules();
+        const list = Array.isArray(res?.reward_rules) ? res.reward_rules : [];
+        if (mounted) setRewardRules(list);
+      } catch (e) {
+        if (mounted) setRewardRules([]);
+      } finally {
+        if (mounted) setRewardRulesLoading(false);
+      }
+    };
+    run();
+    return () => { mounted = false; };
+  }, [isLoggedIn, user]);
+
+  const showRewardedAd = async (rewardRuleId) => {
     if (!isLoggedIn) return;
     if (rewardAdLoading) return;
     try {
@@ -250,7 +272,7 @@ const ProfileScreen = () => {
       // 1) 백엔드에 SSV 요청 레코드 생성 → ssv_id 확보
       let ssvRes;
       try {
-        ssvRes = await createAdMobRewardRequest();
+        ssvRes = await createAdMobRewardRequest({ rewardRuleId });
       } catch (reqErr) {
         const status = reqErr?.response?.status;
         const msg = reqErr?.message || 'SSV 요청 생성에 실패했습니다.';
@@ -295,15 +317,18 @@ const ProfileScreen = () => {
   // };
 
   // 설정 메뉴 아이템 컴포넌트
-  const SettingItem = ({ icon, title, onPress, showBadge = false }) =>
-  <TouchableOpacity style={styles.settingItem} onPress={onPress}>
+  const SettingItem = ({ icon, title, subtitle, onPress, showBadge = false, disabled = false }) =>
+  <TouchableOpacity style={[styles.settingItem, disabled && styles.settingItemDisabled]} onPress={onPress} disabled={disabled}>
       <View style={styles.settingItemLeft}>
-        <Ionicons name={icon} size={24} color="#4CAF50" style={styles.settingIcon} />
-        <Text style={styles.settingTitle}>{title}</Text>
+        <Ionicons name={icon} size={24} color={disabled ? '#BDBDBD' : '#4CAF50'} style={styles.settingIcon} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.settingTitle, disabled && { color: '#9E9E9E' }]}>{title}</Text>
+          {subtitle ? <Text style={styles.settingSubtitle}>{subtitle}</Text> : null}
+        </View>
       </View>
       <View style={styles.settingItemRight}>
         {showBadge && <View style={styles.badge} />}
-        <Ionicons name="chevron-forward" size={20} color="#999" />
+        <Ionicons name="chevron-forward" size={20} color={disabled ? '#D0D0D0' : '#999'} />
       </View>
     </TouchableOpacity>;
 
@@ -613,11 +638,37 @@ const ProfileScreen = () => {
       {isLoggedIn && user ?
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>광고</Text>
-          <SettingItem
-            icon="gift-outline"
-            title={rewardAdLoading ? '광고 불러오는 중...' : '광고 보고 30일 유효 카테고리 받기'}
-            onPress={showRewardedAd}
-          />
+          {rewardRulesLoading ? (
+            <SettingItem
+              icon="gift-outline"
+              title="불러오는 중..."
+              subtitle="잠시만 기다려주세요."
+              disabled={true}
+            />
+          ) : (rewardRules || []).length > 0 ? (
+            (rewardRules || []).map((rule) => {
+              const available = !!rule?.is_available;
+              const title = String(rule?.reward_campaign_name || '리워드 광고');
+              const rewardRuleId = rule?.reward_rule_id;
+              return (
+                <SettingItem
+                  key={String(rule?.reward_rule_id ?? title)}
+                  icon="gift-outline"
+                  title={rewardAdLoading ? '광고 불러오는 중...' : title}
+                  subtitle={!available ? '다음에 다시 시도해주세요.' : undefined}
+                  disabled={!available || rewardAdLoading}
+                  onPress={available ? () => showRewardedAd(rewardRuleId) : undefined}
+                />
+              );
+            })
+          ) : (
+            <SettingItem
+              icon="gift-outline"
+              title="현재 이용 가능한 광고가 없습니다."
+              subtitle="다음에 다시 시도해주세요."
+              disabled={true}
+            />
+          )}
         </View>
         : null}
 
@@ -959,6 +1010,14 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     color: '#333'
+  },
+  settingSubtitle: {
+    fontSize: 12,
+    color: '#9E9E9E',
+    marginTop: 2,
+  },
+  settingItemDisabled: {
+    opacity: 0.7,
   },
   settingItemRight: {
     flexDirection: 'row',
