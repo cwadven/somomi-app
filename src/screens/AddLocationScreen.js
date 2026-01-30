@@ -54,6 +54,40 @@ const AddLocationScreen = () => {
   const additionalProductSlots = slots?.productSlots?.additionalSlots || 0;
   const { locationProducts } = useSelector((state) => state.products);
   const { locations: locationsList } = useSelector((state) => state.locations);
+
+  const formatDateOnly = (isoLike) => {
+    try {
+      const s = String(isoLike || '').trim();
+      if (!s) return null;
+      if (s.includes('T')) return s.split('T')[0];
+      const d = new Date(s);
+      const t = d.getTime();
+      if (!isFinite(t)) return null;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const getTemplateExpiryText = (tpl) => {
+    try {
+      if (!tpl) return null;
+      const exp = tpl?.feature?.expiresAt || tpl?.feature?.validWhile?.expiresAt || null;
+      if (!exp) return null;
+      const expMs = new Date(exp).getTime();
+      if (!isFinite(expMs)) return null;
+      const remainingDays = Math.ceil((expMs - Date.now()) / (24 * 60 * 60 * 1000));
+      const dateOnly = formatDateOnly(exp);
+      if (remainingDays > 0) return `만료까지 ${remainingDays}일 · ${dateOnly || ''}`.trim();
+      if (remainingDays === 0) return `오늘 만료 · ${dateOnly || ''}`.trim();
+      return `만료됨 · ${dateOnly || ''}`.trim();
+    } catch (e) {
+      return null;
+    }
+  };
   
   // 만료 템플릿 판단: 정책 기반(validWhile) 또는 expiresAt
   const isTemplateExpired = (t) => {
@@ -773,7 +807,9 @@ const AddLocationScreen = () => {
               <View style={styles.templateOptionsContainer}>
                 <ScrollView style={styles.templateOptionsScroll} nestedScrollEnabled>
                   <View style={styles.templateOptions}>
-                    {availableTemplates.map((template) =>
+                    {availableTemplates.map((template) => {
+                      const expiryText = getTemplateExpiryText(template);
+                      return (
           <TouchableOpacity 
                         key={template.id}
                         style={[
@@ -790,14 +826,19 @@ const AddLocationScreen = () => {
                             <Text style={styles.templateOptionTitle}>
                               {template.name} · 기본 슬롯: {renderSlotCount(template.feature?.baseSlots)}
           </Text>
-                            {/* 생성 화면에서는 템플릿 description 비표시 */}
+                            {expiryText ? (
+                              <Text style={[styles.templateOptionSubtitle, expiryText.startsWith('만료됨') && { color: '#F44336' }]}>
+                                {expiryText}
+                              </Text>
+                            ) : null}
                           </View>
                         </View>
                         {selectedTemplateInstance?.id === template.id &&
                           <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
                   }
           </TouchableOpacity>
-                )}
+                      );
+                    })}
         </View>
                 </ScrollView>
       </View> :
@@ -820,6 +861,19 @@ const AddLocationScreen = () => {
                 <View style={styles.templateGroupInfo}>
                   <Text style={styles.templateGroupName}>현재 템플릿: {currentTemplate.name}</Text>
                   <Text style={styles.templateGroupDescription}>기본 슬롯: {renderSlotCount(currentTemplate.feature?.baseSlots)}</Text>
+                  {(() => {
+                    // guest_section_template_id는 있는데 템플릿 정보를 못 찾으면 "만료됨"으로 표시
+                    const hasTemplateId = !!locationToEdit?.templateInstanceId;
+                    const expiryText = getTemplateExpiryText(linkedTemplateInEdit || currentTemplate);
+                    if (expiryText) {
+                      const expired = expiryText.startsWith('만료됨');
+                      return <Text style={[styles.templateOptionSubtitle, expired && { color: '#F44336' }]}>{expiryText}</Text>;
+                    }
+                    if (hasTemplateId && !linkedTemplateInEdit) {
+                      return <Text style={[styles.templateOptionSubtitle, { color: '#F44336' }]}>만료됨</Text>;
+                    }
+                    return null;
+                  })()}
                 </View>
               </View> :
 
@@ -833,6 +887,7 @@ const AddLocationScreen = () => {
                       const baseSlots = template.feature?.baseSlots;
                   const allowedSlots = baseSlots === -1 ? Number.POSITIVE_INFINITY : baseSlots + additionalProductSlots;
                       const isDisabled = currentProductCount > allowedSlots;
+                      const expiryText = getTemplateExpiryText(template);
   return (
           <TouchableOpacity 
                           key={template.id}
@@ -853,6 +908,11 @@ const AddLocationScreen = () => {
                                 현재 {currentProductCount}개 / 허용 {allowedSlots === Number.POSITIVE_INFINITY ? '무제한' : `${allowedSlots}개`}
                               </Text>
                         }
+                            {expiryText ? (
+                              <Text style={[styles.templateOptionSubtitle, expiryText.startsWith('만료됨') && { color: '#F44336' }]}>
+                                {expiryText}
+                              </Text>
+                            ) : null}
           </View>
                           {selectedEditTemplateInstance?.id === template.id &&
                             <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />

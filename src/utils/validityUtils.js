@@ -41,7 +41,14 @@ export const isTemplateActive = (template, subscription) => {
     }
   }
 
-  // validWhile가 없으면 기본적으로 유효로 간주 (모든 생성 코드에서 validWhile 주입을 전제로 함)
+  // validWhile가 없더라도 feature.expiresAt(= API expires_at)을 지원
+  const exp = template?.feature?.expiresAt || template?.feature?.expires_at || null;
+  if (exp) {
+    const ts = new Date(exp).getTime();
+    if (Number.isFinite(ts)) return Date.now() < ts;
+  }
+
+  // 만료 정보가 없으면 기본적으로 유효로 간주
   return true;
 };
 

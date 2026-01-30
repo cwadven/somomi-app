@@ -106,6 +106,23 @@ const LocationsScreen = () => {
     }
   }, []);
 
+  const getTemplateExpiryText = useCallback((tpl) => {
+    try {
+      if (!tpl) return null;
+      const exp = tpl?.feature?.expiresAt || tpl?.feature?.validWhile?.expiresAt || null;
+      if (!exp) return null;
+      const expMs = new Date(exp).getTime();
+      if (!Number.isFinite(expMs)) return null;
+      const dateOnly = formatDateOnly(exp);
+      const remainingDays = Math.ceil((expMs - Date.now()) / (24 * 60 * 60 * 1000));
+      if (remainingDays > 0) return `만료까지 ${remainingDays}일${dateOnly ? ` · ${dateOnly}` : ''}`;
+      if (remainingDays === 0) return `오늘 만료${dateOnly ? ` · ${dateOnly}` : ''}`;
+      return `만료됨${dateOnly ? ` · ${dateOnly}` : ''}`;
+    } catch (e) {
+      return null;
+    }
+  }, [formatDateOnly]);
+
   // 템플릿 만료일(expiresAt) 기반 남은 기간 + 날짜 표시
   const getTemplateRemainingTextForLocation = useCallback((locId) => {
     try {
@@ -215,6 +232,14 @@ const LocationsScreen = () => {
                     <Text style={styles.templatePickerDesc}>
                       기본 슬롯: {tpl.feature?.baseSlots === -1 ? '무제한' : tpl.feature?.baseSlots}
                     </Text>
+                    {(() => {
+                      const txt = getTemplateExpiryText(tpl);
+                      return txt ? (
+                        <Text style={[styles.templatePickerDesc, txt.startsWith('만료됨') && { color: '#F44336' }]}>
+                          {txt}
+                        </Text>
+                      ) : null;
+                    })()}
                   </View>
                 </View>
                 {isSelected ? (
@@ -228,7 +253,7 @@ const LocationsScreen = () => {
         </ScrollView>
       )
     }));
-  }, [templatePickerVisible, templatePickerSelectedTemplateId, freeTemplates, templatePickerLocation, dispatch, navigation]);
+  }, [templatePickerVisible, templatePickerSelectedTemplateId, freeTemplates, templatePickerLocation, dispatch, navigation, getTemplateExpiryText]);
 
   // 화면이 포커스될 때마다 카테고리 데이터 로드
   useEffect(() => {
