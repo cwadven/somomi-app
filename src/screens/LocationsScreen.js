@@ -465,6 +465,11 @@ const LocationsScreen = () => {
           >
             <View style={styles.allProductsIconContainer}>
               <Ionicons name="albums-outline" size={30} color="#4CAF50" />
+              {expiredTotalCount > 0 ? (
+                <View pointerEvents="none" style={styles.expiredBadgeOnIcon}>
+                  <Text style={styles.expiredBadgeText}>{expiredTotalCount}</Text>
+                </View>
+              ) : null}
             </View>
             <View style={styles.locationInfo}>
               <Text style={styles.locationTitle}>모든 제품</Text>
@@ -472,11 +477,6 @@ const LocationsScreen = () => {
                 등록된 모든 제품을 확인합니다
               </Text>
             </View>
-            {expiredTotalCount > 0 ? (
-              <View style={styles.expiredBadge}>
-                <Text style={styles.expiredBadgeText}>{expiredTotalCount}</Text>
-              </View>
-            ) : null}
             <Ionicons name="chevron-forward" size={24} color="#999" style={styles.chevronIcon} />
           </TouchableOpacity>
           
@@ -501,16 +501,16 @@ const LocationsScreen = () => {
                     style={styles.locationListItem}
                     onPress={() => handleLocationPress(item)}
                   >
-                    {Number(expiredCountsByLocationId?.[String(item.id)] || 0) > 0 ? (
-                      <View pointerEvents="none" style={styles.expiredBadgeCorner}>
-                        <Text style={styles.expiredBadgeText}>
-                          {Number(expiredCountsByLocationId[String(item.id)] || 0)}
-                        </Text>
-                      </View>
-                    ) : null}
                     <View style={styles.locationListItemContent}>
                       <View style={styles.locationIconContainer}>
                         <Ionicons name={item.icon || 'cube-outline'} size={24} color="#4CAF50" />
+                        {Number(expiredCountsByLocationId?.[String(item.id)] || 0) > 0 ? (
+                          <View pointerEvents="none" style={styles.expiredBadgeOnIcon}>
+                            <Text style={styles.expiredBadgeText}>
+                              {Number(expiredCountsByLocationId[String(item.id)] || 0)}
+                            </Text>
+                          </View>
+                        ) : null}
                       </View>
                       <View style={styles.locationListItemTextContainer}>
                         <Text style={styles.locationListItemTitle}>{item.title}</Text>
@@ -669,6 +669,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     backgroundColor: '#c8e6c9',
+    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -858,6 +859,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: '#f0f0f0',
+    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -880,15 +882,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 10,
   },
-  expiredBadgeCorner: {
+  expiredBadgeOnIcon: {
     position: 'absolute',
-    top: 10,
-    // 오른쪽 chevron(24) + 여백(16) 고려해서 겹침 방지
-    right: 52,
-    minWidth: 28,
-    height: 20,
-    paddingHorizontal: 8,
-    borderRadius: 10,
+    // 아이콘 오른쪽 위에 살짝 겹치도록
+    top: -6,
+    right: -6,
+    minWidth: 22,
+    height: 18,
+    paddingHorizontal: 6,
+    borderRadius: 9,
     backgroundColor: '#EF4444',
     justifyContent: 'center',
     alignItems: 'center',
