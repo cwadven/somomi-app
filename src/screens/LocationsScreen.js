@@ -111,9 +111,21 @@ const LocationsScreen = () => {
     try {
       const id = locId == null ? null : String(locId);
       if (!id) return null;
-      const tpl = (userLocationTemplateInstances || []).find(t => String(t?.usedInLocationId || '') === id) || null;
+      const tplByUsedIn = (userLocationTemplateInstances || []).find(t => String(t?.usedInLocationId || '') === id) || null;
+      const loc = (locations || []).find(l => String(l?.id || '') === id) || null;
+      // guest_section_template_id가 없는 경우는 "만료"가 아니라 그냥 템플릿 미연동 상태 (표시/만료처리 안함)
+      if (!loc?.templateInstanceId) return null;
+
+      const tplById = loc?.templateInstanceId
+        ? (userLocationTemplateInstances || []).find(t => String(t?.id || '') === String(loc.templateInstanceId)) || null
+        : null;
+      const tpl = tplByUsedIn || tplById;
+
+      // guest_section_template_id는 있는데 템플릿 목록 API에 없으면 "만료됨" (요청사항)
+      if (!tpl) return '만료됨';
       const exp = tpl?.feature?.expiresAt || tpl?.feature?.validWhile?.expiresAt || null;
-      if (!tpl || !exp) return null;
+      // expires_at이 null이면 기간 제한이 없는 템플릿일 수 있으므로 표시하지 않음
+      if (!exp) return null;
       const expMs = new Date(exp).getTime();
       if (!Number.isFinite(expMs)) return null;
       const dateOnly = formatDateOnly(exp);
@@ -124,12 +136,23 @@ const LocationsScreen = () => {
     } catch (e) {
       return null;
     }
-  }, [userLocationTemplateInstances, formatDateOnly]);
+  }, [userLocationTemplateInstances, locations, formatDateOnly]);
 
   // 각 카테고리별로 연결된 템플릿이 구독 만료인지 계산하는 헬퍼
   const isLocationExpired = useCallback((loc) => {
-    const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === loc.id) || null;
-    if (!tpl) return false;
+    const locId = loc?.id == null ? null : String(loc.id);
+    if (!locId) return false;
+    // guest_section_template_id가 없으면 만료 개념 없음
+    if (!loc?.templateInstanceId) return false;
+    const tplByUsedIn = (userLocationTemplateInstances || []).find(t => String(t?.usedInLocationId || '') === locId) || null;
+    const tplById = loc?.templateInstanceId
+      ? (userLocationTemplateInstances || []).find(t => String(t?.id || '') === String(loc.templateInstanceId)) || null
+      : null;
+    const tpl = tplByUsedIn || tplById;
+
+    // guest_section_template_id는 있는데 템플릿 목록 API에 없으면 만료로 취급 (요청사항)
+    if (!tpl) return true;
+
     return !isTemplateActive(tpl, subscription);
   }, [userLocationTemplateInstances, subscription]);
 
@@ -363,11 +386,10 @@ const LocationsScreen = () => {
       } else {
         setAlertModalConfig({
           title: '템플릿 부족',
-          message: '이 카테고리는 템플릿이 없어 접근할 수 없습니다.\n템플릿을 구매하고 연동해주세요.',
+          message: '이 카테고리는 템플릿이 없어 접근할 수 없습니다.',
           icon: 'alert-circle',
           iconColor: '#F44336',
           buttons: [
-            { text: '상점으로 이동', style: 'success', onPress: () => { setAlertModalVisible(false); navigation.navigate('Store'); } },
             { text: '닫기', style: 'cancel' }
           ]
         });
