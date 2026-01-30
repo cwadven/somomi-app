@@ -88,7 +88,25 @@ const LocationsScreen = () => {
   const [expiredCountsByLocationId, setExpiredCountsByLocationId] = useState({});
   const [expiredTotalCount, setExpiredTotalCount] = useState(0);
 
-  // 템플릿 만료일(expiresAt) 기반 남은 기간 표시
+  const formatDateOnly = useCallback((isoLike) => {
+    try {
+      const s = String(isoLike || '').trim();
+      if (!s) return null;
+      // "2025-12-31T23:59:59Z" 형태면 날짜만 잘라서(타임존 영향 최소화)
+      if (s.includes('T')) return s.split('T')[0];
+      const d = new Date(s);
+      const t = d.getTime();
+      if (!Number.isFinite(t)) return null;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    } catch (e) {
+      return null;
+    }
+  }, []);
+
+  // 템플릿 만료일(expiresAt) 기반 남은 기간 + 날짜 표시
   const getTemplateRemainingTextForLocation = useCallback((locId) => {
     try {
       const id = locId == null ? null : String(locId);
@@ -98,14 +116,15 @@ const LocationsScreen = () => {
       if (!tpl || !exp) return null;
       const expMs = new Date(exp).getTime();
       if (!Number.isFinite(expMs)) return null;
+      const dateOnly = formatDateOnly(exp);
       const remainingDays = Math.ceil((expMs - Date.now()) / (24 * 60 * 60 * 1000));
-      if (remainingDays > 0) return `만료까지 ${remainingDays}일`;
-      if (remainingDays === 0) return '오늘 만료';
-      return '만료됨';
+      if (remainingDays > 0) return `만료까지 ${remainingDays}일${dateOnly ? ` · ${dateOnly}` : ''}`;
+      if (remainingDays === 0) return `오늘 만료${dateOnly ? ` · ${dateOnly}` : ''}`;
+      return `만료됨${dateOnly ? ` · ${dateOnly}` : ''}`;
     } catch (e) {
       return null;
     }
-  }, [userLocationTemplateInstances]);
+  }, [userLocationTemplateInstances, formatDateOnly]);
 
   // 각 카테고리별로 연결된 템플릿이 구독 만료인지 계산하는 헬퍼
   const isLocationExpired = useCallback((loc) => {
@@ -541,7 +560,7 @@ const LocationsScreen = () => {
                         {(() => {
                           const txt = getTemplateRemainingTextForLocation(item.id);
                           if (!txt) return null;
-                          const expired = txt === '만료됨';
+                          const expired = txt.startsWith('만료됨');
                           return (
                             <Text style={[styles.templateRemainingText, expired && styles.templateRemainingTextExpired]}>
                               {txt}
