@@ -214,7 +214,14 @@ export const loadUserLocationTemplateInstances = createAsyncThunk(
             description: it.description || '',
             icon: it.icon || 'cube-outline',
             feature: {
-              baseSlots: typeof it?.feature?.base_slots === 'number' ? it.feature.base_slots : 0
+              baseSlots: typeof it?.feature?.base_slots === 'number' ? it.feature.base_slots : 0,
+              // API: feature.expires_at (nullable)
+              expiresAt: it?.feature?.expires_at || null,
+              // validityUtils는 feature.validWhile를 우선 사용하므로,
+              // expires_at이 있는 경우 fixed 정책으로 매핑하여 만료 판정이 동작하게 합니다.
+              validWhile: it?.feature?.expires_at
+                ? { type: 'fixed', expiresAt: it.feature.expires_at }
+                : undefined,
             },
             used: !!it.used,
             usedInLocationId: it.used_in_section_id ? String(it.used_in_section_id) : null,

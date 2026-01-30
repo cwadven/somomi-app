@@ -88,6 +88,25 @@ const LocationsScreen = () => {
   const [expiredCountsByLocationId, setExpiredCountsByLocationId] = useState({});
   const [expiredTotalCount, setExpiredTotalCount] = useState(0);
 
+  // 템플릿 만료일(expiresAt) 기반 남은 기간 표시
+  const getTemplateRemainingTextForLocation = useCallback((locId) => {
+    try {
+      const id = locId == null ? null : String(locId);
+      if (!id) return null;
+      const tpl = (userLocationTemplateInstances || []).find(t => String(t?.usedInLocationId || '') === id) || null;
+      const exp = tpl?.feature?.expiresAt || tpl?.feature?.validWhile?.expiresAt || null;
+      if (!tpl || !exp) return null;
+      const expMs = new Date(exp).getTime();
+      if (!Number.isFinite(expMs)) return null;
+      const remainingDays = Math.ceil((expMs - Date.now()) / (24 * 60 * 60 * 1000));
+      if (remainingDays > 0) return `만료까지 ${remainingDays}일`;
+      if (remainingDays === 0) return '오늘 만료';
+      return '만료됨';
+    } catch (e) {
+      return null;
+    }
+  }, [userLocationTemplateInstances]);
+
   // 각 카테고리별로 연결된 템플릿이 구독 만료인지 계산하는 헬퍼
   const isLocationExpired = useCallback((loc) => {
     const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === loc.id) || null;
@@ -519,6 +538,16 @@ const LocationsScreen = () => {
                             {item.description}
                           </Text>
                         ) : null}
+                        {(() => {
+                          const txt = getTemplateRemainingTextForLocation(item.id);
+                          if (!txt) return null;
+                          const expired = txt === '만료됨';
+                          return (
+                            <Text style={[styles.templateRemainingText, expired && styles.templateRemainingTextExpired]}>
+                              {txt}
+                            </Text>
+                          );
+                        })()}
                         {isLoggedIn && locationTemplatesStatus === 'succeeded' && !userLocationTemplateInstances.some(t => t.usedInLocationId === item.id) && (
                           <Text style={{ color: '#F44336', marginTop: 4, fontSize: 12 }}>
                             템플릿 미연동(비활성화)
@@ -910,6 +939,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+  },
+  templateRemainingText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '700',
+  },
+  templateRemainingTextExpired: {
+    color: '#F44336',
   },
   templatePickerItem: {
     flexDirection: 'row',
