@@ -234,7 +234,7 @@ const ProductDetailScreen = () => {
   const yearScrollRef = useRef(null);
   const monthScrollRef = useRef(null);
   const dayScrollRef = useRef(null);
-  const ITEM_HEIGHT = 40; // styles.datePickerOption.height
+  const ITEM_HEIGHT = 48; // styles.datePickerOption.height (중앙 정렬 기준)
   const VISIBLE_HEIGHT = 150; // styles.datePickerScroll.height
   const CENTER_OFFSET = (VISIBLE_HEIGHT - ITEM_HEIGHT) / 2;
 
@@ -2894,16 +2894,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginBottom: 8,
-    fontWeight: '600'
+    fontWeight: '600',
+    lineHeight: 22
   },
   datePickerOption: {
-    paddingVertical: 10,
+    // 일부 기기(예: Galaxy S10)에서 글자 하단이 잘리는 이슈가 있어
+    // 고정 높이 대신 충분한 최소 높이/라인높이를 부여합니다.
+    paddingVertical: 12,
     paddingHorizontal: 15,
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
-    height: 40 // 고정 높이 설정
+    height: 48
   },
   datePickerOptionSelected: {
     backgroundColor: '#4CAF50'
@@ -2911,7 +2914,8 @@ const styles = StyleSheet.create({
   datePickerOptionText: {
     fontSize: 16,
     color: '#333',
-    textAlign: 'center'
+    textAlign: 'center',
+    lineHeight: 22
   },
   datePickerOptionTextSelected: {
     color: '#fff',
