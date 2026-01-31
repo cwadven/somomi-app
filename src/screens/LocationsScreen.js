@@ -4,6 +4,7 @@ import {
 
 View,
 Text,
+Image,
 StyleSheet,
 FlatList,
 TouchableOpacity,
@@ -588,7 +589,13 @@ const LocationsScreen = () => {
                   >
                     <View style={styles.locationListItemContent}>
                       <View style={styles.locationIconContainer}>
-                        <Ionicons name={item.icon || 'cube-outline'} size={24} color="#4CAF50" />
+                        {(() => {
+                          const uri = String(item?.imageUrl || item?.image_url || '').trim();
+                          if (uri) {
+                            return <Image source={{ uri }} style={styles.locationIconImage} resizeMode="cover" />;
+                          }
+                          return <Ionicons name={item?.icon || 'cube-outline'} size={24} color="#4CAF50" />;
+                        })()}
                         {Number(expiredCountsByLocationId?.[String(item.id)] || 0) > 0 ? (
                           <View pointerEvents="none" style={styles.expiredBadgeOnIcon}>
                             <Text style={styles.expiredBadgeText}>
@@ -758,6 +765,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+  },
+  locationIconImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 25,
   },
   allProductsIconContainer: {
     width: 50,

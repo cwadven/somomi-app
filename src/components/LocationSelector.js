@@ -3,6 +3,7 @@ import {
 
   View, 
   Text, 
+  Image,
   StyleSheet, 
   TouchableOpacity, 
   ActivityIndicator,
@@ -56,12 +57,29 @@ const LocationSelector = forwardRef(({
                 ]}
                 onPress={() => onSelectLocation(item)}
               >
-                <Ionicons 
-                  name={item.icon || 'cube-outline'} 
-                  size={16} 
-                  color={selectedLocation?.id === item.id ? '#fff' : '#4CAF50'} 
-                  style={styles.locationChipIcon}
-                />
+                {(() => {
+                  const uri = String(item?.imageUrl || item?.image_url || '').trim();
+                  if (uri) {
+                    return (
+                      <Image
+                        source={{ uri }}
+                        style={[
+                          styles.locationChipImage,
+                          selectedLocation?.id === item.id && styles.locationChipImageSelected,
+                        ]}
+                        resizeMode="cover"
+                      />
+                    );
+                  }
+                  return (
+                    <Ionicons
+                      name={item?.icon || 'cube-outline'}
+                      size={16}
+                      color={selectedLocation?.id === item.id ? '#fff' : '#4CAF50'}
+                      style={styles.locationChipIcon}
+                    />
+                  );
+                })()}
                 <Text
                   style={[
                     styles.locationChipText,
@@ -160,6 +178,16 @@ const styles = StyleSheet.create({
   },
   locationChipIcon: {
     marginRight: 4,
+  },
+  locationChipImage: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginRight: 4,
+    backgroundColor: '#EDEDED',
+  },
+  locationChipImageSelected: {
+    backgroundColor: 'transparent',
   },
   locationChipText: {
     fontSize: 14,

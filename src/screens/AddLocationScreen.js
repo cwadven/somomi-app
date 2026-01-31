@@ -3,15 +3,20 @@ import {
 
   View, 
   Text, 
+  Image,
   StyleSheet, 
   TextInput, 
   TouchableOpacity, 
   ScrollView,
 
   ActivityIndicator,
+  Modal,
+  Platform,
   SafeAreaView } from
 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { createLocation, updateLocation, fetchLocations } from '../redux/slices/locationsSlice';
@@ -36,6 +41,7 @@ import { fetchProductsByLocation } from '../redux/slices/productsSlice';
 import IconSelector from '../components/IconSelector';
 import AlertModal from '../components/AlertModal';
 import { isTemplateActive } from '../utils/validityUtils';
+import { givePresignedUrl } from '../api/commonApi';
 
 const MAX_LOCATION_TITLE_LEN = 50;
 const MAX_LOCATION_DESC_LEN = 100;
@@ -222,6 +228,209 @@ const AddLocationScreen = () => {
     description: isEditMode && locationToEdit ? locationToEdit.description : '',
     icon: isEditMode && locationToEdit ? locationToEdit.icon : 'cube-outline'
   });
+
+  // ✅ 카테고리 이미지 업로드 (제품 이미지 업로드 UX와 동일하게: 선택 즉시 presigned + S3 업로드)
+  const [imagePreviewUri, setImagePreviewUri] = useState(() => {
+    if (!isEditMode || !locationToEdit) return null;
+    const uri = String(locationToEdit?.imageUrl || locationToEdit?.image_url || '').trim();
+    return uri || null;
+  });
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState(null); // read_host + key
+  const [pickedImageMeta, setPickedImageMeta] = useState(null); // { uri, fileName, mimeType, ext }
+  const [didRemoveImage, setDidRemoveImage] = useState(false);
+
+  useEffect(() => {
+    // 이미지가 바뀌면 뷰어 닫기
+    setImageViewerVisible(false);
+  }, [imagePreviewUri]);
+
+  const ALLOWED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
+  const getFileExtension = (nameOrUri) => {
+    if (!nameOrUri || typeof nameOrUri !== 'string') return null;
+    const clean = nameOrUri.split('?')[0].split('#')[0];
+    const last = clean.split('/').pop() || clean;
+    const idx = last.lastIndexOf('.');
+    if (idx === -1) return null;
+    return last.slice(idx + 1).toLowerCase();
+  };
+  const guessMimeTypeFromExtension = (ext) => {
+    switch ((ext || '').toLowerCase()) {
+      case 'png': return 'image/png';
+      case 'jpg':
+      case 'jpeg': return 'image/jpeg';
+      case 'gif': return 'image/gif';
+      case 'webp': return 'image/webp';
+      default: return 'application/octet-stream';
+    }
+  };
+  const guessExtensionFromMimeType = (mimeType) => {
+    switch ((mimeType || '').toLowerCase()) {
+      case 'image/png': return 'png';
+      case 'image/jpeg': return 'jpg';
+      case 'image/gif': return 'gif';
+      case 'image/webp': return 'webp';
+      default: return null;
+    }
+  };
+  const buildSafeFileName = (ext) => `guest_section_${Date.now()}.${String(ext || '').toLowerCase()}`;
+  const joinReadHostAndKey = (readHost, key) => {
+    if (!readHost || !key) return null;
+    const host = String(readHost);
+    const k = String(key);
+    if (host.endsWith('/') && k.startsWith('/')) return host + k.slice(1);
+    if (!host.endsWith('/') && !k.startsWith('/')) return `${host}/${k}`;
+    return host + k;
+  };
+  const optimizeImageIfNeeded = async ({ uri, ext }) => {
+    if (ext === 'gif') return { uri, ext };
+    const MAX_DIM = 1280;
+    let format = SaveFormat.JPEG;
+    let outExt = 'jpg';
+    let compress = 0.78;
+    if (ext === 'png' || ext === 'webp') {
+      format = SaveFormat.WEBP;
+      outExt = 'webp';
+      compress = 0.8;
+    }
+    const result = await manipulateAsync(uri, [{ resize: { width: MAX_DIM } }], { compress, format });
+    return { uri: result?.uri || uri, ext: outExt };
+  };
+
+  const uploadPickedImage = async ({ transactionPk, meta }) => {
+    if (!meta?.uri || !meta?.fileName) return null;
+    setImageUploading(true);
+    try {
+      const presigned = await givePresignedUrl('guest-section-image', String(transactionPk), meta.fileName);
+      const url = presigned?.url;
+      const fields = presigned?.data;
+      const key = fields?.key;
+      const readHost = presigned?.read_host;
+      if (!url || !fields || !key) throw new Error('invalid-presigned-response');
+
+      const form = new FormData();
+      Object.entries(fields).forEach(([k, v]) => {
+        if (v == null) return;
+        form.append(k, String(v));
+      });
+
+      const ext = meta.ext || getFileExtension(meta.fileName) || 'jpg';
+      const mime = meta.mimeType || guessMimeTypeFromExtension(ext);
+      if (Platform.OS === 'web') {
+        const blob = await fetch(meta.uri).then((r) => r.blob());
+        if (typeof File !== 'undefined') {
+          const file = new File([blob], meta.fileName, { type: mime });
+          form.append('file', file);
+        } else {
+          form.append('file', blob, meta.fileName);
+        }
+      } else {
+        form.append('file', { uri: meta.uri, name: meta.fileName, type: mime });
+      }
+
+      const uploadRes = await fetch(url, { method: 'POST', body: form });
+      if (!uploadRes.ok) {
+        const t = await uploadRes.text().catch(() => '');
+        throw new Error(`s3-upload-failed:${uploadRes.status}:${t}`);
+      }
+
+      const full = joinReadHostAndKey(readHost, key);
+      const imageUrl = full || key;
+      setUploadedImageUrl(imageUrl);
+      setDidRemoveImage(false);
+      return imageUrl;
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const pickCategoryImage = async () => {
+    const prevPreviewUri = imagePreviewUri;
+    const prevPickedMeta = pickedImageMeta;
+    const prevUploadedUrl = uploadedImageUrl;
+    const prevDidRemove = didRemoveImage;
+    try {
+      if (Platform.OS !== 'web') {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm?.granted) {
+          setAlertModalConfig({
+            title: '권한 필요',
+            message: '갤러리 접근 권한이 필요합니다.',
+            buttons: [{ text: '확인' }],
+            icon: 'alert-circle',
+            iconColor: '#F44336',
+          });
+          setAlertModalVisible(true);
+          return;
+        }
+      }
+
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.85,
+      });
+      if (res.canceled) return;
+      const asset = Array.isArray(res.assets) ? res.assets[0] : null;
+      if (!asset?.uri) return;
+
+      const extFromNameOrUri = getFileExtension(asset.fileName || asset.uri);
+      const extFromMime = guessExtensionFromMimeType(asset.mimeType);
+      const ext = (extFromNameOrUri || extFromMime || '').toLowerCase();
+      if (!ext || !ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
+        setAlertModalConfig({
+          title: '업로드 불가',
+          message: 'png, jpg, jpeg, gif, webp 파일만 업로드할 수 있어요.',
+          buttons: [{ text: '확인' }],
+          icon: 'alert-circle',
+          iconColor: '#F44336',
+        });
+        setAlertModalVisible(true);
+        return;
+      }
+
+      const optimized = await optimizeImageIfNeeded({ uri: asset.uri, ext }).catch(() => ({ uri: asset.uri, ext }));
+      const finalExt = optimized.ext || ext;
+      const meta = {
+        uri: optimized.uri,
+        ext: finalExt,
+        fileName: buildSafeFileName(finalExt),
+        mimeType: guessMimeTypeFromExtension(finalExt),
+      };
+
+      setPickedImageMeta(meta);
+      setImagePreviewUri(meta.uri);
+      setUploadedImageUrl(null);
+      setDidRemoveImage(false);
+
+      await uploadPickedImage({
+        transactionPk: isEditMode ? (locationToEdit?.id || 0) : 0,
+        meta,
+      });
+    } catch (e) {
+      // 실패 시 롤백
+      setPickedImageMeta(prevPickedMeta || null);
+      setUploadedImageUrl(prevUploadedUrl || null);
+      setImagePreviewUri(prevPreviewUri || null);
+      setDidRemoveImage(prevDidRemove || false);
+      setAlertModalConfig({
+        title: '이미지 업로드 실패',
+        message: e?.message || '이미지 업로드 중 오류가 발생했습니다.',
+        buttons: [{ text: '확인' }],
+        icon: 'alert-circle',
+        iconColor: '#F44336',
+      });
+      setAlertModalVisible(true);
+    }
+  };
+
+  const removeCategoryImage = () => {
+    setPickedImageMeta(null);
+    setUploadedImageUrl(null);
+    setImagePreviewUri(null);
+    setDidRemoveImage(true);
+  };
   const [isIconSelectorVisible, setIsIconSelectorVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -560,6 +769,25 @@ const AddLocationScreen = () => {
     setIsLoading(true);
     
     try {
+      // 업로드 중에는 저장 불가 (제품 이미지와 동일 UX)
+      if (imageUploading) {
+        setIsLoading(false);
+        setAlertModalConfig({
+          title: '업로드 중',
+          message: '이미지를 업로드 중입니다. 잠시만 기다려주세요.',
+          buttons: [{ text: '확인' }],
+          icon: 'time-outline',
+          iconColor: '#4CAF50',
+        });
+        setAlertModalVisible(true);
+        return;
+      }
+
+      const existingImageUrl = isEditMode && locationToEdit
+        ? (String(locationToEdit?.imageUrl || locationToEdit?.image_url || '').trim() || null)
+        : null;
+      const imageUrlForBody = didRemoveImage ? null : (uploadedImageUrl || existingImageUrl || null);
+
       if (isEditMode) {
         // 카테고리 수정 로직
         console.log('카테고리 수정 시작:', {
@@ -610,6 +838,7 @@ const AddLocationScreen = () => {
             title: sanitizedTitle,
             description: sanitizedDesc || null,
             icon: locationData.icon,
+            imageUrl: imageUrlForBody,
             templateInstanceId: newTemplateInstanceId,
             productId: newProductId,
             feature: newFeature
@@ -684,6 +913,7 @@ const AddLocationScreen = () => {
         ...locationData,
           title: sanitizedTitle,
           description: sanitizedDesc || null,
+          imageUrl: imageUrlForBody,
           templateInstanceId: selectedTemplateInstance.id,
           productId: selectedTemplateInstance.productId,
           feature: selectedTemplateInstance.feature
@@ -968,7 +1198,77 @@ const AddLocationScreen = () => {
         </View>
         
           <View style={styles.formGroup}>
-            <Text style={styles.label}>아이콘</Text>
+            <Text style={styles.label}>이미지 (선택사항)</Text>
+            <View style={styles.imageRow}>
+              <View style={styles.imagePreviewBox}>
+                {imagePreviewUri ? (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setImageViewerVisible(true)}
+                    style={{ width: '100%', height: '100%' }}
+                  >
+                    <Image source={{ uri: imagePreviewUri }} style={styles.imagePreview} resizeMode="cover" />
+                  </TouchableOpacity>
+                ) : (
+                  <Ionicons name="image-outline" size={22} color="#9E9E9E" />
+                )}
+                {imageUploading ? (
+                  <View pointerEvents="none" style={styles.imageUploadingOverlay}>
+                    <ActivityIndicator size="small" color="#4CAF50" />
+                  </View>
+                ) : null}
+              </View>
+              <View style={{ flex: 1 }}>
+                <TouchableOpacity
+                  style={[styles.imageButton, (isEditMode && isEditLockedByExpiry) ? { opacity: 0.6 } : null]}
+                  onPress={() => { if (!(isEditMode && isEditLockedByExpiry)) pickCategoryImage(); }}
+                  disabled={isEditMode && isEditLockedByExpiry}
+                >
+                  <Ionicons name="cloud-upload-outline" size={18} color="#4CAF50" style={{ marginRight: 8 }} />
+                  <Text style={styles.imageButtonText}>{imagePreviewUri ? '이미지 변경' : '이미지 업로드'}</Text>
+                </TouchableOpacity>
+
+                {imagePreviewUri ? (
+                  <TouchableOpacity
+                    style={[styles.imageRemoveButton, (isEditMode && isEditLockedByExpiry) ? { opacity: 0.6 } : null]}
+                    onPress={() => { if (!(isEditMode && isEditLockedByExpiry)) removeCategoryImage(); }}
+                    disabled={isEditMode && isEditLockedByExpiry}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#F44336" style={{ marginRight: 8 }} />
+                    <Text style={styles.imageRemoveButtonText}>이미지 제거</Text>
+                  </TouchableOpacity>
+                ) : null}
+
+                <Text style={styles.inputHint}>이미지를 올리면 카테고리 목록에서 아이콘 대신 이미지가 표시됩니다.</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* 이미지 전체보기 모달 */}
+          <Modal
+            visible={imageViewerVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setImageViewerVisible(false)}
+          >
+            <View style={styles.imageViewerOverlay}>
+              <TouchableOpacity
+                style={styles.imageViewerClose}
+                onPress={() => setImageViewerVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+              <View style={styles.imageViewerBody}>
+                {imagePreviewUri ? (
+                  <Image source={{ uri: imagePreviewUri }} style={styles.imageViewerImage} resizeMode="contain" />
+                ) : null}
+              </View>
+            </View>
+          </Modal>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>아이콘 (기본)</Text>
             <TouchableOpacity
               style={[styles.iconSelector, isEditMode && isEditLockedByExpiry ? { opacity: 0.6 } : null]}
               onPress={() => {if (!(isEditMode && isEditLockedByExpiry)) setIsIconSelectorVisible(true);}}
@@ -989,7 +1289,7 @@ const AddLocationScreen = () => {
                       <TouchableOpacity
           style={styles.createButton}
           onPress={handleCreateLocation}
-          disabled={isLoading}>
+          disabled={isLoading || imageUploading}>
 
           {isLoading ?
           <ActivityIndicator size="small" color="#fff" /> :
@@ -1078,6 +1378,94 @@ const styles = StyleSheet.create({
   },
   formGroup: {
     marginBottom: 16
+  },
+  imageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  imagePreviewBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  imageUploadingOverlay: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+    backgroundColor: '#f0f9f0',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  imageButtonText: {
+    color: '#4CAF50',
+    fontWeight: '700',
+  },
+  imageRemoveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ffcdd2',
+    backgroundColor: '#ffebee',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  imageRemoveButtonText: {
+    color: '#F44336',
+    fontWeight: '700',
+  },
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: 48,
+    right: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    elevation: 10,
+  },
+  imageViewerBody: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  imageViewerImage: {
+    width: '100%',
+    height: '100%',
   },
   label: {
     fontSize: 16,

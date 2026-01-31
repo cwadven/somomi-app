@@ -22,6 +22,7 @@ export const fetchLocations = createAsyncThunk(
               id: String(it.id),
               title: it.title,
               description: it.description || '',
+              imageUrl: it.image_url || null,
               icon: it.icon || 'cube-outline',
               templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
               feature: {
@@ -99,6 +100,7 @@ export const createLocation = createAsyncThunk(
         title: locationData.title,
         description: locationData.description || null,
         icon: locationData.icon || null,
+        image_url: locationData.imageUrl ?? locationData.image_url ?? null,
         guest_section_template_id: Number(locationData.templateInstanceId || locationData.templateInstanceLocalId),
       };
       const res = await createGuestSection(payload);
@@ -113,6 +115,7 @@ export const createLocation = createAsyncThunk(
           id: String(it.id),
           title: it.title,
           description: it.description || '',
+          imageUrl: it.image_url || null,
           icon: it.icon || 'cube-outline',
           templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
           feature: {
@@ -155,6 +158,7 @@ export const updateLocation = createAsyncThunk(
         title: locationData.title,
         description: locationData.description || null,
         icon: locationData.icon || null,
+        image_url: locationData.imageUrl ?? locationData.image_url ?? null,
         guest_section_template_id: Number(locationData.templateInstanceId || locationData.templateInstanceLocalId),
       };
       await updateGuestSection(sectionId, payload);
@@ -167,6 +171,7 @@ export const updateLocation = createAsyncThunk(
           id: String(it.id),
           title: it.title,
           description: it.description || '',
+          imageUrl: it.image_url || null,
           icon: it.icon || 'cube-outline',
           templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
           feature: {
@@ -212,6 +217,7 @@ export const deleteLocation = createAsyncThunk(
           id: String(it.id),
           title: it.title,
           description: it.description || '',
+          imageUrl: it.image_url || null,
           icon: it.icon || 'cube-outline',
           templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
           feature: {

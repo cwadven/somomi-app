@@ -4,6 +4,7 @@ import {
 
   View, 
   Text, 
+  Image,
   StyleSheet, 
   TouchableOpacity, 
   Alert, 
@@ -40,6 +41,7 @@ const LocationDetailScreen = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [locationProducts, setLocationProducts] = useState([]);
   const [activeTab, setActiveTab] = useState('products'); // 'products' 또는 'notifications'
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
   // ✅ 앱에서 로컬 정렬/기본 sort 강제하지 않음: 백엔드 응답 순서 그대로 사용
   // (정렬을 쓰고 싶다면 서버 sort 파라미터로만 동작)
   const [sortKey, setSortKey] = useState(null); // null | 'estimated' | 'expiry' | 'created' | 'name' | 'estimatedRate' | 'expiryRate'
@@ -76,6 +78,11 @@ const LocationDetailScreen = () => {
       dispatch(fetchLocationById(locationId));
     }
   }, [dispatch, locationId, isAllProductsView]);
+
+  // 카테고리(또는 이미지)가 바뀌면 뷰어 닫기
+  useEffect(() => {
+    setImageViewerVisible(false);
+  }, [locationId, isAllProductsView, currentLocation?.imageUrl, currentLocation?.image_url]);
   
   // 제품 목록 로드
   useEffect(() => {
@@ -780,7 +787,21 @@ const LocationDetailScreen = () => {
           ) : currentLocation && (
             <>
             <View style={styles.locationIconContainer}>
-                <Ionicons name={currentLocation.icon || 'cube-outline'} size={24} color="#4CAF50" />
+                {(() => {
+                  const uri = String(currentLocation?.imageUrl || currentLocation?.image_url || '').trim();
+                  if (uri) {
+                    return (
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => setImageViewerVisible(true)}
+                        style={{ width: '100%', height: '100%' }}
+                      >
+                        <Image source={{ uri }} style={styles.locationIconImage} resizeMode="cover" />
+                      </TouchableOpacity>
+                    );
+                  }
+                  return <Ionicons name={currentLocation?.icon || 'cube-outline'} size={24} color="#4CAF50" />;
+                })()}
               </View>
               <View style={styles.headerTextContainer}>
                 <Text style={styles.locationTitle}>{currentLocation.title}</Text>
@@ -820,6 +841,33 @@ const LocationDetailScreen = () => {
             </View>
           )}
         </View>
+
+      {/* 카테고리 이미지 전체보기 모달 (제품 이미지 뷰어와 동일 UX) */}
+      {(() => {
+        const uri = String(currentLocation?.imageUrl || currentLocation?.image_url || '').trim();
+        if (!uri) return null;
+        return (
+          <Modal
+            visible={imageViewerVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setImageViewerVisible(false)}
+          >
+            <View style={styles.imageViewerOverlay}>
+              <TouchableOpacity
+                style={styles.imageViewerClose}
+                onPress={() => setImageViewerVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+              <View style={styles.imageViewerBody}>
+                <Image source={{ uri }} style={styles.imageViewerImage} resizeMode="contain" />
+              </View>
+            </View>
+          </Modal>
+        );
+      })()}
         
       {/* 슬롯 상태 표시 (모든 제품 보기가 아닐 때만 표시) */}
       {!isAllProductsView && (
@@ -978,6 +1026,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+  },
+  locationIconImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 25,
+  },
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: 48,
+    right: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    elevation: 10,
+  },
+  imageViewerBody: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  imageViewerImage: {
+    width: '100%',
+    height: '100%',
   },
   headerTextContainer: {
     flex: 1,

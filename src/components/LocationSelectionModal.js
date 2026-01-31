@@ -3,6 +3,7 @@ import {
 
   View,
   Text,
+  Image,
   StyleSheet,
   Modal,
   TouchableOpacity,
@@ -85,7 +86,19 @@ const LocationSelectionModal = ({ visible, onClose, onSelectLocation, reasonMess
           disabled={disabled}
         >
           <View style={styles.locationIconContainer}>
-            <Ionicons name={item.icon || 'cube-outline'} size={24} color={disabled ? '#9E9E9E' : '#4CAF50'} />
+            {(() => {
+              const uri = String(item?.imageUrl || item?.image_url || '').trim();
+              if (uri) {
+                return <Image source={{ uri }} style={styles.locationIconImage} resizeMode="cover" />;
+              }
+              return (
+                <Ionicons
+                  name={item?.icon || 'cube-outline'}
+                  size={24}
+                  color={disabled ? '#9E9E9E' : '#4CAF50'}
+                />
+              );
+            })()}
           </View>
           <View style={styles.locationInfo}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -313,6 +326,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  locationIconImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
   },
   locationInfo: {
     flex: 1,

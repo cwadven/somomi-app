@@ -1,7 +1,7 @@
 import { request } from './client';
 
 // POST /v1/common/image/{constance_type}/{transaction_pk}/url
-// constance_type: 'member-image' | 'inventory-item-image'
+// constance_type: 'member-image' | 'inventory-item-image' | 'guest-section-image'
 export const givePresignedUrl = async (constance_type, transaction_pk, file_name) => {
   if (!constance_type) throw new Error('constance_type is required');
   if (transaction_pk == null) throw new Error('transaction_pk is required');
