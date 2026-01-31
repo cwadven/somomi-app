@@ -88,13 +88,23 @@ const AppContent = () => {
     buttons: null,
     icon: 'information-circle-outline',
     iconColor: '#4CAF50',
+    // lock=true면 사용자가 뒤로가기 등으로 닫을 수 없는 "차단" 모드(강제 업데이트/점검)
+    lock: false,
   });
   const serviceGateResolveRef = useRef(null); // (action?: string) => void
+  // NOTE: serviceGateConfig.lock 값이 런타임에 바뀌므로 deps에 포함해야 함 (stale closure 방지)
   const closeServiceGate = useCallback(() => {
+    // ✅ 강제 게이트(업데이트/점검)는 뒤로가기로 닫히면 안 됨
+    if (serviceGateConfig?.lock) {
+      // Android: 즉시 종료하여 앱 사용 불가
+      exitAppNow();
+      // iOS: 앱 종료 API가 없으므로 모달을 유지(닫지 않음)
+      return;
+    }
     setServiceGateVisible(false);
     try { serviceGateResolveRef.current?.('close'); } catch (e) {}
     serviceGateResolveRef.current = null;
-  }, []);
+  }, [serviceGateConfig?.lock, exitAppNow]);
 
   const getAppVersionString = useCallback(() => {
     const v =
@@ -400,12 +410,13 @@ const AppContent = () => {
               message: meta?.maintenance_message || '점검 중입니다.',
               icon: 'construct-outline',
               iconColor: '#F44336',
+              lock: true,
               buttons: [
                 {
                   text: '확인',
                   style: 'destructive',
                   onPress: async () => {
-                    setServiceGateVisible(false);
+                    // ✅ 앱 사용 차단: 스토어 이동 없이 즉시 종료 (Android) / iOS는 모달 유지
                     resolve('maintenance');
                     exitAppNow();
                   },
@@ -427,17 +438,26 @@ const AppContent = () => {
               message: `현재 버전(${currentVersion})은 지원되지 않습니다.\n최소 지원 버전: ${minRequired}\n업데이트 후 다시 이용해 주세요.`,
               icon: 'alert-circle-outline',
               iconColor: '#F44336',
+              lock: true,
               buttons: [
                 {
-                  text: '확인',
-                  style: 'destructive',
+                  text: '업데이트',
+                  style: 'success',
                   onPress: async () => {
+                    // ✅ 강제 업데이트: 스토어로 이동 후 즉시 종료(Android) / iOS는 모달 유지
                     try { await openStoreForUpdate(); } catch (e) {}
-                    setServiceGateVisible(false);
                     resolve('force-update');
                     exitAppNow();
                   },
                 },
+                {
+                  text: '앱 종료',
+                  style: 'cancel',
+                  onPress: () => {
+                    resolve('force-update-exit');
+                    exitAppNow();
+                  },
+                }
               ],
             });
             setServiceGateVisible(true);
@@ -512,6 +532,27 @@ const AppContent = () => {
   useEffect(() => {
     initializeApp();
   }, [dispatch]);
+
+  // ✅ 강제 업데이트/점검 상태에서 스토어 갔다가 돌아와도 앱을 못 쓰게 처리
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      try {
+        const prev = prevAppStateRef.current;
+        prevAppStateRef.current = next;
+        setAppState(next);
+        // 백그라운드 → 포그라운드로 돌아온 경우
+        if (prev && prev.match(/inactive|background/) && next === 'active') {
+          if (serviceGateVisible && serviceGateConfig?.lock) {
+            // Android는 즉시 종료
+            exitAppNow();
+          }
+        }
+      } catch (e) {}
+    });
+    return () => {
+      try { sub?.remove?.(); } catch (e) {}
+    };
+  }, [serviceGateVisible, serviceGateConfig?.lock, exitAppNow]);
 
   // 스플래시(로딩) 화면 워치독: 일정 시간 경과 시 메인 UI로 진행 (네트워크/업데이트 지연 대비)
   useEffect(() => {
