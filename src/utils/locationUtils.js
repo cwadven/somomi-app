@@ -1,17 +1,28 @@
 // 카테고리 관련 유틸리티
 import { isTemplateActive } from './validityUtils';
 
-// 템플릿 만료 여부 판별
+// ✅ 게스트 섹션 API(feature.expiresAt) 기반 만료 여부 판별
 // params:
 // - locationId: string
-// - context: { userLocationTemplateInstances?: Array, locations?: Array }
+// - context: { locations?: Array }
 export const isLocationExpired = (locationId, { userLocationTemplateInstances = [], locations = [], subscription } = {}) => {
-  const tpl = (userLocationTemplateInstances || []).find(t => t.usedInLocationId === locationId);
-  if (!tpl) {
-    // 템플릿이 없으면 만료 아님
+  try {
+    const id = locationId == null ? null : String(locationId);
+    if (!id) return false;
+    const loc = (locations || []).find(l => String(l?.id) === id) || null;
+    if (!loc?.templateInstanceId) return false; // 미연동이면 만료 개념 없음
+    const exp = loc?.feature?.expiresAt || loc?.feature?.expires_at || null;
+    if (exp) {
+      const expMs = new Date(exp).getTime();
+      if (Number.isFinite(expMs)) return expMs <= Date.now();
+    }
+    // (폴백) 혹시 locations에 expiresAt이 아직 없으면 기존 방식 유지
+    const tpl = (userLocationTemplateInstances || []).find(t => String(t?.usedInLocationId) === id) || null;
+    if (!tpl) return false;
+    return !isTemplateActive(tpl, subscription);
+  } catch (e) {
     return false;
   }
-  return !isTemplateActive(tpl, subscription);
 };
 
 // 슬롯 용량 정보 계산

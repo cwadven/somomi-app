@@ -93,8 +93,8 @@ const LocationsScreen = () => {
     try {
       const s = String(isoLike || '').trim();
       if (!s) return null;
-      // "2025-12-31T23:59:59Z" 형태면 날짜만 잘라서(타임존 영향 최소화)
-      if (s.includes('T')) return s.split('T')[0];
+      // YYYY-MM-DD 형태는 그대로 사용 (이미 날짜-only)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
       const d = new Date(s);
       const t = d.getTime();
       if (!Number.isFinite(t)) return null;
@@ -124,55 +124,57 @@ const LocationsScreen = () => {
     }
   }, [formatDateOnly]);
 
-  // 템플릿 만료일(expiresAt) 기반 남은 기간 + 날짜 표시
+  // ✅ 게스트 섹션 API(feature.expiresAt) 기반 남은 기간 + 날짜 표시
   const getTemplateRemainingTextForLocation = useCallback((locId) => {
     try {
       const id = locId == null ? null : String(locId);
       if (!id) return null;
-      const tplByUsedIn = (userLocationTemplateInstances || []).find(t => String(t?.usedInLocationId || '') === id) || null;
       const loc = (locations || []).find(l => String(l?.id || '') === id) || null;
       // guest_section_template_id가 없는 경우는 "만료"가 아니라 그냥 템플릿 미연동 상태 (표시/만료처리 안함)
       if (!loc?.templateInstanceId) return null;
-
-      const tplById = loc?.templateInstanceId
-        ? (userLocationTemplateInstances || []).find(t => String(t?.id || '') === String(loc.templateInstanceId)) || null
-        : null;
-      const tpl = tplByUsedIn || tplById;
-
-      // guest_section_template_id는 있는데 템플릿 목록 API에 없으면 "만료됨" (요청사항)
-      if (!tpl) return '만료됨';
-      const exp = tpl?.feature?.expiresAt || tpl?.feature?.validWhile?.expiresAt || null;
+      const exp = loc?.feature?.expiresAt || loc?.feature?.expires_at || null;
       // expires_at이 null이면 기간 제한이 없는 템플릿일 수 있으므로 표시하지 않음
       if (!exp) return null;
       const expMs = new Date(exp).getTime();
       if (!Number.isFinite(expMs)) return null;
+
       const dateOnly = formatDateOnly(exp);
-      const remainingDays = Math.ceil((expMs - Date.now()) / (24 * 60 * 60 * 1000));
-      if (remainingDays > 0) return `만료까지 ${remainingDays}일${dateOnly ? ` · ${dateOnly}` : ''}`;
-      if (remainingDays === 0) return `오늘 만료${dateOnly ? ` · ${dateOnly}` : ''}`;
-      return `만료됨${dateOnly ? ` · ${dateOnly}` : ''}`;
+      const todayOnly = formatDateOnly(new Date().toISOString());
+      const dayMs = 24 * 60 * 60 * 1000;
+
+      // ✅ 이미 지난 경우는 무조건 만료됨 (ceil 때문에 '오늘 만료'로 뜨는 문제 방지)
+      if (expMs < Date.now()) return `만료됨${dateOnly ? ` · ${dateOnly}` : ''}`;
+
+      // ✅ 달력 기준: 같은 날짜면 "오늘 만료"
+      if (dateOnly && todayOnly && dateOnly === todayOnly) {
+        return `오늘 만료${dateOnly ? ` · ${dateOnly}` : ''}`;
+      }
+
+      // ✅ 날짜 단위로 남은 일수 계산 (오늘 제외, 내일=1일)
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const expDate = new Date(expMs);
+      expDate.setHours(0, 0, 0, 0);
+      const diffDays = Math.max(0, Math.round((expDate.getTime() - startOfToday.getTime()) / dayMs));
+      if (diffDays <= 0) return `오늘 만료${dateOnly ? ` · ${dateOnly}` : ''}`;
+      return `만료까지 ${diffDays}일${dateOnly ? ` · ${dateOnly}` : ''}`;
     } catch (e) {
       return null;
     }
-  }, [userLocationTemplateInstances, locations, formatDateOnly]);
+  }, [locations, formatDateOnly]);
 
-  // 각 카테고리별로 연결된 템플릿이 구독 만료인지 계산하는 헬퍼
+  // ✅ 게스트 섹션 API(feature.expiresAt) 기반 만료 여부
   const isLocationExpired = useCallback((loc) => {
     const locId = loc?.id == null ? null : String(loc.id);
     if (!locId) return false;
     // guest_section_template_id가 없으면 만료 개념 없음
     if (!loc?.templateInstanceId) return false;
-    const tplByUsedIn = (userLocationTemplateInstances || []).find(t => String(t?.usedInLocationId || '') === locId) || null;
-    const tplById = loc?.templateInstanceId
-      ? (userLocationTemplateInstances || []).find(t => String(t?.id || '') === String(loc.templateInstanceId)) || null
-      : null;
-    const tpl = tplByUsedIn || tplById;
-
-    // guest_section_template_id는 있는데 템플릿 목록 API에 없으면 만료로 취급 (요청사항)
-    if (!tpl) return true;
-
-    return !isTemplateActive(tpl, subscription);
-  }, [userLocationTemplateInstances, subscription]);
+    const exp = loc?.feature?.expiresAt || loc?.feature?.expires_at || null;
+    if (!exp) return false; // 기간 제한 없는 템플릿이면 만료 아님
+    const expMs = new Date(exp).getTime();
+    if (!Number.isFinite(expMs)) return false;
+    return expMs <= Date.now();
+  }, []);
 
   // 템플릿 만료 판별 헬퍼
   const isTemplateExpired = useCallback((tpl) => {
@@ -356,7 +358,7 @@ const LocationsScreen = () => {
   const handleLocationPress = (location) => {
     // 템플릿 정보가 아직 로드되지 않은 상태(앱 재실행 직후 캐시만 있는 상태)에서는
     // "템플릿 미연동" 같은 오판단을 막기 위해 잠시 대기 안내만 보여줌
-    if (isLoggedIn && locationTemplatesStatus !== 'succeeded') {
+    if (isLoggedIn && !location?.templateInstanceId && locationTemplatesStatus !== 'succeeded') {
       setAlertModalConfig({
         title: '불러오는 중',
         message: '템플릿 정보를 불러오는 중입니다.\n잠시만 기다려주세요.',
@@ -367,9 +369,48 @@ const LocationsScreen = () => {
       setAlertModalVisible(true);
       return;
     }
-    // 만료된 경우에도 상세 진입은 허용하되, 내부에서 수정으로 변경 유도
+    // ✅ 만료된 카테고리는 상세 진입 차단 (요청사항: guest-sections.feature.expires_at 기준)
+    if (isLoggedIn && isLocationExpired(location)) {
+      // 만료된 카테고리라도, 사용 가능한 템플릿이 있으면 즉시 교체 선택으로 유도
+      const hasFreeTemplate = userLocationTemplateInstances.some(t => !t.used && !isTemplateExpired(t));
+      if (hasFreeTemplate) {
+        const free = userLocationTemplateInstances.filter(t => !t.used && !isTemplateExpired(t));
+        setFreeTemplates(free);
+        setTemplatePickerLocation(location);
+        setTemplatePickerSelectedTemplateId(null);
+        setAlertModalConfig({
+          title: '템플릿 만료됨',
+          message: '이 카테고리의 템플릿이 만료되어 상세 화면에 들어갈 수 없습니다.\n사용 가능한 템플릿으로 변경해주세요.',
+          icon: 'alert-circle',
+          iconColor: '#F44336',
+          buttons: [
+            { text: '취소', style: 'cancel', onPress: () => setTemplatePickerVisible(false) },
+            {
+              text: '템플릿 변경',
+              onPress: () => {
+                // 실제 선택은 모달 리스트에서 수행
+                setTemplatePickerVisible(true);
+              }
+            }
+          ],
+          content: null
+        });
+        setTemplatePickerVisible(true);
+      } else {
+        setAlertModalConfig({
+          title: '템플릿 만료됨',
+          message: '이 카테고리의 템플릿이 만료되어 상세 화면에 들어갈 수 없습니다.\n새 템플릿을 확보한 뒤 다시 시도해주세요.',
+          icon: 'alert-circle',
+          iconColor: '#F44336',
+          buttons: [{ text: '닫기', style: 'cancel' }],
+        });
+        setAlertModalVisible(true);
+      }
+      return;
+    }
+
     // 로그인 상태에서 템플릿에 연동되지 않은 카테고리는 접근 차단
-    const linked = userLocationTemplateInstances.some(t => t.usedInLocationId === location.id);
+    const linked = !!location?.templateInstanceId;
     const hasFreeTemplate = userLocationTemplateInstances.some(t => !t.used && !isTemplateExpired(t));
     if (isLoggedIn && !linked) {
       if (hasFreeTemplate) {
@@ -514,6 +555,18 @@ const LocationsScreen = () => {
   // 원본(만료 포함) 기준 카운트
   const rawTotalTemplates = userLocationTemplateInstances.length;
   const rawUsedTemplates = useMemo(() => userLocationTemplateInstances.filter(t => t.used).length, [userLocationTemplateInstances]);
+  // ✅ 상단 "사용 중"은 '내 카테고리 목록(연동된 카테고리)' 기준으로 표시
+  // - 템플릿 목록 API에서 만료된 템플릿이 내려오지 않아도(=실사용 가능 수는 줄어도)
+  //   카테고리 목록에는 만료된 카테고리가 남아있을 수 있으므로
+  //   사용 중(분자) = 카테고리 목록의 연동된 카테고리 수
+  //   전체(분모) = 사용 가능한 템플릿 수(만료 제외)
+  const usedLocationCount = useMemo(() => {
+    try {
+      return (locations || []).filter((l) => !!l?.templateInstanceId).length;
+    } catch (e) {
+      return 0;
+    }
+  }, [locations]);
   
   // 템플릿 상태 변경시에만 로그 출력
   useEffect(() => {
@@ -538,8 +591,8 @@ const LocationsScreen = () => {
           {/* 전역 만료 배너 제거. 카테고리별로 안내 */}
           {/* 슬롯 상태 표시 바 - 템플릿 인스턴스 기준 */}
           <SlotStatusBar 
-            used={rawUsedTemplates} 
-            total={rawTotalTemplates} 
+            used={usedLocationCount} 
+            total={totalTemplates} 
             type="location" 
           />
           {/* 자동 연동 모달 제거됨 */}
@@ -626,9 +679,9 @@ const LocationsScreen = () => {
                             템플릿 미연동(비활성화)
                           </Text>
                         )}
-                        {isLocationExpired(item) && (
+                        {isLoggedIn && !item?.templateInstanceId && (
                           <Text style={{ color: '#F44336', marginTop: 4, fontSize: 12 }}>
-                            템플릿 만료됨
+                            템플릿 미연동(비활성화)
                           </Text>
                         )}
                       </View>

@@ -27,6 +27,7 @@ export const fetchLocations = createAsyncThunk(
               templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
               feature: {
                 baseSlots: typeof it?.feature?.base_slots === 'number' ? it.feature.base_slots : 0,
+                expiresAt: it?.feature?.expires_at || null,
                 connectedProductSlotTemplates: Array.isArray(it?.feature?.connected_guest_inventory_item_templates)
                   ? it.feature.connected_guest_inventory_item_templates.map(ct => ({
                       id: String(ct.id),
@@ -120,6 +121,7 @@ export const createLocation = createAsyncThunk(
           templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
           feature: {
             baseSlots: typeof it?.feature?.base_slots === 'number' ? it.feature.base_slots : 0,
+            expiresAt: it?.feature?.expires_at || null,
             connectedProductSlotTemplates: Array.isArray(it?.feature?.connected_guest_inventory_item_templates)
               ? it.feature.connected_guest_inventory_item_templates.map(ct => ({
                   id: String(ct.id),
@@ -176,6 +178,7 @@ export const updateLocation = createAsyncThunk(
           templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
           feature: {
             baseSlots: typeof it?.feature?.base_slots === 'number' ? it.feature.base_slots : 0,
+            expiresAt: it?.feature?.expires_at || null,
             connectedProductSlotTemplates: Array.isArray(it?.feature?.connected_guest_inventory_item_templates)
               ? it.feature.connected_guest_inventory_item_templates.map(ct => ({
                   id: String(ct.id),
@@ -222,6 +225,7 @@ export const deleteLocation = createAsyncThunk(
           templateInstanceId: it.guest_section_template_id ? String(it.guest_section_template_id) : null,
           feature: {
             baseSlots: typeof it?.feature?.base_slots === 'number' ? it.feature.base_slots : 0,
+            expiresAt: it?.feature?.expires_at || null,
             connectedProductSlotTemplates: Array.isArray(it?.feature?.connected_guest_inventory_item_templates)
               ? it.feature.connected_guest_inventory_item_templates.map(ct => ({
                   id: String(ct.id),
