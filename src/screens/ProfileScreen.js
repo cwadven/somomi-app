@@ -297,7 +297,19 @@ const ProfileScreen = () => {
         },
       });
     } catch (e) {
-      showErrorAlert(e?.message || '광고를 불러오지 못했습니다.');
+      const code = e?.code || e?.nativeErrorCode || e?.name || '';
+      const msg = String(e?.message || '');
+      // ✅ No fill: 광고 인벤토리 없음 (정상적인 실패 케이스)
+      if (String(code).toUpperCase() === 'NO_FILL' || msg.toLowerCase().includes('no fill')) {
+        showInfoAlert('알림', '볼 수 있는 광고가 없어요. 다음에 확인해주세요~');
+        return;
+      }
+      // ✅ UI thread 에러(AdMob #008) 방어: 사용자에겐 친절한 메시지
+      if (msg.includes('Must be called on the main UI thread') || msg.includes('#008')) {
+        showInfoAlert('알림', '광고를 준비하는 중 문제가 발생했어요.\n잠시 후 다시 시도해주세요.');
+        return;
+      }
+      showErrorAlert(msg || '광고를 불러오지 못했습니다.');
     } finally {
       setRewardAdLoading(false);
     }
