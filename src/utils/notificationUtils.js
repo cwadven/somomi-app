@@ -502,13 +502,19 @@ export const scheduleDailyReminderIfNeeded = async () => {
     // 강제 활성화: notificationsEnabled와 무관하게 스케줄 진행
     const enabled = true;
     const allow9am = prefs?.remindExpiryEnabled !== false; // 기본 허용, 사용자가 끄면 false
+    const timePref = prefs?.remindExpiryTime;
+    const hourRaw = typeof timePref?.hour === 'number' ? timePref.hour : 9;
+    const minuteRaw = typeof timePref?.minute === 'number' ? timePref.minute : 0;
+    const hour = Math.min(23, Math.max(0, Math.floor(hourRaw)));
+    const minute = Math.min(59, Math.max(0, Math.floor(minuteRaw)));
+    const scheduleKey = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
     try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 스케줄 시도 - enabled(forced)=${enabled}, allow9am=${allow9am}`); } catch (e) {}
     if (!allow9am) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[9시] 스킵: 9시 리마인더 스위치 OFF', 'warning'); } catch (e) {}; return; }
 
     // 오늘 이미 보냈는지 체크
     const sentMap = (await loadData(STORAGE_KEYS.DAILY_REMINDER_SENT)) || {};
     const todayKey = new Date().toISOString().split('T')[0];
-    if (sentMap[todayKey]) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[9시] 스킵: 이미 예약/발송 기록 있음', 'warning'); } catch (e) {}; return; }
+    if (sentMap[todayKey] === scheduleKey) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[9시] 스킵: 이미 예약/발송 기록 있음(동일 시간)', 'warning'); } catch (e) {}; return; }
 
     // 프론트 계산 후보 (오프라인 대비)
     const notifications = await processAllNotifications(true);
@@ -529,14 +535,21 @@ export const scheduleDailyReminderIfNeeded = async () => {
     let notifId = null;
     // 다음 9시에 매일 반복 예약 (중복 방지: 동일 ID 재예약)
     try {
-      const dailyId = await pushNotificationService.scheduleDailyLocalNotification(title, body, data, 9, 0);
+      const dailyId = await pushNotificationService.scheduleDailyLocalNotification(
+        title,
+        body,
+        data,
+        hour,
+        minute,
+        'daily_reminder_expiry'
+      );
       try { if (pushNotificationService) pushNotificationService.addDebugLog(`[9시] 매일 반복 예약(중복방지) 완료 id=${dailyId}`); } catch (e) {}
       notifId = dailyId;
     } catch (e) {}
  
     // 발송 기록 저장
     if (notifId) {
-      sentMap[todayKey] = true;
+      sentMap[todayKey] = scheduleKey;
       await saveAny(STORAGE_KEYS.DAILY_REMINDER_SENT, sentMap);
     } else {
       try { if (pushNotificationService) pushNotificationService.addDebugLog('[9시] 예약/발송 실패: 기록 저장 안함', 'error'); } catch (e) {}
@@ -559,12 +572,18 @@ export const scheduleDailyUpdateReminderIfNeeded = async () => {
     // 강제 활성화: notificationsEnabled와 무관하게 스케줄 진행
     const enabled = true;
     const allow8pm = prefs?.remindAddEnabled !== false; // 기본 허용, 사용자가 끄면 false
+    const timePref = prefs?.remindAddTime;
+    const hourRaw = typeof timePref?.hour === 'number' ? timePref.hour : 20;
+    const minuteRaw = typeof timePref?.minute === 'number' ? timePref.minute : 0;
+    const hour = Math.min(23, Math.max(0, Math.floor(hourRaw)));
+    const minute = Math.min(59, Math.max(0, Math.floor(minuteRaw)));
+    const scheduleKey = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
     try { if (pushNotificationService) pushNotificationService.addDebugLog(`[20시] 스케줄 시도 - enabled(forced)=${enabled}, allow8pm=${allow8pm}`); } catch (e) {}
     if (!allow8pm) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[20시] 스킵: 20시 리마인더 스위치 OFF', 'warning'); } catch (e) {}; return; }
 
     const sentMap = (await loadData(STORAGE_KEYS.DAILY_UPDATE_REMINDER_SENT)) || {};
     const todayKey = new Date().toISOString().split('T')[0];
-    if (sentMap[todayKey]) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[20시] 스킵: 이미 예약/발송 기록 있음', 'warning'); } catch (e) {}; return; }
+    if (sentMap[todayKey] === scheduleKey) { try { if (pushNotificationService) pushNotificationService.addDebugLog('[20시] 스킵: 이미 예약/발송 기록 있음(동일 시간)', 'warning'); } catch (e) {}; return; }
 
     // 오후 8시 트리거
     const now = new Date();
@@ -579,13 +598,20 @@ export const scheduleDailyUpdateReminderIfNeeded = async () => {
     let notifId = null;
     // 다음 20시에 매일 반복 예약 (중복 방지: 동일 ID 재예약)
     try {
-      const dailyId = await pushNotificationService.scheduleDailyLocalNotification(title, body, data, 20, 0);
+      const dailyId = await pushNotificationService.scheduleDailyLocalNotification(
+        title,
+        body,
+        data,
+        hour,
+        minute,
+        'daily_reminder_add'
+      );
       try { if (pushNotificationService) pushNotificationService.addDebugLog(`[20시] 매일 반복 예약(중복방지) 완료 id=${dailyId}`); } catch (e) {}
       notifId = dailyId;
     } catch (e) {}
  
     if (notifId) {
-      sentMap[todayKey] = true;
+      sentMap[todayKey] = scheduleKey;
       await saveAny(STORAGE_KEYS.DAILY_UPDATE_REMINDER_SENT, sentMap);
     } else {
       try { if (pushNotificationService) pushNotificationService.addDebugLog('[20시] 예약/발송 실패: 기록 저장 안함', 'error'); } catch (e) {}

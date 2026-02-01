@@ -82,6 +82,11 @@ const ProfileScreen = () => {
           const guestIdRaw = res?.guest_id;
           const memberId = memberIdRaw == null ? null : String(memberIdRaw);
           const guestId = guestIdRaw == null ? null : String(guestIdRaw);
+          const categoryAlarmEnabledRaw = res?.category_alarm_enabled;
+          const categoryAlarmEnabled =
+            typeof categoryAlarmEnabledRaw === 'boolean'
+              ? categoryAlarmEnabledRaw
+              : (user?.categoryAlarmEnabled ?? true);
           const next = {
             ...user,
             // 서버에서 내려주는 식별자 매핑
@@ -92,7 +97,8 @@ const ProfileScreen = () => {
             username: res?.nickname || user?.username || '사용자',
             name: res?.nickname || user?.name || '사용자',
             email: undefined, // 이메일 필드 제거
-            profileImage: res?.profile_image_url || null
+            profileImage: res?.profile_image_url || null,
+            categoryAlarmEnabled,
           };
           // 로컬에서만 최신화: authSlice에 user 업데이트 로직이 없다면 화면 레벨 상태로 반영
           // 간단히 setState 없이 selector 기반 표시 값을 가공해 사용하려 했으나, 여기서는 임시로 객체 교체
@@ -112,6 +118,7 @@ const ProfileScreen = () => {
               username: next.username,
               name: next.name,
               profileImage: next.profileImage,
+              categoryAlarmEnabled: next.categoryAlarmEnabled,
               email: undefined,
             }));
           } catch (e) {}
@@ -514,7 +521,11 @@ const ProfileScreen = () => {
     if (profileImageUploading) return;
     try {
       const profile_image_url = uploadedProfileImageUrl || null;
-      await updateMemberProfile({ nickname, profile_image_url });
+      await updateMemberProfile({
+        nickname,
+        profile_image_url,
+        category_alarm_enabled: !!activeProfile?.categoryAlarmEnabled,
+      });
       const next = {
         ...(activeProfile || user || {}),
         username: nickname,
@@ -718,10 +729,31 @@ const ProfileScreen = () => {
             </View>
 
             <View style={styles.modalBody}>
-              <Text style={styles.modalDescription}>
-                앱 전체 알림 설정을 관리합니다. 이 설정을 비활성화하면 모든 알림이 중지됩니다.
+              <Text style={styles.modalHintText}>
+                현재 기기 알림 권한이 꺼져 있으면 실제 알림이 오지 않을 수 있어요.
               </Text>
-              <NotificationSettings />
+              <NotificationSettings
+                categoryAlarmEnabled={!!activeProfile?.categoryAlarmEnabled}
+                onChangeCategoryAlarmEnabled={async (enabled) => {
+                  if (!isLoggedIn) return;
+                  // optimistic
+                  setProfileOverride((prev) => ({
+                    ...(prev || user || {}),
+                    categoryAlarmEnabled: !!enabled,
+                  }));
+                  try {
+                    dispatch(updateUserInfo({ categoryAlarmEnabled: !!enabled }));
+                  } catch (e) {}
+
+                  const nicknameForBody = String(activeProfile?.name || activeProfile?.username || user?.name || user?.username || '사용자');
+                  const profileImageForBody = activeProfile?.profileImage ?? null;
+                  await updateMemberProfile({
+                    nickname: nicknameForBody,
+                    profile_image_url: profileImageForBody,
+                    category_alarm_enabled: !!enabled,
+                  });
+                }}
+              />
             </View>
           </View>
         </View>
@@ -1157,7 +1189,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginBottom: 16
-  }
+  },
+  modalHintText: {
+    fontSize: 12,
+    color: '#777',
+    lineHeight: 16,
+    marginBottom: 12,
+    fontWeight: '700',
+  },
+  inlineSettingCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    padding: 12,
+    marginBottom: 12,
+  },
+  inlineSettingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  inlineSettingTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+  },
+  inlineSettingDesc: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#777',
+    lineHeight: 16,
+  },
 });
 
 export default ProfileScreen;

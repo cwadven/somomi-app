@@ -47,11 +47,20 @@ export const fetchMemberProfile = async () => {
 };
 
 // PUT /v1/member/profile
-// ProfileUpdateRequest: { nickname: string, profile_image_url?: string|null }
-export const updateMemberProfile = async ({ nickname, profile_image_url = null }) => {
+// ProfileUpdateRequest: { nickname: string, profile_image_url?: string|null, category_alarm_enabled: boolean }
+export const updateMemberProfile = async ({
+  nickname,
+  profile_image_url = null,
+  category_alarm_enabled = true,
+}) => {
+  const body = {
+    nickname,
+    profile_image_url,
+    category_alarm_enabled: !!category_alarm_enabled,
+  };
   return request('/v1/member/profile', {
     method: 'PUT',
-    body: { nickname, profile_image_url },
+    body,
   });
 };
 

@@ -243,7 +243,8 @@ class PushNotificationService {
   }
 
   // 매일 특정 시각에 반복 알림 예약 (OS가 백그라운드에서도 처리)
-  async scheduleDailyLocalNotification(title, body, data = {}, hour = 9, minute = 0) {
+  // - notificationId를 주면, 시간 변경 시에도 동일 ID로 재설정(중복 방지)
+  async scheduleDailyLocalNotification(title, body, data = {}, hour = 9, minute = 0, notificationId) {
     if (Platform.OS === 'web') {
       addDebugLog('웹 환경에서는 알림을 지원하지 않습니다.', 'info');
       return null;
@@ -252,7 +253,8 @@ class PushNotificationService {
       await this.createNotificationChannels();
       const channelId = 'default';
       // 고정 ID 사용: 동일 스케줄 재설정 시 항상 1개만 유지
-      const notificationId = `daily_${String(hour).padStart(2, '0')}_${String(minute).padStart(2, '0')}`;
+      const fixedId =
+        notificationId || `daily_${String(hour).padStart(2, '0')}_${String(minute).padStart(2, '0')}`;
 
       const normalizeData = (raw) => {
         const result = {};
@@ -266,7 +268,7 @@ class PushNotificationService {
       };
 
       const notificationConfig = {
-        id: notificationId,
+        id: fixedId,
         title: title || '알림',
         body: body || '',
         data: normalizeData(data),
@@ -299,11 +301,11 @@ class PushNotificationService {
       };
       // 기존 동일 ID 트리거 제거 후 재등록 → 항상 1개 유지
       try {
-        await notifee.cancelTriggerNotification(notificationId);
+        await notifee.cancelTriggerNotification(fixedId);
       } catch (e) {}
       await notifee.createTriggerNotification(notificationConfig, trigger);
-      addDebugLog(`매일 알림 예약 완료: ${hour}:${minute.toString().padStart(2, '0')} id=${notificationId}`, 'success');
-      return notificationId;
+      addDebugLog(`매일 알림 예약 완료: ${hour}:${minute.toString().padStart(2, '0')} id=${fixedId}`, 'success');
+      return fixedId;
     } catch (error) {
       addDebugLog(`매일 알림 예약 오류: ${error.message}`, 'error');
       return null;
