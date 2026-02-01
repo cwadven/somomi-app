@@ -36,6 +36,8 @@ const ProfileScreen = () => {
   const route = useRoute();
   const { user, isLoggedIn, isAnonymous, loading, error } = useSelector((state) => state.auth);
   const [syncQueueCount, setSyncQueueCount] = useState(0);
+  const [profileImageViewerVisible, setProfileImageViewerVisible] = useState(false);
+  const [editProfileImageViewerVisible, setEditProfileImageViewerVisible] = useState(false);
 
   // route.params로 전달된 initialMode가 있으면 해당 모드로 설정
   useEffect(() => {
@@ -322,11 +324,6 @@ const ProfileScreen = () => {
     }
   };
 
-  // 도움말 표시
-  const showHelp = () => {
-    navigation.navigate('RootHelp');
-  };
-
   // 문의하기(미구현) - 추후 기능 추가 예정
   // const showContact = () => {
   //   setModalTitle('알림');
@@ -347,7 +344,7 @@ const ProfileScreen = () => {
       </View>
       <View style={styles.settingItemRight}>
         {showBadge && <View style={styles.badge} />}
-        <Ionicons name="chevron-forward" size={20} color={disabled ? '#D0D0D0' : '#999'} />
+        <Ionicons name="chevron-forward" size={20} color={disabled ? '#D0D0D0' : '#999'} style={styles.settingChevron} />
       </View>
     </TouchableOpacity>;
 
@@ -549,7 +546,12 @@ const ProfileScreen = () => {
         {isLoggedIn && (profileOverride || user) ?
       <>
             {profileOverride?.profileImage || user?.profileImage ?
-        <Image source={{ uri: profileOverride?.profileImage || user?.profileImage }} style={styles.profileImage} /> :
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setProfileImageViewerVisible(true)}
+        >
+          <Image source={{ uri: profileOverride?.profileImage || user?.profileImage }} style={styles.profileImage} />
+        </TouchableOpacity> :
 
         <View style={[styles.profileImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#e0e0e0' }]}>
                 <Ionicons name="person-circle" size={64} color="#9E9E9E" />
@@ -643,11 +645,6 @@ const ProfileScreen = () => {
       }
         
         <SettingItem
-        icon="help-circle-outline"
-        title="도움말"
-        onPress={showHelp} />
-
-        <SettingItem
           icon="document-text-outline"
           title="개인정보처리방침"
           onPress={() => rootNavigate('PrivacyPolicyWebView', { title: '개인정보처리방침' })}
@@ -711,6 +708,60 @@ const ProfileScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* 프로필 이미지 전체보기 모달 */}
+      {(() => {
+        const uri = String(activeProfile?.profileImage || '').trim();
+        if (!uri) return null;
+        return (
+          <Modal
+            visible={profileImageViewerVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setProfileImageViewerVisible(false)}
+          >
+            <View style={styles.imageViewerOverlay}>
+              <TouchableOpacity
+                style={styles.imageViewerClose}
+                onPress={() => setProfileImageViewerVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+              <View style={styles.imageViewerBody}>
+                <Image source={{ uri }} style={styles.imageViewerImage} resizeMode="contain" />
+              </View>
+            </View>
+          </Modal>
+        );
+      })()}
+
+      {/* 프로필 수정: 이미지 전체보기 모달 */}
+      {(() => {
+        const uri = String(editProfileImagePreview || '').trim();
+        if (!uri) return null;
+        return (
+          <Modal
+            visible={editProfileImageViewerVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setEditProfileImageViewerVisible(false)}
+          >
+            <View style={styles.imageViewerOverlay}>
+              <TouchableOpacity
+                style={styles.imageViewerClose}
+                onPress={() => setEditProfileImageViewerVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+              <View style={styles.imageViewerBody}>
+                <Image source={{ uri }} style={styles.imageViewerImage} resizeMode="contain" />
+              </View>
+            </View>
+          </Modal>
+        );
+      })()}
 
       {/* 알림 설정 모달 */}
       <Modal
@@ -787,7 +838,12 @@ const ProfileScreen = () => {
 
               <View style={{ alignItems: 'center', marginTop: 12, marginBottom: 12 }}>
                 {editProfileImagePreview ?
-                <Image source={{ uri: editProfileImagePreview }} style={styles.profileImage} /> :
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setEditProfileImageViewerVisible(true)}
+                >
+                  <Image source={{ uri: editProfileImagePreview }} style={styles.profileImage} />
+                </TouchableOpacity> :
                 <View style={[styles.profileImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#e0e0e0' }]}>
                     <Ionicons name="person-circle" size={64} color="#9E9E9E" />
                   </View>
@@ -1046,7 +1102,9 @@ const styles = StyleSheet.create({
   },
   settingItemLeft: {
     flexDirection: 'row',
-    alignItems: 'center'
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
   },
   settingIcon: {
     marginRight: 12
@@ -1065,7 +1123,11 @@ const styles = StyleSheet.create({
   },
   settingItemRight: {
     flexDirection: 'row',
-    alignItems: 'center'
+    alignItems: 'center',
+    paddingRight: 6,
+  },
+  settingChevron: {
+    marginLeft: 8,
   },
   settingDescription: {
     fontSize: 13,
@@ -1196,6 +1258,35 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginBottom: 12,
     fontWeight: '700',
+  },
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: 48,
+    right: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    elevation: 10,
+  },
+  imageViewerBody: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  imageViewerImage: {
+    width: '100%',
+    height: '100%',
   },
   inlineSettingCard: {
     backgroundColor: '#fff',

@@ -836,6 +836,7 @@ const styles = StyleSheet.create({
   },
   locationInfo: {
     flex: 1,
+    minWidth: 0,
   },
   locationTitle: {
     fontSize: 16,
@@ -1013,6 +1014,8 @@ const styles = StyleSheet.create({
   locationListItemContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
   },
   locationIconContainer: {
     width: 40,
@@ -1026,6 +1029,7 @@ const styles = StyleSheet.create({
   },
   locationListItemTextContainer: {
     flex: 1,
+    minWidth: 0,
   },
   locationListItemTitle: {
     fontSize: 16,
@@ -1064,7 +1068,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   chevronIcon: {
-    marginRight: 4,
+    // chevron을 억지로 밀지 않고, 내용 영역이 자리를 양보하도록 처리
+    marginLeft: 8,
+    marginRight: 0,
   },
   locationListItemDescription: {
     fontSize: 14,
