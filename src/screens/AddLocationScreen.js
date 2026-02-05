@@ -1,49 +1,33 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-
-  View, 
-  Text, 
-  Image,
-  StyleSheet, 
-  TextInput, 
-  TouchableOpacity, 
-  ScrollView,
-
-  ActivityIndicator,
-  Modal,
-  Platform,
-  SafeAreaView } from
-'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { createLocation, updateLocation, fetchLocations } from '../redux/slices/locationsSlice';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-import { markTemplateInstanceAsUsed, releaseTemplateInstance, unassignProductSlotTemplate } from '../redux/slices/authSlice';
-import { fetchProductsByLocation } from '../redux/slices/productsSlice';
-import IconSelector from '../components/IconSelector';
-import AlertModal from '../components/AlertModal';
-import { isTemplateActive } from '../utils/validityUtils';
 import { givePresignedUrl } from '../api/commonApi';
-import { categoryCreated, setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
+import AlertModal from '../components/AlertModal';
+import IconSelector from '../components/IconSelector';
 import TutorialTouchBlocker from '../components/TutorialTouchBlocker';
+import { markTemplateInstanceAsUsed, releaseTemplateInstance } from '../redux/slices/authSlice';
+import { createLocation, fetchLocations, updateLocation } from '../redux/slices/locationsSlice';
+import { fetchProductsByLocation } from '../redux/slices/productsSlice';
+import { categoryCreated, setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
+import styles from './AddLocationScreen.styles';
+import { isTemplateActive } from '../utils/validityUtils';
+import { useAddLocationTutorial } from './AddLocationScreen.tutorial';
 
 const MAX_LOCATION_TITLE_LEN = 50;
 const MAX_LOCATION_DESC_LEN = 100;
@@ -59,15 +43,6 @@ const AddLocationScreen = () => {
   const locationToEdit = route.params?.location;
   const tutorial = useSelector((state) => state.tutorial);
   const isTutorialCreate = !!route.params?.tutorial && !isEditMode && tutorial?.active;
-  // ✅ 튜토리얼 전용: 이름 입력 추적(다른 effect에 의해 locationData가 덮여도 라벨이 즉시 반응하도록)
-  const [tutorialTitleDraft, setTutorialTitleDraft] = useState('');
-  const firstTemplateRef = useRef(null);
-  const [firstTemplateRect, setFirstTemplateRect] = useState(null);
-  const nameInputRef = useRef(null);
-  const [nameInputRect, setNameInputRect] = useState(null);
-  const saveBtnRef = useRef(null);
-  const [saveBtnRect, setSaveBtnRect] = useState(null);
-  const [tutorialToSaveTransitioning, setTutorialToSaveTransitioning] = useState(false);
   
   // 템플릿 인스턴스 및 구독 상태
   const { userLocationTemplateInstances, slots, userProductSlotTemplateInstances, subscription, isLoggedIn, locationTemplatesStatus } = useSelector((state) => state.auth);
@@ -117,72 +92,35 @@ const AddLocationScreen = () => {
   // 사용 가능 + 미만료 템플릿만 필터링
   const availableTemplates = userLocationTemplateInstances.filter((template) => !template.used && !isTemplateExpired(template));
   const tutorialFirstTemplateId = availableTemplates?.[0]?.id;
-  const blockerActiveTemplate = !!(isTutorialCreate && tutorial?.step === TUTORIAL_STEPS.WAIT_TEMPLATE_TOP);
-  const blockerActiveName = !!(isTutorialCreate && tutorial?.step === TUTORIAL_STEPS.WAIT_CATEGORY_NAME && !tutorialToSaveTransitioning);
-  const blockerActiveSave = !!(isTutorialCreate && tutorial?.step === TUTORIAL_STEPS.WAIT_CATEGORY_SAVE);
-  const tutorialNameFilled = String((isTutorialCreate ? tutorialTitleDraft : locationData?.title) || '').trim().length > 0;
 
-  useEffect(() => {
-    if (!isTutorialCreate) return;
-    // locationData.title이 바뀌면 드래프트도 동기화(초기값/외부 변경 대비)
-    try {
-      setTutorialTitleDraft(String(locationData?.title || ''));
-    } catch (e) {}
-  }, [isTutorialCreate, locationData?.title]);
+  const {
+    tutorialTitleDraft,
+    setTutorialTitleDraft,
+    tutorialNameFilled,
+    tutorialToSaveTransitioning,
 
-  const measureFirstTemplate = useCallback(() => {
-    try {
-      const node = firstTemplateRef.current;
-      if (!node || typeof node.measureInWindow !== 'function') return;
-      node.measureInWindow((x, y, width, height) => {
-        if (typeof x === 'number' && typeof y === 'number') {
-          setFirstTemplateRect({ x, y, width, height });
-        }
-      });
-    } catch (e) {}
-  }, []);
+    firstTemplateRef,
+    firstTemplateRect,
+    nameInputRef,
+    nameInputRect,
+    saveBtnRef,
+    saveBtnRect,
 
-  const measureNameInput = useCallback(() => {
-    try {
-      const node = nameInputRef.current;
-      if (!node || typeof node.measureInWindow !== 'function') return;
-      node.measureInWindow((x, y, width, height) => {
-        if (typeof x === 'number' && typeof y === 'number') {
-          setNameInputRect({ x, y, width, height });
-        }
-      });
-    } catch (e) {}
-  }, []);
+    blockerActiveTemplate,
+    blockerActiveName,
+    blockerActiveSave,
 
-  const measureSaveBtn = useCallback(() => {
-    try {
-      const node = saveBtnRef.current;
-      if (!node || typeof node.measureInWindow !== 'function') return;
-      node.measureInWindow((x, y, width, height) => {
-        if (typeof x === 'number' && typeof y === 'number') {
-          setSaveBtnRect({ x, y, width, height });
-        }
-      });
-    } catch (e) {}
-  }, []);
+    measureFirstTemplate,
+    measureNameInput,
+    measureSaveBtn,
 
-  useEffect(() => {
-    if (!blockerActiveTemplate) return;
-    const t = setTimeout(() => measureFirstTemplate(), 0);
-    return () => clearTimeout(t);
-  }, [blockerActiveTemplate, measureFirstTemplate]);
-
-  useEffect(() => {
-    if (!blockerActiveName) return;
-    const t = setTimeout(() => measureNameInput(), 0);
-    return () => clearTimeout(t);
-  }, [blockerActiveName, measureNameInput]);
-
-  useEffect(() => {
-    if (!blockerActiveSave) return;
-    const t = setTimeout(() => measureSaveBtn(), 0);
-    return () => clearTimeout(t);
-  }, [blockerActiveSave, measureSaveBtn]);
+    goToSaveStep,
+  } = useAddLocationTutorial({
+    isTutorialCreate,
+    tutorialStep: tutorial?.step,
+    dispatch,
+    scrollRef,
+  });
 
   // 수정 모드에서 현재 카테고리에 연결된 템플릿이 만료되었는지 판단
   const linkedTemplateInEdit = isEditMode && locationToEdit ?
@@ -522,116 +460,11 @@ const AddLocationScreen = () => {
   // 스테이징: 등록/해제 예정 템플릿 ID 목록 (편집 모드에서만 사용)
   const [stagedAssignTemplateIds, setStagedAssignTemplateIds] = useState([]);
   const [stagedUnassignTemplateIds, setStagedUnassignTemplateIds] = useState([]);
-  const [quantityModalVisible, setQuantityModalVisible] = useState(false);
-  const [reserveQuantity, setReserveQuantity] = useState(1);
   const draftTimerRef = useRef(null);
-  const didCreateRef = useRef(false);
   const hasSubmittedRef = useRef(false);
   const draftSelectedTemplateIdRef = useRef(null);
   const pendingNavActionRef = useRef(null);
   const isNavigatingAwayRef = useRef(false);
-  
-  // 스테이징 미리보기 계산 (선언 이후)
-  const stagedAssignCount = stagedAssignTemplateIds.length;
-  const stagedUnassignCount = stagedUnassignTemplateIds.length;
-  // 미만료 기준 프리뷰 등록 수 계산(해제는 활성에만 반영)
-  const activeAssignedIdSet = new Set(assignedActiveTemplatesForThisLocation.map((t) => String(t.id)));
-  const stagedUnassignActiveCount = stagedUnassignTemplateIds.filter((id) => activeAssignedIdSet.has(String(id))).length;
-  const previewAssignedActiveCount = Math.max(0, assignedActiveCountForThisLocation - stagedUnassignActiveCount + stagedAssignCount);
-  const previewAvailableTemplates = availableProductSlotTemplates.filter((t) => !stagedAssignTemplateIds.includes(t.id));
-  const previewAssignedTemplates = assignedProductSlotTemplatesForThisLocation.filter((t) => !stagedUnassignTemplateIds.includes(t.id));
-  const stagedAssignTemplates = availableProductSlotTemplates.filter((t) => stagedAssignTemplateIds.includes(t.id));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   
   // 선택된 템플릿이 있으면 기본 정보 설정 (생성 모드에서만)
   useEffect(() => {
@@ -1091,42 +924,6 @@ const AddLocationScreen = () => {
     }
   };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
   // baseSlots 값을 표시하는 함수
   const renderSlotCount = (baseSlots) => {
     if (baseSlots === -1) {
@@ -1494,26 +1291,7 @@ const AddLocationScreen = () => {
         actionLabel={tutorialNameFilled ? '작성 완료 (다음으로 넘어가기)' : '작성'}
         actionLabelPlacement={'below'}
         onActionPress={
-          tutorialNameFilled
-            ? () => {
-                // ✅ 먼저 "이름만 입력 가능" 오버레이를 즉시 제거하고(자연스럽게),
-                //    스크롤 중에는 전체 화면을 막은 상태로 유지한 뒤 저장 오버레이로 전환합니다.
-                try { setTutorialToSaveTransitioning(true); } catch (e) {}
-                try {
-                  // 1) 스크롤을 맨 아래로 이동
-                  scrollRef.current?.scrollToEnd?.({ animated: true });
-                } catch (e) {}
-                // 2) 스크롤 후 저장 단계로 전환 (저장 버튼만 터치 가능)
-                setTimeout(() => {
-                  try { setTutorialToSaveTransitioning(false); } catch (e) {}
-                  try { dispatch(setTutorialStep({ step: TUTORIAL_STEPS.WAIT_CATEGORY_SAVE })); } catch (e) {}
-                  // 저장 버튼 위치 재측정
-                  setTimeout(() => {
-                    try { measureSaveBtn(); } catch (e) {}
-                  }, 250);
-                }, 350);
-              }
-            : undefined
+          tutorialNameFilled ? goToSaveStep : undefined
         }
       />
       <TutorialTouchBlocker
@@ -1531,457 +1309,5 @@ const AddLocationScreen = () => {
     </SafeAreaView>);
 
 };
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f8f8f8'
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'white',
-    height: 56,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0'
-  },
-  backButton: {
-    padding: 8
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333'
-  },
-  headerRight: {
-    width: 40
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f8f8',
-    padding: 16
-  },
-  section: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#333'
-  },
-  sectionDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16
-  },
-  tutorialBanner: {
-    backgroundColor: 'rgba(76,175,80,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(76,175,80,0.25)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
-  },
-  tutorialBannerText: {
-    color: '#1B5E20',
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
-  tutorialPrimaryCta: {
-    borderWidth: 3,
-    borderColor: '#1B5E20',
-  },
-  formGroup: {
-    marginBottom: 16
-  },
-  imageRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  imagePreviewBox: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  imagePreview: {
-    width: '100%',
-    height: '100%',
-  },
-  imageUploadingOverlay: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#c8e6c9',
-    backgroundColor: '#f0f9f0',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    marginBottom: 8,
-  },
-  imageButtonText: {
-    color: '#4CAF50',
-    fontWeight: '700',
-  },
-  imageRemoveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ffcdd2',
-    backgroundColor: '#ffebee',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    marginBottom: 8,
-  },
-  imageRemoveButtonText: {
-    color: '#F44336',
-    fontWeight: '700',
-  },
-  imageViewerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.92)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageViewerClose: {
-    position: 'absolute',
-    top: 48,
-    right: 18,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-    elevation: 10,
-  },
-  imageViewerBody: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  imageViewerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
-    color: '#333'
-  },
-  input: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0'
-  },
-  placeholderLight: {
-    color: '#333'
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top'
-  },
-  inputHint: {
-    marginTop: 6,
-    fontSize: 12,
-    color: '#9E9E9E'
-  },
-  iconSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    minHeight: 56
-  },
-  selectedIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e8f5e9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16
-  },
-  iconSelectorText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
-    marginRight: 8
-  },
-  createButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 24
-  },
-  createButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold'
-  },
-  templateGroup: {
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    overflow: 'hidden'
-  },
-  templateGroupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#f5f5f5',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0'
-  },
-  templateIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e8f5e9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12
-  },
-  templateGroupInfo: {
-    flex: 1
-  },
-  templateGroupName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333'
-  },
-  templateGroupDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4
-  },
-  templateOptions: {
-    padding: 12
-  },
-  templateOptionsContainer: {
-    maxHeight: 280
-  },
-  templateOptionsScroll: {
-    flexGrow: 0
-  },
-  templateOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    marginBottom: 8
-  },
-  disabledTemplateOption: {
-    opacity: 0.5
-  },
-  selectedTemplateOption: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#e8f5e9'
-  },
-  templateOptionTitle: {
-    fontSize: 15,
-    color: '#333'
-  },
-  templateOptionSubtitle: {
-    fontSize: 12,
-    color: '#777',
-    marginTop: 4
-  },
-  emptyTemplates: {
-    padding: 16,
-    alignItems: 'center'
-  },
-  emptyTemplatesText: {
-    fontSize: 15,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 16
-  },
-  emptySlotCard: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#fafafa',
-    borderRadius: 10,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    alignItems: 'center'
-  },
-  emptySlotTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#444',
-    marginBottom: 4,
-    textAlign: 'center'
-  },
-  emptySlotSubtitle: {
-    fontSize: 13,
-    color: '#777',
-    textAlign: 'center',
-    lineHeight: 18
-  },
-  storeButton: {
-    backgroundColor: '#FF9800',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8
-  },
-  storeButtonText: {
-    color: 'white',
-    fontWeight: 'bold'
-  },
-  planButton: {
-    backgroundColor: '#FF9800',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8
-  },
-  planButtonText: {
-    color: 'white',
-    fontWeight: 'bold'
-  },
-  productSlotSectionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8
-  },
-  productSlotList: {
-    marginTop: 16
-  },
-  slotScrollableList: {
-    maxHeight: 260
-  },
-  productSlotSummary: {
-    marginTop: 8,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0'
-  },
-  productSlotRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6
-  },
-  productSlotLabel: {
-    fontSize: 14,
-    color: '#555',
-    fontWeight: '600'
-  },
-  productSlotValue: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '700'
-  },
-  productSlotItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: '#f9f9f9'
-  },
-  productSlotInfo: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  productSlotText: {
-    marginLeft: 8,
-    fontSize: 15,
-    color: '#333',
-    fontWeight: '500'
-  },
-  productSlotSubText: {
-    fontSize: 13,
-    color: '#777',
-    marginTop: 4
-  },
-  productSlotLinkedText: {
-    fontSize: 13,
-    color: '#555',
-    marginTop: 6
-  },
-  assignButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6
-  },
-  assignButtonText: {
-    color: 'white',
-    fontSize: 13,
-    fontWeight: 'bold'
-  },
-  stagingNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e8f5e9',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: '#c8e6c9'
-  },
-  stagingNoticeText: {
-    fontSize: 12,
-    color: '#2e7d32'
-  },
-  stagingHelpText: {
-    fontSize: 12,
-    color: '#777',
-    marginTop: 6,
-    textAlign: 'center'
-  }
-});
 
 export default AddLocationScreen; 

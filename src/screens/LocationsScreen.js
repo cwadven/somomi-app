@@ -1,66 +1,28 @@
-import { isTemplateActive } from '../utils/validityUtils';
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import {
-
-View,
-Text,
-Image,
-FlatList,
-TouchableOpacity,
-ActivityIndicator,
-
-
-BackHandler,
-ScrollView } from
-'react-native';
-import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  BackHandler,
+  FlatList,
+  Image,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-import { useNavigation, useIsFocused, useRoute } from '@react-navigation/native';
-import { fetchLocations } from '../redux/slices/locationsSlice';
-import { updateLocation } from '../redux/slices/locationsSlice';
 import { fetchGuestSectionsExpiredCount } from '../api/sectionApi';
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import { loadUserLocationTemplateInstances, loadUserProductSlotTemplateInstances } from '../redux/slices/authSlice';
+import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
 import SlotStatusBar from '../components/SlotStatusBar';
-import AlertModal from '../components/AlertModal';
 // 로그인 폼/소셜 버튼은 내 카테고리에서 노출하지 않음
 import { setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
 import TutorialTouchBlocker from '../components/TutorialTouchBlocker';
+import { fetchLocations, updateLocation } from '../redux/slices/locationsSlice';
+import { isTemplateActive } from '../utils/validityUtils';
 import styles from './LocationsScreen.styles';
 import { useLocationsTutorial } from './LocationsScreen.tutorial';
 
@@ -72,7 +34,7 @@ const LocationsScreen = () => {
   
   const { locations, status, error } = useSelector(state => state.locations);
   const tutorial = useSelector((state) => state.tutorial);
-  const { isAnonymous, isLoggedIn, userLocationTemplateInstances, subscription, locationTemplatesStatus } = useSelector(state => state.auth);
+  const { isLoggedIn, userLocationTemplateInstances, subscription, locationTemplatesStatus } = useSelector(state => state.auth);
 
   // 자동 연동 모달 제거 (요청사항)
  
