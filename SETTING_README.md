@@ -714,3 +714,9 @@ context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PE
 # 안드로이드 배포 방법
 
 앱 올릴 때 마다 build.gradle 에 있는 versionCode 올려야함.
+
+
+# 앱에서 문제 확인
+
+brew install android-platform-tools
+adb logcat "*:S" "AndroidRuntime:E" "ReactNative:E" "ReactNativeJS:E" "Expo:E"
