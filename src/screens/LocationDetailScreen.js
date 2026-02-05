@@ -1,18 +1,16 @@
 import { isTemplateActive } from '../utils/validityUtils';
 import React, { useEffect, useState, useCallback } from 'react';
-import { 
-
-  View, 
-  Text, 
-  Image,
-  StyleSheet, 
-  TouchableOpacity, 
-  Alert, 
-  ScrollView, 
+import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Image,
   Modal,
-  TextInput
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { completeTutorial, setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
@@ -26,6 +24,8 @@ import SlotStatusBar from '../components/SlotStatusBar';
 import LocationNotificationSettings from '../components/LocationNotificationSettings';
 import { onEvent, EVENT_NAMES } from '../utils/eventBus';
 import TutorialTouchBlocker from '../components/TutorialTouchBlocker';
+import styles from './LocationDetailScreen.styles';
+import { useLocationDetailTutorial } from './LocationDetailScreen.tutorial';
 
 const LocationDetailScreen = () => {
   const navigation = useNavigation();
@@ -57,61 +57,23 @@ const LocationDetailScreen = () => {
   const productsListRef = React.useRef(null);
   const lastScrollOffsetRef = React.useRef(0);
   const shouldRestoreScrollRef = React.useRef(false);
-  const addProductButtonRef = React.useRef(null);
-  const [addProductButtonRect, setAddProductButtonRect] = useState(null);
-  const createdProductRowRef = React.useRef(null);
-  const [createdProductRowRect, setCreatedProductRowRect] = useState(null);
 
-  // ✅ 튜토리얼(제품 등록 단계): 이 화면에서는 + 버튼만 터치 가능하게 완전 잠금
-  const lockAddProductTutorial = !!(
-    tutorial?.active &&
-    tutorial?.step === TUTORIAL_STEPS.WAIT_LOCATION_ADD_PRODUCT &&
-    !isAllProductsView
-  );
-
-  const lockCreatedProductCongrats = !!(
-    tutorial?.active &&
-    tutorial?.step === TUTORIAL_STEPS.WAIT_CREATED_PRODUCT_CONGRATS &&
-    !isAllProductsView &&
-    tutorial?.createdProductLocationId != null &&
-    String(tutorial.createdProductLocationId) === String(locationId)
-  );
-
-  const measureCreatedProductRow = useCallback(() => {
-    try {
-      const node = createdProductRowRef.current;
-      if (!node || typeof node.measureInWindow !== 'function') return;
-      node.measureInWindow((x, y, width, height) => {
-        if (typeof x === 'number' && typeof y === 'number') {
-          setCreatedProductRowRect({ x, y, width, height });
-        }
-      });
-    } catch (e) {}
-  }, []);
-
-  useEffect(() => {
-    if (!lockCreatedProductCongrats) return;
-    const t = setTimeout(() => measureCreatedProductRow(), 50);
-    return () => clearTimeout(t);
-  }, [lockCreatedProductCongrats, measureCreatedProductRow, locationProducts?.length]);
-
-  const measureAddProductButton = useCallback(() => {
-    try {
-      const node = addProductButtonRef.current;
-      if (!node || typeof node.measureInWindow !== 'function') return;
-      node.measureInWindow((x, y, width, height) => {
-        if (typeof x === 'number' && typeof y === 'number') {
-          setAddProductButtonRect({ x, y, width, height });
-        }
-      });
-    } catch (e) {}
-  }, []);
-
-  useEffect(() => {
-    if (!lockAddProductTutorial) return;
-    const t = setTimeout(() => measureAddProductButton(), 0);
-    return () => clearTimeout(t);
-  }, [lockAddProductTutorial, measureAddProductButton]);
+  const {
+    lockAddProductTutorial,
+    lockCreatedProductCongrats,
+    addProductButtonRef,
+    addProductButtonRect,
+    measureAddProductButton,
+    createdProductRowRef,
+    createdProductRowRect,
+    measureCreatedProductRow,
+    isTargetCreatedProduct,
+  } = useLocationDetailTutorial({
+    tutorial,
+    locationId,
+    isAllProductsView,
+    locationProductsLength: locationProducts?.length,
+  });
 
   // 백엔드 정렬 파라미터 계산
   const getBackendSortParam = useCallback(() => {
@@ -343,135 +305,6 @@ const LocationDetailScreen = () => {
       }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, locationProductsCache, locationId, isAllProductsView, locations, isLocExpired, locationProducts.length]);
-
-  // 비율 계산 헬퍼
-  const computeRate = useCallback((startIso, endIso) => {
-    try {
-      const now = Date.now();
-      const start = startIso ? new Date(startIso).getTime() : null;
-      const end = endIso ? new Date(endIso).getTime() : null;
-      if (!end || !isFinite(end)) return null;
-      const s = start && isFinite(start) ? start : null;
-      // 시작이 없으면 종료 30일 전을 가정(보수적 기본치)
-      const assumedStart = s || (end - 30 * 24 * 60 * 60 * 1000);
-      const total = end - assumedStart;
-      if (total <= 0) return null;
-      const elapsed = Math.max(0, Math.min(total, now - assumedStart));
-      return Math.round((elapsed / total) * 100);
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const getExpiryRate = useCallback((p) => {
-    // 유통률: purchaseDate(있으면) 또는 createdAt ~ expiryDate 진행률
-    return computeRate(p.purchaseDate || p.createdAt, p.expiryDate);
-  }, [computeRate]);
-
-  const getEstimatedRate = useCallback((p) => {
-    // 소진률: purchaseDate(있으면) 또는 createdAt ~ estimatedEndDate 진행률
-    return computeRate(p.purchaseDate || p.createdAt, p.estimatedEndDate);
-  }, [computeRate]);
-
-  // 정렬 로직
-  const sortProducts = useCallback((list) => {
-    const input = list || [];
-    if (!sortKey) return [...input]; // 정렬 취소 시 원본 순서 유지
-
-    const dir = sortDesc ? -1 : 1; // 내림차순: -1, 오름차순: 1
-    const getName = (x) => (x?.name || x?.title || '').toString();
-    const cmpByName = (a, b) => getName(a).localeCompare(getName(b)) * (sortDesc ? -1 : 1);
-    const cmpNum = (av, bv) => (av === bv ? 0 : (av > bv ? dir : -dir));
-    const normalizeRate = (r) => {
-      if (r == null) return null;
-      const n = Number(r);
-      if (!isFinite(n)) return null;
-      return Math.max(0, Math.min(100, Math.round(n)));
-    };
-
-    // 1) 소진순: 소진예상 없음 → 끝으로 보냄(원래 순서 유지)
-    if (sortKey === 'estimated') {
-      const present = input.filter(p => !!p.estimatedEndDate);
-      const missing = input.filter(p => !p.estimatedEndDate);
-      present.sort((a, b) => {
-        const av = new Date(a.estimatedEndDate).getTime();
-        const bv = new Date(b.estimatedEndDate).getTime();
-        if (av === bv) return getName(a).localeCompare(getName(b));
-        return cmpNum(av, bv);
-      });
-      return [...present, ...missing];
-    }
-
-    // 2) 유통순: 유통기한 없음 → 끝으로 보냄(원래 순서 유지)
-    if (sortKey === 'expiry') {
-      const present = input.filter(p => !!p.expiryDate);
-      const missing = input.filter(p => !p.expiryDate);
-      present.sort((a, b) => {
-        const av = new Date(a.expiryDate).getTime();
-        const bv = new Date(b.expiryDate).getTime();
-        if (av === bv) return getName(a).localeCompare(getName(b));
-        return cmpNum(av, bv);
-      });
-      return [...present, ...missing];
-    }
-
-    // 3) 소진률%: 계산 불가(null) → 끝으로 보냄(원래 순서 유지), 소진예상 있는 항목 우선
-    if (sortKey === 'estimatedRate') {
-      const present = input.filter(p => !!p.estimatedEndDate);
-      const missing = input.filter(p => !p.estimatedEndDate);
-      present.sort((a, b) => {
-        const ra = normalizeRate(getEstimatedRate(a));
-        const rb = normalizeRate(getEstimatedRate(b));
-        const av = ra == null ? 0 : ra;
-        const bv = rb == null ? 0 : rb;
-        if (av === bv) {
-          const ad = new Date(a.estimatedEndDate).getTime();
-          const bd = new Date(b.estimatedEndDate).getTime();
-          if (ad !== bd) return cmpNum(ad, bd);
-          return getName(a).localeCompare(getName(b));
-        }
-        return cmpNum(av, bv);
-      });
-      return [...present, ...missing];
-    }
-
-    // 4) 유통률%: 계산 불가(null) → 끝으로 보냄(원래 순서 유지), 유통기한 있는 항목 우선
-    if (sortKey === 'expiryRate') {
-      const present = input.filter(p => !!p.expiryDate);
-      const missing = input.filter(p => !p.expiryDate);
-      present.sort((a, b) => {
-        const ra = normalizeRate(getExpiryRate(a));
-        const rb = normalizeRate(getExpiryRate(b));
-        const av = ra == null ? 0 : ra;
-        const bv = rb == null ? 0 : rb;
-        if (av === bv) {
-          const ad = new Date(a.expiryDate).getTime();
-          const bd = new Date(b.expiryDate).getTime();
-          if (ad !== bd) return cmpNum(ad, bd);
-          return getName(a).localeCompare(getName(b));
-        }
-        return cmpNum(av, bv);
-      });
-      return [...present, ...missing];
-    }
-
-    // 5) 등록순 / 이름순 기존 동작 유지
-    if (sortKey === 'created') {
-      const arr = [...input];
-      arr.sort((a, b) => {
-        const av = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const bv = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        if (av === bv) return getName(a).localeCompare(getName(b));
-        return cmpNum(av, bv);
-      });
-      return arr;
-    }
-
-    // name
-    const arr = [...input];
-    arr.sort(cmpByName);
-    return arr;
-  }, [sortKey, sortDesc, getEstimatedRate, getExpiryRate]);
 
   // 정렬 칩 클릭 시: 내림차순 → 오름차순 → 정렬 해제 순환
   const handleSortPress = useCallback((key) => {
@@ -749,18 +582,14 @@ const LocationDetailScreen = () => {
                 data={locationProducts}
                 keyExtractor={(item) => String(item.localId || item.id)}
                 renderItem={({ item }) => {
-                  const wantName =
-                    tutorial?.createdProductName != null ? String(tutorial.createdProductName).trim() : '';
-                  const itemName = String(item?.name || item?.title || '').trim();
-                  const isTargetCreatedProduct =
-                    lockCreatedProductCongrats && !!wantName && !!itemName && itemName === wantName;
+                  const isTarget = isTargetCreatedProduct(item);
                   const card = (
                     <ProductCard
                       product={item}
                       onPress={() => handleProductPress(item)}
                     />
                   );
-                  if (!isTargetCreatedProduct) return card;
+                  if (!isTarget) return card;
                   return (
                     <View
                       ref={createdProductRowRef}
@@ -1069,353 +898,5 @@ const LocationDetailScreen = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f8f8',
-  },
-  tutorialBanner: {
-    backgroundColor: 'rgba(76,175,80,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(76,175,80,0.25)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    margin: 16,
-    marginBottom: 0,
-  },
-  tutorialBannerText: {
-    color: '#1B5E20',
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#F44336',
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 4,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  backButton: {
-    marginRight: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#666',
-    marginLeft: 16,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerActionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  locationIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#e8f5e9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  locationIconImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 25,
-  },
-  imageViewerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.92)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageViewerClose: {
-    position: 'absolute',
-    top: 48,
-    right: 18,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-    elevation: 10,
-  },
-  imageViewerBody: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  imageViewerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  headerTextContainer: {
-    flex: 1,
-  },
-  locationTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  locationDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  tab: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginRight: 8,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-  },
-  activeTab: {
-    backgroundColor: '#4CAF50',
-  },
-  tabText: {
-    color: '#666',
-    fontWeight: '500',
-  },
-  activeTabText: {
-    color: 'white',
-  },
-  productsContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  loadingContainerInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  loadingInlineText: {
-    marginLeft: 8,
-    color: '#666',
-  },
-  errorInlineContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  loadingListContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 24,
-  },
-  sortBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  sortBarContent: {
-    alignItems: 'center',
-    paddingRight: 8,
-  },
-  sortChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: '#f1f8e9',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#c5e1a5',
-    flexDirection: 'row', // Added for arrow alignment
-    alignItems: 'center', // Added for arrow alignment
-  },
-  sortChipActive: {
-    backgroundColor: '#c8e6c9',
-    borderColor: '#81c784',
-  },
-  sortChipText: {
-    fontSize: 12,
-    color: '#4CAF50',
-  },
-  sortChipTextActive: {
-    fontWeight: '600',
-  },
-  sortDirBtn: {
-    marginLeft: 'auto',
-    padding: 6,
-  },
-  sortChipArrow: {
-    marginLeft: 4,
-  },
-  notificationsContainer: {
-    flex: 1,
-    backgroundColor: '#f8f8f8',
-  },
-  productsList: {
-    padding: 16,
-    paddingBottom: 80, // 하단 버튼을 위한 여백
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#666',
-    marginBottom: 8,
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  addButton: {
-    position: 'absolute',
-    right: 16,
-    bottom: 16,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#4CAF50',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  disabledButton: {
-    backgroundColor: '#9E9E9E',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 20,
-    width: '80%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-  },
-  modalMessage: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
-  },
-  modalWarning: {
-    fontSize: 13,
-    color: '#F44336',
-    marginBottom: 10,
-  },
-  confirmInput: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginBottom: 12,
-    backgroundColor: '#fff',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  modalButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  cancelButton: {
-    backgroundColor: '#f5f5f5',
-  },
-  confirmButton: {
-    backgroundColor: '#F44336',
-  },
-  confirmButtonDisabled: {
-    backgroundColor: '#F8BBD0',
-  },
-  cancelButtonText: {
-    color: '#333',
-  },
-  confirmButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-});
 
 export default LocationDetailScreen; 
