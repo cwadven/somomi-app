@@ -5,7 +5,6 @@ import {
 View,
 Text,
 Image,
-StyleSheet,
 FlatList,
 TouchableOpacity,
 ActivityIndicator,
@@ -62,6 +61,8 @@ import AlertModal from '../components/AlertModal';
 // 로그인 폼/소셜 버튼은 내 카테고리에서 노출하지 않음
 import { setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
 import TutorialTouchBlocker from '../components/TutorialTouchBlocker';
+import styles from './LocationsScreen.styles';
+import { useLocationsTutorial } from './LocationsScreen.tutorial';
 
 const LocationsScreen = () => {
   const dispatch = useDispatch();
@@ -91,40 +92,27 @@ const LocationsScreen = () => {
   const [templatePickerSelectedTemplateId, setTemplatePickerSelectedTemplateId] = useState(null);
   const [expiredCountsByLocationId, setExpiredCountsByLocationId] = useState({});
   const [expiredTotalCount, setExpiredTotalCount] = useState(0);
-  const addButtonRef = useRef(null);
-  const [addButtonRect, setAddButtonRect] = useState(null);
-  const newestLocationRowRef = useRef(null);
-  const [newestLocationRowRect, setNewestLocationRowRect] = useState(null);
-  const didShowTutorialCongratsRef = useRef(false);
-
-  const blockerActive = !!(tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_LOCATIONS_PLUS);
-  const blockerActiveCongrats = !!(tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_CREATED_LOCATION_CONGRATS);
-  const blockerActiveNewestLocation = !!(tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_CREATED_LOCATION_CLICK);
-
-  // ✅ 안전장치: 어떤 이유로든 탭 클릭 이벤트에서 step advance가 누락되면,
-  // Locations 화면에 도착한 순간 WAIT_LOCATIONS_PLUS로 보정하여 + 버튼 오버레이가 보이게 합니다.
-  useEffect(() => {
-    try {
-      if (!isFocused) return;
-      if (!tutorial?.active) return;
-      if (tutorial?.step !== TUTORIAL_STEPS.WAIT_LOCATIONS_TAB) return;
-      dispatch(setTutorialStep({ step: TUTORIAL_STEPS.WAIT_LOCATIONS_PLUS }));
-    } catch (e) {}
-  }, [dispatch, isFocused, tutorial?.active, tutorial?.step]);
-
-  // ✅ 카테고리 생성 직후: 축하 안내(확인 후에만 "방금 만든 카테고리 터치" 단계로 이동)
-  useEffect(() => {
-    try {
-      if (!isFocused) return;
-      if (!blockerActiveCongrats) {
-        didShowTutorialCongratsRef.current = false;
-        return;
-      }
-      if (didShowTutorialCongratsRef.current) return;
-      // 다른 모달이 열려있으면(템플릿 선택 등) 우선 스킵
-      if (templatePickerVisible || alertModalVisible) return;
-
-      didShowTutorialCongratsRef.current = true;
+  const {
+    addButtonRef,
+    addButtonRect,
+    newestLocationRowRef,
+    newestLocationRowRect,
+    blockerActive,
+    blockerActiveNewestLocation,
+    locationsSorted,
+    tutorialTargetTitle,
+    tutorialTargetLocationId,
+    isAllowedCreatedLocation,
+    measureAddButton,
+    measureNewestLocationRow,
+  } = useLocationsTutorial({
+    tutorial,
+    isFocused,
+    dispatch,
+    locations,
+    templatePickerVisible,
+    alertModalVisible,
+    showCongratsModal: (onConfirm) => {
       setAlertModalConfig({
         title: '튜토리얼',
         message: "축하드려요~\n새로운 '카테고리'를 처음으로 만드셨네요~\n이제 '제품'을 만들러 가볼까요?",
@@ -133,7 +121,7 @@ const LocationsScreen = () => {
             text: '확인',
             onPress: () => {
               try { setAlertModalVisible(false); } catch (e) {}
-              try { dispatch(setTutorialStep({ step: TUTORIAL_STEPS.WAIT_CREATED_LOCATION_CLICK })); } catch (e) {}
+              try { onConfirm?.(); } catch (e) {}
             },
           },
         ],
@@ -141,100 +129,8 @@ const LocationsScreen = () => {
         iconColor: '#4CAF50',
       });
       setAlertModalVisible(true);
-    } catch (e) {}
-  }, [
-    dispatch,
-    isFocused,
-    blockerActiveCongrats,
-    templatePickerVisible,
-    alertModalVisible,
-  ]);
-
-  const measureAddButton = useCallback(() => {
-    try {
-      const node = addButtonRef.current;
-      if (!node || typeof node.measureInWindow !== 'function') return;
-      node.measureInWindow((x, y, width, height) => {
-        if (typeof x === 'number' && typeof y === 'number') {
-          setAddButtonRect({ x, y, width, height });
-        }
-      });
-    } catch (e) {}
-  }, []);
-
-  const measureNewestLocationRow = useCallback(() => {
-    try {
-      const node = newestLocationRowRef.current;
-      if (!node || typeof node.measureInWindow !== 'function') return;
-      node.measureInWindow((x, y, width, height) => {
-        if (typeof x === 'number' && typeof y === 'number') {
-          setNewestLocationRowRect({ x, y, width, height });
-        }
-      });
-    } catch (e) {}
-  }, []);
-
-  useEffect(() => {
-    if (!blockerActive) return;
-    const t = setTimeout(() => measureAddButton(), 0);
-    return () => clearTimeout(t);
-  }, [blockerActive, measureAddButton]);
-
-  useEffect(() => {
-    if (!blockerActiveNewestLocation) return;
-    const t = setTimeout(() => measureNewestLocationRow(), 50);
-    return () => clearTimeout(t);
-  }, [blockerActiveNewestLocation, measureNewestLocationRow, locations.length]);
-
-  const locationsSorted = useMemo(() => {
-    const list = Array.isArray(locations) ? [...locations] : [];
-    // newest first (fallback to id numeric)
-    list.sort((a, b) => {
-      const ta = new Date(a?.createdAt || a?.created_at || 0).getTime();
-      const tb = new Date(b?.createdAt || b?.created_at || 0).getTime();
-      if (Number.isFinite(tb) && Number.isFinite(ta) && tb !== ta) return tb - ta;
-      const na = parseInt(String(a?.id || a?.localId || 0), 10) || 0;
-      const nb = parseInt(String(b?.id || b?.localId || 0), 10) || 0;
-      return nb - na;
-    });
-    return list;
-  }, [locations]);
-
-  const tutorialTargetTitle = useMemo(() => {
-    const t = tutorial?.createdLocationTitle != null ? String(tutorial.createdLocationTitle).trim() : '';
-    return t || null;
-  }, [tutorial?.createdLocationTitle]);
-
-  const tutorialTargetLocationId = useMemo(() => {
-    // 1) explicit id from tutorial state
-    const fromId = tutorial?.createdLocationId != null ? String(tutorial.createdLocationId) : null;
-    if (fromId) return fromId;
-
-    // 2) fallback: match by created title (exact match after trim)
-    const t = tutorial?.createdLocationTitle != null ? String(tutorial.createdLocationTitle).trim() : '';
-    if (t) {
-      const matched = (locationsSorted || []).find((l) => String(l?.title || '').trim() === t) || null;
-      if (matched?.id != null) return String(matched.id);
-      if (matched?.localId != null) return String(matched.localId);
-    }
-
-    // 3) last resort: newest item
-    const first = locationsSorted?.[0];
-    return first?.id != null ? String(first.id) : (first?.localId != null ? String(first.localId) : null);
-  }, [tutorial?.createdLocationId, tutorial?.createdLocationTitle, locationsSorted]);
-
-  const isAllowedCreatedLocation = useCallback((loc) => {
-    if (!loc) return false;
-    // ✅ 요청사항: title 기준으로 비교
-    if (tutorialTargetTitle) {
-      return String(loc?.title || '').trim() === String(tutorialTargetTitle).trim();
-    }
-    // 폴백: id/localId 기준
-    const targetId = tutorialTargetLocationId;
-    if (!targetId) return false;
-    const key = loc?.localId != null ? String(loc.localId) : (loc?.id != null ? String(loc.id) : null);
-    return !!(key && String(key) === String(targetId));
-  }, [tutorialTargetTitle, tutorialTargetLocationId]);
+    },
+  });
 
   const formatDateOnly = useCallback((isoLike) => {
     try {
@@ -801,7 +697,7 @@ const LocationsScreen = () => {
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>등록된 카테고리가 없습니다.</Text>
                 <Text style={styles.emptySubText}>
-                  오른쪽 하단의 + 버튼을 눌러 카테고리를 추가하세요.
+                  오른쪽 하단의 + 버튼을<br></br> 눌러 카테고리를 추가하세요.
                 </Text>
               </View>
             ) : (
@@ -970,438 +866,5 @@ const LocationsScreen = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f8f8',
-    padding: 16,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginVertical: 12,
-    color: '#333',
-  },
-  locationsContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  subscriptionExpiredBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffebee',
-    borderColor: '#ffcdd2',
-    borderWidth: 1,
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  subscriptionExpiredText: {
-    color: '#F44336',
-    fontSize: 12,
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 80, // 하단 버튼을 위한 여백
-  },
-  slotsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-start',
-    marginBottom: 20,
-  },
-  slotItem: {
-    width: 120,
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    margin: 8,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  slotIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  slotTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-    textAlign: 'center',
-  },
-  allProductsCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e8f5e9',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  locationIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  locationIconImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 25,
-  },
-  allProductsIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#c8e6c9',
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  locationInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  locationTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  locationDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#F44336',
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 4,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  addButton: {
-    position: 'absolute',
-    right: 16,
-    bottom: 16,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#4CAF50',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  tutorialAddButton: {
-    borderWidth: 3,
-    borderColor: '#1B5E20',
-    shadowOpacity: 0.35,
-    elevation: 8,
-  },
-  disabledAddButton: {
-    opacity: 0.7, // 비활성화된 버튼의 투명도 조절
-    backgroundColor: '#9E9E9E', // 비활성화된 버튼의 배경색 변경
-  },
-  slotCountBadge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FF9800',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
-  },
-  slotCountText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#666',
-    marginBottom: 8,
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  loginTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 8,
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  loginSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  previewContainer: {
-    width: '100%',
-    marginTop: 24,
-    paddingHorizontal: 4,
-    position: 'relative',
-    opacity: 0.9,
-  },
-  previewCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.35)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  previewLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 8,
-  },
-  previewIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(240,240,240,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  previewTitleBar: {
-    width: '60%',
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'rgba(224,224,224,0.6)',
-    marginBottom: 6,
-  },
-  previewSubtitleBar: {
-    width: '40%',
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: 'rgba(238,238,238,0.5)',
-  },
-  previewFade: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    backgroundColor: 'rgba(248,248,248,0.6)',
-  },
-  primaryBtn: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  primaryBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  locationListItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  locationListItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    minWidth: 0,
-  },
-  locationIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  locationListItemTextContainer: {
-    flex: 1,
-    minWidth: 0,
-  },
-  locationListItemTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  expiredBadge: {
-    minWidth: 28,
-    height: 22,
-    paddingHorizontal: 8,
-    borderRadius: 11,
-    backgroundColor: '#EF4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  expiredBadgeOnIcon: {
-    position: 'absolute',
-    // 아이콘 오른쪽 위에 살짝 겹치도록
-    top: -6,
-    right: -6,
-    minWidth: 22,
-    height: 18,
-    paddingHorizontal: 6,
-    borderRadius: 9,
-    backgroundColor: '#EF4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  expiredBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 14,
-    includeFontPadding: false,
-    textAlign: 'center',
-  },
-  chevronIcon: {
-    // chevron을 억지로 밀지 않고, 내용 영역이 자리를 양보하도록 처리
-    marginLeft: 8,
-    marginRight: 0,
-  },
-  tutorialBanner: {
-    backgroundColor: 'rgba(76,175,80,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(76,175,80,0.25)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
-  },
-  tutorialBannerText: {
-    color: '#1B5E20',
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
-  tutorialHighlight: {
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-  },
-  locationListItemDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  templateRemainingText: {
-    marginTop: 4,
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '700',
-  },
-  templateRemainingTextExpired: {
-    color: '#F44336',
-  },
-  templatePickerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: '#fff',
-  },
-  templatePickerItemSelected: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#e8f5e9',
-  },
-  templatePickerList: {
-    maxHeight: 260,
-  },
-  templatePickerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  templatePickerIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#e8f5e9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  templatePickerTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  templatePickerDesc: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-});
 
 export default LocationsScreen; 
