@@ -66,6 +66,14 @@ export const updateMemberProfile = async ({
   });
 };
 
+// PUT /v1/member/tutorial/success
+// 튜토리얼 완료 처리 (seen_tutorial=true)
+export const markTutorialSeenSuccess = async () => {
+  return request('/v1/member/tutorial/success', {
+    method: 'PUT',
+  });
+};
+
 export default {
   loginMember,
   refreshAccessToken,
@@ -74,6 +82,7 @@ export default {
   emailSignUp,
   fetchMemberProfile,
   updateMemberProfile,
+  markTutorialSeenSuccess,
 };
 
 

@@ -21,7 +21,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { givePresignedUrl } from '../api/commonApi';
-import { fetchMemberProfile, updateMemberProfile } from '../api/memberApi';
+import { fetchMemberProfile, markTutorialSeenSuccess, updateMemberProfile } from '../api/memberApi';
 import { createAdMobRewardRequest, fetchAdMobRewardRules } from '../api/rewardApi';
 import NotificationSettings from '../components/NotificationSettings';
 import { navigate as rootNavigate } from '../navigation/RootNavigation';
@@ -84,6 +84,14 @@ const ProfileScreen = () => {
     try {
       if (!tutorial?.active) return;
       if (tutorial?.step !== TUTORIAL_STEPS.PROFILE_INTRO) return;
+      // ✅ 모달이 뜨는 순간 바로 "seen_tutorial=true" 처리 API 호출
+      // (dev StrictMode 등으로 effect가 재실행되어도 중복 호출을 피하도록 user.seenTutorial을 즉시 올려 가드)
+      try {
+        if (isLoggedIn && !isAnonymous && user?.seenTutorial !== true) {
+          dispatch(updateUserInfo({ seenTutorial: true }));
+          markTutorialSeenSuccess().catch(() => {});
+        }
+      } catch (e) {}
       // ✅ 이전 모달의 버튼/콘텐츠가 순간 섞여 보이는 현상 방지
       setModalButtons(null);
       setModalContent(null);
@@ -109,7 +117,7 @@ const ProfileScreen = () => {
       ]);
       setModalVisible(true);
     } catch (e) {}
-  }, [tutorial?.active, tutorial?.step, dispatch]);
+  }, [tutorial?.active, tutorial?.step, dispatch, isAnonymous, isLoggedIn, user?.seenTutorial]);
 
   // ✅ 튜토리얼 인트로 모달에서는 하드웨어 back/제스처로 화면이 뒤로 가지 않게 차단
   useEffect(() => {
