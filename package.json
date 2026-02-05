@@ -1,6 +1,6 @@
 {
   "name": "somomi",
-  "version": "1.0.29",
+  "version": "1.0.30",
   "main": "index.js",
   "scripts": {
     "start": "expo start",
@@ -45,7 +45,8 @@
     "react-native-screens": "~3.33.0",
     "react-native-web": "~0.19.6",
     "react-native-webview": "13.6.4",
-    "react-redux": "^9.0.4"
+    "react-redux": "^9.0.4",
+    "react-native-svg": "14.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.23.3",

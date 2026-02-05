@@ -1,5 +1,5 @@
 import { isTemplateActive } from '../utils/validityUtils';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
 
 View,
@@ -60,6 +60,8 @@ import SignupPromptModal from '../components/SignupPromptModal';
 import SlotStatusBar from '../components/SlotStatusBar';
 import AlertModal from '../components/AlertModal';
 // 로그인 폼/소셜 버튼은 내 카테고리에서 노출하지 않음
+import { setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
+import TutorialTouchBlocker from '../components/TutorialTouchBlocker';
 
 const LocationsScreen = () => {
   const dispatch = useDispatch();
@@ -68,6 +70,7 @@ const LocationsScreen = () => {
   const route = useRoute();
   
   const { locations, status, error } = useSelector(state => state.locations);
+  const tutorial = useSelector((state) => state.tutorial);
   const { isAnonymous, isLoggedIn, userLocationTemplateInstances, subscription, locationTemplatesStatus } = useSelector(state => state.auth);
 
   // 자동 연동 모달 제거 (요청사항)
@@ -88,6 +91,150 @@ const LocationsScreen = () => {
   const [templatePickerSelectedTemplateId, setTemplatePickerSelectedTemplateId] = useState(null);
   const [expiredCountsByLocationId, setExpiredCountsByLocationId] = useState({});
   const [expiredTotalCount, setExpiredTotalCount] = useState(0);
+  const addButtonRef = useRef(null);
+  const [addButtonRect, setAddButtonRect] = useState(null);
+  const newestLocationRowRef = useRef(null);
+  const [newestLocationRowRect, setNewestLocationRowRect] = useState(null);
+  const didShowTutorialCongratsRef = useRef(false);
+
+  const blockerActive = !!(tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_LOCATIONS_PLUS);
+  const blockerActiveCongrats = !!(tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_CREATED_LOCATION_CONGRATS);
+  const blockerActiveNewestLocation = !!(tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_CREATED_LOCATION_CLICK);
+
+  // ✅ 안전장치: 어떤 이유로든 탭 클릭 이벤트에서 step advance가 누락되면,
+  // Locations 화면에 도착한 순간 WAIT_LOCATIONS_PLUS로 보정하여 + 버튼 오버레이가 보이게 합니다.
+  useEffect(() => {
+    try {
+      if (!isFocused) return;
+      if (!tutorial?.active) return;
+      if (tutorial?.step !== TUTORIAL_STEPS.WAIT_LOCATIONS_TAB) return;
+      dispatch(setTutorialStep({ step: TUTORIAL_STEPS.WAIT_LOCATIONS_PLUS }));
+    } catch (e) {}
+  }, [dispatch, isFocused, tutorial?.active, tutorial?.step]);
+
+  // ✅ 카테고리 생성 직후: 축하 안내(확인 후에만 "방금 만든 카테고리 터치" 단계로 이동)
+  useEffect(() => {
+    try {
+      if (!isFocused) return;
+      if (!blockerActiveCongrats) {
+        didShowTutorialCongratsRef.current = false;
+        return;
+      }
+      if (didShowTutorialCongratsRef.current) return;
+      // 다른 모달이 열려있으면(템플릿 선택 등) 우선 스킵
+      if (templatePickerVisible || alertModalVisible) return;
+
+      didShowTutorialCongratsRef.current = true;
+      setAlertModalConfig({
+        title: '튜토리얼',
+        message: "축하드려요~\n새로운 '카테고리'를 처음으로 만드셨네요~\n이제 '제품'을 만들러 가볼까요?",
+        buttons: [
+          {
+            text: '확인',
+            onPress: () => {
+              try { setAlertModalVisible(false); } catch (e) {}
+              try { dispatch(setTutorialStep({ step: TUTORIAL_STEPS.WAIT_CREATED_LOCATION_CLICK })); } catch (e) {}
+            },
+          },
+        ],
+        icon: 'checkmark-circle',
+        iconColor: '#4CAF50',
+      });
+      setAlertModalVisible(true);
+    } catch (e) {}
+  }, [
+    dispatch,
+    isFocused,
+    blockerActiveCongrats,
+    templatePickerVisible,
+    alertModalVisible,
+  ]);
+
+  const measureAddButton = useCallback(() => {
+    try {
+      const node = addButtonRef.current;
+      if (!node || typeof node.measureInWindow !== 'function') return;
+      node.measureInWindow((x, y, width, height) => {
+        if (typeof x === 'number' && typeof y === 'number') {
+          setAddButtonRect({ x, y, width, height });
+        }
+      });
+    } catch (e) {}
+  }, []);
+
+  const measureNewestLocationRow = useCallback(() => {
+    try {
+      const node = newestLocationRowRef.current;
+      if (!node || typeof node.measureInWindow !== 'function') return;
+      node.measureInWindow((x, y, width, height) => {
+        if (typeof x === 'number' && typeof y === 'number') {
+          setNewestLocationRowRect({ x, y, width, height });
+        }
+      });
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    if (!blockerActive) return;
+    const t = setTimeout(() => measureAddButton(), 0);
+    return () => clearTimeout(t);
+  }, [blockerActive, measureAddButton]);
+
+  useEffect(() => {
+    if (!blockerActiveNewestLocation) return;
+    const t = setTimeout(() => measureNewestLocationRow(), 50);
+    return () => clearTimeout(t);
+  }, [blockerActiveNewestLocation, measureNewestLocationRow, locations.length]);
+
+  const locationsSorted = useMemo(() => {
+    const list = Array.isArray(locations) ? [...locations] : [];
+    // newest first (fallback to id numeric)
+    list.sort((a, b) => {
+      const ta = new Date(a?.createdAt || a?.created_at || 0).getTime();
+      const tb = new Date(b?.createdAt || b?.created_at || 0).getTime();
+      if (Number.isFinite(tb) && Number.isFinite(ta) && tb !== ta) return tb - ta;
+      const na = parseInt(String(a?.id || a?.localId || 0), 10) || 0;
+      const nb = parseInt(String(b?.id || b?.localId || 0), 10) || 0;
+      return nb - na;
+    });
+    return list;
+  }, [locations]);
+
+  const tutorialTargetTitle = useMemo(() => {
+    const t = tutorial?.createdLocationTitle != null ? String(tutorial.createdLocationTitle).trim() : '';
+    return t || null;
+  }, [tutorial?.createdLocationTitle]);
+
+  const tutorialTargetLocationId = useMemo(() => {
+    // 1) explicit id from tutorial state
+    const fromId = tutorial?.createdLocationId != null ? String(tutorial.createdLocationId) : null;
+    if (fromId) return fromId;
+
+    // 2) fallback: match by created title (exact match after trim)
+    const t = tutorial?.createdLocationTitle != null ? String(tutorial.createdLocationTitle).trim() : '';
+    if (t) {
+      const matched = (locationsSorted || []).find((l) => String(l?.title || '').trim() === t) || null;
+      if (matched?.id != null) return String(matched.id);
+      if (matched?.localId != null) return String(matched.localId);
+    }
+
+    // 3) last resort: newest item
+    const first = locationsSorted?.[0];
+    return first?.id != null ? String(first.id) : (first?.localId != null ? String(first.localId) : null);
+  }, [tutorial?.createdLocationId, tutorial?.createdLocationTitle, locationsSorted]);
+
+  const isAllowedCreatedLocation = useCallback((loc) => {
+    if (!loc) return false;
+    // ✅ 요청사항: title 기준으로 비교
+    if (tutorialTargetTitle) {
+      return String(loc?.title || '').trim() === String(tutorialTargetTitle).trim();
+    }
+    // 폴백: id/localId 기준
+    const targetId = tutorialTargetLocationId;
+    if (!targetId) return false;
+    const key = loc?.localId != null ? String(loc.localId) : (loc?.id != null ? String(loc.id) : null);
+    return !!(key && String(key) === String(targetId));
+  }, [tutorialTargetTitle, tutorialTargetLocationId]);
 
   const formatDateOnly = useCallback((isoLike) => {
     try {
@@ -340,6 +487,11 @@ const LocationsScreen = () => {
 
   // 카테고리 추가 화면으로 이동 (카테고리 생성/수정 UI는 최소화하고, 제품 슬롯 관련 UI는 제거됨)
   const handleAddLocation = () => {
+    if (tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_LOCATIONS_PLUS) {
+      try { dispatch(setTutorialStep({ step: TUTORIAL_STEPS.WAIT_TEMPLATE_TOP })); } catch (e) {}
+      navigation.navigate('AddLocation', { tutorial: true });
+      return;
+    }
     navigation.navigate('AddLocation');
   };
   
@@ -356,6 +508,22 @@ const LocationsScreen = () => {
   };
 
   const handleLocationPress = (location) => {
+    // ✅ 튜토리얼: 생성된 카테고리만 클릭 가능
+    if (tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_CREATED_LOCATION_CLICK) {
+      if (!isAllowedCreatedLocation(location)) {
+        setAlertModalConfig({
+          title: '튜토리얼',
+          message: '방금 만든 카테고리를 눌러주세요.',
+          icon: 'information-circle-outline',
+          iconColor: '#4CAF50',
+          buttons: [{ text: '확인', style: 'plain' }],
+        });
+        setAlertModalVisible(true);
+        return;
+      }
+      try { dispatch(setTutorialStep({ step: TUTORIAL_STEPS.WAIT_LOCATION_ADD_PRODUCT })); } catch (e) {}
+    }
+
     // 템플릿 정보가 아직 로드되지 않은 상태(앱 재실행 직후 캐시만 있는 상태)에서는
     // "템플릿 미연동" 같은 오판단을 막기 위해 잠시 대기 안내만 보여줌
     if (isLoggedIn && !location?.templateInstanceId && locationTemplatesStatus !== 'succeeded') {
@@ -621,6 +789,11 @@ const LocationsScreen = () => {
           
           {/* 카테고리 목록 */}
           <Text style={styles.sectionTitle}>내 카테고리 목록</Text>
+          {tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_LOCATIONS_PLUS ? (
+            null
+          ) : null}
+          {/* 튜토리얼: 목록 클릭 유도는 오버레이로만 처리 */}
+          {/* 튜토리얼: 카테고리 상세 진입/제품 등록 유도는 오버레이로만 처리 */}
           
           {/* 카테고리 슬롯 리스트 */}
           <View style={styles.locationsContainer}>
@@ -633,12 +806,58 @@ const LocationsScreen = () => {
               </View>
             ) : (
               <FlatList
-                data={locations}
+                data={locationsSorted}
                 keyExtractor={(item) => String(item.localId || item.id)}
                 renderItem={({ item }) => (
                   <TouchableOpacity 
-                    style={styles.locationListItem}
+                    // NOTE: 일부 데이터는 localId만 존재할 수 있어 localId||id로 일관되게 비교합니다.
+                    // (튜토리얼 타겟/비활성화/측정 모두 동일 키 사용)
+                    // eslint-disable-next-line no-shadow
+                    ref={
+                      (() => {
+                        const itemKey = item?.localId != null ? String(item.localId) : (item?.id != null ? String(item.id) : null);
+                        const canMeasure =
+                          blockerActiveNewestLocation &&
+                          isAllowedCreatedLocation(item) &&
+                          (!tutorialTargetLocationId || (itemKey && String(itemKey) === String(tutorialTargetLocationId)));
+                        if (canMeasure) {
+                          return newestLocationRowRef;
+                        }
+                        return undefined;
+                      })()
+                    }
+                    collapsable={false}
+                    onLayout={() => {
+                      const itemKey = item?.localId != null ? String(item.localId) : (item?.id != null ? String(item.id) : null);
+                      const canMeasure =
+                        blockerActiveNewestLocation &&
+                        isAllowedCreatedLocation(item) &&
+                        (!tutorialTargetLocationId || (itemKey && String(itemKey) === String(tutorialTargetLocationId)));
+                      if (canMeasure) {
+                        measureNewestLocationRow();
+                      }
+                    }}
+                    style={[
+                      styles.locationListItem,
+                      (() => {
+                        const itemKey = item?.localId != null ? String(item.localId) : (item?.id != null ? String(item.id) : null);
+                        return tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_CREATED_LOCATION_CLICK && isAllowedCreatedLocation(item)
+                          ? styles.tutorialHighlight
+                          : null;
+                      })(),
+                      (() => {
+                        const itemKey = item?.localId != null ? String(item.localId) : (item?.id != null ? String(item.id) : null);
+                        return tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_CREATED_LOCATION_CLICK && !isAllowedCreatedLocation(item)
+                          ? { opacity: 0.5 }
+                          : null;
+                      })(),
+                    ]}
                     onPress={() => handleLocationPress(item)}
+                    disabled={
+                      tutorial?.active &&
+                      tutorial?.step === TUTORIAL_STEPS.WAIT_CREATED_LOCATION_CLICK &&
+                      !isAllowedCreatedLocation(item)
+                    }
                   >
                     <View style={styles.locationListItemContent}>
                       <View style={styles.locationIconContainer}>
@@ -693,7 +912,18 @@ const LocationsScreen = () => {
             )}
             
             {/* 카테고리 추가 버튼 (우측 하단에 고정) */}
-            <TouchableOpacity style={styles.addButton} onPress={handleAddLocation}>
+            <TouchableOpacity
+              ref={addButtonRef}
+              style={[
+                styles.addButton,
+                tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_LOCATIONS_PLUS ? styles.tutorialAddButton : null,
+              ]}
+              onPress={handleAddLocation}
+              collapsable={false}
+              onLayout={() => {
+                if (blockerActive) measureAddButton();
+              }}
+            >
               <Ionicons name="add" size={30} color="white" />
             </TouchableOpacity>
           </View>
@@ -718,6 +948,25 @@ const LocationsScreen = () => {
           />
         </>
       )}
+
+      <TutorialTouchBlocker
+        active={blockerActive}
+        holeRect={addButtonRect}
+        hideUntilHole={true}
+        message={"'카테고리'를 생성하기 위해서는\n오른쪽 하단의 + 버튼을 터치합니다"}
+      />
+      <TutorialTouchBlocker
+        active={blockerActiveNewestLocation}
+        holeRect={newestLocationRowRect}
+        hideUntilHole={true}
+        messagePlacement={'near'}
+        messagePlacementPreference={'below'}
+        message={
+          tutorialTargetTitle
+            ? `"${tutorialTargetTitle}" 카테고리를 터치해주세요.`
+            : '방금 만든 카테고리를 터치해주세요.'
+        }
+      />
     </View>
   );
 };
@@ -878,6 +1127,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  tutorialAddButton: {
+    borderWidth: 3,
+    borderColor: '#1B5E20',
+    shadowOpacity: 0.35,
+    elevation: 8,
   },
   disabledAddButton: {
     opacity: 0.7, // 비활성화된 버튼의 투명도 조절
@@ -1071,6 +1326,25 @@ const styles = StyleSheet.create({
     // chevron을 억지로 밀지 않고, 내용 영역이 자리를 양보하도록 처리
     marginLeft: 8,
     marginRight: 0,
+  },
+  tutorialBanner: {
+    backgroundColor: 'rgba(76,175,80,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(76,175,80,0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  tutorialBannerText: {
+    color: '#1B5E20',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  tutorialHighlight: {
+    borderWidth: 2,
+    borderColor: '#4CAF50',
   },
   locationListItemDescription: {
     fontSize: 14,

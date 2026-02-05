@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
 
   View, 
@@ -42,6 +42,8 @@ import IconSelector from '../components/IconSelector';
 import AlertModal from '../components/AlertModal';
 import { isTemplateActive } from '../utils/validityUtils';
 import { givePresignedUrl } from '../api/commonApi';
+import { categoryCreated, setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
+import TutorialTouchBlocker from '../components/TutorialTouchBlocker';
 
 const MAX_LOCATION_TITLE_LEN = 50;
 const MAX_LOCATION_DESC_LEN = 100;
@@ -50,13 +52,25 @@ const AddLocationScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const dispatch = useDispatch();
+  const scrollRef = useRef(null);
   
   // 수정 모드 여부 확인
   const isEditMode = route.params?.isEditMode || false;
   const locationToEdit = route.params?.location;
+  const tutorial = useSelector((state) => state.tutorial);
+  const isTutorialCreate = !!route.params?.tutorial && !isEditMode && tutorial?.active;
+  // ✅ 튜토리얼 전용: 이름 입력 추적(다른 effect에 의해 locationData가 덮여도 라벨이 즉시 반응하도록)
+  const [tutorialTitleDraft, setTutorialTitleDraft] = useState('');
+  const firstTemplateRef = useRef(null);
+  const [firstTemplateRect, setFirstTemplateRect] = useState(null);
+  const nameInputRef = useRef(null);
+  const [nameInputRect, setNameInputRect] = useState(null);
+  const saveBtnRef = useRef(null);
+  const [saveBtnRect, setSaveBtnRect] = useState(null);
+  const [tutorialToSaveTransitioning, setTutorialToSaveTransitioning] = useState(false);
   
   // 템플릿 인스턴스 및 구독 상태
-  const { userLocationTemplateInstances, slots, userProductSlotTemplateInstances, subscription, isLoggedIn } = useSelector((state) => state.auth);
+  const { userLocationTemplateInstances, slots, userProductSlotTemplateInstances, subscription, isLoggedIn, locationTemplatesStatus } = useSelector((state) => state.auth);
   const additionalProductSlots = slots?.productSlots?.additionalSlots || 0;
   const { locationProducts } = useSelector((state) => state.products);
   const { locations: locationsList } = useSelector((state) => state.locations);
@@ -102,6 +116,73 @@ const AddLocationScreen = () => {
   };
   // 사용 가능 + 미만료 템플릿만 필터링
   const availableTemplates = userLocationTemplateInstances.filter((template) => !template.used && !isTemplateExpired(template));
+  const tutorialFirstTemplateId = availableTemplates?.[0]?.id;
+  const blockerActiveTemplate = !!(isTutorialCreate && tutorial?.step === TUTORIAL_STEPS.WAIT_TEMPLATE_TOP);
+  const blockerActiveName = !!(isTutorialCreate && tutorial?.step === TUTORIAL_STEPS.WAIT_CATEGORY_NAME && !tutorialToSaveTransitioning);
+  const blockerActiveSave = !!(isTutorialCreate && tutorial?.step === TUTORIAL_STEPS.WAIT_CATEGORY_SAVE);
+  const tutorialNameFilled = String((isTutorialCreate ? tutorialTitleDraft : locationData?.title) || '').trim().length > 0;
+
+  useEffect(() => {
+    if (!isTutorialCreate) return;
+    // locationData.title이 바뀌면 드래프트도 동기화(초기값/외부 변경 대비)
+    try {
+      setTutorialTitleDraft(String(locationData?.title || ''));
+    } catch (e) {}
+  }, [isTutorialCreate, locationData?.title]);
+
+  const measureFirstTemplate = useCallback(() => {
+    try {
+      const node = firstTemplateRef.current;
+      if (!node || typeof node.measureInWindow !== 'function') return;
+      node.measureInWindow((x, y, width, height) => {
+        if (typeof x === 'number' && typeof y === 'number') {
+          setFirstTemplateRect({ x, y, width, height });
+        }
+      });
+    } catch (e) {}
+  }, []);
+
+  const measureNameInput = useCallback(() => {
+    try {
+      const node = nameInputRef.current;
+      if (!node || typeof node.measureInWindow !== 'function') return;
+      node.measureInWindow((x, y, width, height) => {
+        if (typeof x === 'number' && typeof y === 'number') {
+          setNameInputRect({ x, y, width, height });
+        }
+      });
+    } catch (e) {}
+  }, []);
+
+  const measureSaveBtn = useCallback(() => {
+    try {
+      const node = saveBtnRef.current;
+      if (!node || typeof node.measureInWindow !== 'function') return;
+      node.measureInWindow((x, y, width, height) => {
+        if (typeof x === 'number' && typeof y === 'number') {
+          setSaveBtnRect({ x, y, width, height });
+        }
+      });
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    if (!blockerActiveTemplate) return;
+    const t = setTimeout(() => measureFirstTemplate(), 0);
+    return () => clearTimeout(t);
+  }, [blockerActiveTemplate, measureFirstTemplate]);
+
+  useEffect(() => {
+    if (!blockerActiveName) return;
+    const t = setTimeout(() => measureNameInput(), 0);
+    return () => clearTimeout(t);
+  }, [blockerActiveName, measureNameInput]);
+
+  useEffect(() => {
+    if (!blockerActiveSave) return;
+    const t = setTimeout(() => measureSaveBtn(), 0);
+    return () => clearTimeout(t);
+  }, [blockerActiveSave, measureSaveBtn]);
 
   // 수정 모드에서 현재 카테고리에 연결된 템플릿이 만료되었는지 판단
   const linkedTemplateInEdit = isEditMode && locationToEdit ?
@@ -158,37 +239,23 @@ const AddLocationScreen = () => {
  
   // 스테이징 계산은 아래 선언 이후에 수행됩니다.
   
-  // 사용자의 템플릿 인스턴스 목록 콘솔 출력 및 템플릿 부족 확인
+  // 사용자의 템플릿 인스턴스 목록 콘솔 출력
   useEffect(() => {
-    // 컴포넌트 마운트 시 한 번만 실행되는 로직
     const checkTemplates = () => {
+      // 로그인 사용자: 템플릿 로딩이 끝나기 전(초기 빈 배열)에는 "템플릿 부족"을 띄우지 않음
+      if (isLoggedIn && locationTemplatesStatus !== 'succeeded') return;
+
       console.log('사용자의 현재 템플릿 인스턴스 목록:', userLocationTemplateInstances);
       console.log('사용 가능한 템플릿 인스턴스 목록:', availableTemplates);
       console.log('사용 중인 템플릿 인스턴스 목록:', userLocationTemplateInstances.filter((template) => template.used));
-      
-      // 수정 모드가 아니고 사용 가능한 템플릿이 없는 경우 뒤로 가기
-      if (!isEditMode && availableTemplates.length === 0) {
-        setAlertModalConfig({
-          title: '템플릿 부족',
-          message: '사용 가능한 카테고리 템플릿이 없습니다. 카테고리 목록으로 돌아갑니다.',
-          buttons: [
-            { 
-              text: '확인',
-              onPress: () => navigation.goBack()
-          }],
 
-          icon: 'alert-circle',
-          iconColor: '#F44336'
-        });
-        setAlertModalVisible(true);
-      }
+      // ✅ "템플릿 부족" 자동 모달/뒤로가기는 제거:
+      // - 템플릿 로딩 타이밍에 따라 잠깐 0개로 보이는 경우가 있어 오탐이 발생할 수 있음
+      // - 대신 화면 내 빈 상태 UI(템플릿 선택 섹션)로 안내하고, 저장 시점에 검증
     };
-    
-    // 초기 실행
+
     checkTemplates();
-    
-    // 이 useEffect는 컴포넌트 마운트 시 한 번만 실행
-  }, []);
+  }, [isEditMode, isLoggedIn, locationTemplatesStatus, availableTemplates.length, userLocationTemplateInstances]);
 
   // 수정 모드일 때 현재 위치의 제품 목록을 로드하여 현재 개수 기반 검증이 가능하도록 함
   useEffect(() => {
@@ -199,6 +266,17 @@ const AddLocationScreen = () => {
 
   // 뒤로 가기 핸들러(헤더 버튼)
   const handleGoBack = () => {
+    if (isTutorialCreate) {
+      setAlertModalConfig({
+        title: '튜토리얼',
+        message: '튜토리얼 진행 중에는 뒤로 갈 수 없어요.\n안내에 따라 카테고리를 먼저 만들어주세요.',
+        buttons: [{ text: '확인' }],
+        icon: 'information-circle-outline',
+        iconColor: '#4CAF50',
+      });
+      setAlertModalVisible(true);
+      return;
+    }
     if (!hasUnsavedChanges()) {
       navigation.goBack();
       return;
@@ -558,10 +636,11 @@ const AddLocationScreen = () => {
   // 선택된 템플릿이 있으면 기본 정보 설정 (생성 모드에서만)
   useEffect(() => {
     if (selectedTemplateInstance && !isEditMode) {
-      setLocationData({
-        ...locationData,
-        icon: selectedTemplateInstance.icon
-      });
+      // ✅ avoid overwriting user's typed title/description (stale closure bug)
+      setLocationData((prev) => ({
+        ...(prev || {}),
+        icon: selectedTemplateInstance.icon,
+      }));
     }
   }, [selectedTemplateInstance, isEditMode]);
 
@@ -681,25 +760,44 @@ const AddLocationScreen = () => {
     let next = value;
     if (key === 'title') next = String(value || '').slice(0, MAX_LOCATION_TITLE_LEN);
     if (key === 'description') next = String(value || '').slice(0, MAX_LOCATION_DESC_LEN);
-    setLocationData({
-      ...locationData,
-      [key]: next
-    });
+    // ✅ functional update to avoid stale closure during fast typing
+    setLocationData((prev) => ({
+      ...(prev || {}),
+      [key]: next,
+    }));
   };
   
   // 아이콘 선택 핸들러
   const handleIconSelect = (icon) => {
-    setLocationData({
-      ...locationData,
-      icon
-    });
+    setLocationData((prev) => ({
+      ...(prev || {}),
+      icon,
+    }));
     setIsIconSelectorVisible(false);
   };
   
   // 템플릿 인스턴스 선택 핸들러 (생성)
   const handleTemplateSelect = (template) => {
+    if (isTutorialCreate && tutorial?.step === TUTORIAL_STEPS.WAIT_TEMPLATE_TOP) {
+      const firstId = tutorialFirstTemplateId != null ? String(tutorialFirstTemplateId) : null;
+      if (firstId && String(template?.id) !== firstId) {
+        setAlertModalConfig({
+          title: '튜토리얼',
+          message: '가장 위에 있는 템플릿을 선택해주세요.',
+          buttons: [{ text: '확인' }],
+          icon: 'information-circle-outline',
+          iconColor: '#4CAF50',
+        });
+        setAlertModalVisible(true);
+        return;
+      }
+      try { dispatch(setTutorialStep({ step: TUTORIAL_STEPS.WAIT_CATEGORY_NAME })); } catch (e) {}
+    }
     setSelectedTemplateInstance(template);
   };
+
+  // 튜토리얼: AddLocation 화면에서만 쓰는 단계(WAIT_TEMPLATE_TOP/NAME/SAVE)일 때는 그대로 두고,
+  // 다른 단계(예: 생성 완료 후 WAIT_CREATED_LOCATION_CLICK)까지 덮어쓰지 않도록 "강제 세팅"을 제거합니다.
   // 템플릿 인스턴스 선택 핸들러 (수정)
   const handleEditTemplateSelect = (template) => {
     setSelectedEditTemplateInstance(template);
@@ -750,6 +848,19 @@ const AddLocationScreen = () => {
       return;
     }
     
+    // 튜토리얼: 저장 전 필수 단계 체크
+    if (isTutorialCreate && tutorial?.step === TUTORIAL_STEPS.WAIT_TEMPLATE_TOP && !selectedTemplateInstance) {
+      setAlertModalConfig({
+        title: '튜토리얼',
+        message: '가장 위 템플릿을 선택해주세요.',
+        buttons: [{ text: '확인' }],
+        icon: 'information-circle-outline',
+        iconColor: '#4CAF50',
+      });
+      setAlertModalVisible(true);
+      return;
+    }
+
     // 수정 모드가 아니고 템플릿이 선택되지 않은 경우에만 검증
     if (!selectedTemplateInstance && !isEditMode) {
     setAlertModalConfig({
@@ -920,6 +1031,8 @@ const AddLocationScreen = () => {
         })).unwrap();
         
         console.log('카테고리 생성 성공:', result);
+        const createdLocationIdForTutorial = result?.id != null ? String(result.id) : null;
+        const createdLocationTitleForTutorial = String(sanitizedTitle || '').trim() || null;
         
         // 생성된 카테고리 ID로 템플릿 인스턴스를 사용됨으로 표시
         dispatch(markTemplateInstanceAsUsed({
@@ -940,6 +1053,16 @@ const AddLocationScreen = () => {
             {
               text: '확인',
               onPress: () => {
+                try { setAlertModalVisible(false); } catch (e) {}
+                // ✅ 튜토리얼 단계 전환은 "성공" 모달을 닫은 뒤에만 수행
+                if (isTutorialCreate && createdLocationIdForTutorial) {
+                  try {
+                    dispatch(categoryCreated({
+                      locationId: createdLocationIdForTutorial,
+                      title: createdLocationTitleForTutorial,
+                    }));
+                  } catch (e) {}
+                }
                 // 스택의 최상위 화면(카테고리 목록)으로 이동
                 navigation.popToTop();
               }
@@ -1023,7 +1146,8 @@ const AddLocationScreen = () => {
         <View style={styles.headerRight} />
           </View>
       
-      <ScrollView style={styles.container}>
+      <ScrollView ref={scrollRef} style={styles.container}>
+        {/* 튜토리얼 단계 안내는 오버레이로 처리 */}
         {/* 템플릿 선택 섹션 (생성 모드에서만 표시) */}
         {!isEditMode &&
           <View style={styles.section}>
@@ -1037,11 +1161,16 @@ const AddLocationScreen = () => {
               <View style={styles.templateOptionsContainer}>
                 <ScrollView style={styles.templateOptionsScroll} nestedScrollEnabled>
                   <View style={styles.templateOptions}>
-                    {availableTemplates.map((template) => {
+                    {availableTemplates.map((template, idx) => {
                       const expiryText = getTemplateExpiryText(template);
                       return (
           <TouchableOpacity 
                         key={template.id}
+                        ref={isTutorialCreate && idx === 0 ? firstTemplateRef : undefined}
+                        collapsable={false}
+                        onLayout={() => {
+                          if (isTutorialCreate && idx === 0 && blockerActiveTemplate) measureFirstTemplate();
+                        }}
                         style={[
                           styles.templateOption,
                   selectedTemplateInstance?.id === template.id && styles.selectedTemplateOption]
@@ -1171,12 +1300,21 @@ const AddLocationScreen = () => {
           <View style={styles.formGroup}>
             <Text style={styles.label}>이름</Text>
           <TextInput
+              ref={nameInputRef}
               style={styles.input}
               value={locationData.title}
-              onChangeText={(text) => handleInputChange('title', text)}
+              onChangeText={(text) => {
+                if (isTutorialCreate) {
+                  try { setTutorialTitleDraft(String(text || '')); } catch (e) {}
+                }
+                handleInputChange('title', text);
+              }}
               placeholder="카테고리 이름 입력..."
               placeholderTextColor="#999"
               maxLength={MAX_LOCATION_TITLE_LEN}
+              onLayout={() => {
+                if (blockerActiveName) measureNameInput();
+              }}
               editable={!(isEditMode && isEditLockedByExpiry)} />
           <Text style={styles.inputHint}>최대 {MAX_LOCATION_TITLE_LEN}자</Text>
 
@@ -1287,9 +1425,30 @@ const AddLocationScreen = () => {
 
         {/* 저장 버튼 (카테고리 생성/수정은 기능적으로 수행하되 문구는 '저장'으로 통일) */}
                       <TouchableOpacity
-          style={styles.createButton}
-          onPress={handleCreateLocation}
-          disabled={isLoading || imageUploading}>
+          ref={saveBtnRef}
+          style={[
+            styles.createButton,
+            isTutorialCreate && tutorial?.step === TUTORIAL_STEPS.WAIT_CATEGORY_SAVE ? styles.tutorialPrimaryCta : null,
+          ]}
+          onPress={() => {
+            if (isTutorialCreate && tutorial?.step !== TUTORIAL_STEPS.WAIT_CATEGORY_SAVE) {
+              setAlertModalConfig({
+                title: '튜토리얼',
+                message: '먼저 안내에 따라 템플릿 선택과 이름 입력을 완료해주세요.',
+                buttons: [{ text: '확인' }],
+                icon: 'information-circle-outline',
+                iconColor: '#4CAF50',
+              });
+              setAlertModalVisible(true);
+              return;
+            }
+            handleCreateLocation();
+          }}
+          disabled={isLoading || imageUploading}
+          collapsable={false}
+          onLayout={() => {
+            if (blockerActiveSave) measureSaveBtn();
+          }}>
 
           {isLoading ?
           <ActivityIndicator size="small" color="#fff" /> :
@@ -1319,6 +1478,56 @@ const AddLocationScreen = () => {
       
         {/* (제거) 추가 제품 슬롯 등록 수량 선택 모달 */}
       </ScrollView>
+      <TutorialTouchBlocker
+        active={blockerActiveTemplate}
+        holeRect={firstTemplateRect}
+        message={'가장 위 템플릿을\n클릭해주세요.'}
+        hideUntilHole={true}
+        messagePlacement={'near'}
+        messagePlacementPreference={'below'}
+        actionLabel={'클릭'}
+      />
+      <TutorialTouchBlocker
+        active={blockerActiveName}
+        holeRect={nameInputRect}
+        message={'카테고리 이름을 작성해주세요.'}
+        actionLabel={tutorialNameFilled ? '작성 완료 (다음으로 넘어가기)' : '작성'}
+        actionLabelPlacement={'below'}
+        onActionPress={
+          tutorialNameFilled
+            ? () => {
+                // ✅ 먼저 "이름만 입력 가능" 오버레이를 즉시 제거하고(자연스럽게),
+                //    스크롤 중에는 전체 화면을 막은 상태로 유지한 뒤 저장 오버레이로 전환합니다.
+                try { setTutorialToSaveTransitioning(true); } catch (e) {}
+                try {
+                  // 1) 스크롤을 맨 아래로 이동
+                  scrollRef.current?.scrollToEnd?.({ animated: true });
+                } catch (e) {}
+                // 2) 스크롤 후 저장 단계로 전환 (저장 버튼만 터치 가능)
+                setTimeout(() => {
+                  try { setTutorialToSaveTransitioning(false); } catch (e) {}
+                  try { dispatch(setTutorialStep({ step: TUTORIAL_STEPS.WAIT_CATEGORY_SAVE })); } catch (e) {}
+                  // 저장 버튼 위치 재측정
+                  setTimeout(() => {
+                    try { measureSaveBtn(); } catch (e) {}
+                  }, 250);
+                }, 350);
+              }
+            : undefined
+        }
+      />
+      <TutorialTouchBlocker
+        active={!!(isTutorialCreate && tutorial?.step === TUTORIAL_STEPS.WAIT_CATEGORY_NAME && tutorialToSaveTransitioning)}
+        holeRect={null}
+        message={'아래로 이동 중이에요.\n잠시만 기다려주세요.'}
+        actionLabel={'대기'}
+      />
+      <TutorialTouchBlocker
+        active={blockerActiveSave}
+        holeRect={saveBtnRect}
+        message={'아래 “저장” 부분을\n터치해주세요.'}
+        actionLabel={'터치'}
+      />
     </SafeAreaView>);
 
 };
@@ -1375,6 +1584,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginBottom: 16
+  },
+  tutorialBanner: {
+    backgroundColor: 'rgba(76,175,80,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(76,175,80,0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  tutorialBannerText: {
+    color: '#1B5E20',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  tutorialPrimaryCta: {
+    borderWidth: 3,
+    borderColor: '#1B5E20',
   },
   formGroup: {
     marginBottom: 16

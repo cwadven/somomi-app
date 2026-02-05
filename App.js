@@ -25,6 +25,9 @@ import { processSyncQueueIfOnline } from './src/utils/syncManager';
 import { loadData, saveData, STORAGE_KEYS } from './src/utils/storageUtils';
 import { scheduleDailyReminderIfNeeded, scheduleDailyUpdateReminderIfNeeded } from './src/utils/notificationUtils';
 import { fetchServiceMeta } from './src/api/commonApi';
+import { startTutorial, setTutorialStep, TUTORIAL_STEPS } from './src/redux/slices/tutorialSlice';
+import { updateMemberProfile } from './src/api/memberApi';
+import { navigationRef, navigate as rootNavigate } from './src/navigation/RootNavigation';
 
 // Firebase 관련 모듈은 웹이 아닌 환경에서만 import
 let messaging;
@@ -79,6 +82,8 @@ if (typeof localStorage === 'undefined') {
 const AppContent = () => {
   const dispatch = useDispatch();
   const { isLoggedIn, user, subscription, slots } = useSelector(state => state.auth);
+  const tutorial = useSelector((state) => state.tutorial);
+  const tutorialNavRetryRef = useRef({ timer: null, tries: 0 });
 
   // ====== 서비스 메타(점검/업데이트) 게이트 ======
   const [serviceGateVisible, setServiceGateVisible] = useState(false);
@@ -532,6 +537,59 @@ const AppContent = () => {
   useEffect(() => {
     initializeApp();
   }, [dispatch]);
+
+  const goToTutorialStart = useCallback(() => {
+    const attemptNavigate = () => {
+      try {
+        if (!navigationRef?.isReady?.()) return false;
+        // ✅ 튜토리얼 시작은 "프로필"에서 안내 → 사용자가 "내 카테고리" 탭을 직접 누르게 유도
+        rootNavigate('Profile');
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+
+    // 즉시 시도 후, NavigationContainer 준비 전이면 짧게 재시도
+    if (attemptNavigate()) return;
+
+    try {
+      if (tutorialNavRetryRef.current.timer) clearTimeout(tutorialNavRetryRef.current.timer);
+    } catch (e) {}
+    tutorialNavRetryRef.current.tries = 0;
+
+    const tick = () => {
+      tutorialNavRetryRef.current.tries += 1;
+      if (attemptNavigate()) return;
+      if (tutorialNavRetryRef.current.tries >= 30) return; // ~4-5초
+      tutorialNavRetryRef.current.timer = setTimeout(tick, 150);
+    };
+    tutorialNavRetryRef.current.timer = setTimeout(tick, 150);
+  }, []);
+
+  // ✅ 튜토리얼 강제 실행: 로그인 후 seen_tutorial=false 이면 카테고리 생성부터 시작
+  useEffect(() => {
+    try {
+      if (!isLoggedIn || !user) return;
+      if (tutorial?.active) return;
+      // ✅ 튜토리얼을 "완료(DONE)"한 세션에서는 seenTutorial=false여도 재시작하지 않음
+      if (tutorial?.step === TUTORIAL_STEPS.DONE) return;
+      if (user?.seenTutorial !== false) return;
+      dispatch(startTutorial());
+      try {
+        dispatch(setTutorialStep({ step: TUTORIAL_STEPS.PROFILE_INTRO }));
+      } catch (e) {}
+      try { goToTutorialStart(); } catch (e) {}
+    } catch (e) {}
+  }, [isLoggedIn, user?.seenTutorial, tutorial?.active, tutorial?.step, dispatch, goToTutorialStart]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        if (tutorialNavRetryRef.current.timer) clearTimeout(tutorialNavRetryRef.current.timer);
+      } catch (e) {}
+    };
+  }, []);
 
   // ✅ 강제 업데이트/점검 상태에서 스토어 갔다가 돌아와도 앱을 못 쓰게 처리
   useEffect(() => {

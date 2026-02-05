@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { saveUserLocationTemplates, loadUserLocationTemplates, saveUserProductSlotTemplates, loadUserProductSlotTemplates, saveJwtToken, loadJwtToken, removeJwtToken, loadDeviceId, saveLocations, saveProducts, saveConsumedProducts, saveRefreshToken, removeRefreshToken, removeData, STORAGE_KEYS } from '../../utils/storageUtils';
-import { loginMember } from '../../api/memberApi';
+import { fetchMemberProfile, loginMember } from '../../api/memberApi';
 import { fetchGuestSectionTemplates } from '../../api/sectionApi';
 import { generateId } from '../../utils/idUtils';
 
@@ -99,8 +99,18 @@ export const loginUser = createAsyncThunk(
       if (!accessToken) throw new Error('로그인 정보가 올바르지 않습니다.');
       await saveJwtToken(accessToken);
       if (refreshToken) await saveRefreshToken(refreshToken);
-      // 서버에서 사용자 정보 별도 제공 전까지 최소 프로필 구성
-      const user = { id: 'me', username };
+      // 서버에서 사용자 정보 별도 제공 전까지 최소 프로필 구성 (+ 튜토리얼 플래그)
+      let user = { id: 'me', username, seenTutorial: true };
+      try {
+        const profile = await fetchMemberProfile();
+        const seen = profile?.seen_tutorial;
+        if (typeof seen === 'boolean') user = { ...user, seenTutorial: seen };
+        // 기타 식별자도 함께 세팅
+        const memberIdRaw = profile?.member_id;
+        const guestIdRaw = profile?.guest_id;
+        if (memberIdRaw != null) user = { ...user, memberId: String(memberIdRaw) };
+        if (guestIdRaw != null) user = { ...user, guestId: String(guestIdRaw), customerId: String(guestIdRaw) };
+      } catch (e) {}
       // 로그인 직후 내 템플릿 최신화
       try {await dispatch(loadUserLocationTemplateInstances()).unwrap();} catch (e) {}
       try {await dispatch(loadUserProductSlotTemplateInstances()).unwrap();} catch (e) {}
@@ -170,16 +180,49 @@ export const verifyToken = createAsyncThunk(
       const savedTemplates = await loadUserLocationTemplates();
       console.log('저장된 템플릿 인스턴스:', savedTemplates);
 
-      // 회원 토큰인 경우 사용자 정보 포함 (임시)
-      console.log('회원 토큰 검증 성공:', token);
+      // ✅ 회원 토큰: 프로필을 실제로 받아서 seen_tutorial까지 반영
+      let user = getState?.()?.auth?.user || { id: '1', username: '사용자', email: 'user@example.com', seenTutorial: true };
+      try {
+        const profile = await fetchMemberProfile();
+        const memberIdRaw = profile?.member_id;
+        const guestIdRaw = profile?.guest_id;
+        const nickname = profile?.nickname || user?.username || '사용자';
+        const profileImage = profile?.profile_image_url ?? user?.profileImage ?? null;
+        const categoryAlarmEnabled =
+          typeof profile?.category_alarm_enabled === 'boolean'
+            ? profile.category_alarm_enabled
+            : (typeof user?.categoryAlarmEnabled === 'boolean' ? user.categoryAlarmEnabled : true);
+        const seenTutorial =
+          typeof profile?.seen_tutorial === 'boolean'
+            ? profile.seen_tutorial
+            : (typeof user?.seenTutorial === 'boolean' ? user.seenTutorial : true);
+        user = {
+          ...user,
+          id: memberIdRaw != null ? String(memberIdRaw) : (user?.id || '1'),
+          memberId: memberIdRaw != null ? String(memberIdRaw) : user?.memberId,
+          guestId: guestIdRaw != null ? String(guestIdRaw) : user?.guestId,
+          customerId: guestIdRaw != null ? String(guestIdRaw) : user?.customerId,
+          username: nickname,
+          name: nickname,
+          email: undefined,
+          profileImage,
+          categoryAlarmEnabled,
+          seenTutorial,
+        };
+      } catch (e) {
+        const status = e?.response?.status;
+        // 토큰이 만료/무효면 로그아웃 상태로
+        if (status === 401) {
+          try { await removeJwtToken(); } catch (err) {}
+          return { token: null, deviceId };
+        }
+        // 기타 오류는 기존 user 유지
+      }
+
       return {
         token,
         isAnonymous: false,
-        user: {
-          id: '1',
-          username: '사용자',
-          email: 'user@example.com'
-        },
+        user,
         templates: savedTemplates,
         deviceId
       };

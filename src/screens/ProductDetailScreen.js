@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { 
 
   View, 
@@ -18,6 +18,8 @@ import {
 
 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
+import { productCreated, setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
+import TutorialTouchBlocker from '../components/TutorialTouchBlocker';
 
 
 
@@ -176,8 +178,9 @@ const ProductDetailScreen = () => {
   // 저장 후에도 화면이 최신화되지 않을 수 있습니다. store의 products에서도 찾아서 우선 사용합니다.
   const fromProducts = Array.isArray(products) && resolvedProductId ? products.find((p) => String(p?.id) === String(resolvedProductId)) : null;
   const currentProduct = cachedFromSections || selectedProduct || fromProducts || passedProduct;
-  const { userLocationTemplateInstances, userProductSlotTemplateInstances, subscription, slots } = useSelector((state) => state.auth);
+  const { user, userLocationTemplateInstances, userProductSlotTemplateInstances, subscription, slots } = useSelector((state) => state.auth);
   const { locations, status: locationsStatus, error: locationsError } = useSelector((state) => state.locations);
+  const tutorial = useSelector((state) => state.tutorial);
   const isConsumed = currentProduct?.isConsumed === true || currentProduct?.is_consumed === true;
   const [iconLoadFailed, setIconLoadFailed] = useState(false);
   const iconUri = typeof currentProduct?.iconUrl === 'string' && currentProduct.iconUrl.trim() !== '' ? currentProduct.iconUrl : null;
@@ -759,11 +762,124 @@ const ProductDetailScreen = () => {
   const [showEstimatedEndDatePicker, setShowEstimatedEndDatePicker] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null); // create 모드에서 locationId 없을 때 사용
   const didInitEditLocationRef = useRef(false);
+  const overlayHostRef = useRef(null);
   const formScrollRef = useRef(null);
+  const productNameInputRef = useRef(null);
+  const [productNameInputRect, setProductNameInputRect] = useState(null);
+  const saveBtnRef = useRef(null);
+  const [saveBtnRect, setSaveBtnRect] = useState(null);
+  const [tutorialProductNameDraft, setTutorialProductNameDraft] = useState('');
+  const [tutorialToSaveTransitioning, setTutorialToSaveTransitioning] = useState(false);
   const memoInputRef = useRef(null);
   const memoYRef = useRef(0);
   const memoFocusedRef = useRef(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const isTutorialProductCreate =
+    !!route?.params?.tutorial &&
+    tutorial?.active === true &&
+    screenMode === 'create';
+
+  const tutorialProductNameFilled = String((isTutorialProductCreate ? tutorialProductNameDraft : productName) || '').trim().length > 0;
+
+  const blockerActiveName = !!(
+    isTutorialProductCreate &&
+    tutorial?.step === TUTORIAL_STEPS.WAIT_PRODUCT_NAME &&
+    !tutorialToSaveTransitioning
+  );
+  const blockerActiveSave = !!(isTutorialProductCreate && tutorial?.step === TUTORIAL_STEPS.WAIT_PRODUCT_SAVE);
+
+  const measureProductNameInput = useCallback(() => {
+    try {
+      const node = productNameInputRef.current;
+      if (!node) return;
+      // ✅ use window coords (TutorialTouchBlocker converts window→overlay local)
+      if (typeof node.measureInWindow !== 'function') return;
+      node.measureInWindow((x, y, width, height) => {
+        if (typeof x === 'number' && typeof y === 'number') {
+          setProductNameInputRect({ x, y, width, height });
+        }
+      });
+    } catch (e) {}
+  }, []);
+
+  const ensureMeasureProductNameInput = useCallback(() => {
+    let tries = 0;
+    const tick = () => {
+      tries += 1;
+      try { measureProductNameInput(); } catch (e) {}
+      if (tries >= 10) return;
+      setTimeout(tick, 80);
+    };
+    setTimeout(tick, 0);
+  }, [measureProductNameInput]);
+
+  const ensureMeasureSaveBtn = useCallback(() => {
+    let tries = 0;
+    const tick = () => {
+      tries += 1;
+      try { measureSaveBtn(); } catch (e) {}
+      if (tries >= 10) return;
+      setTimeout(tick, 80);
+    };
+    setTimeout(tick, 0);
+  }, [measureSaveBtn]);
+
+  const measureSaveBtn = useCallback(() => {
+    try {
+      const node = saveBtnRef.current;
+      if (!node) return;
+      // ✅ use window coords (TutorialTouchBlocker converts window→overlay local)
+      if (typeof node.measureInWindow !== 'function') return;
+      node.measureInWindow((x, y, width, height) => {
+        if (typeof x === 'number' && typeof y === 'number') {
+          setSaveBtnRect({ x, y, width, height });
+        }
+      });
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    if (!isTutorialProductCreate) return;
+    // 튜토리얼 create 진입 시 기본은 제품명 작성부터
+    if (tutorial?.step === TUTORIAL_STEPS.WAIT_PRODUCT_NAME) return;
+    if (tutorial?.step === TUTORIAL_STEPS.WAIT_PRODUCT_SAVE) return;
+    // ✅ 제품 생성 완료 후에는 축하 단계로 넘어가므로, 여기서 다시 "제품명 작성"으로 되돌리지 않음
+    if (tutorial?.step === TUTORIAL_STEPS.WAIT_CREATED_PRODUCT_CONGRATS) return;
+    try { dispatch(setTutorialStep({ step: TUTORIAL_STEPS.WAIT_PRODUCT_NAME })); } catch (e) {}
+  }, [dispatch, isTutorialProductCreate, tutorial?.step]);
+
+  useEffect(() => {
+    if (!isTutorialProductCreate) return;
+    try { setTutorialProductNameDraft(String(productName || '')); } catch (e) {}
+  }, [isTutorialProductCreate, productName]);
+
+  useEffect(() => {
+    if (!blockerActiveName) return;
+    ensureMeasureProductNameInput();
+  }, [blockerActiveName, ensureMeasureProductNameInput]);
+
+  // ✅ 튜토리얼에서는 네비게이션 헤더/뒤로가기 제스처를 완전히 비활성화
+  useEffect(() => {
+    try {
+      if (!navigation?.setOptions) return;
+      if (isTutorialProductCreate && (tutorial?.step === TUTORIAL_STEPS.WAIT_PRODUCT_NAME || tutorial?.step === TUTORIAL_STEPS.WAIT_PRODUCT_SAVE)) {
+        navigation.setOptions({
+          headerShown: false,
+          gestureEnabled: false,
+        });
+      } else {
+        navigation.setOptions({
+          gestureEnabled: true,
+        });
+      }
+    } catch (e) {}
+  }, [navigation, isTutorialProductCreate, tutorial?.step]);
+
+  useEffect(() => {
+    if (!blockerActiveSave) return;
+    ensureMeasureSaveBtn();
+  }, [blockerActiveSave, ensureMeasureSaveBtn]);
 
   const openExternalUrl = async (rawUrl) => {
     try {
@@ -1070,7 +1186,14 @@ const ProductDetailScreen = () => {
         expire_at: expiryDateObj ? expiryDateObj.toISOString() : null
       };
       const createRes = await createInventoryItemInSection(locIdAfter, body);
-      const newId = createRes?.guest_inventory_item_id ? String(createRes.guest_inventory_item_id) : undefined;
+      const rawId =
+        createRes?.guest_inventory_item_id ??
+        createRes?.guestInventoryItemId ??
+        createRes?.id ??
+        createRes?.guest_inventory_item?.id ??
+        createRes?.guestInventoryItem?.id ??
+        undefined;
+      const newId = rawId != null ? String(rawId) : undefined;
       const createdAt = createRes?.created_at || createRes?.createdAt || new Date().toISOString();
       const created = {
         id: newId,
@@ -1375,7 +1498,14 @@ const ProductDetailScreen = () => {
             expire_at: expiryDateObj ? expiryDateObj.toISOString() : null
           };
           const createRes = await createInventoryItemInSection(locIdAfter, body);
-          const newId = createRes?.guest_inventory_item_id ? String(createRes.guest_inventory_item_id) : undefined;
+          const rawId =
+            createRes?.guest_inventory_item_id ??
+            createRes?.guestInventoryItemId ??
+            createRes?.id ??
+            createRes?.guest_inventory_item?.id ??
+            createRes?.guestInventoryItem?.id ??
+            undefined;
+          const newId = rawId != null ? String(rawId) : undefined;
           const createdAt = createRes?.created_at || createRes?.createdAt || new Date().toISOString();
           const created = {
             id: newId,
@@ -1396,6 +1526,21 @@ const ProductDetailScreen = () => {
           try {emitEvent(EVENT_NAMES.PRODUCT_CREATED, { product: created });} catch (e) {}
           if (availableAssigned && created.id) {
             try {dispatch(markProductSlotTemplateAsUsed({ templateId: availableAssigned.id, productId: created.id }));} catch (e) {}
+          }
+
+          // ✅ 튜토리얼: 제품 생성 축하 단계로 이동 (완료 처리는 다음 화면에서)
+          // - 일부 환경에서 step 타이밍(closure) 이슈로 WAIT_PRODUCT_SAVE 체크가 누락되며 축하 단계로 못 넘어가는 케이스가 있어,
+          //   "튜토리얼 제품 생성 플로우" 자체로 판단합니다.
+          if (isTutorialProductCreate && tutorial?.active) {
+            try {
+              dispatch(
+                productCreated({
+                  productId: created?.id,
+                  name: created?.name,
+                  locationId: created?.locationId,
+                })
+              );
+            } catch (e) {}
           }
           navigation.goBack();
           return;
@@ -1467,10 +1612,13 @@ const ProductDetailScreen = () => {
 
     return (
       <KeyboardAvoidingView
+        ref={overlayHostRef}
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         // iOS에서 헤더/상단바가 있을 때 입력창이 덜 가려지도록 약간 오프셋
         keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+        collapsable={false}
+        onLayout={() => {}}
       >
       <ScrollView
         ref={formScrollRef}
@@ -1565,7 +1713,22 @@ const ProductDetailScreen = () => {
           <Text style={[styles.formLabel, styles.requiredLabel]}>
             제품명 <Text style={styles.requiredAsterisk}>*</Text>
           </Text>
-          <TextInput style={styles.formInput} value={productName} onChangeText={setProductName} placeholder="제품명을 입력하세요" />
+          <TextInput
+            ref={productNameInputRef}
+            style={styles.formInput}
+            value={productName}
+            onChangeText={(txt) => {
+              if (isTutorialProductCreate) {
+                try { setTutorialProductNameDraft(String(txt || '')); } catch (e) {}
+              }
+              setProductName(txt);
+            }}
+            placeholder="제품명을 입력하세요"
+            collapsable={false}
+            onLayout={() => {
+              if (blockerActiveName) measureProductNameInput();
+            }}
+          />
 
           {/* 날짜 입력: 웹은 텍스트, 앱(iOS/Android)은 DateTimePicker UI */}
           {Platform.OS === 'web' ?
@@ -1806,7 +1969,16 @@ const ProductDetailScreen = () => {
             />
           </View>
 
-          <TouchableOpacity style={[styles.formSaveButton, !canSave && { opacity: 0.5 }]} disabled={!canSave} onPress={onSave}>
+          <TouchableOpacity
+            ref={saveBtnRef}
+            style={[styles.formSaveButton, !canSave && { opacity: 0.5 }]}
+            disabled={!canSave}
+            onPress={onSave}
+            collapsable={false}
+            onLayout={() => {
+              if (blockerActiveSave) measureSaveBtn();
+            }}
+          >
             <Text style={styles.formSaveButtonText}>
               {imageUploading ? '업로드중...' : (isCreate ? '등록' : '저장')}
             </Text>
@@ -2126,7 +2298,15 @@ const ProductDetailScreen = () => {
     <View style={styles.mainContainer}>
       {/* 헤더 */}
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => {
+            // ✅ 튜토리얼 진행 중에는 뒤로가기 차단
+            if (isTutorialProductCreate) return;
+            navigation.goBack();
+          }}
+          style={styles.backButton}
+          disabled={isTutorialProductCreate}
+        >
           <Ionicons name="arrow-back" size={24} color="#4CAF50" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
@@ -2155,6 +2335,44 @@ const ProductDetailScreen = () => {
 
       {/* 탭 내용 */}
       {screenMode === 'edit' || screenMode === 'create' ? renderCreateEditForm() : renderProductDetails()}
+
+      {/* ✅ 튜토리얼 오버레이: 화면 최상단(헤더/탭 포함)을 덮도록 여기서 렌더 */}
+      <TutorialTouchBlocker
+        active={blockerActiveName}
+        holeRect={productNameInputRect}
+        message={'제품명을 입력해주세요.'}
+        hideUntilHole={true}
+        messagePlacement={'near'}
+        // "작성/다음으로" 라벨이 입력칸 아래에 있으므로, 메시지는 위로 붙여 가리지 않도록 함
+        messagePlacementPreference={'above'}
+        actionLabel={tutorialProductNameFilled ? '다음으로' : '작성'}
+        actionLabelPlacement={'below'}
+        onActionPress={
+          tutorialProductNameFilled
+            ? () => {
+                try { setTutorialToSaveTransitioning(true); } catch (e) {}
+                try { formScrollRef.current?.scrollToEnd?.({ animated: true }); } catch (e) {}
+                setTimeout(() => {
+                  try { setTutorialToSaveTransitioning(false); } catch (e) {}
+                  try { dispatch(setTutorialStep({ step: TUTORIAL_STEPS.WAIT_PRODUCT_SAVE })); } catch (e) {}
+                  ensureMeasureSaveBtn();
+                }, 350);
+              }
+            : undefined
+        }
+      />
+      <TutorialTouchBlocker
+        active={!!(isTutorialProductCreate && tutorial?.step === TUTORIAL_STEPS.WAIT_PRODUCT_NAME && tutorialToSaveTransitioning)}
+        holeRect={null}
+        message={'아래로 이동 중이에요.\n잠시만 기다려주세요.'}
+        actionLabel={'대기'}
+      />
+      <TutorialTouchBlocker
+        active={blockerActiveSave}
+        holeRect={saveBtnRect}
+        message={'하단의 “등록” 버튼을\n터치해주세요.'}
+        actionLabel={'터치'}
+      />
 
       {/* 하단 액션 버튼 */}
       {screenMode === 'view' && !isConsumed &&

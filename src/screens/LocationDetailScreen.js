@@ -15,6 +15,7 @@ import {
   TextInput
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+import { completeTutorial, setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchLocationById, deleteLocation } from '../redux/slices/locationsSlice';
@@ -24,6 +25,7 @@ import ProductCard from '../components/ProductCard';
 import SlotStatusBar from '../components/SlotStatusBar';
 import LocationNotificationSettings from '../components/LocationNotificationSettings';
 import { onEvent, EVENT_NAMES } from '../utils/eventBus';
+import TutorialTouchBlocker from '../components/TutorialTouchBlocker';
 
 const LocationDetailScreen = () => {
   const navigation = useNavigation();
@@ -35,7 +37,8 @@ const LocationDetailScreen = () => {
   
   const { currentLocation, status, error, locations } = useSelector(state => state.locations);
   const { products, locationProducts: locationProductsCache, status: productsStatus, error: productsError, locationProductsMeta } = useSelector(state => state.products);
-  const { slots, userProductSlotTemplateInstances, subscription, userLocationTemplateInstances } = useSelector(state => state.auth);
+  const { user, slots, userProductSlotTemplateInstances, subscription, userLocationTemplateInstances } = useSelector(state => state.auth);
+  const tutorial = useSelector(state => state.tutorial);
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -54,6 +57,61 @@ const LocationDetailScreen = () => {
   const productsListRef = React.useRef(null);
   const lastScrollOffsetRef = React.useRef(0);
   const shouldRestoreScrollRef = React.useRef(false);
+  const addProductButtonRef = React.useRef(null);
+  const [addProductButtonRect, setAddProductButtonRect] = useState(null);
+  const createdProductRowRef = React.useRef(null);
+  const [createdProductRowRect, setCreatedProductRowRect] = useState(null);
+
+  // ✅ 튜토리얼(제품 등록 단계): 이 화면에서는 + 버튼만 터치 가능하게 완전 잠금
+  const lockAddProductTutorial = !!(
+    tutorial?.active &&
+    tutorial?.step === TUTORIAL_STEPS.WAIT_LOCATION_ADD_PRODUCT &&
+    !isAllProductsView
+  );
+
+  const lockCreatedProductCongrats = !!(
+    tutorial?.active &&
+    tutorial?.step === TUTORIAL_STEPS.WAIT_CREATED_PRODUCT_CONGRATS &&
+    !isAllProductsView &&
+    tutorial?.createdProductLocationId != null &&
+    String(tutorial.createdProductLocationId) === String(locationId)
+  );
+
+  const measureCreatedProductRow = useCallback(() => {
+    try {
+      const node = createdProductRowRef.current;
+      if (!node || typeof node.measureInWindow !== 'function') return;
+      node.measureInWindow((x, y, width, height) => {
+        if (typeof x === 'number' && typeof y === 'number') {
+          setCreatedProductRowRect({ x, y, width, height });
+        }
+      });
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    if (!lockCreatedProductCongrats) return;
+    const t = setTimeout(() => measureCreatedProductRow(), 50);
+    return () => clearTimeout(t);
+  }, [lockCreatedProductCongrats, measureCreatedProductRow, locationProducts?.length]);
+
+  const measureAddProductButton = useCallback(() => {
+    try {
+      const node = addProductButtonRef.current;
+      if (!node || typeof node.measureInWindow !== 'function') return;
+      node.measureInWindow((x, y, width, height) => {
+        if (typeof x === 'number' && typeof y === 'number') {
+          setAddProductButtonRect({ x, y, width, height });
+        }
+      });
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    if (!lockAddProductTutorial) return;
+    const t = setTimeout(() => measureAddProductButton(), 0);
+    return () => clearTimeout(t);
+  }, [lockAddProductTutorial, measureAddProductButton]);
 
   // 백엔드 정렬 파라미터 계산
   const getBackendSortParam = useCallback(() => {
@@ -493,6 +551,12 @@ const LocationDetailScreen = () => {
   
   // 제품 추가 화면으로 이동
   const handleAddProduct = () => {
+    if (tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_LOCATION_ADD_PRODUCT) {
+      try { dispatch(setTutorialStep({ step: TUTORIAL_STEPS.WAIT_PRODUCT_NAME })); } catch (e) {}
+      // ✅ 튜토리얼에서는 네비게이션 헤더를 숨겨 오버레이 좌표계/레이아웃 꼬임 방지
+      navigation.navigate('ProductDetail', { mode: 'create', locationId, tutorial: true, hideHeader: true });
+      return;
+    }
     navigation.navigate('ProductDetail', { mode: 'create', locationId });
   };
   
@@ -626,6 +690,7 @@ const LocationDetailScreen = () => {
           </ScrollView>
       </View>
         {/* 정렬 바 아래에서 상태별로 렌더링 */}
+        <View>
         {(productsStatus === 'loading' && !productsTimedOut) ? (
           <View style={styles.loadingListContainer}>
             <ActivityIndicator size="large" color="#4CAF50" />
@@ -683,12 +748,31 @@ const LocationDetailScreen = () => {
                 ref={productsListRef}
                 data={locationProducts}
                 keyExtractor={(item) => String(item.localId || item.id)}
-                renderItem={({ item }) => (
-                  <ProductCard 
-                    product={item} 
-                    onPress={() => handleProductPress(item)}
-                  />
-                )}
+                renderItem={({ item }) => {
+                  const wantName =
+                    tutorial?.createdProductName != null ? String(tutorial.createdProductName).trim() : '';
+                  const itemName = String(item?.name || item?.title || '').trim();
+                  const isTargetCreatedProduct =
+                    lockCreatedProductCongrats && !!wantName && !!itemName && itemName === wantName;
+                  const card = (
+                    <ProductCard
+                      product={item}
+                      onPress={() => handleProductPress(item)}
+                    />
+                  );
+                  if (!isTargetCreatedProduct) return card;
+                  return (
+                    <View
+                      ref={createdProductRowRef}
+                      collapsable={false}
+                      onLayout={() => {
+                        if (lockCreatedProductCongrats) measureCreatedProductRow();
+                      }}
+                    >
+                      {card}
+                    </View>
+                  );
+                }}
                 contentContainerStyle={styles.productsList}
                 scrollEventThrottle={16}
                 onScroll={(e) => {
@@ -735,21 +819,30 @@ const LocationDetailScreen = () => {
             )}
           </>
         )}
+        </View>
         
-        {/* 제품 추가 버튼 (모든 제품 보기가 아닐 때만 표시) */}
-        {!isAllProductsView && (
-        <TouchableOpacity 
-            style={[
-              styles.addButton,
-              !canAddProduct && styles.disabledButton
-            ]}
-          onPress={handleAddProduct}
-            disabled={!canAddProduct}
-        >
-          <Ionicons name="add" size={30} color="white" />
-        </TouchableOpacity>
-          )}
       </View>
+    );
+  };
+
+  const renderAddProductButton = () => {
+    if (isAllProductsView) return null;
+    return (
+      <TouchableOpacity
+        ref={addProductButtonRef}
+        style={[
+          styles.addButton,
+          !canAddProduct && styles.disabledButton,
+        ]}
+        onPress={handleAddProduct}
+        disabled={!canAddProduct}
+        collapsable={false}
+        onLayout={() => {
+          if (lockAddProductTutorial) measureAddProductButton();
+        }}
+      >
+        <Ionicons name="add" size={30} color="white" />
+      </TouchableOpacity>
     );
   };
   
@@ -764,6 +857,30 @@ const LocationDetailScreen = () => {
 
   return (
     <View style={styles.container}>
+      {/* 튜토리얼: 제품 등록 유도는 오버레이로만 처리 */}
+      <TutorialTouchBlocker
+        active={lockAddProductTutorial}
+        holeRect={addProductButtonRect}
+        message={'제품을 만들기 위해\n우측 하단 + 버튼을 터치해주세요.'}
+        actionLabel={'터치'}
+      />
+      {/* 튜토리얼: 첫 제품 생성 축하 (방금 만든 제품만 강조) */}
+      <TutorialTouchBlocker
+        active={lockCreatedProductCongrats}
+        holeRect={createdProductRowRect}
+        // 측정/리스트 반영 타이밍 이슈가 있어도 축하 메시지는 항상 보이게(확인 버튼 포함)
+        hideUntilHole={false}
+        messagePlacement={'near'}
+        messagePlacementPreference={'below'}
+        message={"축하합니다~\n첫 제품을 생성했습니다~\n이제 소모미를 열심히 이용해보세요!"}
+        showActionLabel={false}
+        ctaText={'확인'}
+        onCtaPress={async () => {
+          try { dispatch(completeTutorial()); } catch (e) {}
+        }}
+      />
+      {/* ✅ 잠금 UI는 오버레이 1개로, 여기서는 터치만 차단 */}
+      <View style={{ flex: 1 }} pointerEvents={(lockAddProductTutorial || lockCreatedProductCongrats) ? 'none' : 'auto'}>
       {/* 헤더 */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -903,6 +1020,10 @@ const LocationDetailScreen = () => {
       
       {/* 탭 내용 */}
       {isAllProductsView || activeTab === 'products' ? renderProductsTab() : renderNotificationsTab()}
+      </View>
+
+      {/* + 버튼은 튜토리얼에서도 클릭 가능해야 하므로 dim wrapper 밖에 렌더 */}
+      {(!isAllProductsView && activeTab === 'products') ? renderAddProductButton() : null}
       
       {/* 삭제 확인 모달 */}
       <Modal
@@ -953,6 +1074,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',
+  },
+  tutorialBanner: {
+    backgroundColor: 'rgba(76,175,80,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(76,175,80,0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    margin: 16,
+    marginBottom: 0,
+  },
+  tutorialBannerText: {
+    color: '#1B5E20',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
   },
   centered: {
     flex: 1,

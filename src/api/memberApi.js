@@ -47,17 +47,19 @@ export const fetchMemberProfile = async () => {
 };
 
 // PUT /v1/member/profile
-// ProfileUpdateRequest: { nickname: string, profile_image_url?: string|null, category_alarm_enabled: boolean }
+// ProfileUpdateRequest: { nickname: string, profile_image_url?: string|null, category_alarm_enabled: boolean, seen_tutorial?: boolean }
 export const updateMemberProfile = async ({
   nickname,
   profile_image_url = null,
   category_alarm_enabled = true,
+  seen_tutorial,
 }) => {
   const body = {
     nickname,
     profile_image_url,
     category_alarm_enabled: !!category_alarm_enabled,
   };
+  if (typeof seen_tutorial === 'boolean') body.seen_tutorial = seen_tutorial;
   return request('/v1/member/profile', {
     method: 'PUT',
     body,

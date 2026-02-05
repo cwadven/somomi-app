@@ -4,6 +4,7 @@ import categoriesReducer from './slices/categoriesSlice';
 import authReducer from './slices/authSlice';
 import locationsReducer from './slices/locationsSlice';
 import notificationsReducer from './slices/notificationsSlice';
+import tutorialReducer from './slices/tutorialSlice';
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
     auth: authReducer,
     locations: locationsReducer,
     notifications: notificationsReducer,
+    tutorial: tutorialReducer,
   },
 });
 

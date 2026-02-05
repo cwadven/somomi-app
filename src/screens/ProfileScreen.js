@@ -29,12 +29,14 @@ import AlertModal from '../components/AlertModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadSyncQueue } from '../utils/storageUtils';
 import { showRewardedAd as showRewardedAdNative } from '../utils/rewardedAd';
+import { setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
 
 const ProfileScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const route = useRoute();
   const { user, isLoggedIn, isAnonymous, loading, error } = useSelector((state) => state.auth);
+  const tutorial = useSelector((state) => state.tutorial);
   const [syncQueueCount, setSyncQueueCount] = useState(0);
   const [profileImageViewerVisible, setProfileImageViewerVisible] = useState(false);
   const [editProfileImageViewerVisible, setEditProfileImageViewerVisible] = useState(false);
@@ -72,6 +74,34 @@ const ProfileScreen = () => {
     })();
   }, []);
 
+  // ✅ 튜토리얼 시작 안내: 프로필에서 "내 카테고리" 탭만 누를 수 있도록 안내
+  useEffect(() => {
+    try {
+      if (!tutorial?.active) return;
+      if (tutorial?.step !== TUTORIAL_STEPS.PROFILE_INTRO) return;
+      // 안내 모달을 열어 "튜토리얼 제품 직접 시작하기" 메시지 제공
+      setModalTitle('튜토리얼');
+      // message는 문자열만 렌더되므로, '카테고리'만 굵게 처리하기 위해 content 사용
+      setModalMessage('');
+      setModalContent(
+        <Text style={styles.tutorialModalText}>
+          첫 작업을 위해서{'\n'}
+          <Text style={styles.tutorialModalTextBold}>'카테고리'</Text>를 만들러 가볼까요?
+        </Text>
+      );
+      setModalButtons([
+        {
+          text: '확인',
+          onPress: () => {
+            try { setModalVisible(false); } catch (e) {}
+            try { dispatch(setTutorialStep({ step: TUTORIAL_STEPS.WAIT_LOCATIONS_TAB })); } catch (e) {}
+          },
+        },
+      ]);
+      setModalVisible(true);
+    } catch (e) {}
+  }, [tutorial?.active, tutorial?.step, dispatch]);
+
   // 로그인 상태에서 화면 진입 시 프로필 최신화
   useEffect(() => {
     let mounted = true;
@@ -89,6 +119,11 @@ const ProfileScreen = () => {
             typeof categoryAlarmEnabledRaw === 'boolean'
               ? categoryAlarmEnabledRaw
               : (user?.categoryAlarmEnabled ?? true);
+          const seenTutorialRaw = res?.seen_tutorial;
+          const seenTutorial =
+            typeof seenTutorialRaw === 'boolean'
+              ? seenTutorialRaw
+              : (user?.seenTutorial ?? true);
           const next = {
             ...user,
             // 서버에서 내려주는 식별자 매핑
@@ -101,6 +136,7 @@ const ProfileScreen = () => {
             email: undefined, // 이메일 필드 제거
             profileImage: res?.profile_image_url || null,
             categoryAlarmEnabled,
+            seenTutorial,
           };
           // 로컬에서만 최신화: authSlice에 user 업데이트 로직이 없다면 화면 레벨 상태로 반영
           // 간단히 setState 없이 selector 기반 표시 값을 가공해 사용하려 했으나, 여기서는 임시로 객체 교체
@@ -121,6 +157,7 @@ const ProfileScreen = () => {
               name: next.name,
               profileImage: next.profileImage,
               categoryAlarmEnabled: next.categoryAlarmEnabled,
+              seenTutorial: next.seenTutorial,
               email: undefined,
             }));
           } catch (e) {}
@@ -223,6 +260,7 @@ const ProfileScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState('');
+  const [modalContent, setModalContent] = useState(null);
   const [modalAction, setModalAction] = useState(null);
   const [modalButtons, setModalButtons] = useState(null);
   const [rewardAdLoading, setRewardAdLoading] = useState(false);
@@ -234,11 +272,13 @@ const ProfileScreen = () => {
     setModalVisible(false);
     // onClose에서는 액션을 수행하지 않음 (버튼으로만 수행)
     setModalButtons(null);
+    setModalContent(null);
   };
 
   const showErrorAlert = (message) => {
     setModalTitle('오류');
     setModalMessage(message);
+    setModalContent(null);
     setModalAction(null);
     setModalButtons([{ text: '확인', onPress: () => setModalVisible(false) }]);
     setModalVisible(true);
@@ -247,6 +287,7 @@ const ProfileScreen = () => {
   const showInfoAlert = (title, message) => {
     setModalTitle(title);
     setModalMessage(message);
+    setModalContent(null);
     setModalAction(null);
     setModalButtons([{ text: '확인', onPress: () => setModalVisible(false) }]);
     setModalVisible(true);
@@ -904,6 +945,7 @@ const ProfileScreen = () => {
         visible={modalVisible}
         title={modalTitle}
         message={modalMessage}
+        content={modalContent}
         buttons={modalButtons || [
         { text: '취소', style: 'cancel' },
         { text: '확인', onPress: () => {setModalVisible(false);if (modalAction) modalAction();} }]
@@ -926,6 +968,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0'
+  },
+  tutorialModalText: {
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  tutorialModalTextBold: {
+    fontWeight: '900',
   },
   profileImage: {
     width: 80,
