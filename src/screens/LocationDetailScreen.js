@@ -572,7 +572,7 @@ const LocationDetailScreen = () => {
                 <Text style={styles.emptyText}>등록된 제품이 없습니다.</Text>
                 {!isAllProductsView && (
                   <Text style={styles.emptySubText}>
-                    오른쪽 하단의 + 버튼을<br></br> 눌러 제품을 추가하세요.
+                    오른쪽 하단의 + 버튼을{'\n'}눌러 제품을 추가하세요.
                   </Text>
                 )}
               </View>

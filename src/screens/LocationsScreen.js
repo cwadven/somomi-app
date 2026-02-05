@@ -659,7 +659,7 @@ const LocationsScreen = () => {
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>등록된 카테고리가 없습니다.</Text>
                 <Text style={styles.emptySubText}>
-                  오른쪽 하단의 + 버튼을<br></br> 눌러 카테고리를 추가하세요.
+                  오른쪽 하단의 + 버튼을{'\n'} 눌러 카테고리를 추가하세요.
                 </Text>
               </View>
             ) : (
