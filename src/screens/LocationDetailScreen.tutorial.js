@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
+import { useMeasuredInWindow } from '../utils/useMeasuredInWindow';
 
 export function useLocationDetailTutorial({
   tutorial,
@@ -7,12 +8,6 @@ export function useLocationDetailTutorial({
   isAllProductsView,
   locationProductsLength,
 }) {
-  const addProductButtonRef = useRef(null);
-  const [addProductButtonRect, setAddProductButtonRect] = useState(null);
-
-  const createdProductRowRef = useRef(null);
-  const [createdProductRowRect, setCreatedProductRowRect] = useState(null);
-
   const lockAddProductTutorial = !!(
     tutorial?.active &&
     tutorial?.step === TUTORIAL_STEPS.WAIT_LOCATION_ADD_PRODUCT &&
@@ -42,41 +37,28 @@ export function useLocationDetailTutorial({
     [lockCreatedProductCongrats, wantCreatedProductName]
   );
 
-  const measureCreatedProductRow = useCallback(() => {
-    try {
-      const node = createdProductRowRef.current;
-      if (!node || typeof node.measureInWindow !== 'function') return;
-      node.measureInWindow((x, y, width, height) => {
-        if (typeof x === 'number' && typeof y === 'number') {
-          setCreatedProductRowRect({ x, y, width, height });
-        }
-      });
-    } catch (e) {}
-  }, []);
+  const {
+    ref: addProductButtonRef,
+    rect: addProductButtonRect,
+    measure: measureAddProductButton,
+  } = useMeasuredInWindow({
+    active: lockAddProductTutorial,
+    initialDelayMs: 0,
+    retryCount: 10,
+    retryDelayMs: 80,
+  });
 
-  useEffect(() => {
-    if (!lockCreatedProductCongrats) return;
-    const t = setTimeout(() => measureCreatedProductRow(), 50);
-    return () => clearTimeout(t);
-  }, [lockCreatedProductCongrats, measureCreatedProductRow, locationProductsLength]);
-
-  const measureAddProductButton = useCallback(() => {
-    try {
-      const node = addProductButtonRef.current;
-      if (!node || typeof node.measureInWindow !== 'function') return;
-      node.measureInWindow((x, y, width, height) => {
-        if (typeof x === 'number' && typeof y === 'number') {
-          setAddProductButtonRect({ x, y, width, height });
-        }
-      });
-    } catch (e) {}
-  }, []);
-
-  useEffect(() => {
-    if (!lockAddProductTutorial) return;
-    const t = setTimeout(() => measureAddProductButton(), 0);
-    return () => clearTimeout(t);
-  }, [lockAddProductTutorial, measureAddProductButton]);
+  const {
+    ref: createdProductRowRef,
+    rect: createdProductRowRect,
+    measure: measureCreatedProductRow,
+  } = useMeasuredInWindow({
+    active: lockCreatedProductCongrats,
+    initialDelayMs: 50,
+    retryCount: 10,
+    retryDelayMs: 80,
+    deps: [locationProductsLength],
+  });
 
   return {
     // locks

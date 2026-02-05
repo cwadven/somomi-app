@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
+import { useMeasuredInWindow } from '../utils/useMeasuredInWindow';
 
 export function useLocationsTutorial({
   tutorial,
@@ -10,10 +11,6 @@ export function useLocationsTutorial({
   alertModalVisible,
   showCongratsModal,
 }) {
-  const addButtonRef = useRef(null);
-  const [addButtonRect, setAddButtonRect] = useState(null);
-  const newestLocationRowRef = useRef(null);
-  const [newestLocationRowRect, setNewestLocationRowRect] = useState(null);
   const didShowTutorialCongratsRef = useRef(false);
 
   const blockerActive = !!(tutorial?.active && tutorial?.step === TUTORIAL_STEPS.WAIT_LOCATIONS_PLUS);
@@ -56,41 +53,28 @@ export function useLocationsTutorial({
     showCongratsModal,
   ]);
 
-  const measureAddButton = useCallback(() => {
-    try {
-      const node = addButtonRef.current;
-      if (!node || typeof node.measureInWindow !== 'function') return;
-      node.measureInWindow((x, y, width, height) => {
-        if (typeof x === 'number' && typeof y === 'number') {
-          setAddButtonRect({ x, y, width, height });
-        }
-      });
-    } catch (e) {}
-  }, []);
+  const {
+    ref: addButtonRef,
+    rect: addButtonRect,
+    measure: measureAddButton,
+  } = useMeasuredInWindow({
+    active: blockerActive,
+    initialDelayMs: 0,
+    retryCount: 10,
+    retryDelayMs: 80,
+  });
 
-  const measureNewestLocationRow = useCallback(() => {
-    try {
-      const node = newestLocationRowRef.current;
-      if (!node || typeof node.measureInWindow !== 'function') return;
-      node.measureInWindow((x, y, width, height) => {
-        if (typeof x === 'number' && typeof y === 'number') {
-          setNewestLocationRowRect({ x, y, width, height });
-        }
-      });
-    } catch (e) {}
-  }, []);
-
-  useEffect(() => {
-    if (!blockerActive) return;
-    const t = setTimeout(() => measureAddButton(), 0);
-    return () => clearTimeout(t);
-  }, [blockerActive, measureAddButton]);
-
-  useEffect(() => {
-    if (!blockerActiveNewestLocation) return;
-    const t = setTimeout(() => measureNewestLocationRow(), 50);
-    return () => clearTimeout(t);
-  }, [blockerActiveNewestLocation, measureNewestLocationRow, locations?.length]);
+  const {
+    ref: newestLocationRowRef,
+    rect: newestLocationRowRect,
+    measure: measureNewestLocationRow,
+  } = useMeasuredInWindow({
+    active: blockerActiveNewestLocation,
+    initialDelayMs: 50,
+    retryCount: 10,
+    retryDelayMs: 80,
+    deps: [locations?.length],
+  });
 
   const locationsSorted = useMemo(() => {
     const list = Array.isArray(locations) ? [...locations] : [];

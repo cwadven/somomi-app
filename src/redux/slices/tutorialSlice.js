@@ -70,6 +70,10 @@ const tutorialSlice = createSlice({
     },
     resetTutorial: () => initialState,
   },
+  extraReducers: (builder) => {
+    // ✅ 로그아웃 시 튜토리얼 상태를 완전 초기화 (로그아웃 중/후에 튜토리얼 모달이 뜨는 현상 방지)
+    builder.addCase('auth/logout', () => initialState);
+  },
 });
 
 export const { startTutorial, setTutorialStep, categoryCreated, productCreated, completeTutorial, resetTutorial } =

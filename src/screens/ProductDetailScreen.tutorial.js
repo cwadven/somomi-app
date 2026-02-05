@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
+import { useMeasuredInWindow } from '../utils/useMeasuredInWindow';
 
 export function useProductDetailTutorial({
   isTutorialProductCreate,
@@ -9,12 +10,6 @@ export function useProductDetailTutorial({
   productName,
   formScrollRef,
 }) {
-  const productNameInputRef = useRef(null);
-  const [productNameInputRect, setProductNameInputRect] = useState(null);
-
-  const saveBtnRef = useRef(null);
-  const [saveBtnRect, setSaveBtnRect] = useState(null);
-
   const [tutorialProductNameDraft, setTutorialProductNameDraft] = useState('');
   const [tutorialToSaveTransitioning, setTutorialToSaveTransitioning] = useState(false);
 
@@ -33,59 +28,28 @@ export function useProductDetailTutorial({
     isTutorialProductCreate && tutorial?.step === TUTORIAL_STEPS.WAIT_PRODUCT_SAVE
   );
 
-  const measureProductNameInput = useCallback(() => {
-    try {
-      const node = productNameInputRef.current;
-      if (!node) return;
-      // ✅ use window coords (TutorialTouchBlocker converts window→overlay local)
-      if (typeof node.measureInWindow !== 'function') return;
-      node.measureInWindow((x, y, width, height) => {
-        if (typeof x === 'number' && typeof y === 'number') {
-          setProductNameInputRect({ x, y, width, height });
-        }
-      });
-    } catch (e) {}
-  }, []);
+  const {
+    ref: productNameInputRef,
+    rect: productNameInputRect,
+    measure: measureProductNameInput,
+  } = useMeasuredInWindow({
+    active: blockerActiveName,
+    initialDelayMs: 0,
+    retryCount: 10,
+    retryDelayMs: 80,
+  });
 
-  const measureSaveBtn = useCallback(() => {
-    try {
-      const node = saveBtnRef.current;
-      if (!node) return;
-      // ✅ use window coords (TutorialTouchBlocker converts window→overlay local)
-      if (typeof node.measureInWindow !== 'function') return;
-      node.measureInWindow((x, y, width, height) => {
-        if (typeof x === 'number' && typeof y === 'number') {
-          setSaveBtnRect({ x, y, width, height });
-        }
-      });
-    } catch (e) {}
-  }, []);
-
-  const ensureMeasureProductNameInput = useCallback(() => {
-    let tries = 0;
-    const tick = () => {
-      tries += 1;
-      try {
-        measureProductNameInput();
-      } catch (e) {}
-      if (tries >= 10) return;
-      setTimeout(tick, 80);
-    };
-    setTimeout(tick, 0);
-  }, [measureProductNameInput]);
-
-  const ensureMeasureSaveBtn = useCallback(() => {
-    let tries = 0;
-    const tick = () => {
-      tries += 1;
-      try {
-        measureSaveBtn();
-      } catch (e) {}
-      if (tries >= 10) return;
-      setTimeout(tick, 80);
-    };
-    setTimeout(tick, 0);
-  }, [measureSaveBtn]);
+  const {
+    ref: saveBtnRef,
+    rect: saveBtnRect,
+    measure: measureSaveBtn,
+    ensureMeasure: ensureMeasureSaveBtn,
+  } = useMeasuredInWindow({
+    active: blockerActiveSave,
+    initialDelayMs: 0,
+    retryCount: 10,
+    retryDelayMs: 80,
+  });
 
   // 튜토리얼 create 진입 시 기본은 제품명 작성부터
   useEffect(() => {
@@ -105,16 +69,6 @@ export function useProductDetailTutorial({
       setTutorialProductNameDraft(String(productName || ''));
     } catch (e) {}
   }, [isTutorialProductCreate, productName]);
-
-  useEffect(() => {
-    if (!blockerActiveName) return;
-    ensureMeasureProductNameInput();
-  }, [blockerActiveName, ensureMeasureProductNameInput]);
-
-  useEffect(() => {
-    if (!blockerActiveSave) return;
-    ensureMeasureSaveBtn();
-  }, [blockerActiveSave, ensureMeasureSaveBtn]);
 
   // ✅ 튜토리얼에서는 네비게이션 헤더/뒤로가기 제스처를 완전히 비활성화
   useEffect(() => {

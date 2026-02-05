@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -37,6 +38,7 @@ const ProfileScreen = () => {
   const route = useRoute();
   const { user, isLoggedIn, isAnonymous, loading, error } = useSelector((state) => state.auth);
   const tutorial = useSelector((state) => state.tutorial);
+  const lockTutorialIntro = !!(tutorial?.active && tutorial?.step === TUTORIAL_STEPS.PROFILE_INTRO);
   const [syncQueueCount, setSyncQueueCount] = useState(0);
   const [profileImageViewerVisible, setProfileImageViewerVisible] = useState(false);
   const [editProfileImageViewerVisible, setEditProfileImageViewerVisible] = useState(false);
@@ -53,6 +55,9 @@ const ProfileScreen = () => {
     if (route.params?.sessionExpired) {
       setModalTitle('로그인 만료');
       setModalMessage('세션이 만료되어 자동으로 로그아웃되었습니다. 다시 로그인해 주세요.');
+      // ✅ 다른 모달(예: 튜토리얼)에서 남아있던 content가 섞이지 않도록 초기화
+      setModalContent(null);
+      setModalAction(null);
       setModalButtons([
       { text: '확인', onPress: () => {setModalVisible(false);} }]
       );
@@ -79,6 +84,10 @@ const ProfileScreen = () => {
     try {
       if (!tutorial?.active) return;
       if (tutorial?.step !== TUTORIAL_STEPS.PROFILE_INTRO) return;
+      // ✅ 이전 모달의 버튼/콘텐츠가 순간 섞여 보이는 현상 방지
+      setModalButtons(null);
+      setModalContent(null);
+      setModalAction(null);
       // 안내 모달을 열어 "튜토리얼 제품 직접 시작하기" 메시지 제공
       setModalTitle('튜토리얼');
       // message는 문자열만 렌더되므로, '카테고리'만 굵게 처리하기 위해 content 사용
@@ -101,6 +110,15 @@ const ProfileScreen = () => {
       setModalVisible(true);
     } catch (e) {}
   }, [tutorial?.active, tutorial?.step, dispatch]);
+
+  // ✅ 튜토리얼 인트로 모달에서는 하드웨어 back/제스처로 화면이 뒤로 가지 않게 차단
+  useEffect(() => {
+    if (!lockTutorialIntro) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => {
+      try { sub?.remove?.(); } catch (e) {}
+    };
+  }, [lockTutorialIntro]);
 
   // 로그인 상태에서 화면 진입 시 프로필 최신화
   useEffect(() => {
@@ -212,6 +230,7 @@ const ProfileScreen = () => {
         console.error('알림 설정 화면 열기 실패:', error);
         setModalTitle('알림 설정');
         setModalMessage('알림 설정 화면을 열 수 없습니다. 설정 앱에서 수동으로 앱의 알림 설정을 변경해주세요.');
+        setModalContent(null);
         setModalAction(null);
         setModalVisible(true);
       }
@@ -222,6 +241,8 @@ const ProfileScreen = () => {
   const handleLogout = () => {
     setModalTitle('로그아웃');
     setModalMessage('정말 로그아웃 하시겠습니까?');
+    // ✅ 튜토리얼 등에서 설정한 content가 로그아웃 모달에 보이지 않도록 초기화
+    setModalContent(null);
     setModalAction(null);
     setModalButtons([
     { text: '확인', onPress: async () => {
@@ -946,11 +967,13 @@ const ProfileScreen = () => {
         title={modalTitle}
         message={modalMessage}
         content={modalContent}
-        buttons={modalButtons || [
-        { text: '취소', style: 'cancel' },
-        { text: '확인', onPress: () => {setModalVisible(false);if (modalAction) modalAction();} }]
-        }
-        onClose={handleModalClose} />
+        buttons={modalButtons}
+        onClose={() => {
+          // 튜토리얼 인트로에서는 back으로 닫히지 않게 처리 (확인 버튼으로만 진행)
+          if (lockTutorialIntro) return;
+          handleModalClose();
+        }}
+      />
 
     </>);
 
