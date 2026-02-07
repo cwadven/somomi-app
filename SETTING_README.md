@@ -720,3 +720,10 @@ context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PE
 
 brew install android-platform-tools
 adb logcat "*:S" "AndroidRuntime:E" "ReactNative:E" "ReactNativeJS:E" "Expo:E"
+
+
+# Android 해시 키 발급 (소셜 로그인)
+
+alias 확인 법
+
+keytool -exportcert -alias my-key-alias -keystore xxxxx.keystore | openssl sha1 -binary | openssl base64

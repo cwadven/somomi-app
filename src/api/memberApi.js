@@ -16,6 +16,19 @@ export const refreshAccessToken = async (refreshToken) => {
   });
 };
 
+// POST /v1/member/social-login
+// provider: 2(KAKAO), 3(NAVER), 4(GOOGLE)
+export const socialLogin = async ({ provider, token }) => {
+  return request('/v1/member/social-login', {
+    method: 'POST',
+    body: {
+      provider,
+      token,
+    },
+    skipAuth: true,
+  });
+};
+
 export const sendVerificationToken = async (email) => {
   return request('/v1/member/send-verification-token', {
     method: 'POST',
@@ -77,6 +90,7 @@ export const markTutorialSeenSuccess = async () => {
 export default {
   loginMember,
   refreshAccessToken,
+  socialLogin,
   sendVerificationToken,
   verifyVerificationToken,
   emailSignUp,

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { verifyToken } from '../redux/slices/authSlice';
-import { sendVerificationToken, verifyVerificationToken, emailSignUp } from '../api/memberApi';
+import { emailSignUp, sendVerificationToken, socialLogin, verifyVerificationToken } from '../api/memberApi';
 import { saveJwtToken, saveRefreshToken } from '../utils/storageUtils';
 import BasicLoginForm from '../components/BasicLoginForm';
+import { login as kakaoLogin } from '@react-native-seoul/kakao-login';
 
 const LoginScreen = ({ navigation }) => {
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
@@ -20,6 +21,7 @@ const LoginScreen = ({ navigation }) => {
   const [otpRequested, setOtpRequested] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
+  const [kakaoLoading, setKakaoLoading] = useState(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -119,6 +121,42 @@ const LoginScreen = ({ navigation }) => {
     }
   };
 
+  const handleKakaoLogin = async () => {
+    if (kakaoLoading || loading || otpLoading) return;
+    try {
+      setError('');
+      setOtpError('');
+      setKakaoLoading(true);
+
+      const tokenRes = await kakaoLogin();
+      const kakaoAccessToken = tokenRes?.accessToken || tokenRes?.access_token || null;
+      if (!kakaoAccessToken) throw new Error('카카오 토큰을 가져오지 못했습니다.');
+
+      const res = await socialLogin({ provider: 2, token: kakaoAccessToken });
+      const apiAccessToken = res?.access_token ?? res?.data?.access_token;
+      const apiRefreshToken = res?.refresh_token ?? res?.data?.refresh_token;
+      if (!apiAccessToken) throw new Error('소셜 로그인에 실패했습니다. (access_token 없음)');
+
+      await saveJwtToken(apiAccessToken);
+      if (apiRefreshToken) await saveRefreshToken(apiRefreshToken);
+      try { await dispatch(verifyToken()).unwrap(); } catch (e) {}
+      // 로그인 직후 디바이스 토큰 등록/갱신 시도 (일반 로그인과 동일하게)
+      try {
+        const { pushNotificationService } = require('../utils/pushNotificationService');
+        await pushNotificationService.registerForPushNotifications();
+      } catch (e) {}
+
+      try {
+        if (navigation?.canGoBack?.()) navigation.goBack();
+        else navigation.navigate('Profile');
+      } catch (e) {}
+    } catch (e) {
+      setError(e?.response?.data?.message || e?.message || '카카오 로그인 중 오류가 발생했습니다.');
+    } finally {
+      if (mountedRef.current) setKakaoLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>소모미</Text>
@@ -200,9 +238,26 @@ const LoginScreen = ({ navigation }) => {
         </View>
       )}
 
+      {/* ✅ Kakao 로그인/일반 로그인에서도 에러가 보이도록 공통 영역에 렌더 */}
+      {mode === 'login' && !!error ? <Text style={styles.errorText}>{error}</Text> : null}
+
       <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
         <Text style={styles.closeBtnText}>닫기</Text>
       </TouchableOpacity>
+
+      {Platform.OS === 'android' ? (
+        <TouchableOpacity
+          style={[styles.kakaoBtn, (kakaoLoading || loading || otpLoading) && { opacity: 0.6 }]}
+          onPress={handleKakaoLogin}
+          disabled={kakaoLoading || loading || otpLoading}
+        >
+          {kakaoLoading ? (
+            <ActivityIndicator size="small" color="#191600" />
+          ) : (
+            <Text style={styles.kakaoBtnText}>카카오로 로그인</Text>
+          )}
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 };
@@ -316,6 +371,17 @@ const styles = StyleSheet.create({
   },
   closeBtnText: {
     color: '#666',
+  },
+  kakaoBtn: {
+    marginTop: 24,
+    backgroundColor: '#FEE500',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  kakaoBtnText: {
+    color: '#191600',
+    fontWeight: '800',
   },
 });
 
