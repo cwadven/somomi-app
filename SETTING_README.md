@@ -727,3 +727,6 @@ adb logcat "*:S" "AndroidRuntime:E" "ReactNative:E" "ReactNativeJS:E" "Expo:E"
 alias 확인 법
 
 keytool -exportcert -alias my-key-alias -keystore xxxxx.keystore | openssl sha1 -binary | openssl base64
+
+
+keytool -list -v -alias my-key-alias -keystore "xxxxxxx.keystore"

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Constants from 'expo-constants';
 import { useDispatch } from 'react-redux';
 import { verifyToken } from '../redux/slices/authSlice';
 import { emailSignUp, sendVerificationToken, socialLogin, verifyVerificationToken } from '../api/memberApi';
@@ -7,10 +8,23 @@ import { saveJwtToken, saveRefreshToken } from '../utils/storageUtils';
 import BasicLoginForm from '../components/BasicLoginForm';
 import { login as kakaoLogin } from '@react-native-seoul/kakao-login';
 
+// Google Sign-In은 웹에서 네이티브 모듈 문제가 생길 수 있어 Android에서만 로드
+let GoogleSignin = null;
+let googleStatusCodes = null;
+if (Platform.OS === 'android') {
+  try {
+    const mod = require('@react-native-google-signin/google-signin');
+    GoogleSignin = mod?.GoogleSignin;
+    googleStatusCodes = mod?.statusCodes;
+  } catch (e) {}
+}
+
 const LoginScreen = ({ navigation }) => {
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
   const dispatch = useDispatch();
   const mountedRef = useRef(true);
+  const extra = Constants?.expoConfig?.extra || Constants?.manifest?.extra || {};
+  const googleWebClientId = extra?.googleWebClientId || null;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -22,11 +36,25 @@ const LoginScreen = ({ navigation }) => {
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [kakaoLoading, setKakaoLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    if (!GoogleSignin) return;
+    try {
+      GoogleSignin.configure({
+        // ⚠️ webClientId에는 "Web application" 타입 Client ID만 넣어야 합니다. (Android 타입 ID를 넣으면 DEVELOPER_ERROR가 날 수 있음)
+        ...(googleWebClientId ? { webClientId: googleWebClientId } : {}),
+        offlineAccess: false,
+        forceCodeForRefreshToken: false,
+      });
+    } catch (e) {}
+  }, [googleWebClientId]);
 
   const handleSignup = async () => {
     try {
@@ -157,6 +185,57 @@ const LoginScreen = ({ navigation }) => {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    if (googleLoading || loading || otpLoading) return;
+    try {
+      if (Platform.OS !== 'android' || !GoogleSignin) return;
+      setError('');
+      setOtpError('');
+      setGoogleLoading(true);
+
+      let idToken = null;
+      let accessToken = null;
+      try {
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      } catch (e) {}
+
+      const userInfo = await GoogleSignin.signIn();
+      idToken = userInfo?.idToken ?? null;
+      try {
+        const tokens = await GoogleSignin.getTokens();
+        accessToken = tokens?.accessToken ?? null;
+        if (!idToken) idToken = tokens?.idToken ?? null;
+      } catch (e) {}
+
+      const googleToken = idToken || accessToken;
+      if (!googleToken) throw new Error('구글 토큰을 가져오지 못했습니다.');
+
+      const res = await socialLogin({ provider: 4, token: googleToken });
+      const apiAccessToken = res?.access_token ?? res?.data?.access_token;
+      const apiRefreshToken = res?.refresh_token ?? res?.data?.refresh_token;
+      if (!apiAccessToken) throw new Error('소셜 로그인에 실패했습니다. (access_token 없음)');
+
+      await saveJwtToken(apiAccessToken);
+      if (apiRefreshToken) await saveRefreshToken(apiRefreshToken);
+      try { await dispatch(verifyToken()).unwrap(); } catch (e) {}
+      // 로그인 직후 디바이스 토큰 등록/갱신 시도
+      try {
+        const { pushNotificationService } = require('../utils/pushNotificationService');
+        await pushNotificationService.registerForPushNotifications();
+      } catch (e) {}
+
+      try {
+        if (navigation?.canGoBack?.()) navigation.goBack();
+        else navigation.navigate('Profile');
+      } catch (e) {}
+    } catch (e) {
+      if (e?.code === googleStatusCodes?.SIGN_IN_CANCELLED) return;
+      setError(e?.response?.data?.message || e?.message || '구글 로그인 중 오류가 발생했습니다.');
+    } finally {
+      if (mountedRef.current) setGoogleLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>소모미</Text>
@@ -246,17 +325,31 @@ const LoginScreen = ({ navigation }) => {
       </TouchableOpacity>
 
       {Platform.OS === 'android' ? (
-        <TouchableOpacity
-          style={[styles.kakaoBtn, (kakaoLoading || loading || otpLoading) && { opacity: 0.6 }]}
-          onPress={handleKakaoLogin}
-          disabled={kakaoLoading || loading || otpLoading}
-        >
-          {kakaoLoading ? (
-            <ActivityIndicator size="small" color="#191600" />
-          ) : (
-            <Text style={styles.kakaoBtnText}>카카오로 로그인</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.socialBtnGroup}>
+          <TouchableOpacity
+            style={[styles.kakaoBtn, (kakaoLoading || loading || otpLoading || googleLoading) && { opacity: 0.6 }]}
+            onPress={handleKakaoLogin}
+            disabled={kakaoLoading || loading || otpLoading || googleLoading}
+          >
+            {kakaoLoading ? (
+              <ActivityIndicator size="small" color="#191600" />
+            ) : (
+              <Text style={styles.kakaoBtnText}>카카오로 로그인</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.googleBtn, (googleLoading || loading || otpLoading || kakaoLoading) && { opacity: 0.6 }]}
+            onPress={handleGoogleLogin}
+            disabled={googleLoading || loading || otpLoading || kakaoLoading}
+          >
+            {googleLoading ? (
+              <ActivityIndicator size="small" color="#1A73E8" />
+            ) : (
+              <Text style={styles.googleBtnText}>Google로 로그인</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       ) : null}
     </View>
   );
@@ -372,8 +465,10 @@ const styles = StyleSheet.create({
   closeBtnText: {
     color: '#666',
   },
-  kakaoBtn: {
+  socialBtnGroup: {
     marginTop: 24,
+  },
+  kakaoBtn: {
     backgroundColor: '#FEE500',
     borderRadius: 8,
     paddingVertical: 12,
@@ -381,6 +476,19 @@ const styles = StyleSheet.create({
   },
   kakaoBtnText: {
     color: '#191600',
+    fontWeight: '800',
+  },
+  googleBtn: {
+    marginTop: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  googleBtnText: {
+    color: '#1A73E8',
     fontWeight: '800',
   },
 });
