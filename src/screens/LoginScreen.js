@@ -334,7 +334,12 @@ const LoginScreen = ({ navigation }) => {
             {kakaoLoading ? (
               <ActivityIndicator size="small" color="#191600" />
             ) : (
-              <Text style={styles.kakaoBtnText}>카카오로 로그인</Text>
+              <View style={styles.socialBtnInner}>
+                <View style={[styles.socialIcon, styles.kakaoIcon]}>
+                  <Text style={styles.kakaoIconText}>K</Text>
+                </View>
+                <Text style={styles.kakaoBtnText}>카카오톡으로 로그인</Text>
+              </View>
             )}
           </TouchableOpacity>
 
@@ -346,7 +351,12 @@ const LoginScreen = ({ navigation }) => {
             {googleLoading ? (
               <ActivityIndicator size="small" color="#1A73E8" />
             ) : (
-              <Text style={styles.googleBtnText}>Google로 로그인</Text>
+              <View style={styles.socialBtnInner}>
+                <View style={[styles.socialIcon, styles.googleIcon]}>
+                  <Text style={styles.googleIconText}>G</Text>
+                </View>
+                <Text style={styles.googleBtnText}>Google로 로그인</Text>
+              </View>
             )}
           </TouchableOpacity>
         </View>
@@ -468,11 +478,37 @@ const styles = StyleSheet.create({
   socialBtnGroup: {
     marginTop: 24,
   },
+  socialBtnInner: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  socialIcon: {
+    position: 'absolute',
+    left: 14,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kakaoIcon: {
+    backgroundColor: '#191600',
+  },
+  kakaoIconText: {
+    color: '#FEE500',
+    fontWeight: '900',
+    fontSize: 12,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
   kakaoBtn: {
     backgroundColor: '#FEE500',
     borderRadius: 8,
-    paddingVertical: 12,
+    height: 48,
+    paddingHorizontal: 14,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   kakaoBtnText: {
     color: '#191600',
@@ -482,14 +518,28 @@ const styles = StyleSheet.create({
     marginTop: 12,
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
-    paddingVertical: 12,
+    height: 48,
+    paddingHorizontal: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#DADCE0',
+    justifyContent: 'center',
   },
   googleBtnText: {
-    color: '#1A73E8',
-    fontWeight: '800',
+    color: '#3C4043',
+    fontWeight: '700',
+  },
+  googleIcon: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DADCE0',
+  },
+  googleIconText: {
+    color: '#4285F4',
+    fontWeight: '900',
+    fontSize: 12,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
 });
 
