@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '../config/apiConfig';
 import { loadJwtToken, loadRefreshToken, saveJwtToken, saveRefreshToken } from '../utils/storageUtils';
+import { deactivateStoredDeviceToken } from '../utils/pushDeviceTokenManager';
 
 // refresh 동시성 제어:
 // 동시에 여러 요청이 401/만료로 실패하면 refresh-token API가 중복 호출되고
@@ -102,6 +103,9 @@ export const request = async (path, { method = 'GET', headers = {}, body, skipAu
 
           const existingRefresh = await loadRefreshToken();
           if (existingRefresh && isRefreshAuthInvalid) {
+            // ✅ refresh token이 만료/무효인 경우: (access token이 아직 유효해도) 로그아웃 처리 전에
+            // 서버의 디바이스 토큰을 비활성화하여 푸시 발송을 막습니다.
+            try { await deactivateStoredDeviceToken({ reason: 'refresh-token-expired' }); } catch (e) {}
             const { store } = require('../redux/store');
             const { logout } = require('../redux/slices/authSlice');
             store.dispatch(logout());

@@ -31,6 +31,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadSyncQueue } from '../utils/storageUtils';
 import { showRewardedAd as showRewardedAdNative } from '../utils/rewardedAd';
 import { setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
+import { deactivateStoredDeviceToken } from '../utils/pushDeviceTokenManager';
 
 const ProfileScreen = () => {
   const dispatch = useDispatch();
@@ -255,6 +256,9 @@ const ProfileScreen = () => {
     setModalButtons([
     { text: '확인', onPress: async () => {
       setModalVisible(false);
+      // ✅ 로그아웃 시 서버의 디바이스 토큰 비활성화(DELETE /v1/push/device-token)
+      // - 실패해도 로그아웃은 진행
+      try { await deactivateStoredDeviceToken({ reason: 'logout' }); } catch (e) {}
       try { await AsyncStorage.removeItem('navigation-state'); } catch (e) {}
       try { dispatch(logout()); } catch (e) {}
       // 로그아웃 후 "내 카테고리" 탭을 첫 화면으로 리셋
