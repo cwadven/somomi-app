@@ -730,3 +730,22 @@ keytool -exportcert -alias my-key-alias -keystore xxxxx.keystore | openssl sha1 
 
 
 keytool -list -v -alias my-key-alias -keystore "xxxxxxx.keystore"
+
+
+# 앱 서명
+
+구글 플래이스토에 올리면 Play Console 것으로 바꿔짐
+확인 방법
+
+Test and release → App integrity → App signing → App signing certificate
+
+
+# 내부 앱 서명 알기
+
+1. 기기 USB 연결
+
+2. adb shell pm path com.nextstory.somomi
+
+3. 나온 경로 확인 후, adb pull "/data/app/.../base.apk" ./somomi-installed.apk
+
+4. 다운로드 받은 api 에서 keytool -printcert -jarfile "./somomi-installed.apk"
