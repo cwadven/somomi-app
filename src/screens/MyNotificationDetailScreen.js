@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { fetchGuestNotificationDetail } from '../api/notificationApi';
+import MarkdownMessageText from '../components/MarkdownMessageText';
 
 const MyNotificationDetailScreen = () => {
   const navigation = useNavigation();
@@ -69,7 +70,7 @@ const MyNotificationDetailScreen = () => {
           ) : null}
 
           <View style={styles.messageBox}>
-            <Text style={styles.message}>{detail?.message || ''}</Text>
+            <MarkdownMessageText style={styles.message} message={detail?.message || ''} />
           </View>
         </ScrollView>
       )}

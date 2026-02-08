@@ -696,16 +696,6 @@ const ProfileScreen = () => {
           title="소진 처리한 상품 목록"
           onPress={() => navigation.navigate('ConsumedProducts')} />
 
-            
-            {/* NOTE: 아직 완전 배포 전이라 노출하지 않음 */}
-            {/*
-            <SettingItem
-              icon="notifications-outline"
-              title="알림 목록"
-              onPress={() => navigation.navigate('Notifications')}
-            />
-            */}
-
             {/* NOTE: 아직 완전 배포 전이라 노출하지 않음 */}
             {/*
             <SettingItem

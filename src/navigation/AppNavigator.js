@@ -36,9 +36,6 @@ import ProductDetailScreen from '../screens/ProductDetailScreen';
 import CategoryScreen from '../screens/CategoryScreen';
 import ConsumedProductsScreen from '../screens/ConsumedProductsScreen';
 import ConsumedProductDetailScreen from '../screens/ConsumedProductDetailScreen';
-import NotificationsScreen from '../screens/NotificationsScreen';
-import NotificationDetailScreen from '../screens/NotificationDetailScreen';
-import NotificationDateScreen from '../screens/NotificationDateScreen';
 import MyNotificationsScreen from '../screens/MyNotificationsScreen';
 import MyNotificationDetailScreen from '../screens/MyNotificationDetailScreen';
 import StoreScreen from '../screens/StoreScreen';
@@ -156,24 +153,6 @@ const ProfileStack = () => {
         name="ConsumedProductDetail" 
         component={ConsumedProductDetailScreen} 
         options={{ title: '소진 상품 상세', headerShown: false }}
-      />
-      <Stack.Screen 
-        name="Notifications" 
-        component={NotificationsScreen} 
-        options={{ title: '알림 목록', headerShown: false }}
-      />
-      <Stack.Screen 
-        name="NotificationDate" 
-        component={NotificationDateScreen} 
-        options={{ title: '날짜별 알림', headerShown: false }}
-      />
-      <Stack.Screen 
-        name="NotificationDetail" 
-        component={NotificationDetailScreen} 
-        options={({ route }) => ({
-          title: '알림 상세',
-          headerShown: false
-        })}
       />
       {/* 상점은 프로필 스택이 아닌 루트 모달로 표시되므로 여기서 제거 */}
       <Stack.Screen 
