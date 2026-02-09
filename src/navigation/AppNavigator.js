@@ -127,6 +127,32 @@ const LocationsStack = () => (
   </Stack.Navigator>
 );
 
+// ✅ 딥링크/마크다운 링크에서 "탭 전환 없이" LocationDetail을 띄우기 위한 루트 모달 스택
+// - 알림 상세(MyNotificationDetail) 위에 한 겹 더 쌓여 "새 탭처럼" 보임
+// - 뒤로가기 시 모달이 닫히며 원래 화면으로 복귀
+const RootLocationDetailStack = ({ route }) => {
+  const locationId = route?.params?.locationId != null ? String(route.params.locationId) : null;
+  const from = route?.params?.from || 'deeplink';
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen
+        name="LocationDetail"
+        component={LocationDetailScreen}
+        // ✅ 탭바가 없는 루트 모달 진입 케이스:
+        // - 하단 플로팅 버튼 위치 보정 필요
+        // - 캐시를 믿지 않고 최초 1회는 강제 fetch가 필요(딥링크/알림 상세 진입)
+        initialParams={{ locationId, from, modal: true, forceFetch: true }}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="ProductDetail"
+        component={ProductDetailScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+    </Stack.Navigator>
+  );
+};
+
 // 프로필 스택 네비게이터
 const ProfileStack = () => {
   return (
@@ -407,6 +433,11 @@ const AppNavigator = ({ linking }) => {
             <RootStack.Screen
               name="RootMyNotificationDetail"
               component={MyNotificationDetailScreen}
+              options={{ presentation: 'modal', animation: 'slide_from_right' }}
+            />
+            <RootStack.Screen
+              name="RootLocationDetail"
+              component={RootLocationDetailStack}
               options={{ presentation: 'modal', animation: 'slide_from_right' }}
             />
           </RootStack.Navigator>

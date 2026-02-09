@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Linking, StyleSheet } from 'react-native';
+import { Linking, StyleSheet, Text } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 
 export default function MarkdownMessageText({ message, style }) {
@@ -13,6 +13,26 @@ export default function MarkdownMessageText({ message, style }) {
       .replace(/<\s*br\s*\/?\s*>/gi, '\n')
       .trim();
   }, [message]);
+
+  const handleLinkPress = (url) => {
+    const u = url == null ? '' : String(url);
+
+    // ✅ 앱 내부 딥링크는 OS openURL이 아닌 "직접 네비게이션"으로 처리 (앱 포그라운드에서 더 안정적)
+    try {
+      const m = u.match(/^somomi:\/\/location\/detail\/([^/?#]+)/i);
+      const locId = m?.[1] ? decodeURIComponent(m[1]) : null;
+      if (locId) {
+        const { navigate } = require('../navigation/RootNavigation');
+        // ✅ 탭 전환 없이 루트 모달로 LocationDetail을 띄움 (뒤로가기 시 닫힘)
+        navigate('RootLocationDetail', { locationId: String(locId), from: 'deeplink' });
+        return;
+      }
+    } catch (e) {}
+
+    try {
+      Linking.openURL(u).catch(() => {});
+    } catch (e) {}
+  };
 
   const mdStyle = useMemo(() => {
     const base = StyleSheet.flatten(style) || {};
@@ -35,12 +55,34 @@ export default function MarkdownMessageText({ message, style }) {
   return (
     <Markdown
       style={mdStyle}
-      onLinkPress={(url) => {
-        try {
-          // somomi:// 딥링크 및 https 링크 모두 허용
-          Linking.openURL(String(url)).catch(() => {});
-        } catch (e) {}
-        return false; // 기본 핸들링 방지
+      rules={{
+        // 링크가 "클릭이 안되는" 환경이 있어, 링크 렌더링을 직접 오버라이드하여 항상 클릭 가능하게 처리
+        link: (node, children, parent, styles) => {
+          const href = node?.attributes?.href || '';
+          return (
+            <Text
+              key={node.key}
+              style={styles.link}
+              onPress={() => handleLinkPress(href)}
+              suppressHighlighting={false}
+            >
+              {children}
+            </Text>
+          );
+        },
+        blocklink: (node, children, parent, styles) => {
+          const href = node?.attributes?.href || '';
+          return (
+            <Text
+              key={node.key}
+              style={styles.link}
+              onPress={() => handleLinkPress(href)}
+              suppressHighlighting={false}
+            >
+              {children}
+            </Text>
+          );
+        },
       }}
     >
       {normalized}

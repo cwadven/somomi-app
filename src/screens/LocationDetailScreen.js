@@ -16,6 +16,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { completeTutorial, setTutorialStep, TUTORIAL_STEPS } from '../redux/slices/tutorialSlice';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchLocationById, deleteLocation } from '../redux/slices/locationsSlice';
 import { fetchProductsByLocation } from '../redux/slices/productsSlice';
 import { releaseTemplateInstance, loadUserProductSlotTemplateInstances } from '../redux/slices/authSlice';
@@ -32,8 +33,15 @@ const LocationDetailScreen = () => {
   const route = useRoute();
   const dispatch = useDispatch();
   
-  const { locationId, isAllProducts, from } = route.params;
+  const insets = useSafeAreaInsets();
+  const params = route?.params || {};
+  const { locationId, isAllProducts, from } = params;
   const isAllProductsView = isAllProducts || locationId === 'all';
+  const isRootModal = params?.modal === true; // RootLocationDetailStack(탭바 없음)
+  const forceFetch = params?.forceFetch === true || from === 'deeplink';
+  const extraBottomForNoTabBar = isRootModal ? 56 : 0; // 탭바가 없는 화면에서 플로팅 버튼을 '탭바 있는 것처럼' 위로 올림
+  const floatingBottom = 16 + (insets?.bottom || 0) + extraBottomForNoTabBar;
+  const listPaddingBottom = 80 + (insets?.bottom || 0) + extraBottomForNoTabBar;
   
   const { currentLocation, status, error, locations } = useSelector(state => state.locations);
   const { products, locationProducts: locationProductsCache, status: productsStatus, error: productsError, locationProductsMeta } = useSelector(state => state.products);
@@ -106,12 +114,13 @@ const LocationDetailScreen = () => {
   
   // 제품 목록 로드
   useEffect(() => {
-    // 초기 진입: 내 카테고리에서 들어온 경우에만 초기 로딩/초기화 수행
-    if (!didInitialFetchRef.current && from === 'Locations') {
+    // 초기 진입: (1) 내 카테고리에서 들어온 경우 (2) 딥링크/알림상세 등 루트 모달로 들어온 경우
+    if (!didInitialFetchRef.current && (from === 'Locations' || forceFetch)) {
       const metaKey = isAllProductsView ? 'all' : locationId;
       const cachedAlready = locationProductsCache?.[metaKey];
-      // ✅ 이미 무한스크롤로 쌓아둔 캐시가 있으면, 다시 첫 페이지 fetch로 덮어쓰지 않음
-      if (Array.isArray(cachedAlready) && cachedAlready.length > 0) {
+      // ✅ Locations에서 진입한 경우만 캐시가 있으면 초기 fetch를 스킵
+      // (딥링크/모달 진입은 "찌꺼기"처럼 보이는 캐시를 피하기 위해 최초 1회는 강제 재조회)
+      if (!forceFetch && Array.isArray(cachedAlready) && cachedAlready.length > 0) {
         didInitialFetchRef.current = true;
         return;
       }
@@ -131,7 +140,7 @@ const LocationDetailScreen = () => {
       }
       didInitialFetchRef.current = true;
     }
-  }, [dispatch, locationId, isAllProductsView, from, getBackendSortParam, locationProductsCache, productsStatus, productsTimerId]);
+  }, [dispatch, locationId, isAllProductsView, from, forceFetch, getBackendSortParam, locationProductsCache, productsStatus, productsTimerId]);
 
   // 포커스 시점마다 제품/템플릿 최신화 (슬롯 계산 즉시 반영)
   useFocusEffect(
@@ -602,7 +611,7 @@ const LocationDetailScreen = () => {
                     </View>
                   );
                 }}
-                contentContainerStyle={styles.productsList}
+                contentContainerStyle={[styles.productsList, { paddingBottom: listPaddingBottom }]}
                 scrollEventThrottle={16}
                 onScroll={(e) => {
                   const y = e?.nativeEvent?.contentOffset?.y ?? 0;
@@ -661,6 +670,7 @@ const LocationDetailScreen = () => {
         ref={addProductButtonRef}
         style={[
           styles.addButton,
+          { bottom: floatingBottom },
           !canAddProduct && styles.disabledButton,
         ]}
         onPress={handleAddProduct}
