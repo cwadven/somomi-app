@@ -749,3 +749,23 @@ Test and release → App integrity → App signing → App signing certificate
 3. 나온 경로 확인 후, adb pull "/data/app/.../base.apk" ./somomi-installed.apk
 
 4. 다운로드 받은 api 에서 keytool -printcert -jarfile "./somomi-installed.apk"
+
+
+
+```
+`app.json`
+expo.version: 2.0.0 → 2.0.1
+(runtimeVersion이 appVersion 정책이라, 앞으로 EAS Update는 runtimeVersion=2.0.1로 발행됨)
+
+`a/app/build.gradle`
+versionName: 2.0.0 → 2.0.1
+versionCode: 34 → 35 (Play 업로드/업데이트 가능하게)
+EXPO_RUNTIME_VERSION: exposdk:50.0.0 → 2.0.1
+manifestPlaceholders.expoRuntimeVersion: exposdk:50.0.0 → 2.0.1
+
+`a/app/src/main/strings.xml`
+expo_runtime_version: exposdk:50.0.0 → 2.0.1
+
+`a/app/src/main/AndroidManifest.xml`
+UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY 안의 expo-runtime-version: exposdk:50.0.0 → 2.0.1
+```
