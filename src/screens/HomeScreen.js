@@ -23,14 +23,17 @@ import { useFocusEffect } from '@react-navigation/native';
 import { navigate as rootNavigate } from '../navigation/RootNavigation';
 import { fetchManageTipsApi, fetchPromotionBannersApi } from '../api/promotionApi';
 import { useSelector } from 'react-redux';
+import { checkUnreadGuestNotifications } from '../api/notificationApi';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
-  const { isLoggedIn } = useSelector((state) => state.auth);
+  const { isLoggedIn, isAnonymous, user } = useSelector((state) => state.auth);
+  const isMemberLoggedIn = !!(isLoggedIn && !isAnonymous && user?.memberId);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [exitApp, setExitApp] = useState(false);
   const flatListRef = useRef(null);
+  const [hasUnreadGuest, setHasUnreadGuest] = useState(false);
 
   // 배너 데이터
   const [banners, setBanners] = useState([]);
@@ -176,6 +179,30 @@ const HomeScreen = ({ navigation }) => {
     }, [exitApp])
   );
 
+  // 홈 탭 포커스 시: 읽지 않은 게스트 알림 존재 여부 조회(회원만)
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      (async () => {
+        if (!isMemberLoggedIn) {
+          if (alive) setHasUnreadGuest(false);
+          return;
+        }
+        try {
+          const res = await checkUnreadGuestNotifications();
+          const v =
+            res?.has_unread != null ? !!res.has_unread :
+            res?.hasUnread != null ? !!res.hasUnread :
+            false;
+          if (alive) setHasUnreadGuest(v);
+        } catch (e) {
+          if (alive) setHasUnreadGuest(false);
+        }
+      })();
+      return () => { alive = false; };
+    }, [isMemberLoggedIn])
+  );
+
   // 배너 렌더링
   const renderBanner = ({ item }) => {
     const bg = typeof item?.background_color === 'string' && item.background_color.trim() !== '' ? item.background_color : '#4CAF50';
@@ -270,11 +297,18 @@ const HomeScreen = ({ navigation }) => {
         {isLoggedIn ? (
           <TouchableOpacity
             style={styles.notificationButton}
-            onPress={() => navigation.navigate('MyNotifications')}
+            onPress={() => {
+              // 알림 목록으로 이동하는 순간 UX 상 레드닷은 즉시 내려도 무방(실제 미읽음은 서버 기준)
+              try { setHasUnreadGuest(false); } catch (e) {}
+              navigation.navigate('MyNotifications');
+            }}
             accessibilityRole="button"
             accessibilityLabel="내 알림"
           >
-            <Ionicons name="notifications-outline" size={22} color="#4CAF50" />
+            <View style={styles.notificationIconWrap}>
+              <Ionicons name="notifications-outline" size={22} color="#4CAF50" />
+              {hasUnreadGuest ? <View style={styles.notificationDot} /> : null}
+            </View>
           </TouchableOpacity>
         ) : (
           <View style={{ width: 24 }} />
@@ -379,6 +413,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 2,
     elevation: 2,
+  },
+  notificationIconWrap: {
+    position: 'relative',
+    width: 22,
+    height: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
   },
   bannerSection: {
     position: 'relative',

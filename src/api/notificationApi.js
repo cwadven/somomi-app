@@ -10,6 +10,12 @@ export const fetchGuestNotifications = async ({ size = 20, nextCursor = null } =
   return request(`/v1/notification/guest-notifications${query}`, { method: 'GET' });
 };
 
+// GET /v1/notification/guest-notifications/check
+// → { has_unread: boolean }
+export const checkUnreadGuestNotifications = async () => {
+  return request('/v1/notification/guest-notifications/check', { method: 'GET' });
+};
+
 // GET /v1/notification/guest-notifications/{guest_notification_id}
 // → { id, title, message, is_read, created_at }
 // NOTE: 조회 시 읽음 처리
@@ -20,5 +26,5 @@ export const fetchGuestNotificationDetail = async (guestNotificationId) => {
   return request(`/v1/notification/guest-notifications/${encodeURIComponent(String(guestNotificationId))}`, { method: 'GET' });
 };
 
-export default { fetchGuestNotifications, fetchGuestNotificationDetail };
+export default { fetchGuestNotifications, checkUnreadGuestNotifications, fetchGuestNotificationDetail };
 
