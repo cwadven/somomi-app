@@ -91,35 +91,40 @@ export const fetchProductsByLocation = createAsyncThunk(
 
       // 서버 호출: 전체/특정 카테고리 분기
       if (locId === 'all') {
-        try {
-          const res = await fetchAllInventoryItems({ nextCursor: nextCursorParam, size: sizeParam, sort: sortParam });
-          const items = Array.isArray(res?.guest_inventory_items) ? res.guest_inventory_items : [];
-          const mapped = items.map((it) => ({
-            id: String(it.id),
-            locationId: it.guest_section_id ? String(it.guest_section_id) : null,
-            name: it.name,
-            memo: it.memo || '',
-            brand: it.brand || '',
-            purchasePlace: it.point_of_purchase || '',
-            price: typeof it.purchase_price === 'number' ? it.purchase_price : null,
-            purchaseDate: it.purchase_at || null,
-            iconUrl: it.icon_url || null,
-            estimatedEndDate: it.expected_expire_at || null,
-            expiryDate: it.expire_at || null,
-            createdAt: it.created_at,
-            updatedAt: it.updated_at,
-            isConsumed: false,
-          }));
-          return { 
-            items: mapped, 
-            nextCursor: res?.next_cursor ?? null, 
-            hasMore: !!res?.has_more, 
-            locationId: locId, 
-            append,
-          };
-        } catch (apiErr) {
-          console.warn('전체 인벤토리 API 실패, 로컬 폴백 사용:', apiErr?.message || String(apiErr));
+        // ✅ "모든 제품"은 로컬(AsyncStorage) 폴백 금지: API 결과만 사용
+        // - 로컬 찌꺼기/캐시 때문에 사용자가 혼동하는 문제 방지
+        const state = getState();
+        const isLoggedIn = !!state?.auth?.isLoggedIn;
+        const isAnonymous = !!state?.auth?.isAnonymous;
+        if (!isLoggedIn || isAnonymous) {
+          return rejectWithValue('로그인이 필요합니다.');
         }
+
+        const res = await fetchAllInventoryItems({ nextCursor: nextCursorParam, size: sizeParam, sort: sortParam });
+        const items = Array.isArray(res?.guest_inventory_items) ? res.guest_inventory_items : [];
+        const mapped = items.map((it) => ({
+          id: String(it.id),
+          locationId: it.guest_section_id ? String(it.guest_section_id) : null,
+          name: it.name,
+          memo: it.memo || '',
+          brand: it.brand || '',
+          purchasePlace: it.point_of_purchase || '',
+          price: typeof it.purchase_price === 'number' ? it.purchase_price : null,
+          purchaseDate: it.purchase_at || null,
+          iconUrl: it.icon_url || null,
+          estimatedEndDate: it.expected_expire_at || null,
+          expiryDate: it.expire_at || null,
+          createdAt: it.created_at,
+          updatedAt: it.updated_at,
+          isConsumed: false,
+        }));
+        return {
+          items: mapped,
+          nextCursor: res?.next_cursor ?? null,
+          hasMore: !!res?.has_more,
+          locationId: locId,
+          append,
+        };
       } else {
         try {
           const res = await fetchInventoryItemsBySection(locId, { nextCursor: nextCursorParam, size: sizeParam, sort: sortParam });
@@ -152,30 +157,12 @@ export const fetchProductsByLocation = createAsyncThunk(
         }
       }
 
-      // 폴백: 로컬 저장/상태 기반
+      // 폴백: 로컬 저장/상태 기반 (특정 카테고리만 허용)
+      // NOTE: "모든 제품(all)"은 위에서 API-only로 처리되며, 이 폴백으로 내려오지 않도록 설계됨.
       const { products } = getState().products;
       if (products.length > 0) {
-        if (locId === 'all') {
-          return { items: products, nextCursor: null, hasMore: false, locationId: locId, append: false };
-        } else {
-          return { 
-            items: products.filter(product => 
-              product.locationLocalId === locId || product.locationId === locId
-            ),
-            nextCursor: null,
-            hasMore: false,
-            locationId: locId,
-            append: false
-          };
-        }
-      }
-
-      const storedProducts = await loadProducts();
-      if (locId === 'all') {
-        return { items: storedProducts, nextCursor: null, hasMore: false, locationId: locId, append: false };
-      } else {
-        return { 
-          items: storedProducts.filter(product => 
+        return {
+          items: products.filter(product =>
             product.locationLocalId === locId || product.locationId === locId
           ),
           nextCursor: null,
@@ -184,8 +171,19 @@ export const fetchProductsByLocation = createAsyncThunk(
           append: false
         };
       }
+
+      const storedProducts = await loadProducts();
+      return {
+        items: (storedProducts || []).filter(product =>
+          product.locationLocalId === locId || product.locationId === locId
+        ),
+        nextCursor: null,
+        hasMore: false,
+        locationId: locId,
+        append: false
+      };
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.message || String(error));
     }
   }
 );
@@ -621,8 +619,8 @@ export const productsSlice = createSlice({
         // 초기 로드(append=false)에서만 전역 상태 업데이트
         if (!append) state.status = 'succeeded';
 
-        // 전체 제품 캐시(all) 초기 로드 시만 보강
-        if (!append && state.products.length === 0 && locationId === 'all') {
+        // ✅ "모든 제품(all)"은 서버 결과를 신뢰: 항상 서버값으로 덮어씀 (로컬 찌꺼기 방지)
+        if (!append && locationId === 'all') {
           state.products = items;
         }
 
