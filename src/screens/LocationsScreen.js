@@ -15,6 +15,7 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { fetchGuestSectionsExpiredCount } from '../api/sectionApi';
 import { loadUserLocationTemplateInstances, loadUserProductSlotTemplateInstances } from '../redux/slices/authSlice';
+import { navigate as rootNavigate } from '../navigation/RootNavigation';
 import AlertModal from '../components/AlertModal';
 import SignupPromptModal from '../components/SignupPromptModal';
 import SlotStatusBar from '../components/SlotStatusBar';
@@ -543,7 +544,15 @@ const LocationsScreen = () => {
         <View style={{ width: '100%', marginTop: 16 }}>
           <TouchableOpacity
             style={styles.primaryBtn}
-            onPress={() => navigation.navigate('Profile')}
+            // ✅ 탭 전환 없이, 현재 화면 위로 로그인 스크린을 모달로 띄움
+            onPress={() => {
+              try {
+                // 현재 네비게이터에서 부모(루트)로 라우팅 시도
+                navigation.navigate('RootLogin', { from: 'Locations' });
+                return;
+              } catch (e) {}
+              try { rootNavigate('RootLogin', { from: 'Locations' }); } catch (e) {}
+            }}
           >
             <Text style={styles.primaryBtnText}>로그인 하러 가기</Text>
           </TouchableOpacity>

@@ -120,7 +120,8 @@ const LocationDetailScreen = () => {
       const cachedAlready = locationProductsCache?.[metaKey];
       // ✅ Locations에서 진입한 경우만 캐시가 있으면 초기 fetch를 스킵
       // (딥링크/모달 진입은 "찌꺼기"처럼 보이는 캐시를 피하기 위해 최초 1회는 강제 재조회)
-      if (!forceFetch && Array.isArray(cachedAlready) && cachedAlready.length > 0) {
+      // ✅ 단, "모든 제품(all)"은 계정 전환 시 캐시가 섞이기 쉬워서 캐시 스킵 금지 → 항상 API 재조회
+      if (!isAllProductsView && !forceFetch && Array.isArray(cachedAlready) && cachedAlready.length > 0) {
         didInitialFetchRef.current = true;
         return;
       }

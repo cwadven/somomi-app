@@ -254,6 +254,8 @@ const ProfileScreen = () => {
     setModalContent(null);
     setModalAction(null);
     setModalButtons([
+    // ✅ 버튼 배치: 취소(왼쪽) / 확인(오른쪽)
+    { text: '취소', style: 'cancel', onPress: () => setModalVisible(false) },
     { text: '확인', onPress: async () => {
       setModalVisible(false);
       // ✅ 로그아웃 시 서버의 디바이스 토큰 비활성화(DELETE /v1/push/device-token)
@@ -261,12 +263,10 @@ const ProfileScreen = () => {
       try { await deactivateStoredDeviceToken({ reason: 'logout' }); } catch (e) {}
       try { await AsyncStorage.removeItem('navigation-state'); } catch (e) {}
       try { dispatch(logout()); } catch (e) {}
-      // 로그아웃 후 "내 카테고리" 탭을 첫 화면으로 리셋
-      try {
-        rootNavigate('Locations', { screen: 'LocationsScreen' });
-      } catch (e) {}
-    } },
-    { text: '취소', style: 'cancel', onPress: () => setModalVisible(false) }]
+      // ✅ 로그아웃 후에도 현재 탭(프로필)에 그대로 유지
+      // (내 카테고리로 강제 이동시키면 사용자 입장에서 "왜 탭이 바뀌지?"가 됨)
+    } }
+    ]
     );
     setModalVisible(true);
   };

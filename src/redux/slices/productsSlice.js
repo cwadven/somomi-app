@@ -452,6 +452,19 @@ const initialState = {
   consumedMeta: { nextCursor: null, hasMore: false, sort: '-moved_to_consumed_section' }, // 소진 목록 메타
 };
 
+const createInitialProductsState = () => ({
+  products: [],
+  consumedProducts: [],
+  status: 'idle',
+  consumedStatus: 'idle',
+  consumedLoadingMore: false,
+  error: null,
+  currentProduct: null,
+  locationProducts: {},
+  locationProductsMeta: {},
+  consumedMeta: { nextCursor: null, hasMore: false, sort: '-moved_to_consumed_section' },
+});
+
 export const productsSlice = createSlice({
   name: 'products',
   initialState,
@@ -576,6 +589,10 @@ export const productsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // ✅ 로그아웃 시: 계정 간 캐시 섞임 방지 (A → logout → B 로그인 시 A 제품 노출)
+      .addCase('auth/logout', () => {
+        return createInitialProductsState();
+      })
       // fetchProducts 처리
       .addCase(fetchProducts.pending, (state) => {
         state.status = 'loading';

@@ -138,7 +138,10 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   cancelButton: {
-    backgroundColor: '#F44336',
+    // ✅ "취소"는 위험 액션이 아니므로 연한 회색
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   destructiveButton: {
     backgroundColor: '#F44336',
@@ -157,7 +160,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   cancelButtonText: {
-    color: 'white',
+    color: '#374151',
   },
   destructiveButtonText: {
     color: 'white',
