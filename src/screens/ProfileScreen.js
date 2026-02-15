@@ -659,30 +659,6 @@ const ProfileScreen = () => {
       }
       </View>
 
-      {/* 앱 설정: 로그인 완료 후에만 표시 */}
-      {isLoggedIn && user ?
-    <>
-          {/* 설정 섹션 */}
-          <View style={styles.settingsSection}>
-            <Text style={styles.sectionTitle}>앱 설정</Text>
-
-            <SettingItem
-          icon="notifications-outline"
-          title="알림 설정"
-          onPress={() => setShowNotificationModal(true)} />
-
-
-            {Platform.OS === 'android' &&
-        <SettingItem
-          icon="phone-portrait-outline"
-          title="안드로이드 앱 푸시 설정"
-          onPress={() => openAndroidNotificationSettings()} />
-
-        }
-          </View>
-        </> :
-    null}
-
       {/* 정보 섹션: 일부 항목은 로그인 후에만 표시 */}
       <View style={styles.settingsSection}>
         <Text style={styles.sectionTitle}>정보</Text>
@@ -711,13 +687,6 @@ const ProfileScreen = () => {
           </>
       }
         
-        <SettingItem
-          icon="document-text-outline"
-          title="개인정보처리방침"
-          onPress={() => rootNavigate('PrivacyPolicyWebView', { title: '개인정보처리방침' })}
-        />
-
-        
         {/* 문의하기(미구현): 추후 기능 추가 예정 */}
       </View>
 
@@ -729,6 +698,11 @@ const ProfileScreen = () => {
             icon="flag-outline"
             title="퀘스트"
             onPress={() => navigation.navigate('Quest')}
+          />
+          <SettingItem
+            icon="cart-outline"
+            title="상점"
+            onPress={() => navigation.navigate('Store')}
           />
         </View>
       ) : null}
@@ -770,6 +744,35 @@ const ProfileScreen = () => {
           )}
         </View>
         : null}
+
+      {/* 앱 설정: 로그인 완료 후에만 표시 */}
+      {isLoggedIn && user ? (
+        <View style={styles.settingsSection}>
+          <Text style={styles.sectionTitle}>앱 설정</Text>
+          <SettingItem
+            icon="notifications-outline"
+            title="알림 설정"
+            onPress={() => setShowNotificationModal(true)}
+          />
+          {Platform.OS === 'android' && (
+            <SettingItem
+              icon="phone-portrait-outline"
+              title="안드로이드 앱 푸시 설정"
+              onPress={() => openAndroidNotificationSettings()}
+            />
+          )}
+        </View>
+      ) : null}
+
+      {/* 고객지원 섹션: 항상 표시 */}
+      <View style={styles.settingsSection}>
+        <Text style={styles.sectionTitle}>고객지원</Text>
+        <SettingItem
+          icon="document-text-outline"
+          title="개인정보처리방침"
+          onPress={() => rootNavigate('PrivacyPolicyWebView', { title: '개인정보처리방침' })}
+        />
+      </View>
 
     </ScrollView>;
 

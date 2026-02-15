@@ -1,59 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import {
-
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-
   Modal,
-  FlatList,
-
-  Platform } from
-'react-native';
+} from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import { updateSlots, addPurchase, usePoints, addTemplateInstance } from '../redux/slices/authSlice';
-import { fetchSectionTemplateProducts, fetchPointProducts } from '../api/productApi';
+import { fetchSectionTemplateProducts } from '../api/productApi';
 import { getLocationSlotChipLabels, getDurationChipLabel } from '../utils/badgeLabelUtils';
-import { fetchLocations } from '../redux/slices/locationsSlice';
 import AlertModal from '../components/AlertModal';
 import { fetchAvailablePoint } from '../api/pointApi';
-import { buyPointWithKakao, buyGuestTemplateProductWithPoint } from '../api/paymentApi';
+import { buyGuestTemplateProductWithPoint } from '../api/paymentApi';
 
 const StoreScreen = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
-  const { isLoggedIn, user, slots, points, pointHistory } = useSelector((state) => state.auth);
-  const { locations, status: locationsStatus } = useSelector((state) => state.locations);
-
-  const [showPointHistory, setShowPointHistory] = useState(false);
-  // 카테고리 슬롯 내부에서만 카운트다운 렌더를 트리거하기 위해 전역 타이머는 두지 않습니다.
-
-  // 카테고리 데이터 로드
-  useEffect(() => {
-    if (isLoggedIn) {
-      dispatch(fetchLocations());
-    }
-  }, [dispatch, isLoggedIn]);
+  const { isLoggedIn, slots, points } = useSelector((state) => state.auth);
 
   // 카테고리 슬롯 항목용 카운트다운 전용 컴포넌트(해당 카테고리만 재렌더)
   const SaleEndCountdown = ({ endAt }) => {
@@ -96,25 +64,20 @@ const StoreScreen = () => {
     } catch (_) {}
   };
 
-  // 초기 진입 시 현재 탭 데이터 로드
+  // 초기 진입 시 데이터 로드
   useEffect(() => {
-    fetchDataForTab(activeShopTab);
+    fetchDataForTab('locationSlot');
   }, []);
 
-  // 상점 접근 시 포인트 API 즉시 호출 (포커스마다 실행)
+  // 상점 접근 시 가용 포인트 조회 (포커스마다 실행)
   useFocusEffect(
     React.useCallback(() => {
       let alive = true;
       (async () => {
-        try {
-          const res = await fetchPointProducts();
-          const list = Array.isArray(res?.point_products) ? res.point_products : [];
-          if (alive) setRemotePointProducts(list);
-        } catch (_) {}
         if (isLoggedIn) {
           try {
-            const res2 = await fetchAvailablePoint();
-            const raw = res2?.available_point;
+            const res = await fetchAvailablePoint();
+            const raw = res?.available_point;
             const num = raw != null ? Number(raw) : null;
             const value = num != null && isFinite(num) ? num : null;
             if (alive) setRemotePoint(value);
@@ -124,14 +87,6 @@ const StoreScreen = () => {
       return () => {alive = false;};
     }, [isLoggedIn])
   );
-
-  // 탭 변경 핸들러
-  const handleTabChange = (tab) => {
-    setActiveShopTab(tab);
-    fetchDataForTab(tab);
-  };
-
-  // 가용 포인트 값은 points 탭에서만 동기화함 (위 탭 이펙트에서 처리)
 
   const [remotePoint, setRemotePoint] = useState(null);
 
@@ -145,40 +100,10 @@ const StoreScreen = () => {
     iconColor: ''
   });
   const [purchaseConfirmVisible, setPurchaseConfirmVisible] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null); // kept for compatibility
-  const [selectedItem, setSelectedItem] = useState(null); // new generic selected item
-  const [activeShopTab, setActiveShopTab] = useState('locationSlot'); // 'locationSlot' | 'points'
-  const [pointPurchaseConfirmVisible, setPointPurchaseConfirmVisible] = useState(false);
-  const [selectedPointPackage, setSelectedPointPackage] = useState(null);
-
-  // 구독 플랜 정보 (외부 데이터)
-  // 구독 플랜 제거 (추후 추가 예정)
+  const [selectedItem, setSelectedItem] = useState(null);
 
   // 데이터 주도 방식 카탈로그 (외부 데이터 + 서버)
   const [remoteLocationTemplateProducts, setRemoteLocationTemplateProducts] = useState(null);
-
-  // 포인트 패키지 정보
-  const [remotePointProducts, setRemotePointProducts] = useState(null);
-  const pointPackages = Array.isArray(remotePointProducts) ?
-  remotePointProducts.map((p) => ({
-    id: String(p.product_id),
-    name: p.title,
-    price: typeof p.price === 'number' ? p.price.toLocaleString() + '원' : String(p.price),
-    points: typeof p.point === 'number' ? p.point : 0,
-    saleEndAt: p.end_at || null,
-    bonus: 0
-  })) :
-  [];
-
-  // 제품 슬롯(Inventory Item Template) 상품 목록
-  // (제거) 제품 슬롯 상품
-
-  // 포인트 상품은 points 탭에서만 로드 (위 탭 이펙트에서 처리)
-
-  // 제품 슬롯 상품은 productSlot 탭에서만 로드 (위 탭 이펙트에서 처리)
-
-  // 구독 구매 처리
-  // 구독 플랜 제거
 
   // 카탈로그 아이템 구매 처리(슬롯/스페셜/번들 등 확장형)
   const handlePurchaseItem = (item) => {
@@ -192,133 +117,79 @@ const StoreScreen = () => {
   };
 
   // 구매 확정 처리
-  const confirmPurchase = () => {
+  const confirmPurchase = async () => {
     setPurchaseConfirmVisible(false);
 
-    const item = selectedItem || selectedProduct;
+    const item = selectedItem;
     if (!item) return;
 
     try {
-      // 포인트 차감
+      // 서버 포인트 결제 API 호출
+      await buyGuestTemplateProductWithPoint(Number(item.id));
+
+      // 성공 시 로컬 상태 반영
       const pointCost = typeof item.realPointPrice === 'number' ? item.realPointPrice : typeof item.pointPrice === 'number' ? item.pointPrice : 0;
-      const effectiveBalanceRaw = remotePoint != null ? Number(remotePoint) : Number(points.balance);
-      const effectiveBalance = isFinite(effectiveBalanceRaw) ? effectiveBalanceRaw : 0;
 
-      // 포인트가 부족한 경우
-      if (effectiveBalance < pointCost) {
-        showErrorModal(`G가 부족합니다.\n현재 G: ${effectiveBalance.toLocaleString()}G\n필요 G: ${pointCost.toLocaleString()}G`);
-        return;
-      }
+      dispatch(usePoints({
+        amount: pointCost,
+        description: `${item.name} 구매`,
+        itemId: item.id,
+        itemType: 'slot'
+      }));
 
-      if (item.category === 'locationTemplateBundle' || item.category === 'locationTemplateSpecial') {
-        // 포인트 사용 - usePoints 액션 호출
-        dispatch(usePoints({
-          amount: pointCost,
-          description: `${item.name} 구매`,
-          itemId: item.id,
-          itemType: 'slot'
-        }));
-
-        // 슬롯/템플릿 구매 처리 (데이터주도)
-        // 서버 포인트 결제 API 호출 (게스트 템플릿 상품)
-        buyGuestTemplateProductWithPoint(Number(item.id)).catch((e) => {
-          const msg = e?.response?.data?.message || '포인트 결제 중 오류가 발생했습니다.';
-          showErrorModal(msg);
-        });
-        if (item.category === 'locationTemplateBundle') {
-          const templates = Array.isArray(item.templates) ? item.templates : [];
-          const count = templates.length;
-          // slots counter 업데이트
-          dispatch(updateSlots({ locationSlots: { additionalSlots: slots.locationSlots.additionalSlots + count } }));
-          for (const t of templates) {
-            const baseSlots = t && typeof t.feature?.baseSlots === 'number' ? t.feature.baseSlots : 3;
-            const displayName = t?.locationTemplateName || '기본 카테고리';
-            dispatch(addTemplateInstance({
-              productId: t?.locationTemplateId || 'basic_location',
-              name: displayName,
-              description: '기본적인 제품 관리 기능을 제공하는 카테고리',
-              icon: 'cube-outline',
-              feature: { baseSlots },
-              used: false,
-              usedInLocationId: null
-            }));
-          }
-          showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.`);
-          dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: count }));
-          // 구매 후 가용 포인트 최신화
-          fetchAvailablePoint().
-          then((res) => {
-            const raw = res?.available_point;
-            const num = raw != null ? Number(raw) : null;
-            const value = num != null && isFinite(num) ? num : null;
-            setRemotePoint(value);
-          }).
-          catch(() => {});
-        }
-        if (item.category === 'locationTemplateSpecial') {
-          const specialTemplate = Array.isArray(item.templates) && item.templates[0] ? item.templates[0] : null;
-          const days = specialTemplate?.feature?.validWhile && specialTemplate.feature.validWhile.expiresAt ? null : specialTemplate?.durationDays || 30;
-          const baseSlots = specialTemplate && typeof specialTemplate.feature?.baseSlots === 'number' ? specialTemplate.feature.baseSlots : -1;
-          const expiresAt = specialTemplate?.feature?.validWhile && specialTemplate.feature.validWhile.expiresAt || new Date(Date.now() + (days || 0) * 24 * 60 * 60 * 1000).toISOString();
-          // slots counter 업데이트(스페셜 카테고리도 하나의 추가 카테고리로 카운트)
-          dispatch(updateSlots({ locationSlots: { additionalSlots: slots.locationSlots.additionalSlots + 1 } }));
+      if (item.category === 'locationTemplateBundle') {
+        const templates = Array.isArray(item.templates) ? item.templates : [];
+        const count = templates.length;
+        dispatch(updateSlots({ locationSlots: { additionalSlots: slots.locationSlots.additionalSlots + count } }));
+        for (const t of templates) {
+          const baseSlots = t && typeof t.feature?.baseSlots === 'number' ? t.feature.baseSlots : 3;
+          const displayName = t?.locationTemplateName || '기본 카테고리';
           dispatch(addTemplateInstance({
-            productId: specialTemplate?.locationTemplateId || 'special_location',
-            name: specialTemplate?.locationTemplateName || '스페셜 카테고리',
-            description: days ? `${days}일 유효` : '기간 제한 없음',
-            icon: 'star',
-            feature: { baseSlots, validWhile: { type: 'fixed', expiresAt } },
+            productId: t?.locationTemplateId || 'basic_location',
+            name: displayName,
+            description: '기본적인 제품 관리 기능을 제공하는 카테고리',
+            icon: 'cube-outline',
+            feature: { baseSlots },
             used: false,
             usedInLocationId: null
           }));
-          showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.\n유효기간: ${days}일`);
-          dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: 1 }));
-          // 구매 후 가용 포인트 최신화
-          fetchAvailablePoint().
-          then((res) => {
-            const raw = res?.available_point;
-            const num = raw != null ? Number(raw) : null;
-            const value = num != null && isFinite(num) ? num : null;
-            setRemotePoint(value);
-          }).
-          catch(() => {});
         }
+        dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: count }));
+        showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.`);
+      } else if (item.category === 'locationTemplateSpecial') {
+        const specialTemplate = Array.isArray(item.templates) && item.templates[0] ? item.templates[0] : null;
+        const days = specialTemplate?.feature?.validWhile && specialTemplate.feature.validWhile.expiresAt ? null : specialTemplate?.durationDays || 30;
+        const baseSlots = specialTemplate && typeof specialTemplate.feature?.baseSlots === 'number' ? specialTemplate.feature.baseSlots : -1;
+        const expiresAt = specialTemplate?.feature?.validWhile && specialTemplate.feature.validWhile.expiresAt || new Date(Date.now() + (days || 0) * 24 * 60 * 60 * 1000).toISOString();
+        dispatch(updateSlots({ locationSlots: { additionalSlots: slots.locationSlots.additionalSlots + 1 } }));
+        dispatch(addTemplateInstance({
+          productId: specialTemplate?.locationTemplateId || 'special_location',
+          name: specialTemplate?.locationTemplateName || '스페셜 카테고리',
+          description: days ? `${days}일 유효` : '기간 제한 없음',
+          icon: 'star',
+          feature: { baseSlots, validWhile: { type: 'fixed', expiresAt } },
+          used: false,
+          usedInLocationId: null
+        }));
+        dispatch(addPurchase({ id: `slot_${Date.now()}`, type: 'slot', itemId: item.id, itemName: item.name, price: pointCost, pointsUsed: pointCost, amount: 1 }));
+        showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.`);
+      } else {
+        showSuccessModal('구매 완료', `${item.name} 구매가 완료되었습니다.`);
       }
+
+      // 구매 후 가용 포인트 최신화
+      try {
+        const res = await fetchAvailablePoint();
+        const raw = res?.available_point;
+        const num = raw != null ? Number(raw) : null;
+        const value = num != null && isFinite(num) ? num : null;
+        setRemotePoint(value);
+      } catch (_) {}
+
+      // 상품 목록 최신화
+      try { await fetchDataForTab('locationSlot'); } catch (_) {}
     } catch (error) {
-      console.log('error', error);
-      showErrorModal('구매 처리 중 오류가 발생했습니다.');
-    }
-  };
-
-  // 포인트 충전 처리
-  const handlePurchasePoints = (pkg) => {
-    if (!isLoggedIn) {
-      goToProfileTab();
-      return;
-    }
-
-    setSelectedPointPackage(pkg);
-    setPointPurchaseConfirmVisible(true);
-  };
-
-  // 포인트 구매 확정 처리
-  const confirmPointPurchase = async () => {
-    setPointPurchaseConfirmVisible(false);
-    if (!selectedPointPackage) return;
-    try {
-      const res = await buyPointWithKakao(Number(selectedPointPackage.id));
-      const appUrl = res?.next_redirect_app_url || null;
-      const mobileUrl = res?.next_redirect_mobile_url || null;
-      const pcUrl = res?.next_redirect_pc_url || null;
-      // 웹뷰 기반 플로우 권장: Android는 mobile 우선(내장 WebView에서 진행), 웹은 pc, iOS는 mobile 우선
-      const url = Platform.OS === 'web' ?
-      pcUrl || mobileUrl || appUrl :
-      Platform.OS === 'android' ? mobileUrl || appUrl || pcUrl : mobileUrl || appUrl || pcUrl;
-      if (!url) {showErrorModal('결제 페이지로 이동할 수 없습니다.');return;}
-      // 앱 내 웹뷰로 이동
-      navigation.navigate('PaymentWebView', { url });
-    } catch (error) {
-      const msg = error?.response?.data?.message || '결제 요청 중 오류가 발생했습니다.';
+      const msg = error?.response?.data?.message || error?.message || '구매 처리 중 오류가 발생했습니다.';
       showErrorModal(msg);
     }
   };
@@ -349,7 +220,7 @@ const StoreScreen = () => {
 
   // 구매 확인 모달
   const PurchaseConfirmModal = () => {
-    const item = selectedItem || selectedProduct;
+    const item = selectedItem;
     if (!item) return null;
 
     return (
@@ -375,11 +246,11 @@ const StoreScreen = () => {
               <Text style={styles.modalProductName}>{item.name}</Text>
               {item.originalPointPrice != null && item.realPointPrice != null && item.originalPointPrice !== item.realPointPrice ?
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={[styles.modalProductPriceOriginal, styles.strike]}>{item.originalPointPrice.toLocaleString()}G</Text>
-                  <Text style={styles.modalProductPriceReal}>{item.realPointPrice.toLocaleString()}G</Text>
+                  <Text style={[styles.modalProductPriceOriginal, styles.strike]}>{item.originalPointPrice.toLocaleString()}P</Text>
+                  <Text style={styles.modalProductPriceReal}>{item.realPointPrice.toLocaleString()}P</Text>
                 </View> :
 
-              <Text style={styles.modalProductPrice}>{(item.originalPointPrice ?? item.realPointPrice ?? item.pointPrice).toLocaleString()}G</Text>
+              <Text style={styles.modalProductPrice}>{(item.originalPointPrice ?? item.realPointPrice ?? item.pointPrice).toLocaleString()}P</Text>
               }
               
               {(item.category === 'locationTemplateBundle' || item.category === 'locationTemplateSpecial') &&
@@ -396,8 +267,8 @@ const StoreScreen = () => {
                   const after = Math.max(0, effectiveBalance - pointCost);
                   return (
                     <>
-                      <Text style={styles.pointInfoText}>현재 G: {effectiveBalance.toLocaleString()}G</Text>
-                      <Text style={styles.pointInfoText}>구매 후 G: {after.toLocaleString()}G</Text>
+                      <Text style={styles.pointInfoText}>현재 P: {effectiveBalance.toLocaleString()}P</Text>
+                      <Text style={styles.pointInfoText}>구매 후 P: {after.toLocaleString()}P</Text>
                     </>);
 
                 })()}
@@ -431,64 +302,6 @@ const StoreScreen = () => {
       </Modal>);
 
   };
-
-  // 포인트 구매 확인 모달
-  const PointPurchaseConfirmModal = () => {
-    if (!pointPurchaseConfirmVisible || !selectedPointPackage) return null;
-
-    return (
-      <Modal
-        visible={true}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setPointPurchaseConfirmVisible(false)}>
-
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>G 구매 확인</Text>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setPointPurchaseConfirmVisible(false)}>
-
-                <Ionicons name="close" size={24} color="#999" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.modalContent}>
-              <Text style={styles.modalProductName}>{selectedPointPackage.name}</Text>
-              <Text style={styles.modalProductPrice}>{selectedPointPackage.price}</Text>
-              
-              <Text style={styles.modalDescription}>
-                결제 후 즉시 젬이 충전됩니다.
-              </Text>
-              
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.modalCancelButton]}
-                  onPress={() => setPointPurchaseConfirmVisible(false)}>
-
-                  <Text style={styles.modalCancelButtonText}>취소</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.modalConfirmButton]}
-                  onPress={confirmPointPurchase}>
-
-                  <Text style={styles.modalConfirmButtonText}>결제하기</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>);
-
-  };
-
-  // 구독 플랜 렌더링
-  // 구독 플랜 렌더 제거
-
-  // (제거) 슬롯 기본 카탈로그 렌더링은 더 이상 사용하지 않음
 
   // 카테고리 슬롯만 렌더링
   const renderLocationSlotItems = () => {
@@ -564,11 +377,11 @@ const StoreScreen = () => {
             <View style={styles.slotTileRight}>
               {item.originalPointPrice != null && item.realPointPrice != null && item.originalPointPrice !== item.realPointPrice ?
             <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[styles.slotPriceOriginal, styles.strike]}>{item.originalPointPrice.toLocaleString()}G</Text>
-                  <Text style={styles.slotPriceReal}>{item.realPointPrice.toLocaleString()}G</Text>
+                  <Text style={[styles.slotPriceOriginal, styles.strike]}>{item.originalPointPrice.toLocaleString()}P</Text>
+                  <Text style={styles.slotPriceReal}>{item.realPointPrice.toLocaleString()}P</Text>
                 </View> :
 
-            <Text style={styles.slotPrice}>{(item.originalPointPrice ?? item.realPointPrice ?? item.pointPrice).toLocaleString()}G</Text>
+            <Text style={styles.slotPrice}>{(item.originalPointPrice ?? item.realPointPrice ?? item.pointPrice).toLocaleString()}P</Text>
             }
               <TouchableOpacity style={[styles.slotBuyButton, { marginTop: 6 }]} onPress={() => handlePurchaseItem(item)}>
                 <Ionicons name="cart" size={16} color="#fff" />
@@ -580,110 +393,6 @@ const StoreScreen = () => {
       </View>);
 
   };
-
-  // (제거) 제품 슬롯 렌더링
-
-  // 포인트 패키지 렌더링
-  const renderPointPackages = () => {
-    return (
-      <View style={styles.pointPackagesColumn}>
-        {pointPackages.map((pkg) =>
-        <TouchableOpacity
-          key={pkg.id}
-          style={styles.pointPackageCard}
-          onPress={() => handlePurchasePoints(pkg)}>
-
-            {/* 포인트 표시는 번개 아이콘 + G 표기로 통일 */}
-            <View style={styles.pointPackageMiddle}>
-              <Ionicons name="flash" size={20} color="#4CAF50" />
-              <Text style={styles.pointPackagePoints}>{(pkg.points || 0).toLocaleString()} G</Text>
-            </View>
-            <View style={styles.pointPackageFooter}>
-              <View style={styles.priceChip}>
-                <Text style={styles.priceChipText}>{pkg.price}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#4CAF50" />
-            </View>
-          </TouchableOpacity>
-        )}
-      </View>);
-
-  };
-
-  // 포인트 내역 렌더링
-  const renderPointHistoryItem = ({ item }) => {
-    const isAdd = item.type === 'add';
-
-    return (
-      <View style={styles.historyItem}>
-        <View style={styles.historyItemLeft}>
-          <Ionicons
-            name={isAdd ? 'add-circle' : 'remove-circle'}
-            size={24}
-            color={isAdd ? '#4CAF50' : '#F44336'} />
-
-          <View style={styles.historyItemInfo}>
-            <Text style={styles.historyItemDescription}>{item.description}</Text>
-            <Text style={styles.historyItemDate}>
-              {new Date(item.date).toLocaleDateString()} {new Date(item.date).toLocaleTimeString()}
-            </Text>
-          </View>
-        </View>
-        <Text style={[
-        styles.historyItemAmount,
-        isAdd ? styles.historyItemAmountAdd : styles.historyItemAmountUse]
-        }>
-          {isAdd ? '+' : '-'}{item.amount.toLocaleString()}G
-        </Text>
-      </View>);
-
-  };
-
-  // 현재 슬롯 상태 표시
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // 포인트 화면으로 이동
-
-
-
 
   // 프로필 메인 탭으로 이동 (탭 포커스)
   const goToProfileTab = () => {
@@ -733,7 +442,7 @@ const StoreScreen = () => {
             <Ionicons name="lock-closed" size={40} color="#999" />
             <Text style={styles.loginPromptTitle}>로그인이 필요합니다</Text>
             <Text style={styles.loginPromptText}>
-              카테고리 슬롯 구매 및 G 충전을 위해 로그인이 필요합니다.
+              카테고리 슬롯 구매를 위해 로그인이 필요합니다.
             </Text>
             <TouchableOpacity
             style={styles.loginButton}
@@ -748,13 +457,13 @@ const StoreScreen = () => {
         {isLoggedIn &&
         <View style={[styles.pointInfoContainer, { marginTop: 12 }]}>
             <View style={styles.pointInfoHeader}>
-              <Text style={styles.pointInfoTitle}>보유 G</Text>
+              <Text style={styles.pointInfoTitle}>보유 P</Text>
             </View>
             {(() => {
             const val = remotePoint != null ? Number(remotePoint) : Number(points.balance);
             const isLoadingPoint = !isFinite(val) || remotePoint === null; // API 호출 전(null)
             return (
-              <Text style={styles.pointInfoValue}>{isLoadingPoint ? '-' : val.toLocaleString() + 'G'}</Text>);
+              <Text style={styles.pointInfoValue}>{isLoadingPoint ? '-' : val.toLocaleString() + 'P'}</Text>);
 
           })()}
           </View>
@@ -762,74 +471,15 @@ const StoreScreen = () => {
         
         {/* 현재 슬롯 상태 숨김 */}
 
-        {/* 상점 탭 (사용자 기본 정보 아래) */}
-        <View style={styles.shopTabsContainer}>
-          <View style={styles.shopTabs}>
-            <TouchableOpacity
-              style={[styles.shopTabItem, activeShopTab === 'locationSlot' && styles.shopTabItemActive]}
-              onPress={() => handleTabChange('locationSlot')}>
-
-              <Text style={[styles.shopTabText, activeShopTab === 'locationSlot' && styles.shopTabTextActive]}>카테고리 슬롯</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.shopTabItem, activeShopTab === 'points' && styles.shopTabItemActive]}
-              onPress={() => handleTabChange('points')}>
-
-              <Text style={[styles.shopTabText, activeShopTab === 'points' && styles.shopTabTextActive]}>G 충전</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        {/* 탭 내용 */}
-        {activeShopTab === 'locationSlot' &&
+        {/* 카테고리 슬롯 상품 목록 */}
         <View style={styles.section}>
-            <Text style={styles.sectionTitle}>카테고리 슬롯</Text>
-            {renderLocationSlotItems()}
-          </View>
-        }
-
-        {activeShopTab === 'points' &&
-        <View style={[styles.section, styles.pointChargeSection]}>
-          <Text style={styles.sectionTitle}>G 충전</Text>
-          {renderPointPackages()}
-          
-          {isLoggedIn && pointHistory.length > 0 &&
-          <TouchableOpacity
-            style={styles.historyToggleButton}
-            onPress={() => setShowPointHistory(!showPointHistory)}>
-
-              <Text style={styles.historyToggleText}>
-                {showPointHistory ? '내역 접기' : 'G 내역 자세히 보기'}
-              </Text>
-              <Ionicons
-              name={showPointHistory ? 'chevron-up' : 'chevron-down'}
-              size={16}
-              color="#4CAF50" />
-
-            </TouchableOpacity>
-          }
-          
-          {isLoggedIn && pointHistory.length > 0 && showPointHistory &&
-          <View style={styles.historyContainer}>
-              <Text style={styles.historyTitle}>G 내역</Text>
-              <FlatList
-              data={pointHistory}
-              renderItem={renderPointHistoryItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-              style={styles.historyList} />
-
-            </View>
-          }
+          <Text style={styles.sectionTitle}>카테고리 슬롯</Text>
+          {renderLocationSlotItems()}
         </View>
-        }
-        
-        {/* 포인트 내역 섹션 - 제거 */}
       </ScrollView>
       
       {/* 모달 */}
       <PurchaseConfirmModal />
-      <PointPurchaseConfirmModal />
       
       <AlertModal
         visible={alertModalVisible}
@@ -1249,7 +899,7 @@ const styles = StyleSheet.create({
   modalProductPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#333',
     marginBottom: 16,
     alignSelf: 'stretch',
     textAlign: 'left'
@@ -1335,7 +985,7 @@ const styles = StyleSheet.create({
   pointInfoValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#4CAF50'
+    color: '#333'
   },
   chargeButton: {
     backgroundColor: '#2196F3',
@@ -1361,7 +1011,7 @@ const styles = StyleSheet.create({
   },
   pointInfoText: {
     fontSize: 15,
-    color: '#2E7D32',
+    color: '#333',
     fontWeight: '600',
     marginBottom: 6
   },
