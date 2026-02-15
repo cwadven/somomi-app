@@ -15,15 +15,15 @@ import { fetchQuests, completeQuest } from '../api/questApi';
 const TABS = [
   { key: 'daily', label: '일일' },
   { key: 'weekly', label: '주간' },
-  { key: 'hidden', label: '스페셜' },
+  { key: 'special', label: '스페셜' },
 ];
 
 const QuestScreen = () => {
   const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState('daily');
-  const [quests, setQuests] = useState({ daily: [], weekly: [], hidden: [] });
-  const [loading, setLoading] = useState({ daily: false, weekly: false, hidden: false });
-  const [error, setError] = useState({ daily: false, weekly: false, hidden: false });
+  const [quests, setQuests] = useState({ daily: [], weekly: [], special: [] });
+  const [loading, setLoading] = useState({ daily: false, weekly: false, special: false });
+  const [error, setError] = useState({ daily: false, weekly: false, special: false });
   const [completing, setCompleting] = useState(null); // 완료 처리 중인 quest_id
   // TODO: 무한스크롤 페이지네이션 — API에 커서/페이지 파라미터 추가 시 활성화
   // const [meta, setMeta] = useState({ daily: { nextCursor: null, hasMore: false }, ... });
