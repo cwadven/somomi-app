@@ -46,6 +46,7 @@ import PaymentWebViewScreen from '../screens/PaymentWebViewScreen';
 import ContentWebViewScreen from '../screens/ContentWebViewScreen';
 import ExternalWebViewScreen from '../screens/ExternalWebViewScreen';
 import PrivacyPolicyWebViewScreen from '../screens/PrivacyPolicyWebViewScreen';
+import PointScreen from '../screens/PointScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -170,9 +171,14 @@ const ProfileStack = () => {
         component={ProfileScreen} 
         options={{ title: '프로필', headerShown: false }}
       />
-      <Stack.Screen 
-        name="ConsumedProducts" 
-        component={ConsumedProductsScreen} 
+      <Stack.Screen
+        name="Point"
+        component={PointScreen}
+        options={{ title: '포인트', headerShown: false }}
+      />
+      <Stack.Screen
+        name="ConsumedProducts"
+        component={ConsumedProductsScreen}
         options={{ title: '소진 처리된 상품', headerShown: false }}
       />
       <Stack.Screen 

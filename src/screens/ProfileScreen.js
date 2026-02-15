@@ -659,8 +659,6 @@ const ProfileScreen = () => {
       }
       </View>
 
-      {/* 앱푸시 테스트 섹션 제거 */}
-
       {/* 앱 설정: 로그인 완료 후에만 표시 */}
       {isLoggedIn && user ?
     <>
@@ -691,6 +689,11 @@ const ProfileScreen = () => {
         
         {isLoggedIn && user &&
       <>
+            <SettingItem
+          icon="wallet-outline"
+          title="포인트"
+          onPress={() => navigation.navigate('Point')} />
+
             <SettingItem
           icon="checkmark-done-circle-outline"
           title="소진 처리한 상품 목록"
