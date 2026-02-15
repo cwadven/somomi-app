@@ -47,6 +47,7 @@ import ContentWebViewScreen from '../screens/ContentWebViewScreen';
 import ExternalWebViewScreen from '../screens/ExternalWebViewScreen';
 import PrivacyPolicyWebViewScreen from '../screens/PrivacyPolicyWebViewScreen';
 import PointScreen from '../screens/PointScreen';
+import QuestScreen from '../screens/QuestScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -175,6 +176,11 @@ const ProfileStack = () => {
         name="Point"
         component={PointScreen}
         options={{ title: '포인트', headerShown: false }}
+      />
+      <Stack.Screen
+        name="Quest"
+        component={QuestScreen}
+        options={{ title: '퀘스트', headerShown: false }}
       />
       <Stack.Screen
         name="ConsumedProducts"

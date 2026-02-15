@@ -721,6 +721,18 @@ const ProfileScreen = () => {
         {/* 문의하기(미구현): 추후 기능 추가 예정 */}
       </View>
 
+      {/* 활동 섹션: 로그인 완료 후에만 표시 */}
+      {isLoggedIn && user ? (
+        <View style={styles.settingsSection}>
+          <Text style={styles.sectionTitle}>활동</Text>
+          <SettingItem
+            icon="flag-outline"
+            title="퀘스트"
+            onPress={() => navigation.navigate('Quest')}
+          />
+        </View>
+      ) : null}
+
       {/* 광고 섹션: 로그인 완료 후에만 표시 */}
       {isLoggedIn && user ?
         <View style={styles.settingsSection}>
