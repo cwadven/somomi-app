@@ -10,19 +10,48 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { fetchAvailablePoint } from '../api/pointApi';
+import { fetchAvailablePoint, fetchPointHistory } from '../api/pointApi';
+
+const PAGE_SIZE = 20;
+
+const formatDateTime = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const d = new Date(dateString);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${y}.${m}.${day} ${h}:${min}`;
+  } catch {
+    return dateString;
+  }
+};
+
+const formatDateShort = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const d = new Date(dateString);
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${m}.${day}`;
+  } catch {
+    return dateString;
+  }
+};
 
 const PointScreen = () => {
   const navigation = useNavigation();
   const [availablePoint, setAvailablePoint] = useState(null);
   const [pointLoading, setPointLoading] = useState(true);
 
-  // TODO: 포인트 내역 API 연동 시 활성화
-  // const [history, setHistory] = useState([]);
-  // const [historyLoading, setHistoryLoading] = useState(false);
-  // const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
-  // const [historyMeta, setHistoryMeta] = useState({ nextCursor: null, hasMore: false });
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [historyMeta, setHistoryMeta] = useState({ nextCursor: null, hasMore: false });
 
+  // 보유 포인트 조회
   useEffect(() => {
     let mounted = true;
     const run = async () => {
@@ -40,41 +69,87 @@ const PointScreen = () => {
     return () => { mounted = false; };
   }, []);
 
-  // TODO: 포인트 내역 API 연동 시 무한 스크롤 핸들러
-  // const loadMore = useCallback(() => {
-  //   if (historyLoadingMore) return;
-  //   if (!historyMeta?.hasMore) return;
-  //   // dispatch or API call with historyMeta.nextCursor
-  // }, [historyLoadingMore, historyMeta]);
+  // 포인트 내역 첫 페이지 로드
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      try {
+        setHistoryLoading(true);
+        const res = await fetchPointHistory({ size: PAGE_SIZE });
+        if (!mounted) return;
+        const items = Array.isArray(res?.guest_point_items) ? res.guest_point_items : [];
+        setHistory(items);
+        setHistoryMeta({ nextCursor: res?.next_cursor || null, hasMore: !!res?.has_more });
+      } catch (e) {
+        if (mounted) setHistory([]);
+      } finally {
+        if (mounted) setHistoryLoading(false);
+      }
+    };
+    run();
+    return () => { mounted = false; };
+  }, []);
+
+  // 무한스크롤 다음 페이지
+  const loadMore = useCallback(async () => {
+    if (historyLoadingMore) return;
+    if (!historyMeta?.hasMore) return;
+    setHistoryLoadingMore(true);
+    try {
+      const res = await fetchPointHistory({ nextCursor: historyMeta.nextCursor, size: PAGE_SIZE });
+      const items = Array.isArray(res?.guest_point_items) ? res.guest_point_items : [];
+      setHistory((prev) => [...prev, ...items]);
+      setHistoryMeta({ nextCursor: res?.next_cursor || null, hasMore: !!res?.has_more });
+    } catch (e) {
+      // 무시
+    } finally {
+      setHistoryLoadingMore(false);
+    }
+  }, [historyLoadingMore, historyMeta]);
 
   const renderHistoryItem = ({ item }) => {
-    const isEarn = item.type === 'earn';
+    const isPositive = item.point >= 0;
+    const color = isPositive ? '#4CAF50' : '#F44336';
+    const sign = isPositive ? '+' : '';
+
     return (
       <View style={styles.historyItem}>
         <View style={styles.historyIconWrap}>
           <Ionicons
-            name={isEarn ? 'add-circle-outline' : 'remove-circle-outline'}
+            name={isPositive ? 'add-circle-outline' : 'remove-circle-outline'}
             size={24}
-            color={isEarn ? '#4CAF50' : '#F44336'}
+            color={color}
           />
         </View>
         <View style={styles.historyInfo}>
-          <Text style={styles.historyDesc}>{item.description || (isEarn ? '포인트 적립' : '포인트 사용')}</Text>
-          <Text style={styles.historyDate}>{item.date || ''}</Text>
+          <Text style={styles.historyReason}>{item.reason}</Text>
+          <Text style={styles.historyDate}>{formatDateTime(item.created_at)}</Text>
+          {(item.valid_from || item.valid_until) ? (
+            <Text style={styles.historyValidity}>
+              {item.valid_from && item.valid_until
+                ? `${formatDateShort(item.valid_from)} ~ ${formatDateShort(item.valid_until)}`
+                : item.valid_from
+                  ? `${formatDateShort(item.valid_from)}부터`
+                  : `${formatDateShort(item.valid_until)}까지`}
+            </Text>
+          ) : null}
         </View>
-        <Text style={[styles.historyAmount, { color: isEarn ? '#4CAF50' : '#F44336' }]}>
-          {isEarn ? '+' : '-'}{Number(item.amount || 0).toLocaleString()} P
+        <Text style={[styles.historyAmount, { color }]}>
+          {sign}{Number(item.point).toLocaleString()} P
         </Text>
       </View>
     );
   };
 
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="receipt-outline" size={52} color="#BDBDBD" />
-      <Text style={styles.emptyText}>포인트 내역이 없습니다.</Text>
-    </View>
-  );
+  const renderEmpty = () => {
+    if (historyLoading) return null;
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="receipt-outline" size={52} color="#BDBDBD" />
+        <Text style={styles.emptyText}>포인트 내역이 없습니다.</Text>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -104,20 +179,26 @@ const PointScreen = () => {
         <Text style={styles.historyTitle}>포인트 내역</Text>
       </View>
 
-      <FlatList
-        data={[]}
-        renderItem={renderHistoryItem}
-        keyExtractor={(item) => String(item.id)}
-        ListEmptyComponent={renderEmpty}
-        contentContainerStyle={styles.listContent}
-        onEndReachedThreshold={0.3}
-        // onEndReached={loadMore}
-        // ListFooterComponent={historyLoadingMore ? (
-        //   <View style={{ paddingVertical: 16 }}>
-        //     <ActivityIndicator size="small" color="#4CAF50" />
-        //   </View>
-        // ) : null}
-      />
+      {historyLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+        </View>
+      ) : (
+        <FlatList
+          data={history}
+          renderItem={renderHistoryItem}
+          keyExtractor={(item) => String(item.id)}
+          ListEmptyComponent={renderEmpty}
+          contentContainerStyle={styles.listContent}
+          onEndReachedThreshold={0.3}
+          onEndReached={loadMore}
+          ListFooterComponent={historyLoadingMore ? (
+            <View style={{ paddingVertical: 16 }}>
+              <ActivityIndicator size="small" color="#4CAF50" />
+            </View>
+          ) : null}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -184,6 +265,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#666',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   listContent: {
     flexGrow: 1,
     paddingHorizontal: 16,
@@ -204,7 +290,7 @@ const styles = StyleSheet.create({
   historyInfo: {
     flex: 1,
   },
-  historyDesc: {
+  historyReason: {
     fontSize: 14,
     color: '#333',
     fontWeight: '500',
@@ -212,6 +298,11 @@ const styles = StyleSheet.create({
   historyDate: {
     fontSize: 12,
     color: '#9E9E9E',
+    marginTop: 2,
+  },
+  historyValidity: {
+    fontSize: 11,
+    color: '#FF9800',
     marginTop: 2,
   },
   historyAmount: {
